@@ -1,563 +1,459 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useEffect, useMemo, useState } from "react";
 import {
-  NavigationIcon,
-  ClockIcon,
-  MapPinIcon,
-  TruckIcon,
-  BatteryIcon,
-  SignalIcon,
-  PlayIcon,
-  SquareIcon,
-  AlertTriangleIcon,
-  HomeIcon,
-  ChevronLeftIcon,
-  PackageIcon
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useDriverTracking } from '@/contexts/DriverTrackingContext';
-import { DriverStatus } from '@/types/user';
-import DriverLiveMap from '@/components/Driver/DriverLiveMap';
-import { DeliveryStatusControl } from '@/components/Driver/DeliveryStatusControl';
+  CheckCircle2,
+  CloudOff,
+  MapPin,
+  Navigation2,
+  Play,
+  Settings,
+  Square,
+  TriangleAlert,
+  Truck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { DriverStatus } from "@/types/user";
+import DriverLiveMap from "@/components/Driver/DriverLiveMap";
+import {
+  DriverButton,
+  DriverCard,
+  DriverScreen,
+  HealthBar,
+  NextAction,
+  StateBlock,
+  StatusPill,
+  TypeBadge,
+  formatDuration,
+  getDriverNextActionLabel,
+  getNextStatus,
+  getStatusProgress,
+} from "@/components/Driver/ui";
+import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 
-interface DriverTrackingPortalProps {
-  className?: string;
+interface PodTarget {
+  deliveryId: string;
+  orderNumber: string;
 }
 
-export default function DriverTrackingPortal({ className }: DriverTrackingPortalProps) {
+export default function DriverTrackingPortal() {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-  const [updatingDeliveryId, setUpdatingDeliveryId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
 
-  // Use the global tracking context - this persists across page navigations
   const {
-    // Location tracking
     currentLocation,
     isTracking,
     accuracy,
     locationError,
     isRealtimeConnected,
-    isRealtimeEnabled,
     connectionMode,
     permissionState,
     isRequestingPermission,
     startTracking,
     stopTracking,
     requestLocationPermission,
-
-    // Shift management
     currentShift,
     isShiftActive,
     shiftLoading,
     shiftError,
     startShift,
     endShift,
-
-    // Deliveries
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
-
-    // Offline support
     isOnline,
+    queuedItems,
   } = useDriverTracking();
 
-  // Monitor battery level
+  // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
-    setIsMounted(true);
-    const getBatteryInfo = async () => {
-      if ('getBattery' in navigator) {
-        try {
-          const battery = await (navigator as any).getBattery();
+    setMounted(true);
+    if ("getBattery" in navigator) {
+      (navigator as any)
+        .getBattery()
+        .then((battery: any) => {
           setBatteryLevel(battery.level * 100);
-          
-          battery.addEventListener('levelchange', () => {
-            setBatteryLevel(battery.level * 100);
-          });
-        } catch (error) {
-                  }
-      }
-    };
-
-    getBatteryInfo();
+          battery.addEventListener("levelchange", () =>
+            setBatteryLevel(battery.level * 100),
+          );
+        })
+        .catch(() => {});
+    }
   }, []);
 
-  // Auto-resume tracking when shift is active but tracking isn't running
-  // This handles: page refresh, navigation back to tracking page, or tracking that stopped unexpectedly
+  // Live shift timer.
   useEffect(() => {
-    if (isMounted && isShiftActive && !isTracking && !isRequestingPermission) {
-      // Try to resume tracking for active shift
-      const resumeTracking = async () => {
-        // If we don't have permission yet, request it first
-        if (permissionState !== 'granted') {
+    if (!isShiftActive || !currentShift?.startTime) return;
+    const startedAt = new Date(currentShift.startTime).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isShiftActive, currentShift?.startTime]);
+
+  // Auto-resume GPS when a shift is active but tracking isn't running.
+  useEffect(() => {
+    if (mounted && isShiftActive && !isTracking && !isRequestingPermission) {
+      (async () => {
+        if (permissionState !== "granted") {
           const granted = await requestLocationPermission();
           if (!granted) return;
         }
-        // Start the continuous GPS tracking
         startTracking();
-      };
-      resumeTracking();
+      })();
     }
-  }, [isMounted, isShiftActive, isTracking, isRequestingPermission, permissionState, requestLocationPermission, startTracking]);
+  }, [
+    mounted,
+    isShiftActive,
+    isTracking,
+    isRequestingPermission,
+    permissionState,
+    requestLocationPermission,
+    startTracking,
+  ]);
 
-  // Handle location permission request
-  const handleRequestLocationPermission = async () => {
-    await requestLocationPermission();
-  };
-
-  // Handle shift start
   const handleStartShift = async () => {
-    // If no location yet, try to get permission first
-    if (!currentLocation) {
+    let location = currentLocation;
+    if (!location) {
       const granted = await requestLocationPermission();
-      if (!granted) {
-        return; // Error message is handled by the hook
-      }
+      if (!granted) return;
+      location = currentLocation;
     }
-
-    // Wait a moment for location to update if we just got permission
-    const locationToUse = currentLocation;
-    if (!locationToUse) {
-      return;
-    }
-
-    const success = await startShift(locationToUse);
-    if (success) {
-      startTracking();
-    }
+    if (!location) return;
+    const ok = await startShift(location);
+    if (ok) startTracking();
   };
 
-  // Handle shift end
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
-
-    // Try to get current location, but allow ending shift without it
-    let locationForEndShift = currentLocation;
-
-    if (!locationForEndShift) {
-      // Try to get location one more time
-      try {
-        const granted = await requestLocationPermission();
-        if (granted && currentLocation) {
-          locationForEndShift = currentLocation;
-        }
-      } catch {
-        // Continue without location
-      }
-    }
-
-    // If still no location, create a minimal one from the shift's start location or use defaults
-    if (!locationForEndShift) {
-      // Create a placeholder location to allow shift to end
-      const driverId = currentShift.driverId;
-      locationForEndShift = {
-        driverId,
-        coordinates: { lat: 0, lng: 0 }, // Server should handle missing location gracefully
+    let location = currentLocation;
+    if (!location) {
+      location = {
+        driverId: currentShift.driverId,
+        coordinates: { lat: 0, lng: 0 },
         accuracy: 0,
         speed: 0,
         heading: 0,
         isMoving: false,
-        activityType: 'stationary' as const,
-        timestamp: new Date()
+        activityType: "stationary" as const,
+        timestamp: new Date(),
       };
     }
-
-    const success = await endShift(currentShift.id, locationForEndShift);
-    if (success) {
-      stopTracking();
-    }
+    const ok = await endShift(currentShift.id, location);
+    if (ok) stopTracking();
   };
 
-  // Calculate shift duration
-  const getShiftDuration = () => {
-    if (!currentShift?.startTime) return '0h 0m';
-    
-    const start = new Date(currentShift.startTime);
-    const now = new Date();
-    const diff = now.getTime() - start.getTime();
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return `${hours}h ${minutes}m`;
-  };
-
-  // Handle delivery status change with loading state
-  const handleDeliveryStatusChange = async (deliveryId: string, newStatus: DriverStatus) => {
-    setUpdatingDeliveryId(deliveryId);
+  const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
+    setUpdatingId(deliveryId);
     try {
-      await updateDeliveryStatus(deliveryId, newStatus, currentLocation || undefined);
+      await updateDeliveryStatus(deliveryId, status, currentLocation || undefined);
     } finally {
-      setUpdatingDeliveryId(null);
+      setUpdatingId(null);
     }
   };
+
+  const handleAdvance = (delivery: (typeof activeDeliveries)[number]) => {
+    const next = getNextStatus(delivery.status);
+    if (!next) return;
+    const orderNumber =
+      delivery.cateringRequestId || delivery.onDemandId || delivery.id;
+    // The final step routes through proof-of-delivery capture.
+    if (next === DriverStatus.COMPLETED) {
+      setPodTarget({ deliveryId: delivery.id, orderNumber });
+      return;
+    }
+    advanceStatus(delivery.id, next);
+  };
+
+  const onPodComplete = async () => {
+    if (!podTarget) return;
+    await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
+    setPodTarget(null);
+  };
+
+  const headerRight = useMemo(() => {
+    if (!isShiftActive || !currentShift?.startTime) return null;
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-driver-success-bg px-3 py-1.5">
+        <span className="h-2 w-2 animate-driver-pulse rounded-full bg-driver-success" />
+        <span className="font-mono text-[13px] font-extrabold tabular-nums text-driver-success-ink">
+          {formatDuration(elapsed)}
+        </span>
+      </span>
+    );
+  }, [isShiftActive, currentShift?.startTime, elapsed]);
 
   return (
-    <div className={cn('w-full max-w-md mx-auto p-4 space-y-4', className)}>
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between bg-background sticky top-0 z-10 -mx-4 px-4 py-2 border-b">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
-            <Link href="/driver">
-              <ChevronLeftIcon className="h-5 w-5" />
-            </Link>
-          </Button>
-          <h1 className="text-lg font-semibold">Live Tracking</h1>
-        </div>
-        <Button variant="outline" size="sm" className="gap-2" asChild>
-          <Link href="/driver">
-            <HomeIcon className="h-4 w-4" />
-            Dashboard
-          </Link>
-        </Button>
-      </div>
+    <DriverScreen
+      title="Live tracking"
+      subtitle={
+        isShiftActive
+          ? `Shift active · ${connectionMode === "realtime" && isRealtimeConnected ? "real-time" : "standard"}`
+          : "Start a shift to begin"
+      }
+      right={headerRight}
+    >
+      <div className="space-y-4">
+        <HealthBar
+          online={mounted ? isOnline : true}
+          realtime={isRealtimeConnected}
+          gps={accuracy}
+          battery={batteryLevel}
+          queued={queuedItems}
+        />
 
-      {/* Header Status Bar */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col space-y-1">
-              <div className="flex items-center space-x-2">
-                <div suppressHydrationWarning className={cn('w-3 h-3 rounded-full', {
-                  'bg-green-500': isMounted && isOnline,
-                  'bg-red-500': isMounted && !isOnline,
-                  'bg-gray-400': !isMounted
-                })} />
-                <span suppressHydrationWarning className="text-sm font-medium">
-                  {isMounted ? (isOnline ? 'Online' : 'Offline') : '...'}
-                </span>
-              </div>
-              {isRealtimeEnabled && (
-                <span suppressHydrationWarning className="text-xs text-muted-foreground ml-5">
-                  {connectionMode === 'realtime' && isRealtimeConnected && '✓ Real-time connected'}
-                  {connectionMode === 'hybrid' && '⟳ Connecting to real-time...'}
-                  {connectionMode === 'rest' && 'Standard mode'}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* GPS Status */}
-              <div className="flex items-center space-x-1">
-                <SignalIcon className={cn('w-4 h-4', {
-                  'text-green-500': accuracy && accuracy < 50,
-                  'text-yellow-500': accuracy && accuracy >= 50 && accuracy < 100,
-                  'text-red-500': !accuracy || accuracy >= 100
-                })} />
-                <span className="text-xs text-muted-foreground">
-                  {accuracy ? `${Math.round(accuracy)}m` : '--'}
-                </span>
-              </div>
-
-              {/* Battery Level */}
-              {batteryLevel !== null && (
-                <div className="flex items-center space-x-1">
-                  <BatteryIcon className={cn('w-4 h-4', {
-                    'text-green-500': batteryLevel > 20,
-                    'text-yellow-500': batteryLevel <= 20 && batteryLevel > 10,
-                    'text-red-500': batteryLevel <= 10
-                  })} />
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(batteryLevel)}%
-                  </span>
-                </div>
-              )}
-            </div>
+        {locationError || shiftError || deliveriesError ? (
+          <div className="flex items-start gap-2 rounded-2xl border border-driver-error/30 bg-driver-error-bg px-4 py-3 text-driver-error-ink">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="text-[13px] font-semibold">
+              {locationError || shiftError || deliveriesError}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        ) : null}
 
-      {/* Error Alerts */}
-      {(locationError || shiftError || deliveriesError) && (
-        <Alert variant="destructive">
-          <AlertTriangleIcon className="h-4 w-4" />
-          <AlertDescription>
-            {locationError || shiftError || deliveriesError}
-          </AlertDescription>
-        </Alert>
-      )}
+        {!isOnline ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-driver-warning/30 bg-driver-warning-bg px-4 py-3 text-driver-warning-ink">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <span className="text-[13px] font-bold">
+              You&apos;re offline{queuedItems > 0 ? ` — ${queuedItems} updates queued` : ""}
+            </span>
+          </div>
+        ) : null}
 
-      {/* Live Map & Current Location - Only show when shift is active */}
-      {isShiftActive && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <NavigationIcon className="w-5 h-5" />
-              <span>Live Map</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {currentLocation ? (
-              <>
-                <div className="h-64 rounded-lg overflow-hidden">
+        {isShiftActive ? (
+          <>
+            {/* Live map */}
+            <DriverCard className="overflow-hidden p-0">
+              {currentLocation ? (
+                <div className="h-64 w-full">
                   <DriverLiveMap
                     currentLocation={currentLocation}
                     activeDeliveries={activeDeliveries}
                   />
                 </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span>Coordinates:</span>
-                    <span className="font-mono">
-                      {currentLocation.coordinates.lat.toFixed(6)},{' '}
-                      {currentLocation.coordinates.lng.toFixed(6)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Accuracy:</span>
-                    <span>{Math.round(currentLocation.accuracy)}m</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Speed:</span>
-                    <span>{Math.round(currentLocation.speed * 2.237)} mph</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Updated:</span>
-                    <span>
-                      {new Date(currentLocation.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-64 rounded-lg bg-muted flex flex-col items-center justify-center space-y-4">
-                <MapPinIcon className="w-12 h-12 text-muted-foreground" />
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {isRequestingPermission ? 'Getting your location...' : 'Location not available'}
+              ) : (
+                <div className="flex h-64 flex-col items-center justify-center gap-3 bg-driver-surface-alt">
+                  <MapPin className="h-10 w-10 text-driver-subtle" />
+                  <p className="text-[13px] font-semibold text-driver-muted">
+                    {isRequestingPermission
+                      ? "Getting your location…"
+                      : "Location not available"}
                   </p>
-                  {!isRequestingPermission && (
-                    <Button
-                      onClick={handleRequestLocationPermission}
+                  {!isRequestingPermission ? (
+                    <DriverButton
                       variant="outline"
                       size="sm"
+                      onClick={() => requestLocationPermission()}
                     >
-                      <MapPinIcon className="w-4 h-4 mr-2" />
-                      Enable Location
-                    </Button>
-                  )}
+                      <MapPin className="h-4 w-4" />
+                      Enable location
+                    </DriverButton>
+                  ) : null}
+                </div>
+              )}
+            </DriverCard>
+
+            {/* Shift control bar */}
+            <DriverCard className="flex items-center justify-between">
+              <div>
+                <div className="text-[13px] font-extrabold text-driver-text">
+                  On shift
+                </div>
+                <div className="text-[11.5px] font-semibold text-driver-muted">
+                  Since{" "}
+                  {currentShift
+                    ? new Date(currentShift.startTime).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : ""}
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Shift Status Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <ClockIcon className="w-5 h-5" />
-            <span>Shift Status</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isShiftActive && currentShift ? (
-            <>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Active Shift</p>
-                  <p className="text-sm text-muted-foreground">
-                    Started: {new Date(currentShift.startTime).toLocaleTimeString()}
-                  </p>
-                </div>
-                <Badge variant="default">Active</Badge>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-primary">{getShiftDuration()}</p>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">
-                    {currentShift.totalDistanceMiles
-                      ? `${Math.round(currentShift.totalDistanceMiles * 10) / 10} mi`
-                      : '0 mi'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Distance</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{currentShift.deliveryCount}</p>
-                  <p className="text-xs text-muted-foreground">Deliveries</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <Button 
+              <DriverButton
+                variant="danger"
+                size="md"
                 onClick={handleEndShift}
-                className="w-full"
-                variant="destructive"
-                disabled={shiftLoading}
+                loading={shiftLoading}
               >
-                <SquareIcon className="w-4 h-4 mr-2" />
-                End Shift
-              </Button>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-center py-4">
-                <TruckIcon className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-lg font-medium">Ready to Start</p>
-                <p className="text-sm text-muted-foreground">
-                  Start your shift to begin location tracking
-                </p>
-              </div>
+                <Square className="h-4 w-4" />
+                End shift
+              </DriverButton>
+            </DriverCard>
 
-              {/* Show "Enable Location" button if permission not granted */}
-              {!currentLocation && (permissionState === 'prompt' || permissionState === 'unknown') && (
-                <Button
-                  onClick={handleRequestLocationPermission}
-                  className="w-full"
-                  variant="outline"
-                  disabled={isRequestingPermission}
-                >
-                  <MapPinIcon className="w-4 h-4 mr-2" />
-                  {isRequestingPermission ? 'Requesting Location...' : 'Enable Location'}
-                </Button>
-              )}
+            {/* Active deliveries */}
+            <section className="space-y-3">
+              <h2 className="text-[14px] font-extrabold uppercase tracking-[0.04em] text-driver-muted">
+                Active deliveries
+                {activeDeliveries.length > 0 ? ` — ${activeDeliveries.length} in progress` : ""}
+              </h2>
 
-              <Button
-                onClick={handleStartShift}
-                className="w-full"
-                disabled={shiftLoading || isRequestingPermission}
-              >
-                <PlayIcon className="w-4 h-4 mr-2" />
-                Start Shift
-              </Button>
-
-              {!currentLocation && permissionState === 'denied' && (
-                <div className="space-y-3">
-                  <Alert variant="destructive" className="text-left">
-                    <AlertTriangleIcon className="h-4 w-4" />
-                    <AlertDescription className="space-y-2">
-                      <p className="font-medium">Location access denied</p>
-                      <p className="text-sm">Please enable location in your browser settings:</p>
-                      <ol className="text-sm list-decimal list-inside space-y-1 pl-2">
-                        <li>Open <strong>Settings</strong> on your device</li>
-                        <li>Scroll down and tap <strong>Safari</strong></li>
-                        <li>Tap <strong>Location</strong></li>
-                        <li>Select <strong>Allow</strong> or <strong>Ask</strong></li>
-                        <li>Return here and tap the button below</li>
-                      </ol>
-                    </AlertDescription>
-                  </Alert>
-                  <Button
-                    onClick={handleRequestLocationPermission}
-                    className="w-full"
-                    variant="outline"
-                    disabled={isRequestingPermission}
-                  >
-                    <MapPinIcon className="w-4 h-4 mr-2" />
-                    {isRequestingPermission ? 'Checking Location...' : 'Try Again - Enable Location'}
-                  </Button>
-                </div>
-              )}
-
-              {!currentLocation && permissionState !== 'denied' && !isRequestingPermission && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Tap &quot;Enable Location&quot; or &quot;Start Shift&quot; to allow location access
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Active Deliveries */}
-      {activeDeliveries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <PackageIcon className="w-5 h-5" />
-              <span>Active Deliveries ({activeDeliveries.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {activeDeliveries.map((delivery) => (
-              <div key={delivery.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-base">
-                      #{delivery.cateringRequestId?.slice(-6) || delivery.onDemandId?.slice(-6) || delivery.id.slice(-6)}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {delivery.cateringRequestId ? 'Catering' : 'On Demand'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-sm text-muted-foreground space-y-1">
-                  {(() => {
-                    const coords = delivery.deliveryLocation?.coordinates;
-                    const lng = coords?.[0];
-                    const lat = coords?.[1];
-                    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
-                    return (
-                      <p className="flex items-center gap-1">
-                        <MapPinIcon className="w-3 h-3" />
-                        {lat.toFixed(4)}, {lng.toFixed(4)}
-                      </p>
-                    );
-                  })()}
-                  {delivery.estimatedArrival && (
-                    <p className="flex items-center gap-1">
-                      <ClockIcon className="w-3 h-3" />
-                      ETA: {new Date(delivery.estimatedArrival).toLocaleTimeString()}
-                    </p>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Delivery Status Control */}
-                <DeliveryStatusControl
-                  deliveryId={delivery.id}
-                  orderNumber={delivery.cateringRequestId || delivery.onDemandId || delivery.id}
-                  orderType={delivery.cateringRequestId ? 'catering' : 'on_demand'}
-                  currentStatus={delivery.status}
-                  onStatusChange={(newStatus) => handleDeliveryStatusChange(delivery.id, newStatus)}
-                  isLoading={updatingDeliveryId === delivery.id}
-                  disabled={deliveriesLoading}
+              {activeDeliveries.length === 0 ? (
+                <StateBlock
+                  icon={CheckCircle2}
+                  title="No active deliveries"
+                  body="New assignments will appear here while you're on shift."
                 />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              ) : (
+                activeDeliveries.map((delivery, idx) => {
+                  const orderNumber =
+                    delivery.cateringRequestId ||
+                    delivery.onDemandId ||
+                    delivery.id;
+                  const orderType = delivery.cateringRequestId
+                    ? "catering"
+                    : "on_demand";
+                  const next = getNextStatus(delivery.status);
+                  const progress = getStatusProgress(delivery.status);
+                  const coords = delivery.deliveryLocation?.coordinates;
+                  const lng = coords?.[0];
+                  const lat = coords?.[1];
+                  const lead = idx === 0;
+                  const atClient =
+                    delivery.status === DriverStatus.ARRIVED_TO_CLIENT;
 
-      {/* Tracking Status */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div suppressHydrationWarning className={cn('w-2 h-2 rounded-full', {
-                'bg-green-500 animate-pulse': isMounted && isTracking,
-                'bg-gray-400': !isMounted || !isTracking
-              })} />
-              <span suppressHydrationWarning className="text-sm">
-                {isMounted ? (isTracking ? 'Location tracking active' : 'Location tracking stopped') : '...'}
-              </span>
+                  return (
+                    <DriverCard
+                      key={delivery.id}
+                      className={cn(
+                        "space-y-3",
+                        lead && "border-[1.5px] border-driver-brand",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <TypeBadge type={orderType} />
+                        <span className="font-mono text-[12.5px] font-bold text-driver-muted">
+                          #{orderNumber.slice(-6)}
+                        </span>
+                        <div className="flex-1" />
+                        <StatusPill status={delivery.status} size="sm" />
+                      </div>
+
+                      {delivery.estimatedArrival ? (
+                        <div className="text-[12px] font-semibold text-driver-muted">
+                          ETA{" "}
+                          {new Date(delivery.estimatedArrival).toLocaleTimeString(
+                            [],
+                            { hour: "numeric", minute: "2-digit" },
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* progress bar */}
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-driver-surface-alt">
+                        <div
+                          className="h-full rounded-full bg-driver-brand transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+
+                      {next ? (
+                        <NextAction
+                          label={getDriverNextActionLabel(delivery.status)}
+                          sub={atClient ? "Final step" : "Next step"}
+                          tone={atClient ? "success" : "brand"}
+                          icon={atClient ? CheckCircle2 : Navigation2}
+                          hint={lead ? "Tap to update your status" : undefined}
+                          loading={updatingId === delivery.id}
+                          disabled={deliveriesLoading}
+                          onClick={() => handleAdvance(delivery)}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 rounded-2xl bg-driver-success-bg px-4 py-3 text-driver-success-ink">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="text-[13px] font-extrabold">
+                            Delivered
+                          </span>
+                        </div>
+                      )}
+
+                      {typeof lat === "number" && typeof lng === "number" ? (
+                        <a
+                          href={`https://maps.google.com/?q=${lat},${lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-driver-on-brand"
+                        >
+                          <Navigation2 className="h-3.5 w-3.5" />
+                          Navigate
+                        </a>
+                      ) : null}
+                    </DriverCard>
+                  );
+                })
+              )}
+            </section>
+          </>
+        ) : (
+          /* Pre-shift permission flow */
+          <DriverCard className="space-y-4">
+            <div className="flex flex-col items-center py-4 text-center">
+              <Truck className="mb-2 h-12 w-12 text-driver-subtle" />
+              <p className="text-[17px] font-extrabold text-driver-text">
+                {permissionState === "denied"
+                  ? "Location is turned off"
+                  : currentLocation
+                    ? "You're ready to roll"
+                    : "Location access needed"}
+              </p>
+              <p className="mt-1 max-w-xs text-[13px] font-semibold text-driver-muted">
+                {permissionState === "denied"
+                  ? "Enable location in your browser settings, then try again."
+                  : "We use your location to track your shift and deliveries."}
+              </p>
             </div>
-            
-            {isTracking && (
-              <span className="text-xs text-muted-foreground">
-                Updates every 30s
-              </span>
+
+            {permissionState === "denied" ? (
+              <DriverButton
+                variant="outline"
+                full
+                size="lg"
+                onClick={() => requestLocationPermission()}
+                loading={isRequestingPermission}
+              >
+                <Settings className="h-4 w-4" />
+                Try again
+              </DriverButton>
+            ) : !currentLocation ? (
+              <DriverButton
+                variant="brand"
+                full
+                size="lg"
+                onClick={() => requestLocationPermission()}
+                loading={isRequestingPermission}
+              >
+                <MapPin className="h-4 w-4" />
+                Request location permission
+              </DriverButton>
+            ) : (
+              <DriverButton
+                variant="brand"
+                full
+                size="lg"
+                onClick={handleStartShift}
+                loading={shiftLoading || isRequestingPermission}
+              >
+                <Play className="h-4 w-4" />
+                Start shift
+              </DriverButton>
             )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </DriverCard>
+        )}
+      </div>
+
+      {podTarget ? (
+        <DriverPodSheet
+          open={!!podTarget}
+          onOpenChange={(o) => !o && setPodTarget(null)}
+          deliveryId={podTarget.deliveryId}
+          orderNumber={podTarget.orderNumber}
+          onComplete={onPodComplete}
+        />
+      ) : null}
+    </DriverScreen>
   );
 }

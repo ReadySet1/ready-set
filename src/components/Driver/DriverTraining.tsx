@@ -1,14 +1,21 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { VideoPlayer } from "./VideoPlayer"
-import { CheckCircle2, Clock } from 'lucide-react'
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, GraduationCap } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { VideoPlayer } from "./VideoPlayer";
+import {
+  DriverButton,
+  DriverCard,
+  DriverScreen,
+  Segmented,
+} from "@/components/Driver/ui";
 
 interface TrainingVideo {
-  id: string
-  title: string
-  description: string
-  videoUrl: string
+  id: string;
+  title: string;
+  description: string;
+  videoUrl: string;
 }
 
 const trainingVideos: TrainingVideo[] = [
@@ -27,109 +34,142 @@ const trainingVideos: TrainingVideo[] = [
   {
     id: "3",
     title: "Customer Service Excellence",
-    description: "Discover how to provide excellent customer service during deliveries.",
+    description:
+      "Discover how to provide excellent customer service during deliveries.",
     videoUrl: "KyxprzEto3Y",
   },
-]
+];
+
+type Filter = "all" | "todo" | "done";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "todo", label: "To do" },
+  { value: "done", label: "Completed" },
+];
+
+/** Circular progress ring (% complete). */
+function ProgressRing({ value }: { value: number }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const offset = c - (value / 100) * c;
+  return (
+    <svg width="64" height="64" viewBox="0 0 64 64" className="shrink-0">
+      <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-driver-surface-alt" />
+      <circle
+        cx="32"
+        cy="32"
+        r={r}
+        fill="none"
+        strokeWidth="6"
+        strokeLinecap="round"
+        className="stroke-driver-brand"
+        strokeDasharray={c}
+        strokeDashoffset={offset}
+        transform="rotate(-90 32 32)"
+      />
+      <text
+        x="32"
+        y="32"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="fill-driver-text text-[14px] font-extrabold"
+      >
+        {value}%
+      </text>
+    </svg>
+  );
+}
 
 export function DeliveryDriverTraining() {
-  const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set())
-  const [isMounted, setIsMounted] = useState(false)
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [mounted, setMounted] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
-    setIsMounted(true)
-    // Load completed videos from localStorage if available
-    const saved = localStorage.getItem('completedVideos')
-    if (saved) {
-      setCompletedVideos(new Set(JSON.parse(saved)))
-    }
-  }, [])
+    setMounted(true);
+    const saved = localStorage.getItem("completedVideos");
+    if (saved) setCompleted(new Set(JSON.parse(saved)));
+  }, []);
 
-  const toggleVideoCompletion = (videoId: string) => {
-    setCompletedVideos(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(videoId)) {
-        newSet.delete(videoId)
-      } else {
-        newSet.add(videoId)
-      }
-      // Save to localStorage
-      localStorage.setItem('completedVideos', JSON.stringify([...newSet]))
-      return newSet
-    })
-  }
+  const toggle = (id: string) => {
+    setCompleted((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem("completedVideos", JSON.stringify([...next]));
+      return next;
+    });
+  };
 
-  const getProgress = () => {
-    return Math.round((completedVideos.size / trainingVideos.length) * 100)
-  }
+  const progress = Math.round((completed.size / trainingVideos.length) * 100);
+  const remaining = trainingVideos.length - completed.size;
 
-  if (!isMounted) {
-    return <div className="min-h-screen bg-gray-50 py-12">Loading...</div>
-  }
+  const visible = useMemo(() => {
+    if (filter === "todo") return trainingVideos.filter((v) => !completed.has(v.id));
+    if (filter === "done") return trainingVideos.filter((v) => completed.has(v.id));
+    return trainingVideos;
+  }, [filter, completed]);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="container mx-auto px-4">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Delivery Driver Training
-            </h1>
-            <p className="mt-2 text-lg text-gray-600">
-              Complete all videos to finish your training
-            </p>
-          </div>
-          <div className="rounded-full bg-white p-4 shadow-sm">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">{getProgress()}%</p>
-              <p className="text-sm text-gray-500">Completed</p>
+    <DriverScreen title="Training" subtitle="Keep your training current">
+      <div className="space-y-4">
+        <DriverCard className="flex items-center gap-4">
+          <ProgressRing value={mounted ? progress : 0} />
+          <div className="min-w-0">
+            <div className="text-[15px] font-extrabold text-driver-text">
+              {progress === 100 ? "All caught up!" : "Keep your training current"}
+            </div>
+            <div className="text-[12.5px] font-semibold text-driver-muted">
+              {completed.size} of {trainingVideos.length} modules complete
+              {remaining > 0 ? ` · ${remaining} to go` : ""}
             </div>
           </div>
-        </div>
+        </DriverCard>
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {trainingVideos.map((video) => {
-            const isCompleted = completedVideos.has(video.id)
-            
+        <Segmented options={FILTERS} value={filter} onChange={setFilter} aria-label="Training filter" />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {visible.map((video) => {
+            const isDone = completed.has(video.id);
             return (
-              <div
-                key={video.id}
-                className="group overflow-hidden rounded-xl bg-white shadow-sm transition-all hover:shadow-md"
-              >
-                <div className="relative">
+              <DriverCard key={video.id} className="space-y-3 p-0">
+                <div className="relative overflow-hidden rounded-t-2xl">
                   <VideoPlayer videoUrl={video.videoUrl} title={video.title} />
-                  <div className="absolute right-2 top-2 rounded-full bg-white p-1 shadow-md">
-                    {isCompleted ? (
-                      <CheckCircle2 className="h-6 w-6 text-green-500" />
-                    ) : (
-                      <Clock className="h-6 w-6 text-gray-400" />
-                    )}
-                  </div>
+                  {isDone ? (
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-driver-success px-2 py-1 text-[11px] font-extrabold text-white shadow">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Done
+                    </span>
+                  ) : null}
                 </div>
-                
-                <div className="p-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div className="space-y-3 p-4 pt-0">
+                  <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-driver-on-brand">
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    Module
+                  </div>
+                  <div>
+                    <h2 className="text-[14.5px] font-extrabold text-driver-text">
                       {video.title}
                     </h2>
+                    <p className="mt-1 text-[12px] font-medium leading-relaxed text-driver-muted">
+                      {video.description}
+                    </p>
                   </div>
-                  <p className="mb-4 text-gray-600">{video.description}</p>
-                  <button
-                    onClick={() => toggleVideoCompletion(video.id)}
-                    className={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                      isCompleted
-                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    }`}
+                  <DriverButton
+                    variant={isDone ? "success" : "brand"}
+                    size="sm"
+                    full
+                    onClick={() => toggle(video.id)}
                   >
-                    {isCompleted ? 'Mark as Incomplete' : 'Mark as Complete'}
-                  </button>
+                    {isDone ? "Mark as incomplete" : "Mark as complete"}
+                  </DriverButton>
                 </div>
-              </div>
-            )
+              </DriverCard>
+            );
           })}
         </div>
       </div>
-    </div>
-  )
+    </DriverScreen>
+  );
 }

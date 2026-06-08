@@ -235,7 +235,7 @@ describe('Tracking System Integration', () => {
 
       // Should show the map component with location (only shown during active shift)
       expect(screen.getByTestId('driver-live-map')).toBeInTheDocument();
-      expect(screen.getByText('Location: available')).toBeInTheDocument();
+      expect(screen.getByText('On shift')).toBeInTheDocument();
     });
 
     it('shows start shift button when no active shift', () => {
@@ -301,7 +301,7 @@ describe('Tracking System Integration', () => {
       render(<DriverTrackingPortal />);
 
       // Should show active shift UI
-      expect(screen.getByText(/Active Shift/i)).toBeInTheDocument();
+      expect(screen.getByText('On shift')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /end shift/i })).toBeInTheDocument();
     });
 
@@ -362,7 +362,7 @@ describe('Tracking System Integration', () => {
 
       // The break button may or may not be present depending on UI implementation
       // Just verify the component renders successfully with active shift
-      expect(screen.getByText(/Active Shift/i)).toBeInTheDocument();
+      expect(screen.getByText('On shift')).toBeInTheDocument();
     });
   });
 
@@ -486,7 +486,8 @@ describe('Tracking System Integration', () => {
 
       render(<DriverTrackingPortal />);
 
-      expect(screen.getByText(/Offline/i)).toBeInTheDocument();
+      // New UI surfaces offline in both the health bar and a queued-updates banner.
+      expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
     });
 
     it('shows online status in driver portal', () => {
