@@ -12,39 +12,31 @@ import { ClientFormWrapper } from "@/components/Logistics/QuoteRequest/ClientFor
 import DeliveryOptions from "@/components/Logistics/DeliveryOptions";
 
 export const metadata: Metadata = {
-  title: "Premium Catering Logistics Services | Ready Set Group LLC",
+  title: "Delivery Services for Businesses",
   description:
-    "Bay Area's trusted catering delivery partner since 2019. Specialized in temperature-controlled deliveries, serving tech giants like Apple, Google, and Facebook. Professional handling with real-time tracking.",
+    "On-demand business delivery and logistics built for reliability. Serving the SF Bay Area, Austin, and Dallas. Request a quote today.", // DRAFT — review copy
   keywords: [
+    "business delivery service",
     "catering logistics",
-    "food delivery service",
-    "temperature controlled delivery",
-    "Bay Area catering",
-    "corporate catering delivery",
-    "professional food transport",
-    "Silicon Valley catering",
-    "premium delivery service",
-    "time-critical delivery",
-    "specialized food logistics",
-    "corporate event delivery",
-    "same-day catering delivery",
-    "food safety certified delivery",
-    "professional catering transport",
-    "Bay Area food logistics",
+    "Bay Area delivery",
+    "on-demand courier",
   ],
   openGraph: {
-    title: "Premium Catering Logistics Services | Ready Set Group LLC",
+    title: "Delivery Services for Businesses | Ready Set",
     description:
-      "Expert catering delivery services in the Bay Area. Temperature-controlled vehicles, professional handling, and real-time tracking for corporate events.",
+      "On-demand business delivery and logistics built for reliability. Serving the SF Bay Area, Austin, and Dallas. Request a quote today.",
     type: "website",
     locale: "en_US",
-    siteName: "Ready Set Group LLC",
+    siteName: "Ready Set",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Premium Catering Logistics Services | Ready Set Delivery",
+    title: "Delivery Services for Businesses | Ready Set",
     description:
-      "Specialized catering logistics for Bay Area businesses. Trusted by tech giants for reliable, temperature-controlled delivery services.",
+      "On-demand business delivery and logistics built for reliability. Serving the SF Bay Area, Austin, and Dallas. Request a quote today.",
+  },
+  alternates: {
+    canonical: "/logistics",
   },
 };
 

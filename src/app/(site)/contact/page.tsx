@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     title: "Contact Ready Set | Business Solutions Provider",
     description: "Connect with Ready Set for premium catering delivery and virtual assistant services in Bay Area and Austin.",
   },
+  alternates: {
+    canonical: "/contact",
+  },
 };
 
 const ContactPage = () => {
@@ -86,7 +89,7 @@ const ContactPage = () => {
         </div>
       </div>
 
-      <Breadcrumb pageName="Contact Page" />
+      <Breadcrumb pageName="Contact Page" pagePath="/contact" />
       <Contact />
       <BayAreaMap />
       <AustinMap />
