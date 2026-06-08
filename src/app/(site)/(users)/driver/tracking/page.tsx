@@ -32,9 +32,5 @@ export const viewport: Viewport = {
  * - Mobile-optimized interface
  */
 export default function DriverTrackingPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <DriverTrackingPortal />
-    </div>
-  );
+  return <DriverTrackingPortal />;
 }
