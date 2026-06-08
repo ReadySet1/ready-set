@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
 import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
+import { createClient } from '@/utils/supabase/server';
+import { getUserRole } from '@/lib/auth';
 
 /**
  * Update delivery status with location and optional proof of delivery
@@ -18,6 +20,22 @@ export async function updateDeliveryStatus(
   notes?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Validate the id shape before it touches raw SQL.
+    if (!z.string().uuid().safeParse(deliveryId).success) {
+      return { success: false, error: 'Invalid deliveryId' };
+    }
+
+    // AuthN: the caller must be signed in.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Authentication required' };
+    }
+    const role = (await getUserRole(user.id))?.toUpperCase();
+    const isPrivileged = role === 'ADMIN' || role === 'SUPER_ADMIN';
+
     // Get current delivery info
     const delivery = await prisma.$queryRawUnsafe<{
       driver_id: string;
@@ -32,6 +50,18 @@ export async function updateDeliveryStatus(
     }
 
     const deliveryRecord = delivery[0];
+
+    // AuthZ: a non-admin caller may only mutate a delivery assigned to their
+    // own driver record (drivers.user_id === auth user id). Prevents one driver
+    // from advancing another driver's delivery (IDOR).
+    if (!isPrivileged) {
+      const owns = await prisma.$queryRawUnsafe<{ id: string }[]>(`
+        SELECT id FROM drivers WHERE id = $1::uuid AND user_id = $2::uuid
+      `, deliveryRecord?.driver_id, user.id);
+      if (owns.length === 0) {
+        return { success: false, error: 'Access denied' };
+      }
+    }
 
     // Prepare update fields
     const updateFields: string[] = ['status = $2', 'updated_at = NOW()'];
@@ -65,18 +95,32 @@ export async function updateDeliveryStatus(
       WHERE id = $1::uuid
     `, ...params);
 
-    // Update driver location if provided
-    if (location && deliveryRecord?.driver_id) {
+    // Update driver location if provided. Coordinates are validated and bound
+    // as numeric params (ST_MakePoint) — never string-interpolated into SQL.
+    const lng = location?.coordinates?.lng;
+    const lat = location?.coordinates?.lat;
+    const validCoords =
+      typeof lng === 'number' &&
+      typeof lat === 'number' &&
+      Number.isFinite(lng) &&
+      Number.isFinite(lat) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180;
+
+    if (validCoords && deliveryRecord?.driver_id) {
       await prisma.$executeRawUnsafe(`
-        UPDATE drivers 
-        SET 
-          last_known_location = ST_GeogFromText($2),
+        UPDATE drivers
+        SET
+          last_known_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
           last_location_update = NOW(),
           updated_at = NOW()
         WHERE id = $1::uuid
       `,
         deliveryRecord.driver_id,
-        `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
+        lng,
+        lat
       );
     }
 

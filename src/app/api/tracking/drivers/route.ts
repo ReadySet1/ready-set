@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
 // import { Pool } from 'pg';
 const Pool = require('pg').Pool;
 
@@ -38,8 +39,15 @@ interface DriverLocation {
   longitude: number;
 }
 
-// GET - List all drivers
+// GET - List drivers (admins) / own record (drivers)
 export async function GET(request: NextRequest) {
+  // AuthZ: drivers see only themselves; admins/helpdesk see all.
+  const auth = await withAuth(request, {
+    allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const isActive = searchParams.get('active');
@@ -73,6 +81,13 @@ export async function GET(request: NextRequest) {
     
     const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
+
+    // Drivers are scoped to their own record (drivers.user_id === auth user id).
+    if (auth.context.user.type === 'DRIVER') {
+      query += ` AND user_id = $${paramCounter}`;
+      params.push(auth.context.user.id);
+      paramCounter++;
+    }
 
     if (isActive !== null) {
       query += ` AND is_active = $${paramCounter}`;
@@ -119,8 +134,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new driver
+// POST - Create new driver (admins only)
 export async function POST(request: NextRequest) {
+  const auth = await withAuth(request, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const {
@@ -202,8 +223,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update driver location
+// PUT - Update driver location / duty (drivers: own record only)
 export async function PUT(request: NextRequest) {
+  const auth = await withAuth(request, {
+    allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { driver_id, location, is_on_duty } = body;
@@ -215,14 +242,36 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // A DRIVER may only update their own record.
+    if (auth.context.user.type === 'DRIVER') {
+      const owns = await pool.query(
+        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        [driver_id, auth.context.user.id]
+      );
+      if (owns.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
+    }
+
     let query = 'UPDATE drivers SET last_location_update = NOW()';
     const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
-    if (location && location.latitude && location.longitude) {
-      query += `, last_known_location = ST_GeogFromText($${paramCounter})`;
-      params.push(`POINT(${location.longitude} ${location.latitude})`);
-      paramCounter++;
+    if (
+      location &&
+      typeof location.latitude === 'number' &&
+      typeof location.longitude === 'number' &&
+      location.latitude >= -90 &&
+      location.latitude <= 90 &&
+      location.longitude >= -180 &&
+      location.longitude <= 180
+    ) {
+      query += `, last_known_location = ST_SetSRID(ST_MakePoint($${paramCounter}, $${paramCounter + 1}), 4326)::geography`;
+      params.push(location.longitude, location.latitude);
+      paramCounter += 2;
     }
 
     if (typeof is_on_duty === 'boolean') {
@@ -274,8 +323,14 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete driver
+// DELETE - Delete driver (admins only)
 export async function DELETE(request: NextRequest) {
+  const auth = await withAuth(request, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   try {
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');

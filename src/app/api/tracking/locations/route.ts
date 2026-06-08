@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
 // import { Pool } from 'pg';
 const Pool = require('pg').Pool;
 
@@ -23,11 +24,18 @@ interface LocationUpdate {
 
 // POST - Record driver location
 export async function POST(request: NextRequest) {
+  // AuthZ: only authenticated drivers/admins may write locations.
+  const auth = await withAuth(request, {
+    allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     const body = await request.json();
     const {
       driver_id,
@@ -61,17 +69,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if driver exists
-    const driverCheck = await client.query(
-      'SELECT id FROM drivers WHERE id = $1 AND is_active = true',
-      [driver_id]
-    );
+    // Check if driver exists. A DRIVER may only write their OWN location:
+    // verify the target driver row belongs to the authenticated user
+    // (drivers.user_id === auth user id). Admins may write for any driver.
+    const isDriver = auth.context.user.type === 'DRIVER';
+    const driverCheck = isDriver
+      ? await client.query(
+          'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND is_active = true',
+          [driver_id, auth.context.user.id]
+        )
+      : await client.query(
+          'SELECT id FROM drivers WHERE id = $1 AND is_active = true',
+          [driver_id]
+        );
 
     if (driverCheck.rows.length === 0) {
       await client.query('ROLLBACK');
       return NextResponse.json(
-        { success: false, error: 'Driver not found or inactive' },
-        { status: 404 }
+        {
+          success: false,
+          error: isDriver
+            ? 'Access denied'
+            : 'Driver not found or inactive',
+        },
+        { status: isDriver ? 403 : 404 }
       );
     }
 
@@ -89,8 +110,8 @@ export async function POST(request: NextRequest) {
         activity_type,
         recorded_at
       )
-      VALUES ($1, ST_GeogFromText($2), $3, $4, $5, $6, $7, $8, $9, NOW())
-      RETURNING 
+      VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4, $5, $6, $7, $8, $9, $10, NOW())
+      RETURNING
         id,
         ST_AsGeoJSON(location) as location_geojson,
         accuracy,
@@ -106,7 +127,8 @@ export async function POST(request: NextRequest) {
 
     const locationResult = await client.query(locationQuery, [
       driver_id,
-      `POINT(${longitude} ${latitude})`,
+      longitude,
+      latitude,
       accuracy,
       speed,
       heading,
@@ -118,13 +140,13 @@ export async function POST(request: NextRequest) {
 
     // Update driver's last known location
     await client.query(`
-      UPDATE drivers 
-      SET 
-        last_known_location = ST_GeogFromText($1),
+      UPDATE drivers
+      SET
+        last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
         last_location_update = NOW(),
         updated_at = NOW()
-      WHERE id = $2
-    `, [`POINT(${longitude} ${latitude})`, driver_id]);
+      WHERE id = $3
+    `, [longitude, latitude, driver_id]);
 
     await client.query('COMMIT');
 
@@ -156,17 +178,39 @@ export async function POST(request: NextRequest) {
 
 // GET - Get location history for a driver
 export async function GET(request: NextRequest) {
+  // AuthZ: drivers/admins only.
+  const auth = await withAuth(request, {
+    allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const driver_id = searchParams.get('driver_id');
-    const hours = parseInt(searchParams.get('hours') || '24');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    // Clamp to sane bounds (also keeps the interpolated INTERVAL numeric).
+    const hours = Math.min(Math.max(parseInt(searchParams.get('hours') || '24', 10) || 24, 1), 168);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100', 10) || 100, 1), 1000);
 
     if (!driver_id) {
       return NextResponse.json(
         { success: false, error: 'Missing driver_id parameter' },
         { status: 400 }
       );
+    }
+
+    // A DRIVER may only read their own location history.
+    if (auth.context.user.type === 'DRIVER') {
+      const owns = await pool.query(
+        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        [driver_id, auth.context.user.id]
+      );
+      if (owns.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     const query = `

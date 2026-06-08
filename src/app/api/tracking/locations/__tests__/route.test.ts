@@ -45,6 +45,11 @@ jest.mock("pg", () => {
   };
 });
 
+// Mock auth middleware (the route gained withAuth in the security-hardening pass)
+jest.mock("@/lib/auth-middleware", () => ({ withAuth: jest.fn() }));
+import { withAuth } from "@/lib/auth-middleware";
+const mockWithAuth = withAuth as jest.Mock;
+
 // Import route handlers after mocking
 import { POST, GET } from "../route";
 
@@ -87,6 +92,14 @@ describe("/api/tracking/locations", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Default: an authenticated ADMIN (matches the route's pre-hardening
+    // behavior — no per-driver ownership scoping). Security-specific cases
+    // below override this with a DRIVER / unauthenticated context.
+    mockWithAuth.mockResolvedValue({
+      success: true,
+      context: { user: { id: "admin-1", type: "ADMIN" } },
+    });
 
     // Reset connect to return our mock client
     mockPoolInstance.connect.mockResolvedValue(mockClient);
@@ -610,6 +623,81 @@ describe("/api/tracking/locations", () => {
 
         expect(data.details).toBeDefined();
       });
+    });
+  });
+
+  describe("Security (auth + ownership)", () => {
+    it("POST: returns 401 when unauthenticated", async () => {
+      mockWithAuth.mockResolvedValue({
+        success: false,
+        response: { status: 401 },
+        context: {},
+      });
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(401);
+      expect(mockPoolInstance.connect).not.toHaveBeenCalled();
+    });
+
+    it("POST: denies a driver writing a foreign driver_id (403)", async () => {
+      mockWithAuth.mockResolvedValue({
+        success: true,
+        context: { user: { id: "attacker", type: "DRIVER" } },
+      });
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql.includes("SELECT id FROM drivers")) return Promise.resolve({ rows: [] });
+        return Promise.resolve({ rows: [] });
+      });
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toBe("Access denied");
+    });
+
+    it("POST: allows the owning driver and scopes the check to their auth id (201)", async () => {
+      mockWithAuth.mockResolvedValue({
+        success: true,
+        context: { user: { id: "user-owner", type: "DRIVER" } },
+      });
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(201);
+      const ownershipCall = mockClient.query.mock.calls.find(
+        ([sql]: [string]) => typeof sql === "string" && sql.includes("AND user_id"),
+      );
+      expect(ownershipCall?.[1]).toEqual([mockDriverId, "user-owner"]);
+    });
+
+    it("GET: returns 401 when unauthenticated", async () => {
+      mockWithAuth.mockResolvedValue({
+        success: false,
+        response: { status: 401 },
+        context: {},
+      });
+      const response = await GET(
+        createRequestWithParams("http://localhost:3000/api/tracking/locations", {
+          driver_id: mockDriverId,
+        }),
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it("GET: denies a driver reading a foreign driver's history (403)", async () => {
+      mockWithAuth.mockResolvedValue({
+        success: true,
+        context: { user: { id: "attacker", type: "DRIVER" } },
+      });
+      mockPoolInstance.query.mockResolvedValue({ rows: [] }); // ownership lookup → not owned
+      const response = await GET(
+        createRequestWithParams("http://localhost:3000/api/tracking/locations", {
+          driver_id: "driver-victim",
+        }),
+      );
+      expect(response.status).toBe(403);
     });
   });
 });

@@ -18,8 +18,14 @@ jest.mock('pg', () => {
   };
 });
 
+// Route gained withAuth in the security-hardening pass — mock it (default ADMIN).
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+
 import { GET, POST, PUT } from '@/app/api/tracking/drivers/route';
+import { withAuth } from '@/lib/auth-middleware';
 import type * as pg from 'pg';
+
+const mockWithAuth = withAuth as jest.Mock;
 
 // Access the mock query function
 const { __mockQuery: mockQuery } = jest.requireMock<typeof pg & { __mockQuery: jest.Mock }>('pg');
@@ -27,6 +33,10 @@ const { __mockQuery: mockQuery } = jest.requireMock<typeof pg & { __mockQuery: j
 describe('/api/tracking/drivers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockWithAuth.mockResolvedValue({
+      success: true,
+      context: { user: { id: 'admin-1', type: 'ADMIN' } },
+    });
   });
 
   describe('GET /api/tracking/drivers', () => {
