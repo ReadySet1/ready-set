@@ -154,6 +154,43 @@ const config: Config = {
         border:  "hsl(var(--border) / <alpha-value>)",
         input:   "hsl(var(--input) / <alpha-value>)",
         ring:    "hsl(var(--ring) / <alpha-value>)",
+
+        // ─── Driver app tokens (scoped via `.driver-theme`) ─────────
+        // Cool slate-neutral surfaces + amber accent for the mobile
+        // driver redesign. Full-color CSS vars (hex/rgba), so the
+        // /<alpha-value> modifier does not apply to these keys.
+        // Defs: src/styles/index.css → `.driver-theme` / `.dark .driver-theme`
+        driver: {
+          bg: "var(--rs-driver-bg)",
+          surface: "var(--rs-driver-surface)",
+          "surface-alt": "var(--rs-driver-surface-alt)",
+          glass: "var(--rs-driver-glass)",
+          border: "var(--rs-driver-border)",
+          "border-hi": "var(--rs-driver-border-hi)",
+          text: "var(--rs-driver-text)",
+          muted: "var(--rs-driver-text-muted)",
+          subtle: "var(--rs-driver-text-subtle)",
+          brand: "var(--rs-driver-brand)",
+          "brand-hover": "var(--rs-driver-brand-hover)",
+          "brand-ink": "var(--rs-driver-brand-ink)",
+          "on-brand": "var(--rs-driver-on-brand-subtle)",
+          success: "var(--rs-driver-success)",
+          "success-bg": "var(--rs-driver-success-bg)",
+          "success-ink": "var(--rs-driver-success-ink)",
+          warning: "var(--rs-driver-warning)",
+          "warning-bg": "var(--rs-driver-warning-bg)",
+          "warning-ink": "var(--rs-driver-warning-ink)",
+          error: "var(--rs-driver-error)",
+          "error-bg": "var(--rs-driver-error-bg)",
+          "error-ink": "var(--rs-driver-error-ink)",
+          info: "var(--rs-driver-info)",
+          "info-bg": "var(--rs-driver-info-bg)",
+          "info-ink": "var(--rs-driver-info-ink)",
+        },
+      },
+      boxShadow: {
+        driver: "var(--rs-driver-shadow)",
+        "driver-sm": "var(--rs-driver-shadow-sm)",
       },
       spacing: {
         'page-y-sm': '100px',
@@ -166,6 +203,25 @@ const config: Config = {
         'card-h': '300px',
         'card-h-md': '400px',
         'card-h-lg': '500px',
+        // Driver app fixed sizes (exact pixels from the design handoff). Named by
+        // role so the components read intent, not magic numbers.
+        'driver-hair': '3px',        // segmented/healthbar inner padding
+        'driver-nudge': '5px',       // hairline nudge
+        'driver-dot': '7px',         // status dot
+        'driver-rail-sm': '10px',    // compact timeline connector
+        'driver-pip': '15px',        // healthbar marker
+        'driver-rail': '16px',       // timeline connector
+        'driver-node': '22px',       // timeline node / bottom-nav icon
+        'driver-glyph': '30px',      // state/stat icon, compact row height
+        'driver-seg': '32px',        // compact segmented control height
+        'driver-glyph-lg': '38px',   // next-action icon, row height
+        'driver-touch': '44px',      // min touch target
+        'driver-control': '50px',    // icon chip / standard control height
+        'driver-action': '56px',     // primary action height
+        'driver-action-lg': '58px',  // large button height
+        'driver-tile': '96px',       // stat tile height
+        'driver-block': '120px',     // list skeleton block height
+        'driver-prose': '260px',     // empty-state body max width
       },
       fontFamily: {
         display: ["var(--font-display)", "Kabel", "Montserrat", "sans-serif"],
@@ -195,6 +251,24 @@ const config: Config = {
           "0%":   { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        // Driver app motion (keyframes mirrored in src/styles/index.css
+        // as rs-driver-* so reduced-motion can disable them globally).
+        "driver-ping": {
+          "0%":        { transform: "scale(0.9)", opacity: "0.8" },
+          "75%, 100%": { transform: "scale(1.6)", opacity: "0" },
+        },
+        "driver-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%":      { opacity: "0.45" },
+        },
+        "driver-sheet-up": {
+          from: { transform: "translateY(100%)" },
+          to:   { transform: "translateY(0)" },
+        },
+        "driver-tap": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%":      { transform: "translateY(-3px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -205,6 +279,11 @@ const config: Config = {
         "fade-out": "fade-out 120ms cubic-bezier(0.4, 0, 1, 1)",
         "slide-up": "slide-up 300ms cubic-bezier(0.2, 0, 0, 1)",
         shimmer:    "shimmer 1.6s linear infinite",
+        // Driver app
+        "driver-ping":     "driver-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite",
+        "driver-pulse":    "driver-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "driver-sheet-up": "driver-sheet-up 0.26s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "driver-tap":      "driver-tap 1.4s ease-in-out infinite",
       },
     },
   },
