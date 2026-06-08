@@ -1,13 +1,14 @@
 {
   "title": "Ready Set — Tasks Board",
-  "subtitle": "Action items from the Dev Team Meetings on May 4, May 11, and May 19, 2026 — status as of May 19.",
-  "generated": "2026-05-19",
+  "subtitle": "Action items from the Dev Team Meetings on May 4 – June 1, 2026 — status as of June 1.",
+  "generated": "2026-06-01",
   "sources": [
     "meetings/shared/2026-05-04-dev-team-meeting.md",
     "meetings/shared/2026-05-11-dev-team-meeting.md",
     "meetings/shared/2026-05-11-may4-action-item-review.md",
     "meetings/shared/2026-05-11-weekly-recap.md",
-    "meetings/shared/2026-05-19-dev-team-meeting.md"
+    "meetings/shared/2026-05-19-dev-team-meeting.md",
+    "meetings/shared/2026-06-01-dev-team-meeting.md"
   ],
   "columns": [
     {
@@ -24,7 +25,7 @@
     },
     {
       "key": "new",
-      "title": "★ New — May 19"
+      "title": "★ New — Jun 1"
     }
   ],
   "owners": {
@@ -36,6 +37,7 @@
     "may4": "May 4",
     "may11": "May 11",
     "may19": "May 19",
+    "jun1": "June 1",
     "qa": "QA",
     "catercow": "CaterCow"
   },
@@ -94,7 +96,7 @@
       "title": "Resolve driver tracking sync issues",
       "owner": "emmanuel",
       "source": "may11",
-      "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections. Prioritize distance calculations before map drawing."
+      "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections. Prioritize distance calculations before map drawing. <strong>Jun 1 update:</strong> tracking-error code is fixed; verification testing scheduled across this week."
     },
     {
       "id": "driver-phone-storage",
@@ -212,7 +214,7 @@
     },
     {
       "id": "rea-drt-07-supabase-browser-session-bridge",
-      "status": "open",
+      "status": "done",
       "title": "REA-DRT-07 — Bridge SSR cookie to browser supabase-js session (Realtime never initializes)",
       "owner": "emmanuel",
       "source": "qa",
@@ -221,7 +223,7 @@
         "bug",
         "critical"
       ],
-      "description": "<strong>Root cause (investigated 2026-05-19):</strong> server-side cookie defaults force <code>httpOnly: true</code> on every cookie they write — including the <code>sb-&lt;ref&gt;-auth-token</code> chunks. <code>src/utils/supabase/server.ts:10-16</code> and <code>src/utils/supabase/middleware.ts:6-12</code> both define <code>{ httpOnly: true, ...options }</code> defaults, and <code>@supabase/ssr</code> doesn't override <code>httpOnly</code>, so the auth cookies land HttpOnly. The browser supabase-js client (<code>src/utils/supabase/client.ts:19-28</code>) reads cookies via <code>document.cookie</code>, which by spec cannot see HttpOnly cookies — so <code>getSession()</code> returns null, Realtime channels never authenticate, and <code>TokenRefreshService</code> throws <code>REFRESH_FAILED</code> (the symptom #404 patched as graceful failure). Regression introduced in commit <code>f49f6ec5</code> (2026-01-07 mobile-Safari ITP fix); the <code>sameSite: 'lax'</code> + request+response sync changes in that commit were correct, only <code>httpOnly: true</code> was wrong. <strong>Fix:</strong> drop <code>httpOnly: true</code> from <code>getDefaultCookieOptions</code> (server.ts) and <code>getCookieOptions</code> (middleware.ts); auth cookies must be JS-readable for the <code>@supabase/ssr</code> SSR↔browser bridge. ~2-line change in 2 files. Add a browser <code>getSession()</code> smoke test in <code>src/lib/auth/__tests__/token-refresh-and-session.test.ts</code> that fails if auth cookies are written HttpOnly. <strong>Tradeoff:</strong> XSS-exfiltrable auth tokens in principle; mitigated by existing CSP + dompurify + Supabase's short-lived JWT + refresh-token rotation. <strong>Keep #404 patch in place</strong> — graceful sign-in redirect on legitimate session expiry is still correct behavior. <strong>Out of scope:</strong> Realtime reconnect handler (see <code>docs/architecture/REMEDIATION_PLAN.md</code>). See <code>docs/JOURNAL.md</code> 2026-05-19 for full trace."
+      "description": "<strong>DONE — shipped in PR #409 (merged 2026-05-22), live on apex via #412.</strong> Remaining: confirm Sentry READY-SET-NEXTJS-1S goes silent with an authenticated apex check. <strong>Root cause (investigated 2026-05-19):</strong> server-side cookie defaults force <code>httpOnly: true</code> on every cookie they write — including the <code>sb-&lt;ref&gt;-auth-token</code> chunks. <code>src/utils/supabase/server.ts:10-16</code> and <code>src/utils/supabase/middleware.ts:6-12</code> both define <code>{ httpOnly: true, ...options }</code> defaults, and <code>@supabase/ssr</code> doesn't override <code>httpOnly</code>, so the auth cookies land HttpOnly. The browser supabase-js client (<code>src/utils/supabase/client.ts:19-28</code>) reads cookies via <code>document.cookie</code>, which by spec cannot see HttpOnly cookies — so <code>getSession()</code> returns null, Realtime channels never authenticate, and <code>TokenRefreshService</code> throws <code>REFRESH_FAILED</code> (the symptom #404 patched as graceful failure). Regression introduced in commit <code>f49f6ec5</code> (2026-01-07 mobile-Safari ITP fix); the <code>sameSite: 'lax'</code> + request+response sync changes in that commit were correct, only <code>httpOnly: true</code> was wrong. <strong>Fix:</strong> drop <code>httpOnly: true</code> from <code>getDefaultCookieOptions</code> (server.ts) and <code>getCookieOptions</code> (middleware.ts); auth cookies must be JS-readable for the <code>@supabase/ssr</code> SSR↔browser bridge. ~2-line change in 2 files. Add a browser <code>getSession()</code> smoke test in <code>src/lib/auth/__tests__/token-refresh-and-session.test.ts</code> that fails if auth cookies are written HttpOnly. <strong>Tradeoff:</strong> XSS-exfiltrable auth tokens in principle; mitigated by existing CSP + dompurify + Supabase's short-lived JWT + refresh-token rotation. <strong>Keep #404 patch in place</strong> — graceful sign-in redirect on legitimate session expiry is still correct behavior. <strong>Out of scope:</strong> Realtime reconnect handler (see <code>docs/architecture/REMEDIATION_PLAN.md</code>). See <code>docs/JOURNAL.md</code> 2026-05-19 for full trace."
     },
     {
       "id": "test-telnyx-integration",
@@ -345,11 +347,11 @@
     },
     {
       "id": "fernando-redesign-address-manager",
-      "status": "new",
-      "title": "Redesign address manager — 3 proposals",
+      "status": "done",
+      "title": "Redesign address manager",
       "owner": "fernando",
       "source": "may19",
-      "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders. Develop 3 design proposals and review with Iman to pick the one that fits current architecture."
+      "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders. <strong>DONE — shipped in PR #417 (merged 2026-05-25):</strong> AddressSelector redesigned with RouteBuilder, MiniMap & geocoding + mobile-responsive pass; CateringRequestForm unified to a single AddressSelector. Superseded the original 3-proposal-review-with-Iman approach by shipping the redesign directly."
     },
     {
       "id": "push-jitter-dev-code",
@@ -361,14 +363,14 @@
     },
     {
       "id": "driver-integration-realworld-test",
-      "status": "new",
+      "status": "done",
       "title": "Real-world driver integration test (Thursday 2026-05-21)",
       "owner": "emmanuel",
       "source": "may19",
       "tags": [
         "critical"
       ],
-      "description": "Real-world test with Gary + Mark on Thursday 2026-05-21. Monitor logs, identify + resolve errors. Co-owners: Fernando (testing), Gary (field). First step of the 3-week phased rollout (2–3 drivers at a time) leading to the July Cool Fire sunset."
+      "description": "Real-world test with Gary + Mark on Thursday 2026-05-21. Monitor logs, identify + resolve errors. Co-owners: Fernando (testing), Gary (field). First step of the 3-week phased rollout (2–3 drivers at a time) leading to the July Cool Fire sunset. <strong>Jun 1 update:</strong> device testing on Android + Apple ran (week of May 29); surfaced a refresh-rate issue. Continued testing tracked under <code>mobile-refresh-rate-testing</code>."
     },
     {
       "id": "gary-review-hours-file",
@@ -404,7 +406,7 @@
     },
     {
       "id": "rea-367-realtime-channel-off-cleanup",
-      "status": "progress",
+      "status": "done",
       "title": "REA-367 — Realtime <code>channel.off()</code> cleanup throws (channel closes ~1ms after subscribe)",
       "owner": "emmanuel",
       "source": "qa",
@@ -414,7 +416,7 @@
         "bug",
         "critical"
       ],
-      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical). <strong>In progress:</strong> fixed in PR #410 (stable broadcast dispatcher; removed the phantom <code>channel.off()</code> + its <code>.d.ts</code> augmentation; 38 tests). The TypeError + cleanup WARN are verified gone. The remaining subscribe→close (StrictMode) is split to <code>rea-367b-realtime-strictmode-resubscribe</code>."
+      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical). <strong>DONE (PR #410, merged 2026-05-22, live via #412):</strong> fixed in PR #410 (stable broadcast dispatcher; removed the phantom <code>channel.off()</code> + its <code>.d.ts</code> augmentation; 38 tests). The TypeError + cleanup WARN are verified gone. The remaining subscribe→close (StrictMode) is split to <code>rea-367b-realtime-strictmode-resubscribe</code>."
     },
     {
       "id": "rea-367b-realtime-strictmode-resubscribe",
@@ -428,6 +430,84 @@
         "bug"
       ],
       "description": "Split from REA-367. After the <code>channel.off</code> fix (PR #410), the admin <code>driver-locations</code> channel still reaches <code>subscribed</code> then closes ~1ms later in dev and does not re-subscribe. Root cause is a React <strong>StrictMode</strong> double-invoke race in <code>useAdminRealtimeTracking</code> (<code>src/hooks/tracking/useAdminRealtimeTracking.ts:512-534</code>): mount 1's deferred <code>.then</code> cleanup (lines 518-523) calls <code>removeChannel('driver-locations')</code> on the channel mount 2 established (the RealtimeClient dedups by channel name), tearing it down with no re-subscribe. StrictMode double-invoke is <strong>dev-only</strong>, so production single-mount is unaffected — but it blocks dev/QA (DRT-06+). <strong>Fix direction:</strong> ref-count or guard the shared channel so a stale mount's cleanup can't remove a channel a live mount owns (or key channels per-subscriber). Verify on <code>development.readysetllc.com</code> (prod build, no StrictMode double-invoke) after #410 merges. Found during #410 verification on 2026-05-20."
+    },
+    {
+      "id": "migrate-vercel-to-vps",
+      "status": "progress",
+      "title": "Migrate all sites/apps from Vercel → Hetzner VPS",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "tags": [
+        "critical"
+      ],
+      "description": "<strong>Decision aligned Jun 1.</strong> Vercel now bills per-deployment (cost creep; $24 pending) and has had security issues; consolidate all live websites + tracking apps onto a single Hetzner VPS for cost control, performance, and direct management (~5 hrs/month maintenance). In progress on branch <code>chore/self-host-image-envs</code> (CI builds the prod image → GHCR). See <code>docs/STATUS.md</code> → infra."
+    },
+    {
+      "id": "migrate-error-tracking-self-host",
+      "status": "new",
+      "title": "Self-host the error-tracking app on the VPS",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "description": "The free hosted error-tracking tier hit its event-capture limit. Relocate the error-tracking app to the dedicated VPS to remove usage caps. Part of the Vercel → VPS migration."
+    },
+    {
+      "id": "driver-photo-signature-required",
+      "status": "new",
+      "title": "Mandatory driver photo + signature capture",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability."
+    },
+    {
+      "id": "mobile-refresh-rate-testing",
+      "status": "progress",
+      "title": "Fix mobile refresh-rate issue + continue device testing",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "tags": [
+        "bug"
+      ],
+      "description": "Android + Apple device testing (week of May 29) surfaced a refresh-rate issue in the driver/tracking UI. Fix it and run further functional-error testing across this week. Co-owners: Fernando (testing), Gary (field screenshots)."
+    },
+    {
+      "id": "dashboard-redesign-helpdesk",
+      "status": "progress",
+      "title": "Help-desk dashboard front-end redesign",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "description": "Redesign in progress: simpler, more organized view for the help-desk team. Mobile-first, dark mode, in-app error reporting, improved responsiveness."
+    },
+    {
+      "id": "gary-email-cater-client",
+      "status": "new",
+      "title": "Email CaterCow re: API endpoint + timeline",
+      "owner": "gary",
+      "source": "jun1",
+      "description": "No recent updates from CaterCow on their webhook/API endpoint or testing. Gary to email (referencing the May 13 correspondence) requesting an update and pushing them to proceed to production. Unblocks the CaterCow webhook work (<code>catercow-webhook-preconfigure</code>, <code>catercow-hmac-secret</code>)."
+    },
+    {
+      "id": "emmanuel-forward-cater-email",
+      "status": "new",
+      "title": "Forward prior CaterCow correspondence to Gary",
+      "owner": "emmanuel",
+      "source": "jun1",
+      "description": "Forward the previous CaterCow email thread to Gary so he can follow up (see <code>gary-email-cater-client</code>)."
+    },
+    {
+      "id": "gary-screenshot-layout-errors",
+      "status": "new",
+      "title": "Capture screenshots of layout problems / errors",
+      "owner": "gary",
+      "source": "jun1",
+      "description": "Gary to capture and provide screenshots of any layout issues or errors encountered while using the app, to feed the bug queue."
+    },
+    {
+      "id": "fernando-verify-driver-pay",
+      "status": "new",
+      "title": "Verify driver payment calculation accuracy",
+      "owner": "fernando",
+      "source": "jun1",
+      "description": "Fernando shifting toward help-desk ops; review the testing results to confirm driver payment amounts calculate correctly."
     }
   ]
 }
