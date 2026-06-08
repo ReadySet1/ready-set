@@ -29,6 +29,11 @@ jest.mock('pg', () => {
 // Export mocks for the pg mock to access
 module.exports = { mocks };
 
+// Route gained withAuth in the security-hardening pass — mock it (default ADMIN).
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { withAuth } from '@/lib/auth-middleware';
+const mockWithAuth = withAuth as jest.Mock;
+
 import { GET, POST } from '@/app/api/tracking/locations/route';
 import {
   createGetRequest,
@@ -40,6 +45,10 @@ import {
 describe('/api/tracking/locations API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockWithAuth.mockResolvedValue({
+      success: true,
+      context: { user: { id: 'admin-1', type: 'ADMIN' } },
+    });
     // Reset connect mock to return a client with query and release
     mocks.connect.mockResolvedValue({
       query: mocks.clientQuery,
@@ -352,10 +361,12 @@ describe('/api/tracking/locations API', () => {
 
         await POST(request);
 
-        // Verify driver update query was called with correct POINT string
+        // Verify driver update used the parameterized geometry (security hardening:
+        // coordinates are bound as numeric params, never string-interpolated).
         const updateCall = mocks.clientQuery.mock.calls[3];
         expect(updateCall[0]).toContain('UPDATE drivers');
-        expect(updateCall[1]).toContain('POINT(-97.7431 30.2672)');
+        expect(updateCall[0]).toContain('ST_MakePoint');
+        expect(updateCall[1]).toEqual([-97.7431, 30.2672, 'driver-123']);
       });
 
       it('should rollback transaction on error', async () => {
