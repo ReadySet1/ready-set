@@ -7,6 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService, CarrierWebhookService } from '@/lib/services/carrierService';
+import {
+  recordAndDispatchLifecycleEvent,
+  DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
+} from '@/lib/services/partnerWebhookService';
 import { DriverStatus } from '@/types/prisma';
 import { DriverStatus as DriverStatusEnum } from '@/types/user';
 import { getEmailPreferencesForUser } from "@/lib/email-preferences";
@@ -108,6 +112,7 @@ export async function PATCH(
               select: {
                 id: true,
                 name: true,
+                contactNumber: true,
               },
             },
           },
@@ -249,6 +254,33 @@ export async function PATCH(
           error: error instanceof Error ? error.message : 'Unknown ezCater error',
         };
       }
+    }
+
+    // 5c. Registry-driven partner webhooks (e.g. CaterCow) — partners in
+    //     api_partners that aren't hardcoded in CARRIER_CONFIGS. Maps the
+    //     internal driver status to the partner-facing lifecycle, records
+    //     it to order_status_history, and POSTs a signed webhook. The
+    //     helper self-guards against legacy carriers and non-partner
+    //     orders, and never throws.
+    const partnerLifecycle = DRIVER_STATUS_TO_PARTNER_LIFECYCLE[validatedData.driverStatus];
+    if (partnerLifecycle) {
+      const driverProfile = order.dispatches[0]?.driver;
+      const driver =
+        driverProfile?.name && driverProfile?.contactNumber
+          ? { name: driverProfile.name, phone: driverProfile.contactNumber }
+          : undefined;
+      await recordAndDispatchLifecycleEvent({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        partnerStatus: partnerLifecycle,
+        driverStatus: validatedData.driverStatus,
+        changedBy: validatedData.driverId ?? driverProfile?.id ?? null,
+        driver,
+        location: validatedData.location
+          ? { lat: validatedData.location.latitude, lng: validatedData.location.longitude }
+          : undefined,
+        notes: validatedData.notes,
+      });
     }
 
     // 6. Create dispatch record if driver is assigned

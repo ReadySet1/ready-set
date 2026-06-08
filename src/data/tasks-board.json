@@ -295,7 +295,7 @@
       "title": "Pre-configure CaterCow staging webhook URL",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "Dispatcher landed (<code>src/lib/services/partnerWebhookService.ts</code>) and wired into the status route; <code>scripts/update-partner-webhook.ts</code> is ready. Still need to run it against the staging DB: <code>PARTNER_SLUG=catercow WEBHOOK_URL=https://api.staging.steerdelivery.com/webhooks/ready_set pnpm tsx scripts/update-partner-webhook.ts</code>. Their endpoint isn't live yet, so dispatcher will log <code>[partner-webhook] misconfigured</code> until <code>webhookSecret</code> is also set."
+      "description": "Dispatcher code is shipped (<code>catercow-dispatcher-refactor</code>); <code>scripts/set-partner-webhook.ts</code> is ready. Remaining (ops): run against staging to set CaterCow's <code>webhook_url</code> = <code>https://api.staging.steerdelivery.com/webhooks/ready_set</code> and a generated secret. CaterCow dev row exists (CC-, active, url/secret still null → dispatcher logs <code>[partner-webhook] skipped</code> until set)."
     },
     {
       "id": "catercow-dispatcher-refactor",
@@ -303,15 +303,15 @@
       "title": "Generalize outbound webhook dispatcher (partner-registry-driven)",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the <code>api_partners</code> row at send time. Wired into <code>/api/catering-requests/[orderId]/status/route.ts</code> for partners not in <code>CARRIER_CONFIGS</code>. HMAC-SHA256 signed per <code>API_CONTRACT.md</code> (<code>x-readyset-signature</code>); 3-attempt retry, no-retry on 4xx; 6 new unit tests; existing 161 cater-valley tests still green."
+      "description": "<strong>Built</strong> on <code>feature/catercow-partner-webhooks</code> (commit <code>50d78873</code>, off <code>development</code>). New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the resolved <code>api_partners</code> row; builds the contract payload, HMAC-SHA256 signs it (<code>x-readyset-signature</code>), 3-attempt backoff (no retry on 4xx), skips with a logged notice when unconfigured. <code>recordAndDispatchLifecycleEvent</code> writes history + dispatches, self-guarding against <code>CARRIER_CONFIGS</code> and non-partner orders. Added <code>getPartnerByOrderNumber</code> (registry, prefix-match, cached). Wired into the driver status route (<code>driverStatus</code>→ASSIGNED/PICKED_UP/ON_THE_WAY/ARRIVED/DELIVERED) and the confirm cancel branch (CANCELLED). 7 unit tests green."
     },
     {
       "id": "catercow-hmac-secret",
-      "status": "new",
+      "status": "progress",
       "title": "Generate + deliver CaterCow webhook HMAC secret",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "Generate a 256-bit secret (<code>crypto.randomBytes(32)</code>), set <code>webhookSecret</code> on the staging row, deliver to CaterCow via 1Password share link (7-day expiry). Trigger: their webhook endpoint becomes reachable."
+      "description": "Generation + delivery now handled by <code>scripts/set-partner-webhook.ts</code> (generates a 256-bit secret, prints once for 1Password). Run: <code>PARTNER_SLUG=catercow WEBHOOK_URL=https://api.staging.steerdelivery.com/webhooks/ready_set DATABASE_URL=$STAGING_DATABASE_URL pnpm tsx scripts/set-partner-webhook.ts</code>, capture secret → 1Password → share with Nate. Trigger: their staging endpoint reachable (Nate says it's ready)."
     },
     {
       "id": "catercow-steerdelivery-domain-check",
@@ -323,11 +323,11 @@
     },
     {
       "id": "catercow-get-orders-scope",
-      "status": "open",
-      "title": "Scope GET /orders/{id} for partner API v1.x",
+      "status": "done",
+      "title": "GET /orders/{id} for partner API",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "Pre-scoped in <code>docs/catercow/IMPLEMENTATION_PLAN.md</code> Phase 4.1 (~half day). Reads from <code>catering_requests</code> filtered by <code>brokerage = partner.displayName</code>, returns status + last 10 lifecycle events. Pull forward only if CaterCow flags as a go-live blocker."
+      "description": "<strong>Built</strong> (commit <code>50d78873</code>). <code>GET /api/partners/orders/{id}</code> (+ cater-valley alias) returns current status + last 10 lifecycle events from the new <code>order_status_history</code> table, with the same partner-ownership check as the writes. Backed by migration <code>20260605000000_add_order_status_history</code> (applied to dev Supabase). 6 endpoint tests green."
     },
     {
       "id": "catercow-openapi-export",
@@ -508,6 +508,15 @@
       "owner": "fernando",
       "source": "jun1",
       "description": "Fernando shifting toward help-desk ops; review the testing results to confirm driver payment amounts calculate correctly."
+    },
+    {
+      "id": "catercow-durable-webhook-retry",
+      "status": "open",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "title": "Durable webhook retry queue (fast-follow)",
+      "description": "v1 dispatcher does in-request retries (3 attempts, short backoff). The contract promises “5 attempts over ~30 min”, which needs a queue/cron, not in-request retries. Build a <code>partner_webhook_deliveries</code> table + cron worker on top of the existing <code>order_status_history</code> table. Not a go-live blocker — missed callbacks are recoverable via <code>GET /orders/{id}</code>.",
+      "tags": []
     }
   ]
 }

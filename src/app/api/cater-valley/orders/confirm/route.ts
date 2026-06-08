@@ -20,6 +20,7 @@ import {
   isOrderEditable,
   isPartnerOrder,
 } from '@/app/api/cater-valley/_lib';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 
 const ConfirmOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID format'),
@@ -153,6 +154,16 @@ export async function POST(request: NextRequest) {
             : existingOrder.specialNotes,
           updatedAt: new Date(),
         },
+      });
+
+      // Notify the partner of the cancellation (records to
+      // order_status_history + POSTs a signed CANCELLED webhook). The
+      // helper self-guards against legacy carriers and never throws.
+      await recordAndDispatchLifecycleEvent({
+        orderId: cancelledOrder.id,
+        orderNumber: cancelledOrder.orderNumber,
+        partnerStatus: 'CANCELLED',
+        notes: validatedData.reason,
       });
 
       return storeAndReturnResponse(idempotency, 200, {
