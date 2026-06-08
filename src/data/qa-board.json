@@ -1,11 +1,11 @@
 {
   "source": "2026-Q2-test-cases.csv",
   "generated": "2026-05-23",
-  "total": 35,
+  "total": 36,
   "counts": {
     "PASS": 11,
     "PARTIAL-FAIL": 4,
-    "FAIL": 17,
+    "FAIL": 18,
     "BLOCKED": 1,
     "IN-PROGRESS": 1,
     "NOT-RUN": 1,
@@ -1201,6 +1201,36 @@
           "step": "Reload page; switch tab",
           "data": "",
           "expected": "Entry still visible (persisted)"
+        }
+      ]
+    },
+    {
+      "key": "REA-QF-01",
+      "summary": "Quote forms 500 ERR_REQUIRE_ESM on submit (food/flower/bakery/specialty)",
+      "description": "All four logistics quote-request forms fail on submit in production: POST /api/form-submissions returns 500 and the UI shows 'Unexpected token <, <!DOCTYPE ... is not valid JSON'.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Emmanuel Alanis",
+      "labels": ["qa", "q2-2026", "quote-forms", "build", "bug"],
+      "components": ["Logistics/QuoteRequest/FormManager", "api/form-submissions", "lib/email-service"],
+      "folder": "Q2 2026/Quote Forms",
+      "notes": "FAIL - Found 2026-06-04 (production). The food-delivery quote form, plus the flower/bakery/specialty forms (all share one endpoint via FormManager.tsx), fail on submit: POST /api/form-submissions -> 500 FUNCTION_INVOCATION_FAILED. Root cause: require() of ES Module @exodus/bytes/encoding-lite.js from html-encoding-sniffer@6.0.0 not supported (ERR_REQUIRE_ESM), reached via EmailService -> isomorphic-dompurify -> jsdom@28 -> html-encoding-sniffer@6 -> @exodus/bytes (ESM-only). It fails at module-load time, so the route try/catch never runs; Vercel returns an HTML 500 and the client's res.json() throws 'Unexpected token <'. IMPORTANT: `next dev` does NOT reproduce this (jsdom is bundled in dev); only the production/standalone build externalizes jsdom and hits the raw require() — verify with `pnpm vercel-sim`. Same ESM/CJS class as REA-DRT-11 (driver pages). Suggested fix: remove isomorphic-dompurify from server paths (use he.escape in EmailService; sanitize-html in validation.ts InputSanitizer and free-resources/[slug]/page.tsx), then drop isomorphic-dompurify and the jsdom externalization in next.config.js (keep jsdom as devDependency). Confirm all 4 quote types return 200 against a production-like build. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Open /logistics and submit each quote form: food, flower, bakery, specialty",
+          "data": "Valid required fields",
+          "expected": "200 + 'Request submitted successfully' for each type"
+        },
+        {
+          "step": "Watch Vercel logs (or production-like build) during submit",
+          "data": "",
+          "expected": "No 500 ERR_REQUIRE_ESM on POST /api/form-submissions"
+        },
+        {
+          "step": "Reproduce/verify in a production-like build, NOT next dev",
+          "data": "pnpm vercel-sim or standalone build",
+          "expected": "Bug reproduces pre-fix and is gone post-fix"
         }
       ]
     }
