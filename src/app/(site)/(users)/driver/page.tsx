@@ -22,11 +22,22 @@ import {
 import { DriverProfileSheet } from "@/components/Driver/ui/DriverProfileSheet";
 import { DriverStatsPanel } from "@/components/Driver/DriverStatsPanel";
 import { DriverDeliveryList } from "@/components/Driver/DriverDeliveryList";
+import { useDriverDeliveriesFeed } from "@/hooks/driver/useDriverDeliveriesFeed";
 
 export default function DriverHomePage() {
   const { logout } = useUser();
   const supabase = createClient();
-  const { isShiftActive, currentShift, activeDeliveries } = useDriverTracking();
+  const { isShiftActive, currentShift } = useDriverTracking();
+
+  // Single source for the deliveries list AND the "N active" count below, so
+  // they can never disagree (the prior bug). Polls + refreshes on focus.
+  const {
+    deliveries,
+    loading: deliveriesLoading,
+    error: deliveriesError,
+    refresh: refreshDeliveries,
+    activeCount,
+  } = useDriverDeliveriesFeed();
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -81,7 +92,6 @@ export default function DriverHomePage() {
   const shiftSeconds = currentShift?.startTime
     ? Math.floor((now.getTime() - new Date(currentShift.startTime).getTime()) / 1000)
     : 0;
-  const activeCount = activeDeliveries?.length ?? 0;
 
   const handleSignOut = async () => {
     try {
@@ -188,7 +198,12 @@ export default function DriverHomePage() {
 
         {driverId ? <DriverStatsPanel driverId={driverId} /> : null}
 
-        <DriverDeliveryList />
+        <DriverDeliveryList
+          deliveries={deliveries}
+          loading={deliveriesLoading}
+          error={deliveriesError}
+          onRetry={refreshDeliveries}
+        />
       </div>
     </DriverScreen>
   );
