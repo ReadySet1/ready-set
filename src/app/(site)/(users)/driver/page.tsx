@@ -1,315 +1,210 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
-  NavigationIcon,
-  MapPinIcon,
-  ClockIcon,
-  TruckIcon,
-  PlayIcon,
-  PauseIcon,
-  PackageIcon,
-  CheckCircleIcon,
-  AlertCircleIcon,
-  UserIcon,
-  HistoryIcon,
-  LogOutIcon,
+  ChevronRight,
+  Clock,
+  History,
+  Navigation,
+  Package,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import DriverDeliveries from "@/components/Driver/DriverDeliveries";
-import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
-import { useDriverStats } from "@/hooks/tracking/useDriverStats";
+import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { useUser } from "@/contexts/UserContext";
 import { clearAuthCookies } from "@/utils/auth/cookies";
 import { createClient } from "@/utils/supabase/client";
+import { cn } from "@/lib/utils";
+import {
+  DriverCard,
+  DriverScreen,
+  formatDurationShort,
+} from "@/components/Driver/ui";
+import { DriverProfileSheet } from "@/components/Driver/ui/DriverProfileSheet";
+import { DriverStatsPanel } from "@/components/Driver/DriverStatsPanel";
+import { DriverDeliveryList } from "@/components/Driver/DriverDeliveryList";
+import { useDriverDeliveriesFeed } from "@/hooks/driver/useDriverDeliveriesFeed";
 
-interface ShiftStatus {
-  isActive: boolean;
-  startTime?: Date;
-  duration?: string;
-}
+export default function DriverHomePage() {
+  const { logout } = useUser();
+  const supabase = createClient();
+  const { isShiftActive, currentShift } = useDriverTracking();
 
-const DriverPage = () => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isMounted, setIsMounted] = useState(false);
-  const [shiftStatus, setShiftStatus] = useState<ShiftStatus>({ isActive: false });
+  // Single source for the deliveries list AND the "N active" count below, so
+  // they can never disagree (the prior bug). Polls + refreshes on focus.
+  const {
+    deliveries,
+    loading: deliveriesLoading,
+    error: deliveriesError,
+    refresh: refreshDeliveries,
+    activeCount,
+  } = useDriverDeliveriesFeed();
+
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(new Date());
   const [driverName, setDriverName] = useState("Driver");
   const [driverId, setDriverId] = useState<string | null>(null);
 
-  const { logout } = useUser();
-  const supabase = createClient();
+  useEffect(() => {
+    setMounted(true);
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const profileRes = await fetch("/api/profile");
+        if (!profileRes.ok) return;
+        const profile = await profileRes.json();
+        setDriverName(profile.name || profile.firstName || "Driver");
+
+        const driverRes = await fetch("/api/tracking/drivers?limit=1");
+        if (driverRes.ok) {
+          const driverData = await driverRes.json();
+          if (driverData.success && driverData.data?.length > 0) {
+            setDriverId(driverData.data[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching driver info:", err);
+      }
+    })();
+  }, []);
+
+  const greeting = useMemo(() => {
+    const h = now.getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  }, [now]);
+
+  const dateLabel = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const timeLabel = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const shiftSeconds = currentShift?.startTime
+    ? Math.floor((now.getTime() - new Date(currentShift.startTime).getTime()) / 1000)
+    : 0;
 
   const handleSignOut = async () => {
     try {
       clearAuthCookies();
       await supabase.auth.signOut();
+      await logout?.();
+    } catch (err) {
+      console.error("Error signing out:", err);
+    } finally {
       window.location.href = "/sign-in";
-    } catch (error) {
-      console.error("Error signing out:", error);
     }
   };
 
-  // Fetch driver stats for the quick summary
-  const { data: stats } = useDriverStats({
-    driverId: driverId || '',
-    period: 'today',
-    enabled: !!driverId,
-  });
-
-  // Ensure time-based UI only renders on the client to avoid SSR hydration mismatches
-  useEffect(() => {
-    setIsMounted(true);
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Calculate greeting based on current time - memoized to prevent unnecessary recalculations
-  const greeting = useMemo(() => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'afternoon';
-    return 'evening';
-  }, [currentTime]);
-
-  // Fetch driver profile and ID
-  useEffect(() => {
-    const fetchDriverInfo = async () => {
-      try {
-        // Fetch user profile to get driver info
-        const profileResponse = await fetch('/api/profile');
-        if (profileResponse.ok) {
-          const profile = await profileResponse.json();
-          setDriverName(profile.name || profile.firstName || 'Driver');
-
-          // Fetch driver ID using the profile
-          const driverResponse = await fetch('/api/tracking/drivers?limit=1');
-          if (driverResponse.ok) {
-            const driverData = await driverResponse.json();
-            if (driverData.success && driverData.data?.length > 0) {
-              // For drivers, the API returns their own driver record
-              setDriverId(driverData.data[0].id);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching driver info:', error);
-      }
-    };
-
-    fetchDriverInfo();
-  }, []);
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      month: 'long', 
-      day: 'numeric'
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-gray-900 dark:to-gray-800">
-      {/* Mobile-optimized header */}
-      <div className="bg-white dark:bg-gray-900 shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
-                <TruckIcon className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Driver Dashboard</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400" suppressHydrationWarning>
-                  {isMounted ? formatDate(currentTime) : ''}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="text-right">
-                <div className="text-lg font-bold text-gray-900 dark:text-white" suppressHydrationWarning>
-                  {isMounted ? formatTime(currentTime) : ''}
-                </div>
-                <div className="flex items-center space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${shiftStatus.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {shiftStatus.isActive ? 'On Shift' : 'Off Shift'}
-                  </span>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
-                      <UserIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link href="/driver/profile" className="flex items-center">
-                      <UserIcon className="w-4 h-4 mr-2" />
-                      My Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="text-red-600 dark:text-red-400"
-                  >
-                    <LogOutIcon className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+  const header = (
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] font-bold text-driver-muted" suppressHydrationWarning>
+          {mounted ? `${dateLabel} · ${timeLabel}` : ""}
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Welcome Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>
-                {isMounted ? `Good ${greeting}, ${driverName}!` : `Hello, ${driverName}!`}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">Ready to make some deliveries today?</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Start Shift / Tracking */}
-          <Link href="/driver/tracking" className="block">
-            <Card className="h-full border-2 border-transparent hover:border-amber-500 transition-all duration-200 bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 hover:shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      {shiftStatus.isActive ? (
-                        <PauseIcon className="w-6 h-6" />
-                      ) : (
-                        <PlayIcon className="w-6 h-6" />
-                      )}
-                      <h3 className="text-lg font-semibold">
-                        {shiftStatus.isActive ? 'Manage Shift' : 'Start Shift'}
-                      </h3>
-                    </div>
-                    <p className="text-gray-700 text-sm">
-                      {shiftStatus.isActive
-                        ? 'Track location & manage deliveries'
-                        : 'Begin tracking your shift & location'
-                      }
-                    </p>
-                    {shiftStatus.isActive && shiftStatus.duration && (
-                      <div className="flex items-center space-x-1 text-gray-700">
-                        <ClockIcon className="w-4 h-4" />
-                        <span className="text-xs">Active for {shiftStatus.duration}</span>
-                      </div>
-                    )}
-                  </div>
-                  <NavigationIcon className="w-8 h-8 opacity-60" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* View Deliveries */}
-          <Card className="h-full border-2 border-transparent hover:border-amber-400 transition-all duration-200 bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <MapPinIcon className="w-6 h-6 text-amber-400" />
-                    <h3 className="text-lg font-semibold">My Deliveries</h3>
-                  </div>
-                  <p className="text-gray-300 text-sm">
-                    View today's delivery schedule
-                  </p>
-                  <div className="flex items-center space-x-4 text-amber-300">
-                    <div className="flex items-center space-x-1">
-                      <PackageIcon className="w-4 h-4" />
-                      <span className="text-xs">
-                        {stats?.deliveryStats.inProgress ?? 0} Pending
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <CheckCircleIcon className="w-4 h-4" />
-                      <span className="text-xs">
-                        {stats?.deliveryStats.completed ?? 0} Complete
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <MapPinIcon className="w-8 h-8 text-amber-400 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* View History */}
-          <Link href="/driver/history" className="block">
-            <Card className="h-full border-2 border-transparent hover:border-yellow-500 transition-all duration-200 bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <HistoryIcon className="w-6 h-6" />
-                      <h3 className="text-lg font-semibold">View History</h3>
-                    </div>
-                    <p className="text-gray-700 text-sm">
-                      View and export your delivery history
-                    </p>
-                    <div className="flex items-center space-x-1 text-gray-700">
-                      <ClockIcon className="w-4 h-4" />
-                      <span className="text-xs">Past 12 weeks available</span>
-                    </div>
-                  </div>
-                  <HistoryIcon className="w-8 h-8 opacity-60" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Performance Stats Card */}
-        {driverId && (
-          <DriverStatsCard
-            driverId={driverId}
-            defaultPeriod="today"
-            showTrends={true}
+        <h1 className="mt-0.5 text-driver-node font-extrabold leading-tight text-driver-text">
+          {greeting},{" "}
+          <span className="text-driver-on-brand">{driverName}</span>
+        </h1>
+        <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-driver-surface-alt px-2.5 py-1">
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              isShiftActive
+                ? "animate-driver-pulse bg-driver-success"
+                : "bg-driver-subtle",
+            )}
           />
-        )}
-
-        {/* Delivery Details */}
-        <DriverDeliveries />
+          <span className="text-[11.5px] font-extrabold text-driver-muted">
+            {isShiftActive ? "On shift" : "Off shift"}
+          </span>
+        </div>
       </div>
+      <DriverProfileSheet driverName={driverName} onSignOut={handleSignOut} />
     </div>
   );
-};
 
-export default DriverPage;
+  return (
+    <DriverScreen header={header}>
+      <div className="space-y-6">
+        {/* Entry cards */}
+        <div className="space-y-3">
+          <Link href="/driver/tracking" className="block">
+            <DriverCard
+              interactive
+              className={cn(
+                "flex items-center gap-3.5",
+                isShiftActive && "bg-gradient-to-br from-driver-brand/15 to-transparent",
+              )}
+            >
+              <span className="flex h-driver-control w-driver-control shrink-0 items-center justify-center rounded-2xl bg-driver-brand text-driver-brand-ink">
+                <Navigation className="h-6 w-6" strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[15.5px] font-extrabold text-driver-text">
+                  {isShiftActive ? "Active shift" : "Start shift"}
+                </div>
+                <div className="text-[12.5px] font-semibold text-driver-muted">
+                  {isShiftActive
+                    ? "Track location & manage deliveries"
+                    : "Begin tracking your shift & location"}
+                </div>
+                {isShiftActive && currentShift?.startTime ? (
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-bold text-driver-on-brand">
+                    <Clock className="h-3.5 w-3.5" />
+                    Active for {formatDurationShort(shiftSeconds)}
+                  </div>
+                ) : null}
+              </div>
+              <ChevronRight className="h-5 w-5 text-driver-subtle" strokeWidth={2.4} />
+            </DriverCard>
+          </Link>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/driver/tracking" className="block">
+              <DriverCard interactive className="flex h-full flex-col gap-2">
+                <Package className="h-6 w-6 text-driver-on-brand" strokeWidth={2.2} />
+                <div className="text-[13.5px] font-extrabold text-driver-text">
+                  My deliveries
+                </div>
+                <div className="mt-auto text-[11.5px] font-semibold text-driver-muted">
+                  {activeCount} active
+                </div>
+              </DriverCard>
+            </Link>
+
+            <Link href="/driver/history" className="block">
+              <DriverCard interactive className="flex h-full flex-col gap-2">
+                <History className="h-6 w-6 text-driver-on-brand" strokeWidth={2.2} />
+                <div className="text-[13.5px] font-extrabold text-driver-text">
+                  View history
+                </div>
+                <div className="mt-auto text-[11.5px] font-semibold text-driver-muted">
+                  Past 12 weeks
+                </div>
+              </DriverCard>
+            </Link>
+          </div>
+        </div>
+
+        {driverId ? <DriverStatsPanel driverId={driverId} /> : null}
+
+        <DriverDeliveryList
+          deliveries={deliveries}
+          loading={deliveriesLoading}
+          error={deliveriesError}
+          onRetry={refreshDeliveries}
+        />
+      </div>
+    </DriverScreen>
+  );
+}

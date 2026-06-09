@@ -57,6 +57,7 @@ interface CacheEntry {
 
 const cacheByHash = new Map<string, CacheEntry>();
 const cacheBySlug = new Map<string, { partner: ResolvedPartner; expiresAt: number }>();
+let cacheActivePartners: { partners: ResolvedPartner[]; expiresAt: number } | null = null;
 
 function bypassCache(): boolean {
   return process.env.NODE_ENV === 'test';
@@ -132,6 +133,39 @@ export async function getPartnerBySlug(slug: string): Promise<ResolvedPartner | 
 }
 
 /**
+ * Resolve the partner that owns an order from its order number. Orders
+ * are persisted with `orderNumber = <orderPrefix><orderCode>` (e.g.
+ * `CC-12345`), so we match the order number against each active
+ * partner's `orderPrefix`. Used by the outbound webhook dispatcher to
+ * find the `webhookUrl` / `webhookSecret` for a status change.
+ *
+ * The active-partner list is tiny and cached for 60s, so this stays off
+ * the hot path of every driver status update. When prefixes overlap the
+ * longest match wins, so a more specific prefix can't be shadowed.
+ */
+export async function getPartnerByOrderNumber(orderNumber: string): Promise<ResolvedPartner | null> {
+  if (!orderNumber) return null;
+
+  let partners: ResolvedPartner[];
+  if (!bypassCache() && cacheActivePartners && cacheActivePartners.expiresAt > Date.now()) {
+    partners = cacheActivePartners.partners;
+  } else {
+    const rows = await prisma.apiPartner.findMany({
+      where: { deletedAt: null, isActive: true },
+    });
+    partners = rows.map(toResolvedPartner);
+    if (!bypassCache()) {
+      cacheActivePartners = { partners, expiresAt: Date.now() + POSITIVE_TTL_MS };
+    }
+  }
+
+  const match = partners
+    .filter((p) => p.orderPrefix && orderNumber.startsWith(p.orderPrefix))
+    .sort((a, b) => b.orderPrefix.length - a.orderPrefix.length)[0];
+  return match ?? null;
+}
+
+/**
  * Authenticate a partner request. Reads the `partner` and `x-api-key`
  * headers, hashes the key, looks up the partner row, and verifies that
  * the resolved row's slug matches the header value. Active flag is
@@ -198,6 +232,7 @@ export async function authenticatePartner(request: NextRequest | Request): Promi
 export function _resetPartnerCacheForTests(): void {
   cacheByHash.clear();
   cacheBySlug.clear();
+  cacheActivePartners = null;
 }
 
 /**

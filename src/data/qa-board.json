@@ -1,14 +1,14 @@
 {
   "source": "2026-Q2-test-cases.csv",
-  "generated": "2026-05-15",
-  "total": 29,
+  "generated": "2026-05-23",
+  "total": 36,
   "counts": {
-    "PASS": 7,
-    "PARTIAL-FAIL": 1,
-    "FAIL": 9,
-    "BLOCKED": 0,
+    "PASS": 11,
+    "PARTIAL-FAIL": 4,
+    "FAIL": 18,
+    "BLOCKED": 1,
     "IN-PROGRESS": 1,
-    "NOT-RUN": 11,
+    "NOT-RUN": 1,
     "SKIPPED": 0,
     "UNKNOWN": 0
   },
@@ -756,10 +756,114 @@
       ]
     },
     {
+      "key": "REA-DRT-09",
+      "summary": "Admin map: WebSocket 'connected' but renders zero drivers (marker flickers)",
+      "description": "Live admin tracking shows the driver marker appearing then disappearing while the dashboard stays in WebSocket mode. Root cause is in the data-source merge, not the GPS feed.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "realtime", "bug"],
+      "components": ["hooks/tracking/useAdminRealtimeTracking", "Dashboard/Tracking"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found in 2026-05-29 two-driver test session (development). useAdminRealtimeTracking merges sources as activeDrivers = (isRealtimeConnected && useRealtime) ? Array.from(realtimeDrivers.values()) : sseActiveDrivers. The realtimeDrivers Map is only populated by incoming driver_location_updated broadcasts, which never arrive (see REA-DRT-12). client.ts resolves onConnect on channel status SUBSCRIBED regardless of data, so isRealtimeConnected flips true and the map swaps to an empty source -> marker vanishes; on channel bounce it falls back to SSE -> marker reappears. No SSE seeding and no merge-by-driverId fallback. Evidence: screenshot 2:39 PM '1 drivers/1 updates' (SSE window) vs 3:03 PM 'WebSocket Mode / 0 drivers / No active drivers'. Fix: seed realtimeDrivers from SSE on connect, or merge by driverId instead of either/or; do not treat SUBSCRIBED as 'has data'. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /admin/tracking with realtime ON and 1-2 drivers on shift sending GPS", "data": "WebSocket mode", "expected": "Driver marker stays visible continuously"},
+        {"step": "Observe over several minutes", "data": "", "expected": "No flicker; marker persists across channel reconnects"},
+        {"step": "Toggle WebSocket/SSE mode", "data": "", "expected": "Same driver set in both modes (no empty map in WS mode)"}
+      ]
+    },
+    {
+      "key": "REA-DRT-10",
+      "summary": "SSE /api/tracking/live killed by Vercel 300s maxDuration",
+      "description": "The admin live stream endpoint terminates after 300s, dropping the only working transport (SSE) every 5 minutes.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "sse", "bug"],
+      "components": ["api/tracking/live"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). Route opens an SSE ReadableStream with a 5s setInterval but exports no maxDuration/runtime. Vercel runtime logs show repeated 'Vercel Runtime Timeout Error: Task timed out after 300 seconds' on GET /api/tracking/live. EventSource auto-reconnects but leaves data gaps every ~5 min, contributing to marker flicker (REA-DRT-09). Fix: add export const maxDuration / runtime, or move the live stream off a long-running serverless function (rely on Supabase Realtime once REA-DRT-12 is fixed). Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /admin/tracking and keep it open >5 min", "data": "", "expected": "Stream stays alive; no 300s timeout"},
+        {"step": "Check Vercel runtime logs for /api/tracking/live", "data": "", "expected": "No 'Task timed out after 300 seconds'"}
+      ]
+    },
+    {
+      "key": "REA-DRT-11",
+      "summary": "Driver pages 500 ERR_REQUIRE_ESM (html-encoding-sniffer / @exodus/bytes)",
+      "description": "Driver-facing routes intermittently return 500, stopping GPS capture at the source.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "build", "bug"],
+      "components": ["Driver/DriverTrackingPortal", "app/driver"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). /driver, /driver/tracking and /driver/deliveries/[id] intermittently 500 with: require() of ES Module @exodus/bytes/encoding-lite.js from html-encoding-sniffer@6.0.0 not supported (code ERR_REQUIRE_ESM, digest 2585452143). When the driver page crashes, useLocationTracking stops -> no GPS pings -> admin loses the marker regardless of transport. Same ESM/CJS class as the catering quote-form bug. Fix: pin/replace the offending transitive dependency or add to serverComponentsExternalPackages / transpilePackages. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /driver/deliveries/[id] as a driver", "data": "Active delivery", "expected": "200, page renders"},
+        {"step": "Refresh several times", "data": "", "expected": "No 500 ERR_REQUIRE_ESM in logs"}
+      ]
+    },
+    {
+      "key": "REA-DRT-12",
+      "summary": "Broadcast transport gap: pg_notify is not bridged to Supabase Realtime broadcast",
+      "description": "Extends REA-DRT-02 (DT2-09): even after applying the missing trigger, location broadcasts would not reach admin clients.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "realtime", "bug"],
+      "components": ["lib/realtime", "supabase/migrations", "app/actions/tracking/driver-actions"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). driver-actions.ts updateDriverLocation delegates broadcasting to the DB trigger; migration 20251107000008 notify_driver_location_update() uses pg_notify('driver_location_update', ...). Supabase Realtime does NOT bridge pg_notify to the broadcast channel the admin listens on (channel.on('broadcast', {event: 'driver_location_updated'})). Repo grep confirms no realtime.send / realtime.broadcast_changes / ALTER PUBLICATION supabase_realtime ... driver_locations anywhere. So even fixing the repo<->DB drift in REA-DRT-02 would not deliver updates. Fix Opt A: rewrite trigger to use realtime.send(payload, 'driver_location_updated', 'driver-locations', false) + grants/RLS on realtime.messages. Fix Opt B: subscribe admin to postgres_changes (pass onDatabaseInsert) and add driver_locations to the supabase_realtime publication. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Driver sends a location; inspect admin WS frames", "data": "Realtime ON", "expected": "driver_location_updated broadcast received on driver-locations channel"},
+        {"step": "Verify DB broadcast mechanism", "data": "trigger/function", "expected": "Uses realtime.send (or postgres_changes via publication), not pg_notify"}
+      ]
+    },
+    {
+      "key": "REA-DRT-13",
+      "summary": "Driver dropped from admin map during break / outside 5-min window",
+      "description": "A driver who is on break or whose GPS pings stall for >5 min is filtered out of the admin map even though tracking is active.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "bug"],
+      "components": ["api/tracking/live"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). The recentLocations query in api/tracking/live filters recorded_at > NOW() - INTERVAL '5 minutes' AND driver_id IN (drivers WHERE is_on_duty = true), and the activeDrivers projection computes isOnDuty as current_shift_id != null AND shift_status = 'active'. When a driver starts a break the shift moves to status='paused' (see 'REST' badge in driver screenshots), so the driver is excluded from the map even while still sending location. Same applies if pings stall beyond the 5-min window. Fix: include paused shifts (or a dedicated on-shift flag) and/or widen/decouple the freshness window from the on-duty gate. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Driver on active shift visible on /admin/tracking", "data": "", "expected": "Marker visible"},
+        {"step": "Driver starts a break (REST)", "data": "shift status -> paused", "expected": "Marker remains visible while location is still being sent"},
+        {"step": "No GPS ping for >5 min then resume", "data": "", "expected": "Marker reappears on next ping without losing the driver from the list"}
+      ]
+    },
+    {
+      "key": "REA-DRT-14",
+      "summary": "Driver status transition EN_ROUTE_TO_VENDOR -> ARRIVED_TO_CLIENT rejected (live repro)",
+      "description": "Live reproduction during the test session of the status-transition failure previously seen as a static finding in REA-DRT-01 (D2) and REA-OMG-08.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "state-machine", "bug"],
+      "components": ["Driver/DriverTrackingPortal", "app/actions/tracking"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). Driver portal threw 'Failed to update driver status: Cannot transition driverStatus from EN_ROUTE_TO_VENDOR to ARRIVED_TO_CLIENT' (screenshot). The transition guard does not allow advancing from EN_ROUTE_TO_VENDOR directly to ARRIVED_TO_CLIENT (intermediate states ARRIVED_AT_VENDOR / EN_ROUTE_TO_CLIENT appear required), and retrying eventually succeeded, indicating an ordering/guard issue rather than a hard block. Confirms and extends the static findings in REA-DRT-01 (D2: validStatuses missing EN_ROUTE_TO_VENDOR) and REA-OMG-08. Fix: align the allowed-transition map with the actual driver flow and ensure all status values are registered. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "As driver, advance a delivery through each status in order", "data": "Active delivery", "expected": "Each transition succeeds without error toast"},
+        {"step": "Attempt EN_ROUTE_TO_VENDOR -> ARRIVED_TO_CLIENT path used in the field", "data": "", "expected": "Either allowed, or UI prevents skipping with a clear message (no 'Cannot transition' failure)"}
+      ]
+    },
+    {
       "key": "REA-CAL-01",
       "summary": "One-way driving distance — Haversine x 1.35",
       "description": "calculateEstimatedDrivingDistance returns expected miles for known coords (SF -> Oakland).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -772,8 +876,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — distance-calculator.test.ts 17/17. SF (37.7749,-122.4194) -> Oakland (37.8044,-122.2712) = 11.3mi (Haversine km x 1.35 x 0.621371, rounded 1dp). Implementation correct. Two follow-ups raised: (1) [TECH-DEBT][Low] assertions too loose in the suite — SF->Oakland asserts 8<=d<=14 so a regression disabling the 1.35x multiplier (~8.3mi) or inflating to 1.68x (~14mi) would still pass; multiplier test accepts ~1.08-1.55; rounding test checks string format not the Math.round contract; SF->LA comment inconsistent with its range. Harden to toBeCloseTo(11.3,1), ratio result/haversineMiles ~1.35 +/-0.05, and Number.isInteger(distance*10). Implementation file unchanged (test-quality only). (2) [BUG?][Medium] calculateEstimatedRoundTripDistance docstring (L49-51) describes 3 legs (depot -> pickup -> delivery -> depot) but code (L64) computes oneWay*2 (2 legs, no depot/return). If real flow is 3-leg with depot not co-located with pickup, distance under-reports ~33%, impacting driver pay + fee estimation. Existing test codifies current code, not the docstring, so drift is uncaught. Needs domain-owner validation + caller audit before any change.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calculator tab address mode; enter SF + Oakland coords",
@@ -791,7 +895,7 @@
       "key": "REA-CAL-02",
       "summary": "Round-trip distance = 2 x one-way",
       "description": "calculateEstimatedRoundTripDistance returns exactly double the one-way value (within rounding).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -804,8 +908,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — 5/5 green in 0.61s. calculateEstimatedRoundTripDistance returns oneWay x 2, validated with toBeCloseTo(oneWay*2, 1) for SF->Oakland (expected ~22.6mi). Test literally satisfies the ticket spec. WARNING: this PASS validates behavior that is under investigation in the follow-up raised from REA-CAL-01 (docstring describes 3 legs depot->pickup->delivery->depot, code does 2). If the product owner confirms intent is 3 legs, this test will be codifying the bug and REA-CAL-02 must be re-evaluated. Inherited test-quality observations (see CAL-05 hardening ticket): loose range 16-28mi for an expected 22.6, and the rounding assert verifies string format not the Math.round contract.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Trigger round-trip computation",
@@ -818,7 +922,7 @@
       "key": "REA-CAL-03",
       "summary": "Drive time / ETA from Mapbox geocoding",
       "description": "Address-mode populates estimatedDriveTime from Mapbox routing response.",
-      "status": "TO DO",
+      "status": "BLOCKED",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -831,8 +935,8 @@
         "components/calculator/DeliveryCalculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "BLOCKED — spec drift. Ticket specifies Mapbox routing but the implementation uses Google Directions: DeliveryCalculator.tsx:275 comment 'Calculate mileage from addresses using Google Directions API'; calculateMileageFromAddresses (L276) calls internal /api/route... (L297) with Google as upstream. Only Mapbox usage in src/ is visual map rendering (MileageCalculator/MileageMap.tsx, Driver/DriverLiveMap) — neither feeds estimatedDriveTime. A tester following the ticket literally would look for api.mapbox.com/directions and find nothing. Two readings exist: strict (must be Mapbox) -> auto FAIL; intent-based (populates ETA from a directions API) -> likely PASS. Not executable with confidence until spec is corrected. Pending QA-lead decision on provider, then rewrite summary/description/steps to reference /api/route... (Google upstream, expect 200 with totalDurationMinutes), plus audit qa-board.json for similar Mapbox-vs-Google drift. Spec intentionally left unchanged for now.",
+      "verdict": "BLOCKED",
       "steps": [
         {
           "step": "Enter pickup + dropoff addresses",
@@ -850,7 +954,7 @@
       "key": "REA-CAL-04",
       "summary": "Bridge toll auto-applies for configured areas",
       "description": "When pickup or dropoff is in autoApplyForAreas, defaultTollAmount is applied to customer total and driver pay.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -864,8 +968,8 @@
         "vendor-pricing/BridgeTollEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "FAIL — feature not implemented. The pricing engine never consults bridgeTollSettings.autoApplyForAreas; there is no address-to-area matching anywhere. Toll only applies when the caller passes requiresBridge:true explicitly. Evidence: pnpm test src/lib/calculator/__tests__/bridge-toll-auto-apply.test.ts → tests 1 & 2 fail 'Expected 8.5, Received 0' (branch qa/rea-cal-04-test-evidence, DO NOT MERGE). Code refs: delivery-cost-calculator.ts:736 (toll keyed off boolean, not area), :19-29 (DeliveryCostInput has no pickup/dropoffAddress), calculator-service.ts:300 (just forwards caller boolean), client-configurations.ts:86 (autoApplyForAreas declared but unread; all 6 active vendor configs populate SF/Oakland/Marin). Admin UIs (BridgeTollEditor.tsx, ClientConfigurationManager.tsx:810-819) write the field — operator-facing affordance suggesting it works. FIX SCOPE (bigger than it looks): (1) pick canonical area representation, (2) add pickup/dropoffAddress to DeliveryCostInput + Zod CalculationInput, (3) add shouldAutoApplyBridgeToll matcher — naive address.includes is unsafe ('South San Francisco' matches 'San Francisco'; 'Oakland Park FL' matches 'Oakland') so use case-insensitive + token/geocoded match, (4) OR matcher with requiresBridge so manual override still works; warn if they disagree, (5) forward addresses in calculator-service.ts:295-304, (6) wire DeliveryCalculator.tsx:268 addresses (currently collected then discarded), (7) positive+negative engine & integration tests. ARCH FINDING (follow-up): 4 disconnected 'area' shapes (autoApplyForAreas string[], CalculationInput.deliveryArea free-text, ClientConfigurationSchema.areaRules, DeliveryCostInput none) — consolidate before adding more area-dependent features. Plus spec-drift follow-up: qa-board.json REA-CAL-04 describes behavior that does not exist; reword as 'VERIFY post-implementation, blocked by product bug' or defer from active block.",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Select vendor with bridge toll auto-apply",
@@ -883,7 +987,7 @@
       "key": "REA-CAL-05",
       "summary": "Mileage charge above/below distanceThreshold",
       "description": "Distance <= threshold uses flat fee; distance > threshold adds per-mile rate (vendor and driver).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -897,8 +1001,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — mileage threshold logic works; below-threshold uses flat fee, above-threshold adds per-mile rate for both customer and driver. Discriminating test mileage-threshold.test.ts (branch qa/rea-cal-05-test-evidence) pins the implemented formula for READY_SET_FOOD_STANDARD and TRY_HUNGRY. Two follow-ups raised: (1) [DOC-DRIFT][Medium] components field names lib/calculator/distance-calculator (Haversine module, same as CAL-01/02) but the mileage charge logic actually lives in lib/calculator/delivery-cost-calculator.ts — customer charge L485-506, driver mileage pay L705-725. Update components to delivery-cost-calculator (keep client-configurations, the field source). (2) [TECH-DEBT][Medium] suite hardening across CAL-01..05: range-based asserts tolerate Haversine drift; tautological round-trip test (CAL-02); structure-only asserts (kasa/try-hungry/hy-food pricing tests assert distanceThreshold===10 without exercising the threshold); LATENT FORMULA AMBIGUITY — driver-over-threshold is totalMileage×rate, NOT flat+(excess×rate); all current configs are calibrated so both formulas match, masking the cliff a future non-calibrated vendor would expose; per-vendor rate hardcoding risk (most configs $3.00, Try Hungry $2.50 — a hardcoded $3.00 regression passes every test except a Try-Hungry-specific one). Fixes: exact-fixture distance asserts, merge mileage-threshold.test.ts into main suite as regression guard, add below/above threshold pair per vendor, document the 'total×rate' formula inline at delivery-cost-calculator.ts ~L716, document the 'every active config is calibrated' assumption near driverMileageSettings.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calc with mileage = threshold - 1",
@@ -921,7 +1025,7 @@
       "key": "REA-CAL-06",
       "summary": "Driver pay tiered by headcount and food cost",
       "description": "driverBasePayTiers and driverFoodCostPayTiers resolve to correct base pay; tier boundaries handled per spec.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -935,8 +1039,8 @@
         "vendor-pricing/DriverPaySettingsEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — headcount tier resolution is correct, but food-cost axis is ignored when headcount>0; needs product confirmation. delivery-cost-calculator.ts:L339 only consults driverFoodCostPayTiers when headcount===0 && foodCost>0; otherwise foodCost is ignored for driver base pay even when its tier would resolve higher. Repro (KASA, both tier sets): headcount=30, foodCost=1200, totalMileage=15 → headcount tier 25-49 gives basePay=23; food-cost tier $1,200-$1,499 gives basePay=53; ACTUAL returned=23. So a KASA order pays the driver $23 instead of $53. KASA notes mention both tier sets and the food-cost table has a $1,500+ by-case flag, suggesting food cost is a meaningful axis — but unconfirmed. Resolutions: (a) CODE WINS — update ticket+KASA docs that food-cost tiers apply only when no headcount; document test E1 as intended; or (b) TICKET WINS — refactor determineDriverBasePay to apply a LESSER/GREATER rule between headcount- and food-cost-resolved tiers (E1 would fail, signaling the refactor). Evidence: test E1 in src/lib/calculator/__tests__/driver-pay-tiered.test.ts. THREE additional findings: (1) [Low] MANUAL_REVIEW_HEADCOUNT_THRESHOLD is a global const=100 but vendors declare different thresholds via tier structure (TRY_HUNGRY/CATER_VALLEY 100 ✓, KASA 125, HY_FOOD 200); correct only by coincidence (manual review fires only when tier.basePay===0, which sits in the top tier ≥100). Risk: a basePay:0 in an intermediate tier would fire review at 100 instead of surfacing a config error. Fix per the L113-126 comment: move threshold to ClientDeliveryConfiguration.manualReviewThreshold and read per-vendor. (2) [Medium] validateConfiguration (client-configurations.ts L713-768) validates driverBasePayTiers for gaps/overlaps/null-last/basePay>=0/manual-review, but driverFoodCostPayTiers gets NO such validation though KASA & HY_FOOD use both; an admin-introduced gap is accepted silently and throws 'No driver base pay tier found for food cost' at runtime. Fix: extract tier validation into a (min,max,name) helper and run it on both arrays. (3) [Low] fractional gap between foodCostMax=299.99 and foodCostMin=300 — isInTier uses >=min && <=max, so 299.995 matches neither tier and throws; real risk low but calculated values (tax-inclusive subtotals, per-person averages, conversions) can land in the gap. Fix: contiguous boundaries or round foodCost to 2dp. Refs: client-configurations.ts L277-282 (KASA), L505-510 (HY_FOOD).",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Calc in known tier",
@@ -954,7 +1058,7 @@
       "key": "REA-CAL-07",
       "summary": "Multi-stop pricing",
       "description": "Each extra stop adds $5 customer / $2.50 driver.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -967,8 +1071,8 @@
         "lib/calculator multi-stop"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — multi-stop pricing works; numberOfStops=3 adds +$10 customer / +$5 driver (CUSTOMER_EXTRA_STOP_RATE=5.00, DRIVER_EXTRA_STOP_BONUS=2.50, both global). 33/33 in multi-stop-pricing.test.ts. Three follow-ups, all Low: (1) no input validation for numberOfStops in calculateDeliveryCost/calculateDriverPay (other inputs validated at L437-440); the L240 guard if(numberOfStops<=1) return 0 masks pathological cases — 0 and -2 silently return 0, and 2.7 is unguarded → (2.7-1)*5 = $8.5 non-integer monetary charge. Fix: throw if <1 || !Number.isInteger. Risk for API consumers (CaterValley, planned ezCater). (2) multi-stop-pricing.test.ts has 3 edge-case tests ('0 stops treat as 1', 'negative treat as 1', 'decimal round down') that ENCODE the defect instead of asserting toThrow — they act as a regression guard against fixing it; replace with toThrow tests when validation lands. (3) all 33 tests use clientConfigId='ready-set-food-standard' only; no cross-vendor coverage — would miss per-vendor rate divergence or a constants→config migration. Fix: parameterize 2-3 tests via describe.each across kasa/cater-valley/try-hungry/hy-food (tune inputs to avoid manual-review/zero-order branches). Part of the CAL-01..08 test-hardening roll-up.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calc with numberOfStops=1",
@@ -991,7 +1095,7 @@
       "key": "REA-CAL-08",
       "summary": "Daily drive discount (numberOfDrives)",
       "description": "Discount applies as numberOfDrives increases per spec.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1004,8 +1108,8 @@
         "lib/calculator daily-drive-discount"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — discount applies per spec (discountPerDrive × numberOfDrives, docstring L244 confirms TOTAL = per-drive × count) and tests pass, BUT [Medium] revenue-loss bug: the multiplication is unbounded with no cap on numberOfDrives (validation only requires >=1 at L440). Small-tier order (hc=24, fc=0, <10mi → deliveryCost=$60) with numberOfDrives=10 → deliveryFee = 60 + 0 - (15×10) = -$90, i.e. Ready Set pays the customer. Not reproducible in current fixtures (hc=50/fc=700 have headroom); found by logical analysis of delivery-cost-calculator.ts L258 + L506-518. Fix: cap discount at pre-discount subtotal — const cappedDiscount = Math.min(discount, subtotal) — or validate deliveryFee>=0 and surface manual review. Same revenue-risk class as CAL-04. Two more (Low): (a) service-layer integration test asserts only dailyDriveDiscount<0 (sign), not exact amount — won't catch magnitude drift; replace with exact value (e.g. -30 for 3 drives). (b) spec-clarity: table comments like '2: 5 // 2 drives/day = -$5 per drive' are ambiguous between $5/drive×N (current) vs $5 flat; clarify comments and/or rename keys (perDriveDiscountAtTwo). Same ambiguity class as CAL-02/06.",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Calc with numberOfDrives=1",
@@ -1028,7 +1132,7 @@
       "key": "REA-CAL-09",
       "summary": "Adjust Vendor Pricing — DB persists, takes effect immediately",
       "description": "Edits in Adjust Vendor Pricing tab save to DB via POST /api/calculator/configurations and the next /api/calculator/calculate reflects new values.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1042,8 +1146,8 @@
         "api/calculator/configurations"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — config persistence works (POST /api/calculator/configurations calls deliveryConfiguration.upsert; live evidence 2026-05-18 shows changes computed correctly: kasa mileageRate 3→4) and the next calculate reflects the new value; the spec steps pass. BUT F1 (HIGH, blocks full closure): the config-change audit log is emitted ONLY via console.log('[AUDIT]') + Sentry.addBreadcrumb — neither is durable/queryable. console.log rotates on Vercel; Sentry breadcrumbs are discarded if no error follows in the request. Cannot answer 'who changed kasa.mileageRate on date X and why' after the fact. Fix: persist to an audit table — reuse UserAudit (action='calculator-config:update'|...) or new ConfigurationAudit model FK to delivery_configurations.configId. Evidence test (qa/rea-cal-09-test-evidence) asserts only deliveryConfiguration.findUnique+upsert are touched — no audit model. Additional findings: F7 (Medium) DB→merged-config logic duplicated identically in 3 places (configurations/route.ts GET, config/route.ts L99-121, calculator-service.ts L263-285); subtle merge rules (only 3 boolean flags inherit, structural data must NOT) risk drift → extract dbRecordToClientConfig helper + unit tests. F8 (Medium) CalculatorService.getCalculatorConfig is a stub that throws 'Not implemented' → GET /api/calculator/calculate returns 500 (REA-CAL-09 uses POST so not blocked); investigate consumers, then implement or remove the dead route. F2 (Low) on create (previous=null) computeConfigChanges returns [{field:'_action'...}], so changedFields=['_action'] breaks field-filtered audit queries; enumerate actual fields with null oldValue, keep action='create' as discriminator (do AFTER F1). Incidental (separate auth ticket, not part of this test): [SOFT_DELETE_AUDIT] warning — Profile.findUnique({where:{email}}) can't auto-inject deletedAt:null; a soft-deleted profile could still resolve; audit auth lookups (getCurrentUser/syncOAuthProfile), switch to findFirst{email,deletedAt:null} or post-check.",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Edit a field in Adjust Vendor Pricing tab; save",
@@ -1066,7 +1170,7 @@
       "key": "REA-CAL-10",
       "summary": "Save calculation to history",
       "description": "Saving from Calculator tab persists via /api/calculator/save and surfaces in Recent Calculations tab; survives reload.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1080,8 +1184,8 @@
         "api/calculator/history"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "FAIL — save feature effectively non-functional; nothing has ever persisted. Bug #1 (HIGH): POST /api/calculator/save passes clientConfigId as a domain string (e.g. 'kasa') but calculation_history.client_config_id is UUID-typed → Postgres rejects INSERT with 22P02 'invalid input syntax for type uuid', yet the endpoint still returns 200. DB evidence: SELECT COUNT(*) FROM calculation_history = 0 across all time. Root cause: clientConfigId is a string everywhere (matches delivery_configurations.config_id) but the history column expects a UUID. Fix Option A (recommended): ALTER COLUMN client_config_id TYPE text + prisma String?; Option B: resolve config_id→row UUID before insert. Bug #2 (HIGH): saveCalculationHistory swallows errors — Path A (Supabase response {error}) only console.error's and returns void (Sentry NOT called); Path B (JS exception) calls Sentry. Since the 22P02 is a response error (Path A), no save failure has EVER reached Sentry — invisible to dashboards, user sees success. Fix: capture+throw on response error; route already returns 500 on throw. Bug #3 (HIGH): the Recent Calculations tab in CalculatorClient.tsx renders volatile useState(savedCalculations), does NOT consume /api/calculator/history, and is lost on reload (repro 2026-05-18: entry shows after save, gone after F5 → 'No calculations yet'). Even with persistence fixed, the tab wouldn't show cross-session history. Fix: hoist useCalculatorHistory into CalculatorClient, drop local state, refresh on save. + Finding #4 (Medium): /api/calculator/history uses Bearer-token auth while every other calculator endpoint uses session cookies — breaks SSR/server-action callers; convert to cookie-based createClient(). + Finding #5 (Medium, needs product decision): admin/super_admin without ?userId sees GLOBAL history of all users (filter skipped when userId undefined); decide self-default vs explicit ?userId=all opt-in. All three bugs interdependent — fix #1+#2+#3 together for end-to-end correctness. Evidence branch qa/rea-cal-10-test-evidence (save/history route.audit tests + CalculatorClient.test.tsx with it.todo placeholders).",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Run calc and click Save",
@@ -1097,6 +1201,36 @@
           "step": "Reload page; switch tab",
           "data": "",
           "expected": "Entry still visible (persisted)"
+        }
+      ]
+    },
+    {
+      "key": "REA-QF-01",
+      "summary": "Quote forms 500 ERR_REQUIRE_ESM on submit (food/flower/bakery/specialty)",
+      "description": "All four logistics quote-request forms fail on submit in production: POST /api/form-submissions returns 500 and the UI shows 'Unexpected token <, <!DOCTYPE ... is not valid JSON'.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Emmanuel Alanis",
+      "labels": ["qa", "q2-2026", "quote-forms", "build", "bug"],
+      "components": ["Logistics/QuoteRequest/FormManager", "api/form-submissions", "lib/email-service"],
+      "folder": "Q2 2026/Quote Forms",
+      "notes": "FAIL - Found 2026-06-04 (production). The food-delivery quote form, plus the flower/bakery/specialty forms (all share one endpoint via FormManager.tsx), fail on submit: POST /api/form-submissions -> 500 FUNCTION_INVOCATION_FAILED. Root cause: require() of ES Module @exodus/bytes/encoding-lite.js from html-encoding-sniffer@6.0.0 not supported (ERR_REQUIRE_ESM), reached via EmailService -> isomorphic-dompurify -> jsdom@28 -> html-encoding-sniffer@6 -> @exodus/bytes (ESM-only). It fails at module-load time, so the route try/catch never runs; Vercel returns an HTML 500 and the client's res.json() throws 'Unexpected token <'. IMPORTANT: `next dev` does NOT reproduce this (jsdom is bundled in dev); only the production/standalone build externalizes jsdom and hits the raw require() — verify with `pnpm vercel-sim`. Same ESM/CJS class as REA-DRT-11 (driver pages). Suggested fix: remove isomorphic-dompurify from server paths (use he.escape in EmailService; sanitize-html in validation.ts InputSanitizer and free-resources/[slug]/page.tsx), then drop isomorphic-dompurify and the jsdom externalization in next.config.js (keep jsdom as devDependency). Confirm all 4 quote types return 200 against a production-like build. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Open /logistics and submit each quote form: food, flower, bakery, specialty",
+          "data": "Valid required fields",
+          "expected": "200 + 'Request submitted successfully' for each type"
+        },
+        {
+          "step": "Watch Vercel logs (or production-like build) during submit",
+          "data": "",
+          "expected": "No 500 ERR_REQUIRE_ESM on POST /api/form-submissions"
+        },
+        {
+          "step": "Reproduce/verify in a production-like build, NOT next dev",
+          "data": "pnpm vercel-sim or standalone build",
+          "expected": "Bug reproduces pre-fix and is gone post-fix"
         }
       ]
     }

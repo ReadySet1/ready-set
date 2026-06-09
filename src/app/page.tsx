@@ -56,9 +56,11 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  alternates: {
+    canonical: "/",
+  },
   category: "Business Services",
   classification: "Logistics and Professional Services",
-
 };
 
 export default function Home() {

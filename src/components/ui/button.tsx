@@ -1,29 +1,57 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
+/**
+ * Ready Set — Button (v2)
+ * components/ui/button.tsx
+ *
+ * Drop-in replacement. Wires Shadcn's Button to the v2 design tokens
+ * (brand-* + neutral-* + semantic aliases). Radix Slot still handles
+ * the `asChild` pattern.
+ *
+ * Peer deps: react, @radix-ui/react-slot, class-variance-authority,
+ *            clsx, tailwind-merge.
+ */
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium ring-offset-white transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-slate-950 dark:focus-visible:ring-slate-300",
+  // ── Base — applied to every variant + size combination
+  [
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap",
+    "font-semibold tracking-tight",
+    "transition-colors duration-150 ease-out",
+    "focus-visible:outline-none",
+    "focus-visible:ring-2 focus-visible:ring-brand-500",
+    "focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "disabled:pointer-events-none disabled:opacity-50",
+    // Inline icons sized + non-shrinking by default
+    "[&_svg]:size-4 [&_svg]:shrink-0",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-slate-900 text-slate-50 hover:bg-slate-800 shadow-md hover:shadow-lg dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50/90",
-        destructive:
-          "bg-red-500 text-slate-50 hover:bg-red-600 shadow-md hover:shadow-lg dark:bg-red-900 dark:text-slate-50 dark:hover:bg-red-900/90",
+        default:
+          "bg-brand-400 text-neutral-900 shadow-xs hover:bg-brand-500 active:bg-brand-600",
         outline:
-          "border border-slate-200 bg-white hover:bg-slate-50 hover:text-slate-900 shadow-sm hover:shadow-md hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+          "border border-input bg-card text-foreground shadow-xs hover:bg-muted",
         secondary:
-          "bg-slate-100 text-slate-900 hover:bg-slate-200 shadow-sm hover:shadow-md dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-800/80",
-        ghost: "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50",
-        link: "text-slate-900 underline-offset-4 hover:underline dark:text-slate-50",
+          "bg-secondary text-secondary-foreground hover:bg-neutral-200 dark:hover:bg-neutral-700",
+        ghost:
+          "text-foreground hover:bg-muted hover:text-foreground",
+        destructive:
+          "bg-destructive text-destructive-foreground shadow-xs hover:bg-error-700",
+        link:
+          "text-brand-700 dark:text-brand-400 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-11 px-6 py-2",
-        sm: "h-9 rounded-lg px-4",
-        lg: "h-13 rounded-xl px-8 text-base",
-        icon: "h-11 w-11",
+        xs: "h-8 px-2.5 text-xs rounded-md",
+        sm: "h-9 px-3.5 text-sm rounded-lg",
+        default: "h-10 px-4 text-sm rounded-lg",
+        lg: "h-11 px-6 text-base rounded-lg",
+        "icon-xs": "size-8 rounded-md",
+        "icon-sm": "size-9 rounded-md",
+        icon: "size-10 rounded-lg",
       },
     },
     defaultVariants: {
@@ -31,26 +59,26 @@ const buttonVariants = cva(
       size: "default",
     },
   }
-)
+);
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+  asChild?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+    const Comp = asChild ? Slot : "button";
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       />
-    )
+    );
   }
-)
-Button.displayName = "Button"
+);
+Button.displayName = "Button";
 
-export { Button, buttonVariants }
+export { Button, buttonVariants };

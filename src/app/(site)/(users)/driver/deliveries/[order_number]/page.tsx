@@ -2,97 +2,62 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
-import SingleOrder from "@/components/Orders/SingleOrder";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Home, Truck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { DriverDeliveryDetail } from "@/components/Driver/DriverDeliveryDetail";
 
-const DriverOrderPage = () => {
+/**
+ * Driver Delivery Detail.
+ *
+ * Wrapped in the new driver app chrome (themed glass header + background, no
+ * bottom nav — BottomNav hides itself on this route). The body renders the
+ * driver-specific DriverDeliveryDetail view (status timeline + pickup/drop-off
+ * blocks + sticky Next-Action + proof-of-delivery), which reuses the exact same
+ * order-fetch + status-update + POD endpoints SingleOrder used — so behavior is
+ * preserved while the presentation is driver-native.
+ */
+export default function DriverOrderPage() {
   const [orderNumber, setOrderNumber] = useState("");
   const params = useParams();
   const router = useRouter();
 
   useEffect(() => {
-    // Get the order number from the URL params
     if (params?.order_number) {
-      const rawOrderNumber = Array.isArray(params.order_number) 
-        ? params.order_number[0] 
+      const raw = Array.isArray(params.order_number)
+        ? params.order_number[0]
         : params.order_number;
-      
-      if (rawOrderNumber) {
-        setOrderNumber(decodeURIComponent(rawOrderNumber));
-      }
+      if (raw) setOrderNumber(decodeURIComponent(raw));
     }
   }, [params]);
 
-  const handleDeleteSuccess = () => {
-    router.push("/driver");
-  };
-
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-50">
-      <div className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-6 shadow-sm">
-        <Button
-          onClick={() => router.push("/driver")}
-          variant="ghost"
-          size="icon"
-          className="mr-2 h-9 w-9 text-slate-500 hover:text-green-600"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span className="sr-only">Back to driver dashboard</span>
-        </Button>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/driver" className="flex items-center">
-                  <Home className="mr-1 h-4 w-4" />
-                  Driver Dashboard
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link
-                  href="/driver"
-                  className="flex items-center"
-                >
-                  <Truck className="mr-1 h-4 w-4" />
-                  Deliveries
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium text-green-600">
-                Order {orderNumber}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
+    <div className="flex min-h-dvh w-full flex-col">
+      <header
+        className="sticky top-0 z-30 border-b border-driver-border bg-driver-glass backdrop-blur-xl backdrop-saturate-150"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-4 py-3 lg:max-w-5xl">
+          <button
+            type="button"
+            onClick={() => router.push("/driver")}
+            aria-label="Back to dashboard"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-driver-muted hover:bg-driver-surface-alt"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <div className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+              Delivery
+            </div>
+            <div className="truncate font-mono text-[16px] font-bold text-driver-text">
+              {orderNumber ? `#${orderNumber}` : "…"}
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <div className="flex-1">
-        <SingleOrder 
-          onDeleteSuccess={handleDeleteSuccess} 
-          showHeader={false}
-          canAssignDriver={false}
-          canUpdateDriverStatus={true}
-          canDeleteOrder={false}
-          canEditOrder={false}
-        />
-      </div>
+      <main className="mx-auto w-full max-w-2xl flex-1 px-2 py-4 lg:max-w-5xl">
+        <DriverDeliveryDetail orderNumber={orderNumber} />
+      </main>
     </div>
   );
-};
-
-export default DriverOrderPage;
+}

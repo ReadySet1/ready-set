@@ -2,7 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import { DriverTrackingProvider } from '@/contexts/DriverTrackingContext';
-import { DriverTrackingIndicator } from '@/components/Driver/DriverTrackingIndicator';
+import { DriverThemeProvider } from '@/components/Driver/ui/DriverThemeProvider';
+import { BottomNav } from '@/components/Driver/ui/BottomNav';
+import { ShiftPill } from '@/components/Driver/ui/ShiftPill';
 
 // Dynamically import LocationSimulator only in development
 // This ensures it's tree-shaken in production builds
@@ -20,9 +22,12 @@ interface DriverLayoutProps {
 export default function DriverLayout({ children }: DriverLayoutProps) {
   return (
     <DriverTrackingProvider>
-      {children}
-      <DriverTrackingIndicator />
-      {process.env.NODE_ENV === 'development' && <LocationSimulator />}
+      <DriverThemeProvider>
+        {children}
+        <ShiftPill />
+        <BottomNav />
+        {process.env.NODE_ENV === 'development' && <LocationSimulator />}
+      </DriverThemeProvider>
     </DriverTrackingProvider>
   );
 }

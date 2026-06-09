@@ -7,44 +7,38 @@ import DriverPage from '../page';
 import {
   renderPage,
   mockAuthenticatedUser,
-  mockLoadingUser,
   createMockApiResponse,
   resetAllPageMocks,
 } from '@/__tests__/utils/page-test-utils';
 import { UserType } from '@/types/user';
 
-// Mock the useDriverStats hook
-jest.mock('@/hooks/tracking/useDriverStats', () => ({
-  useDriverStats: jest.fn(() => ({
-    data: {
-      deliveryStats: {
-        inProgress: 3,
-        completed: 12,
-        total: 15,
-      },
-      performance: {
-        onTimeRate: 95,
-        rating: 4.8,
-      },
-    },
-    isLoading: false,
-    error: null,
-  })),
+// Controllable driver-tracking state (the redesigned home pulls shift + active
+// deliveries from the tracking context).
+let mockTrackingState: {
+  isShiftActive: boolean;
+  currentShift: { startTime: string } | null;
+  activeDeliveries: unknown[];
+};
+jest.mock('@/contexts/DriverTrackingContext', () => ({
+  useDriverTracking: () => mockTrackingState,
 }));
 
-// Mock DriverDeliveries component to avoid complex setup
-jest.mock('@/components/Driver/DriverDeliveries', () => {
-  return function MockDriverDeliveries() {
-    return <div data-testid="driver-deliveries">Driver Deliveries Component</div>;
-  };
-});
-
-// Mock DriverStatsCard component
-jest.mock('@/components/Driver/DriverStatsCard', () => ({
-  DriverStatsCard: () => <div data-testid="driver-stats-card">Driver Stats Card</div>,
+// Stub the leaf integrations — each owns its own fetch/context and is tested
+// separately. The page test only cares that they're mounted.
+jest.mock('@/components/Driver/DriverStatsPanel', () => ({
+  DriverStatsPanel: ({ driverId }: { driverId: string }) => (
+    <div data-testid="driver-stats-panel">{driverId}</div>
+  ),
+}));
+jest.mock('@/components/Driver/DriverDeliveryList', () => ({
+  DriverDeliveryList: () => <div data-testid="driver-delivery-list" />,
+}));
+jest.mock('@/components/Driver/ui/DriverProfileSheet', () => ({
+  DriverProfileSheet: ({ driverName }: { driverName: string }) => (
+    <div data-testid="driver-profile-sheet">{driverName}</div>
+  ),
 }));
 
-// Mock profile and driver API responses
 const mockProfileResponse = {
   id: 'test-driver-id',
   name: 'John Driver',
@@ -54,20 +48,24 @@ const mockProfileResponse = {
 
 const mockDriversResponse = {
   success: true,
-  data: [
-    {
-      id: 'driver-123',
-      userId: 'test-driver-id',
-      status: 'ACTIVE',
-    },
-  ],
+  data: [{ id: 'driver-123', userId: 'test-driver-id', status: 'ACTIVE' }],
 };
 
-describe('DriverPage', () => {
+function renderDriverHome() {
+  return renderPage(<DriverPage />, {
+    user: mockAuthenticatedUser({ role: UserType.DRIVER, name: 'John Driver' }),
+  });
+}
+
+describe('DriverPage (redesigned home)', () => {
   beforeEach(() => {
     resetAllPageMocks();
+    mockTrackingState = {
+      isShiftActive: false,
+      currentShift: null,
+      activeDeliveries: [],
+    };
 
-    // Setup fetch mock for API endpoints
     global.fetch = jest.fn().mockImplementation((url: string) => {
       if (url.includes('/api/profile')) {
         return Promise.resolve(createMockApiResponse(mockProfileResponse));
@@ -78,7 +76,6 @@ describe('DriverPage', () => {
       return Promise.resolve(createMockApiResponse({}));
     });
 
-    // Mock Date to have consistent time for tests
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-06-15T14:30:00'));
   });
@@ -89,122 +86,100 @@ describe('DriverPage', () => {
   });
 
   describe('rendering', () => {
-    it('should render dashboard title when driver is authenticated', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER, name: 'John Driver' }),
-      });
+    it('greets the driver by the name fetched from the profile API', async () => {
+      renderDriverHome();
 
       await waitFor(() => {
-        expect(screen.getByText('Driver Dashboard')).toBeInTheDocument();
+        const heading = screen.getByRole('heading', { level: 1 });
+        expect(heading).toHaveTextContent('Good afternoon');
+        expect(heading).toHaveTextContent('John Driver');
       });
     });
 
-    it('should render welcome message with driver name', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER, name: 'John Driver' }),
-      });
+    it('shows the off-shift status and the start-shift entry card by default', async () => {
+      renderDriverHome();
 
       await waitFor(() => {
-        // The component fetches the name from API
-        expect(screen.getByText(/Good afternoon, John Driver!/)).toBeInTheDocument();
+        expect(screen.getByText('Off shift')).toBeInTheDocument();
       });
+      expect(screen.getByText('Start shift')).toBeInTheDocument();
+      expect(screen.getByText('My deliveries')).toBeInTheDocument();
+      expect(screen.getByText('View history')).toBeInTheDocument();
     });
 
-    it('should show ready message', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
+    it('reflects an active shift and the active-delivery count', async () => {
+      mockTrackingState = {
+        isShiftActive: true,
+        currentShift: { startTime: '2024-06-15T13:30:00' },
+        activeDeliveries: [],
+      };
+      // The "N active" count now derives from /api/driver-deliveries — the same
+      // single source the deliveries list uses — not the tracking context.
+      global.fetch = jest.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/profile')) {
+          return Promise.resolve(createMockApiResponse(mockProfileResponse));
+        }
+        if (url.includes('/api/tracking/drivers')) {
+          return Promise.resolve(createMockApiResponse(mockDriversResponse));
+        }
+        if (url.includes('/api/driver-deliveries')) {
+          return Promise.resolve(
+            createMockApiResponse({
+              deliveries: [
+                { id: 'd1', completeDateTime: null },
+                { id: 'd2', completeDateTime: null },
+              ],
+            }),
+          );
+        }
+        return Promise.resolve(createMockApiResponse({}));
       });
+
+      renderDriverHome();
 
       await waitFor(() => {
-        expect(screen.getByText('Ready to make some deliveries today?')).toBeInTheDocument();
+        expect(screen.getByText('On shift')).toBeInTheDocument();
       });
-    });
-
-    it('should show off shift status by default', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
+      expect(screen.getByText('Active shift')).toBeInTheDocument();
       await waitFor(() => {
-        expect(screen.getByText('Off Shift')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('quick actions', () => {
-    it('should have link to start shift/tracking', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Start Shift')).toBeInTheDocument();
-      });
-
-      const trackingLink = screen.getByRole('link', { name: /start shift/i });
-      expect(trackingLink).toHaveAttribute('href', '/driver/tracking');
-    });
-
-    it('should show my deliveries section', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('My Deliveries')).toBeInTheDocument();
-      });
-    });
-
-    it('should display pending and complete delivery counts', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('3 Pending')).toBeInTheDocument();
-        expect(screen.getByText('12 Complete')).toBeInTheDocument();
+        expect(screen.getByText('2 active')).toBeInTheDocument();
       });
     });
   });
 
-  describe('components', () => {
-    it('should render DriverDeliveries component', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
+  describe('navigation entry cards', () => {
+    it('links the primary card to live tracking and history card to history', async () => {
+      renderDriverHome();
 
       await waitFor(() => {
-        expect(screen.getByTestId('driver-deliveries')).toBeInTheDocument();
+        expect(screen.getByText('Start shift')).toBeInTheDocument();
       });
+
+      const trackingLinks = screen.getAllByRole('link', { name: /start shift|active shift/i });
+      expect(trackingLinks[0]).toHaveAttribute('href', '/driver/tracking');
+
+      const historyLink = screen.getByRole('link', { name: /view history/i });
+      expect(historyLink).toHaveAttribute('href', '/driver/history');
     });
+  });
 
-    it('should render DriverStatsCard when driverId is available', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
+  describe('child integrations', () => {
+    it('renders the deliveries list and the stats panel once a driverId resolves', async () => {
+      renderDriverHome();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('driver-stats-card')).toBeInTheDocument();
-      });
+      expect(await screen.findByTestId('driver-delivery-list')).toBeInTheDocument();
+      // DriverStatsPanel only mounts after /api/tracking/drivers resolves a driver.
+      expect(await screen.findByTestId('driver-stats-panel')).toHaveTextContent('driver-123');
     });
   });
 
   describe('API calls', () => {
-    it('should fetch driver profile on mount', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
+    it('fetches the profile and the driver record on mount', async () => {
+      renderDriverHome();
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('/api/profile');
       });
-    });
-
-    it('should fetch driver data after profile', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('/api/tracking/drivers?limit=1');
       });
@@ -212,78 +187,34 @@ describe('DriverPage', () => {
   });
 
   describe('time-based greeting', () => {
-    it('should show morning greeting before noon', async () => {
-      jest.setSystemTime(new Date('2024-06-15T09:00:00'));
-
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Good morning, John Driver!/)).toBeInTheDocument();
-      });
-    });
-
-    it('should show afternoon greeting between noon and 5pm', async () => {
-      jest.setSystemTime(new Date('2024-06-15T14:00:00'));
-
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
+    it.each([
+      ['2024-06-15T09:00:00', 'Good morning'],
+      ['2024-06-15T14:00:00', 'Good afternoon'],
+      ['2024-06-15T18:00:00', 'Good evening'],
+    ])('shows the right greeting at %s', async (time, expected) => {
+      jest.setSystemTime(new Date(time));
+      renderDriverHome();
 
       await waitFor(() => {
-        expect(screen.getByText(/Good afternoon, John Driver!/)).toBeInTheDocument();
-      });
-    });
-
-    it('should show evening greeting after 5pm', async () => {
-      jest.setSystemTime(new Date('2024-06-15T18:00:00'));
-
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Good evening, John Driver!/)).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(expected);
       });
     });
   });
 
   describe('error handling', () => {
-    it('should handle profile fetch error gracefully', async () => {
-      // Mock console.error to avoid noise in test output
+    it('falls back to the default name when the profile fetch fails', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
+      renderDriverHome();
 
-      // Should still render the dashboard without crashing
       await waitFor(() => {
-        expect(screen.getByText('Driver Dashboard')).toBeInTheDocument();
-      });
-
-      // Should show default driver name
-      await waitFor(() => {
-        expect(screen.getByText(/Driver!/)).toBeInTheDocument();
+        const heading = screen.getByRole('heading', { level: 1 });
+        expect(heading).toHaveTextContent('Good afternoon');
+        expect(heading).toHaveTextContent('Driver');
       });
 
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe('shift status indicator', () => {
-    it('should display shift status indicator', async () => {
-      renderPage(<DriverPage />, {
-        user: mockAuthenticatedUser({ role: UserType.DRIVER }),
-      });
-
-      await waitFor(() => {
-        // The status indicator shows "Off Shift" by default
-        expect(screen.getByText('Off Shift')).toBeInTheDocument();
-      });
     });
   });
 });

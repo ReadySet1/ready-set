@@ -9,8 +9,8 @@ import { PortableText } from "@portabletext/react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata, ResolvingMetadata } from "next";
-import CustomNextSeo from "@/components/Blog/CustomSeo";
 import type { PostDocument } from "@/sanity/schemaTypes/seo";
+import JsonLd from "@/components/SEO/JsonLd";
 import React from "react";
 import { format } from "date-fns";
 import BookNow from "@/components/Blog/BookNow";
@@ -78,6 +78,9 @@ export async function generateMetadata({
         }
       : undefined,
     keywords: seo?.seoKeywords?.join(", "),
+    alternates: {
+      canonical: `/blog/${slug}`,
+    },
   };
 }
 
@@ -167,13 +170,42 @@ export default async function BlogPost({
     notFound();
   }
 
-  const { title, mainImage, body, seo, _updatedAt } = post;
-  const seoSlug = `/blog/${slug}`;
+  const { title, mainImage, body, seo, _createdAt, _updatedAt, publishedAt } =
+    post;
 
   const formattedDate = format(new Date(_updatedAt), "MMMM d, yyyy");
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "https://readysetllc.com";
+
+  const ogImage = seo?.openGraph?.image
+    ? urlFor(seo.openGraph.image).url()
+    : mainImage
+      ? urlFor(mainImage).url()
+      : undefined;
+
   return (
     <article className="pb-[120px] pt-[150px]">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          headline: title,
+          ...(ogImage ? { image: ogImage } : {}),
+          datePublished: publishedAt || _createdAt,
+          dateModified: _updatedAt,
+          author: {
+            "@type": "Organization",
+            name: "Ready Set LLC",
+            url: siteUrl,
+          },
+          mainEntityOfPage: {
+            "@type": "WebPage",
+            "@id": `${siteUrl}/blog/${slug}`,
+          },
+        }}
+      />
       <div className="container">
         <div className="-mx-4 flex flex-wrap justify-center">
           <div className="w-full px-4 lg:w-8/12">

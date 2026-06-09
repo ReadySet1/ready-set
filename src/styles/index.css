@@ -23,6 +23,256 @@
   font-display: swap;
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * DRIVER APP — mobile-first redesign token layer (scoped)
+ *
+ * The driver experience uses a COOL slate-neutral surface palette with
+ * amber as an accent (distinct from the global *warm* --neutral ramp and
+ * the yellow-forward marketing surfaces). To avoid disturbing the rest of
+ * the app, these tokens are scoped under `.driver-theme` (applied on the
+ * driver route-group layout root). Dark values apply under `.dark
+ * .driver-theme` (next-themes toggles `.dark` on <html>).
+ *
+ * Values come straight from the design handoff
+ * (design_handoff_driver_app/theme.jsx + README.md token tables).
+ * Status colors are defined here explicitly so StatusPill matches the
+ * design exactly; brand amber reuses the existing brand token.
+ * ─────────────────────────────────────────────────────────────── */
+.driver-theme {
+  /* surfaces & text — light */
+  --rs-driver-bg: #eef2f7;
+  --rs-driver-surface: #ffffff;
+  --rs-driver-surface-alt: #f5f8fc;
+  --rs-driver-glass: rgba(244, 247, 251, 0.82);
+  --rs-driver-border: #e2e8f0;
+  --rs-driver-border-hi: #cbd5e1;
+  --rs-driver-text: #15202e;
+  --rs-driver-text-muted: #5a6b82;
+  --rs-driver-text-subtle: #94a3b8;
+
+  /* brand */
+  --rs-driver-brand: #fbd113;
+  --rs-driver-brand-hover: #ffc61a;
+  --rs-driver-brand-ink: #1a1a1a;
+  --rs-driver-on-brand-subtle: #854d0e;
+
+  /* semantic status — light ({color} / {bg} / {ink}) */
+  --rs-driver-success: #16a34a;
+  --rs-driver-success-bg: #dcfce7;
+  --rs-driver-success-ink: #15803d;
+  --rs-driver-warning: #d97706;
+  --rs-driver-warning-bg: #fef3c7;
+  --rs-driver-warning-ink: #b45309;
+  --rs-driver-error: #dc2626;
+  --rs-driver-error-bg: #fee2e2;
+  --rs-driver-error-ink: #b91c1c;
+  --rs-driver-info: #2563eb;
+  --rs-driver-info-bg: #dbeafe;
+  --rs-driver-info-ink: #1d4ed8;
+
+  /* map (faux placeholder; real Mapbox uses its own style) */
+  --rs-driver-map-bg: #e7edf4;
+  --rs-driver-map-road: #ffffff;
+  --rs-driver-map-block: #dce5ef;
+
+  /* elevation */
+  --rs-driver-shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.08);
+  --rs-driver-shadow: 0 10px 28px rgba(16, 24, 40, 0.12);
+}
+
+.dark .driver-theme,
+.driver-theme.dark {
+  /* surfaces & text — dark */
+  --rs-driver-bg: #070b14;
+  --rs-driver-surface: #0f1828;
+  --rs-driver-surface-alt: #16202f;
+  --rs-driver-glass: rgba(10, 17, 32, 0.78);
+  --rs-driver-border: #22304a;
+  --rs-driver-border-hi: #2e4060;
+  --rs-driver-text: #f4f7fb;
+  --rs-driver-text-muted: #9fb0c7;
+  --rs-driver-text-subtle: #64748b;
+
+  /* brand (amber accent text reads brighter on dark) */
+  --rs-driver-on-brand-subtle: #fbd113;
+
+  /* semantic status — dark */
+  --rs-driver-success: #34d399;
+  --rs-driver-success-bg: rgba(34, 197, 94, 0.16);
+  --rs-driver-success-ink: #6ee7b7;
+  --rs-driver-warning: #fbbf24;
+  --rs-driver-warning-bg: rgba(245, 158, 11, 0.16);
+  --rs-driver-warning-ink: #fcd34d;
+  --rs-driver-error: #f87171;
+  --rs-driver-error-bg: rgba(239, 68, 68, 0.16);
+  --rs-driver-error-ink: #fca5a5;
+  --rs-driver-info: #60a5fa;
+  --rs-driver-info-bg: rgba(59, 130, 246, 0.16);
+  --rs-driver-info-ink: #93c5fd;
+
+  /* map */
+  --rs-driver-map-bg: #0c1422;
+  --rs-driver-map-road: #1b2740;
+  --rs-driver-map-block: #111c2e;
+
+  /* elevation */
+  --rs-driver-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --rs-driver-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Driver motion keyframes (referenced via Tailwind animate-driver-* utils).
+ * Decorative pulses/pings are disabled under reduced-motion. */
+@keyframes rs-driver-ping {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  75%, 100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes rs-driver-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes rs-driver-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes rs-driver-tap {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes rs-driver-trail {
+  to { stroke-dashoffset: -24; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .driver-theme [class*="animate-driver-"] {
+    animation: none !important;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * V2 design tokens — CSS variable definitions
+ *
+ * Status: ADDITIVE in this PR. These variables back the new
+ * brand / neutral / semantic Tailwind tokens added in
+ * tailwind.config.ts. Legacy components don't consume them yet —
+ * they keep using legacy hex tokens (#FBD113, #F4F7FF, etc.).
+ *
+ * Base element rules (body bg/color, focus rings, ::selection,
+ * `* border-color`) are intentionally NOT included here — those
+ * land in the sweep PR (PR-B) alongside call-site migration.
+ *
+ * See: tailwind.tokens.ts and globals.css in the design bundle
+ *      docs/ready-set/reports/2026-05-22-design-baseline/
+ * ─────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Brand ramp */
+    --brand-50:  48 100% 96%;
+    --brand-100: 50 96% 88%;
+    --brand-200: 50 96% 76%;
+    --brand-300: 50 96% 65%;
+    --brand-400: 50 97% 53%;   /* #FBD113 — anchor, matches legacy brand */
+    --brand-500: 47 92% 47%;
+    --brand-600: 42 95% 39%;
+    --brand-700: 36 90% 31%;
+    --brand-800: 32 80% 24%;
+    --brand-900: 28 80% 14%;
+
+    /* Neutrals (warm, low chroma) */
+    --neutral-50:  60 14% 97%;
+    --neutral-100: 50 12% 94%;
+    --neutral-200: 50 14% 89%;
+    --neutral-300: 48 10% 80%;
+    --neutral-400: 50 4%  62%;
+    --neutral-500: 51 3%  43%;
+    --neutral-600: 50 4%  31%;
+    --neutral-700: 48 4%  22%;
+    --neutral-800: 50 9%  13%;
+    --neutral-900: 60 10% 7%;
+
+    /* Semantic ramps */
+    --success-50:  138 76% 97%;
+    --success-100: 141 84% 93%;
+    --success-500: 142 71% 45%;
+    --success-600: 142 76% 36%;
+    --success-700: 142 72% 29%;
+
+    --warning-50:  48 100% 96%;
+    --warning-100: 48 96% 89%;
+    --warning-500: 38 92% 50%;
+    --warning-600: 32 95% 44%;
+    --warning-700: 26 90% 37%;
+
+    --error-50:    0 86% 97%;
+    --error-100:   0 93% 94%;
+    --error-500:   0 84% 60%;
+    --error-600:   0 72% 51%;
+    --error-700:   0 74% 42%;
+
+    --info-50:    214 100% 97%;
+    --info-100:   214 95% 93%;
+    --info-500:   217 91% 60%;
+    --info-600:   221 83% 53%;
+    --info-700:   224 76% 48%;
+
+    /* Shadcn semantic aliases (light) */
+    --background:        var(--neutral-50);
+    --foreground:        var(--neutral-900);
+    --card:              0 0% 100%;
+    --card-foreground:   var(--neutral-900);
+    --popover:           0 0% 100%;
+    --popover-foreground:var(--neutral-900);
+    --primary:           var(--brand-400);
+    --primary-hover:     var(--brand-500);
+    --primary-foreground:var(--neutral-900);
+    --secondary:         var(--neutral-100);
+    --secondary-foreground: var(--neutral-900);
+    --muted:             var(--neutral-100);
+    --muted-foreground:  var(--neutral-500);
+    --accent:            var(--brand-50);
+    --accent-foreground: var(--brand-800);
+    --destructive:           var(--error-600);
+    --destructive-foreground: 0 0% 100%;
+    --border:            var(--neutral-200);
+    --input:             var(--neutral-200);
+    --ring:              var(--brand-500);
+
+    /* Type */
+    --font-sans:    "Montserrat", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-display: "Kabel", "Montserrat", sans-serif;
+    --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Radius (Shadcn maps `--radius` to its components) */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background:        var(--neutral-900);
+    --foreground:        var(--neutral-50);
+    --card:              var(--neutral-800);
+    --card-foreground:   var(--neutral-50);
+    --popover:           var(--neutral-800);
+    --popover-foreground:var(--neutral-50);
+    --primary:           var(--brand-400);
+    --primary-hover:     var(--brand-300);
+    --primary-foreground:var(--neutral-900);
+    --secondary:         var(--neutral-800);
+    --secondary-foreground: var(--neutral-50);
+    --muted:             var(--neutral-800);
+    --muted-foreground:  var(--neutral-400);
+    --accent:            var(--brand-900);
+    --accent-foreground: var(--brand-100);
+    --destructive:           var(--error-500);
+    --destructive-foreground: var(--neutral-50);
+    --border:            var(--neutral-700);
+    --input:             var(--neutral-700);
+    --ring:              var(--brand-400);
+  }
+
+  /* Opt-in display font (marketing/H1). Default headings stay Kabel
+     via the existing `h1, h2` rule below until PR-B. */
+  .font-display { font-family: var(--font-display); }
+}
+
 /* Custom utility classes */
 @layer utilities {
   .scrollbar-hide {

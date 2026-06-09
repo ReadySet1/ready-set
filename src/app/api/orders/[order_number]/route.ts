@@ -411,6 +411,38 @@ export async function PATCH(
       return NextResponse.json({ message: "Order not found" }, { status: 404 });
     }
 
+    // AuthZ for driver-status updates (OWASP A01 / IDOR): a DRIVER may only
+    // advance the status of an order assigned to THEM via Dispatch. Dispatch.driver
+    // references Profile, whose id equals the auth user id. Admins/helpdesk are
+    // exempt (they manage all orders). Without this, any authenticated driver
+    // could advance any order's driverStatus.
+    if (driverStatus) {
+      const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('type')
+        .eq('id', user.id)
+        .single();
+      const callerType = callerProfile?.type?.toUpperCase();
+      const privileged =
+        callerType === 'ADMIN' ||
+        callerType === 'SUPER_ADMIN' ||
+        callerType === 'HELPDESK';
+
+      if (!privileged) {
+        const dispatches = (existingOrder as any).dispatches;
+        const assignedDriverProfileId =
+          Array.isArray(dispatches) && dispatches.length > 0
+            ? dispatches[0]?.driver?.id
+            : undefined;
+        if (!assignedDriverProfileId || assignedDriverProfileId !== user.id) {
+          return NextResponse.json(
+            { message: "You are not assigned to this delivery" },
+            { status: 403 },
+          );
+        }
+      }
+    }
+
     // For full field updates (not just status), check permissions and terminal status
     if (hasFieldUpdates) {
       // Get user profile to check role

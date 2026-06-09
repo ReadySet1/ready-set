@@ -212,6 +212,33 @@ Config lives in `release-please-config.json` + `.release-please-manifest.json`; 
 
 `/api/health` returns the current `package.json` version as `version` — useful for verifying which build is live in a given environment.
 
+#### User-facing changelog (`Changelog:` trailer convention)
+
+Two changelogs ship from one release:
+
+- **Technical** — `CHANGELOG.md` (release-please generated), surfaced in-app at `/admin/changelog`.
+- **User-facing** — `src/data/changelog.json` (plain-language), surfaced publicly at `/changelog` with a "What's New" badge.
+
+The user-facing entries are auto-collected from commit message trailers, then human-polished in the release PR. Add an optional footer to any commit whose work is worth surfacing to users:
+
+```
+feat: live driver tracking
+
+Changelog: You can now follow your driver on the map in real time.
+Changelog-type: new        # optional: new | improved | fixed
+```
+
+- `Changelog:` present → the commit contributes a change item; absent → ignored.
+- `Changelog-type:` optional; when omitted it's inferred from the conventional prefix (`feat→new`, `fix→fixed`, `perf`/`refactor→improved`, default `improved`).
+- The extractor `scripts/build-changelog.mjs` (zero-dep node) reads `version` from `package.json`, scans `git log <last tag>..HEAD`, and writes/updates the current version's entry in `src/data/changelog.json`. It's idempotent (re-running replaces the current version's auto-collected `changes`; it won't clobber hand-curated `changes` when no trailers are found, and leaves `title`/`summary` as editable placeholders).
+- CI: the `.github/workflows/release-please.yml` workflow runs the extractor after opening the release PR and commits the regenerated `changelog.json` onto the release branch for human review before merge.
+
+Run it manually with:
+
+```bash
+node scripts/build-changelog.mjs
+```
+
 ### External Integrations
 
 - **CaterValley**: Catering order API (`src/app/api/cater-valley/`)

@@ -1,15 +1,45 @@
 import Link from "next/link";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import JsonLd from "@/components/SEO/JsonLd";
 
 const Breadcrumb = ({
   pageName,
   pageDescription,
+  pagePath,
 }: {
   pageName: string;
   pageDescription?: string;
+  /** When provided, a BreadcrumbList JSON-LD node is emitted. */
+  pagePath?: string;
 }) => {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "https://readysetllc.com";
+
   return (
     <>
+      {pagePath && (
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "Home",
+                item: siteUrl,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: pageName,
+                item: `${siteUrl}${pagePath}`,
+              },
+            ],
+          }}
+        />
+      )}
       <div
         className="relative z-10 overflow-hidden bg-cover bg-center bg-no-repeat pb-[40px] pt-[80px] sm:pb-[50px] sm:pt-page-y-sm md:pb-[60px] md:pt-[130px] lg:pt-page-y-xl"
         style={{

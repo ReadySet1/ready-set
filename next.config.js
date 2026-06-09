@@ -124,6 +124,13 @@ const nextConfig = {
   },
 
   serverExternalPackages: ['@prisma/client', 'prisma', 'jsdom'],
+  // Prisma's native query-engine binary isn't followed by static import tracing,
+  // so `output: "standalone"` ships without it and the server can't connect at
+  // runtime. Force the generated client + engine into the trace. pnpm stores it
+  // under .pnpm/<hashed-dir>, hence the wildcard.
+  outputFileTracingIncludes: {
+    '*': ['./node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/**'],
+  },
   skipTrailingSlashRedirect: true,
   // Ensure all API routes are treated as dynamic
   async rewrites() {
