@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-// import { Pool } from 'pg';
-const Pool = require('pg').Pool;
-
-// Database connection for tracking system
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+import { rawQuery, withRawTx, DbHttpError } from '@/lib/db/raw';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
 
 interface LocationUpdate {
   driver_id: string;
@@ -31,11 +25,14 @@ export async function POST(request: NextRequest) {
   });
   if (!auth.success) return auth.response;
 
-  const client = await pool.connect();
+  // Abuse protection: cap location writes per authenticated user (keyed by the
+  // auth id, not the body driver_id, so it can't be bypassed). Multi-instance
+  // safe via Upstash; falls open if the limiter backend is unavailable. Normal
+  // drivers write ~12/min (client throttled to 1/5s) — well under the cap.
+  const limited = await enforceRateLimit(auth.context.user.id, 'tracking-location-write');
+  if (limited) return limited;
 
   try {
-    await client.query('BEGIN');
-
     const body = await request.json();
     const {
       driver_id,
@@ -53,9 +50,9 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!driver_id || typeof latitude !== 'number' || typeof longitude !== 'number') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Missing required fields: driver_id, latitude, longitude' 
+        {
+          success: false,
+          error: 'Missing required fields: driver_id, latitude, longitude'
         },
         { status: 400 }
       );
@@ -69,90 +66,92 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if driver exists. A DRIVER may only write their OWN location:
-    // verify the target driver row belongs to the authenticated user
-    // (drivers.user_id === auth user id). Admins may write for any driver.
     const isDriver = auth.context.user.type === 'DRIVER';
-    const driverCheck = isDriver
-      ? await client.query(
-          'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND is_active = true',
-          [driver_id, auth.context.user.id]
-        )
-      : await client.query(
-          'SELECT id FROM drivers WHERE id = $1 AND is_active = true',
-          [driver_id]
-        );
 
-    if (driverCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return NextResponse.json(
-        {
+    // One transaction: ownership/existence check + insert + denormalized update.
+    // A DRIVER may only write their OWN location (drivers.user_id === auth user
+    // id); admins may write for any driver. Coordinates are bound as numeric
+    // params via ST_MakePoint (never string-interpolated).
+    const locationRow = await withRawTx(async (tx) => {
+      const driverCheck = isDriver
+        ? await tx.$queryRawUnsafe<{ id: string }[]>(
+            'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND is_active = true',
+            driver_id,
+            auth.context.user.id,
+          )
+        : await tx.$queryRawUnsafe<{ id: string }[]>(
+            'SELECT id FROM drivers WHERE id = $1 AND is_active = true',
+            driver_id,
+          );
+
+      if (driverCheck.length === 0) {
+        throw new DbHttpError(isDriver ? 403 : 404, {
           success: false,
-          error: isDriver
-            ? 'Access denied'
-            : 'Driver not found or inactive',
-        },
-        { status: isDriver ? 403 : 404 }
-      );
-    }
+          error: isDriver ? 'Access denied' : 'Driver not found or inactive',
+        });
+      }
 
-    // Insert location record
-    const locationQuery = `
-      INSERT INTO driver_locations (
+      const inserted = await tx.$queryRawUnsafe<any[]>(
+        `
+        INSERT INTO driver_locations (
+          driver_id,
+          location,
+          accuracy,
+          speed,
+          heading,
+          altitude,
+          battery_level,
+          is_moving,
+          activity_type,
+          recorded_at
+        )
+        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4, $5, $6, $7, $8, $9, $10, NOW())
+        RETURNING
+          id,
+          ST_AsGeoJSON(location) as location_geojson,
+          accuracy,
+          speed,
+          heading,
+          altitude,
+          battery_level,
+          is_moving,
+          activity_type,
+          recorded_at,
+          created_at
+        `,
         driver_id,
-        location,
-        accuracy,
-        speed,
-        heading,
-        altitude,
-        battery_level,
-        is_moving,
-        activity_type,
-        recorded_at
-      )
-      VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4, $5, $6, $7, $8, $9, $10, NOW())
-      RETURNING
-        id,
-        ST_AsGeoJSON(location) as location_geojson,
-        accuracy,
-        speed,
-        heading,
-        altitude,
-        battery_level,
-        is_moving,
-        activity_type,
-        recorded_at,
-        created_at
-    `;
+        longitude,
+        latitude,
+        accuracy ?? null,
+        speed ?? null,
+        heading ?? null,
+        altitude ?? null,
+        battery_level ?? null,
+        is_moving ?? null,
+        activity_type ?? null,
+      );
 
-    const locationResult = await client.query(locationQuery, [
-      driver_id,
-      longitude,
-      latitude,
-      accuracy,
-      speed,
-      heading,
-      altitude,
-      battery_level,
-      is_moving,
-      activity_type
-    ]);
+      // Update driver's last known location
+      await tx.$executeRawUnsafe(
+        `
+        UPDATE drivers
+        SET
+          last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+          last_location_update = NOW(),
+          updated_at = NOW()
+        WHERE id = $3
+        `,
+        longitude,
+        latitude,
+        driver_id,
+      );
 
-    // Update driver's last known location
-    await client.query(`
-      UPDATE drivers
-      SET
-        last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-        last_location_update = NOW(),
-        updated_at = NOW()
-      WHERE id = $3
-    `, [longitude, latitude, driver_id]);
-
-    await client.query('COMMIT');
+      return inserted[0];
+    });
 
     const locationData = {
-      ...locationResult.rows[0],
-      location: JSON.parse(locationResult.rows[0].location_geojson)
+      ...locationRow,
+      location: JSON.parse(locationRow.location_geojson)
     };
 
     return NextResponse.json({
@@ -161,18 +160,18 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (error instanceof DbHttpError) {
+      return NextResponse.json(error.body, { status: error.status });
+    }
     console.error('Error recording location:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to record location',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 }
 
@@ -201,11 +200,11 @@ export async function GET(request: NextRequest) {
 
     // A DRIVER may only read their own location history.
     if (auth.context.user.type === 'DRIVER') {
-      const owns = await pool.query(
+      const owns = await rawQuery<{ id: string }>(
         'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
-        [driver_id, auth.context.user.id]
+        [driver_id, auth.context.user.id],
       );
-      if (owns.rows.length === 0) {
+      if (owns.length === 0) {
         return NextResponse.json(
           { success: false, error: 'Access denied' },
           { status: 403 }
@@ -213,8 +212,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const query = `
-      SELECT 
+    const rows = await rawQuery<any>(
+      `
+      SELECT
         id,
         ST_AsGeoJSON(location) as location_geojson,
         accuracy,
@@ -227,16 +227,16 @@ export async function GET(request: NextRequest) {
         recorded_at,
         created_at
       FROM driver_locations
-      WHERE 
-        driver_id = $1 
+      WHERE
+        driver_id = $1
         AND recorded_at >= NOW() - INTERVAL '${hours} hours'
       ORDER BY recorded_at DESC
       LIMIT $2
-    `;
+      `,
+      [driver_id, limit],
+    );
 
-    const result = await pool.query(query, [driver_id, limit]);
-
-    const locations = result.rows.map((row: any) => ({
+    const locations = rows.map((row: any) => ({
       ...row,
       location: JSON.parse(row.location_geojson)
     }));
@@ -254,12 +254,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching location history:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch location history',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
   }
-} 
+}
