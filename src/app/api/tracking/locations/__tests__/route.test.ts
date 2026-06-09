@@ -51,13 +51,18 @@ jest.mock("@/lib/db/raw", () => {
 // Mock auth middleware (the route gained withAuth in the security-hardening pass)
 jest.mock("@/lib/auth-middleware", () => ({ withAuth: jest.fn() }));
 
+// Rate limiter — default to "allowed" (null); the abuse-protection test overrides.
+jest.mock("@/lib/security/rate-limit", () => ({ enforceRateLimit: jest.fn() }));
+
 import { withAuth } from "@/lib/auth-middleware";
 import { withRawTx, rawQuery } from "@/lib/db/raw";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { POST, GET } from "../route";
 
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
 const mockRawQuery = rawQuery as jest.Mock;
+const mockEnforceRateLimit = enforceRateLimit as jest.Mock;
 
 // Fake interactive-transaction client driven by these two jest fns.
 const mockTxQuery = jest.fn();
@@ -105,6 +110,9 @@ describe("/api/tracking/locations", () => {
       success: true,
       context: { user: { id: "admin-1", type: "ADMIN" } },
     });
+
+    // Default: rate limiter allows the request.
+    mockEnforceRateLimit.mockResolvedValue(null);
 
     // withRawTx invokes its callback with our fake tx client.
     mockWithRawTx.mockImplementation((fn: any) =>
@@ -471,6 +479,19 @@ describe("/api/tracking/locations", () => {
         createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
       );
       expect(response.status).toBe(401);
+      expect(mockWithRawTx).not.toHaveBeenCalled();
+    });
+
+    it("POST: returns the limiter's 429 and skips the DB when rate-limited", async () => {
+      mockEnforceRateLimit.mockResolvedValue(
+        new Response(JSON.stringify({ status: "ERROR" }), { status: 429 }),
+      );
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(429);
+      // Keyed by the authenticated user id, not the body driver_id.
+      expect(mockEnforceRateLimit).toHaveBeenCalledWith("admin-1", "tracking-location-write");
       expect(mockWithRawTx).not.toHaveBeenCalled();
     });
 

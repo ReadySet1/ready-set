@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { rawQuery, withRawTx, DbHttpError } from '@/lib/db/raw';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
 
 interface LocationUpdate {
   driver_id: string;
@@ -23,6 +24,13 @@ export async function POST(request: NextRequest) {
     requireAuth: true,
   });
   if (!auth.success) return auth.response;
+
+  // Abuse protection: cap location writes per authenticated user (keyed by the
+  // auth id, not the body driver_id, so it can't be bypassed). Multi-instance
+  // safe via Upstash; falls open if the limiter backend is unavailable. Normal
+  // drivers write ~12/min (client throttled to 1/5s) — well under the cap.
+  const limited = await enforceRateLimit(auth.context.user.id, 'tracking-location-write');
+  if (limited) return limited;
 
   try {
     const body = await request.json();

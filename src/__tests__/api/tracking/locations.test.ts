@@ -27,7 +27,11 @@ jest.mock('@/lib/db/raw', () => {
 // Route gained withAuth in the security-hardening pass — mock it (default ADMIN).
 jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
 
+// Rate limiter — default to "allowed" (null) in beforeEach.
+jest.mock('@/lib/security/rate-limit', () => ({ enforceRateLimit: jest.fn() }));
+
 import { withAuth } from '@/lib/auth-middleware';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { withRawTx, rawQuery } from '@/lib/db/raw';
 import { GET, POST } from '@/app/api/tracking/locations/route';
 import {
@@ -40,6 +44,7 @@ import {
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
 const mockRawQuery = rawQuery as jest.Mock;
+const mockEnforceRateLimit = enforceRateLimit as jest.Mock;
 
 // Fake interactive-transaction client.
 const mockTxQuery = jest.fn();
@@ -61,6 +66,7 @@ describe('/api/tracking/locations API', () => {
       success: true,
       context: { user: { id: 'admin-1', type: 'ADMIN' } },
     });
+    mockEnforceRateLimit.mockResolvedValue(null);
     mockWithRawTx.mockImplementation((fn: any) =>
       fn({ $queryRawUnsafe: mockTxQuery, $executeRawUnsafe: mockTxExec }),
     );
