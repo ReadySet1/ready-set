@@ -1,39 +1,34 @@
 // src/__tests__/api/tracking/locations.test.ts
 
-// Create shared mock storage - the actual mock functions get assigned in beforeEach
-const mocks = {
-  clientQuery: jest.fn(),
-  release: jest.fn(),
-  poolQuery: jest.fn(),
-  connect: jest.fn(),
-};
-
-// Must mock pg before importing the route
-jest.mock('pg', () => {
-  // Access mocks through the shared object to avoid hoisting issues
-  const getMocks = () => require('./locations.test').mocks || {
-    clientQuery: jest.fn(),
-    release: jest.fn(),
-    poolQuery: jest.fn(),
-    connect: jest.fn(),
-  };
-
+// The route uses the shared pooled-Prisma raw helpers (`@/lib/db/raw`) instead
+// of its own pg.Pool. Mock those helpers. DbHttpError is defined here so the
+// route's `throw new DbHttpError` / `instanceof DbHttpError` use the same class.
+jest.mock('@/lib/db/raw', () => {
+  class DbHttpError extends Error {
+    status: number;
+    body: any;
+    constructor(status: number, body: any) {
+      super('db-http-error');
+      this.name = 'DbHttpError';
+      this.status = status;
+      this.body = body;
+    }
+  }
   return {
-    Pool: jest.fn().mockImplementation(() => ({
-      connect: (...args: unknown[]) => getMocks().connect(...args),
-      query: (...args: unknown[]) => getMocks().poolQuery(...args),
-    })),
+    __esModule: true,
+    DbHttpError,
+    TRACKING_STATEMENT_TIMEOUT_MS: 8000,
+    withRawTx: jest.fn(),
+    rawQuery: jest.fn(),
+    rawExec: jest.fn(),
   };
 });
 
-// Export mocks for the pg mock to access
-module.exports = { mocks };
-
 // Route gained withAuth in the security-hardening pass — mock it (default ADMIN).
 jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
-import { withAuth } from '@/lib/auth-middleware';
-const mockWithAuth = withAuth as jest.Mock;
 
+import { withAuth } from '@/lib/auth-middleware';
+import { withRawTx, rawQuery } from '@/lib/db/raw';
 import { GET, POST } from '@/app/api/tracking/locations/route';
 import {
   createGetRequest,
@@ -42,6 +37,23 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
+const mockWithAuth = withAuth as jest.Mock;
+const mockWithRawTx = withRawTx as jest.Mock;
+const mockRawQuery = rawQuery as jest.Mock;
+
+// Fake interactive-transaction client.
+const mockTxQuery = jest.fn();
+const mockTxExec = jest.fn();
+
+/** Configure the POST transaction to return a given location row on INSERT. */
+function txReturning(record: any, driverRows: any[] = [{ id: 'driver-123' }]) {
+  mockTxQuery.mockImplementation((sql: string) => {
+    if (sql.includes('SELECT id FROM drivers')) return Promise.resolve(driverRows);
+    if (sql.includes('INSERT INTO driver_locations')) return Promise.resolve([record]);
+    return Promise.resolve([]);
+  });
+}
+
 describe('/api/tracking/locations API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,11 +61,18 @@ describe('/api/tracking/locations API', () => {
       success: true,
       context: { user: { id: 'admin-1', type: 'ADMIN' } },
     });
-    // Reset connect mock to return a client with query and release
-    mocks.connect.mockResolvedValue({
-      query: mocks.clientQuery,
-      release: mocks.release,
+    mockWithRawTx.mockImplementation((fn: any) =>
+      fn({ $queryRawUnsafe: mockTxQuery, $executeRawUnsafe: mockTxExec }),
+    );
+    mockTxExec.mockResolvedValue(1);
+    // Default: driver exists, insert echoes a basic record.
+    txReturning({
+      id: 'location-default',
+      location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7431, 30.2672] }),
+      recorded_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
+    mockRawQuery.mockResolvedValue([]);
   });
 
   describe('POST /api/tracking/locations - Record Driver Location', () => {
@@ -72,39 +91,23 @@ describe('/api/tracking/locations API', () => {
           activity_type: 'driving',
         };
 
-        // Mock transaction queries
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'driver-123' }] }) // Driver check
-          .mockResolvedValueOnce({
-            rows: [
-              {
-                id: 'location-1',
-                location_geojson: JSON.stringify({
-                  type: 'Point',
-                  coordinates: [-97.7431, 30.2672],
-                }),
-                accuracy: 10.5,
-                speed: 25.0,
-                heading: 180,
-                altitude: 150,
-                battery_level: 85,
-                is_moving: true,
-                activity_type: 'driving',
-                recorded_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-              },
-            ],
-          }) // INSERT location
-          .mockResolvedValueOnce({}) // UPDATE driver location
-          .mockResolvedValueOnce({}); // COMMIT
+        txReturning({
+          id: 'location-1',
+          location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7431, 30.2672] }),
+          accuracy: 10.5,
+          speed: 25.0,
+          heading: 180,
+          altitude: 150,
+          battery_level: 85,
+          is_moving: true,
+          activity_type: 'driving',
+          recorded_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        });
 
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          locationData
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', locationData),
         );
-
-        const response = await POST(request);
         const data = await expectSuccessResponse(response, 201);
 
         expect(data.success).toBe(true);
@@ -114,300 +117,217 @@ describe('/api/tracking/locations API', () => {
       });
 
       it('should record location with minimal required fields', async () => {
-        const locationData = {
-          driver_id: 'driver-123',
-          latitude: 30.2672,
-          longitude: -97.7431,
-        };
+        txReturning({
+          id: 'location-2',
+          location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7431, 30.2672] }),
+          accuracy: null,
+          speed: null,
+          heading: null,
+          altitude: null,
+          battery_level: null,
+          is_moving: null,
+          activity_type: null,
+          recorded_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        });
 
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'driver-123' }] }) // Driver check
-          .mockResolvedValueOnce({
-            rows: [
-              {
-                id: 'location-2',
-                location_geojson: JSON.stringify({
-                  type: 'Point',
-                  coordinates: [-97.7431, 30.2672],
-                }),
-                accuracy: null,
-                speed: null,
-                heading: null,
-                altitude: null,
-                battery_level: null,
-                is_moving: null,
-                activity_type: null,
-                recorded_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-              },
-            ],
-          }) // INSERT location
-          .mockResolvedValueOnce({}) // UPDATE driver
-          .mockResolvedValueOnce({}); // COMMIT
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          locationData
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
+            driver_id: 'driver-123',
+            latitude: 30.2672,
+            longitude: -97.7431,
+          }),
         );
-
-        const response = await POST(request);
         expect(response.status).toBe(201);
       });
     });
 
     describe('Validation Tests', () => {
       it('should return 400 for missing driver_id', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             latitude: 30.2672,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Missing required fields/i);
       });
 
       it('should return 400 for missing latitude', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Missing required fields/i);
       });
 
       it('should return 400 for missing longitude', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             latitude: 30.2672,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Missing required fields/i);
       });
 
       it('should return 400 for invalid latitude (out of range)', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
-            latitude: 91, // Invalid: > 90
+            latitude: 91,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Invalid coordinates/i);
       });
 
       it('should return 400 for invalid latitude (negative out of range)', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
-            latitude: -91, // Invalid: < -90
+            latitude: -91,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Invalid coordinates/i);
       });
 
       it('should return 400 for invalid longitude (out of range)', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             latitude: 30.2672,
-            longitude: 181, // Invalid: > 180
-          }
+            longitude: 181,
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Invalid coordinates/i);
       });
 
       it('should return 400 for invalid longitude (negative out of range)', async () => {
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             latitude: 30.2672,
-            longitude: -181, // Invalid: < -180
-          }
+            longitude: -181,
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 400, /Invalid coordinates/i);
       });
 
       it('should accept valid boundary coordinates', async () => {
-        const locationData = {
-          driver_id: 'driver-123',
-          latitude: 90, // Valid boundary
-          longitude: 180, // Valid boundary
-        };
+        txReturning({
+          id: 'location-3',
+          location_geojson: JSON.stringify({ type: 'Point', coordinates: [180, 90] }),
+          recorded_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        });
 
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'driver-123' }] }) // Driver check
-          .mockResolvedValueOnce({
-            rows: [
-              {
-                id: 'location-3',
-                location_geojson: JSON.stringify({
-                  type: 'Point',
-                  coordinates: [180, 90],
-                }),
-                recorded_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-              },
-            ],
-          })
-          .mockResolvedValueOnce({})
-          .mockResolvedValueOnce({});
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          locationData
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
+            driver_id: 'driver-123',
+            latitude: 90,
+            longitude: 180,
+          }),
         );
-
-        const response = await POST(request);
         expect(response.status).toBe(201);
       });
     });
 
     describe('Driver Verification', () => {
       it('should return 404 for non-existent driver', async () => {
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [] }); // Driver check - no driver found
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        mockTxQuery.mockImplementation((sql: string) => {
+          if (sql.includes('SELECT id FROM drivers')) return Promise.resolve([]);
+          return Promise.resolve([]);
+        });
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'non-existent',
             latitude: 30.2672,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 404, /Driver not found or inactive/i);
       });
 
       it('should return 404 for inactive driver', async () => {
-        // Driver exists but is_active = false won't be returned by the query
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [] }); // Driver check - inactive drivers not returned
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        mockTxQuery.mockImplementation((sql: string) => {
+          if (sql.includes('SELECT id FROM drivers')) return Promise.resolve([]);
+          return Promise.resolve([]);
+        });
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'inactive-driver',
             latitude: 30.2672,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        const response = await POST(request);
         await expectErrorResponse(response, 404, /Driver not found or inactive/i);
       });
     });
 
     describe('Database State Verification', () => {
-      it('should update driver last_known_location after recording', async () => {
-        const locationData = {
-          driver_id: 'driver-123',
-          latitude: 30.2672,
-          longitude: -97.7431,
-        };
+      it('should update driver last_known_location with parameterized geometry', async () => {
+        txReturning({
+          id: 'location-4',
+          location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7431, 30.2672] }),
+          recorded_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        });
 
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'driver-123' }] }) // Driver check
-          .mockResolvedValueOnce({
-            rows: [
-              {
-                id: 'location-4',
-                location_geojson: JSON.stringify({
-                  type: 'Point',
-                  coordinates: [-97.7431, 30.2672],
-                }),
-                recorded_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-              },
-            ],
-          })
-          .mockResolvedValueOnce({}) // UPDATE driver location
-          .mockResolvedValueOnce({}); // COMMIT
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          locationData
-        );
-
-        await POST(request);
-
-        // Verify driver update used the parameterized geometry (security hardening:
-        // coordinates are bound as numeric params, never string-interpolated).
-        const updateCall = mocks.clientQuery.mock.calls[3];
-        expect(updateCall[0]).toContain('UPDATE drivers');
-        expect(updateCall[0]).toContain('ST_MakePoint');
-        expect(updateCall[1]).toEqual([-97.7431, 30.2672, 'driver-123']);
-      });
-
-      it('should rollback transaction on error', async () => {
-        mocks.clientQuery
-          .mockResolvedValueOnce({}) // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'driver-123' }] }) // Driver check
-          .mockRejectedValueOnce(new Error('Database error')); // INSERT fails
-
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             latitude: 30.2672,
             longitude: -97.7431,
-          }
+          }),
         );
 
-        const response = await POST(request);
-        expect(response.status).toBe(500);
+        // Security hardening: coordinates are bound as numeric params via
+        // ST_MakePoint, never string-interpolated. The denormalized driver
+        // update is the $executeRawUnsafe call.
+        const updateCall = mockTxExec.mock.calls[0];
+        expect(updateCall[0]).toContain('UPDATE drivers');
+        expect(updateCall[0]).toContain('ST_MakePoint');
+        expect(updateCall.slice(1)).toEqual([-97.7431, 30.2672, 'driver-123']);
+      });
 
-        // Verify ROLLBACK was called
-        expect(mocks.clientQuery).toHaveBeenCalledWith('ROLLBACK');
+      it('should not apply the driver update when the insert fails (atomic rollback)', async () => {
+        mockTxQuery.mockImplementation((sql: string) => {
+          if (sql.includes('SELECT id FROM drivers')) return Promise.resolve([{ id: 'driver-123' }]);
+          if (sql.includes('INSERT INTO driver_locations')) return Promise.reject(new Error('Database error'));
+          return Promise.resolve([]);
+        });
+
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
+            driver_id: 'driver-123',
+            latitude: 30.2672,
+            longitude: -97.7431,
+          }),
+        );
+        expect(response.status).toBe(500);
+        // Transaction rolls back (Prisma) — the UPDATE drivers statement never runs.
+        expect(mockTxExec).not.toHaveBeenCalled();
       });
     });
 
     describe('Error Handling', () => {
-      it('should handle database connection errors', async () => {
-        mocks.connect.mockRejectedValueOnce(new Error('Connection failed'));
+      it('should return 500 when the transaction fails to start (connection error)', async () => {
+        mockWithRawTx.mockRejectedValueOnce(new Error('Connection failed'));
 
-        const request = createPostRequest(
-          'http://localhost:3000/api/tracking/locations',
-          {
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
             driver_id: 'driver-123',
             latitude: 30.2672,
             longitude: -97.7431,
-          }
+          }),
         );
-
-        // Note: Connection errors occur before the try-catch in the route,
-        // so we expect the error to propagate (status 500 or thrown error)
-        await expect(POST(request)).rejects.toThrow('Connection failed');
+        // All DB access is now inside the try/catch, so a connection failure is a
+        // graceful 500 rather than an unhandled throw.
+        await expectErrorResponse(response, 500, /Failed to record location/i);
       });
     });
   });
@@ -418,10 +338,7 @@ describe('/api/tracking/locations API', () => {
         const mockLocations = [
           {
             id: 'loc-1',
-            location_geojson: JSON.stringify({
-              type: 'Point',
-              coordinates: [-97.7431, 30.2672],
-            }),
+            location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7431, 30.2672] }),
             accuracy: 10,
             speed: 25,
             heading: 180,
@@ -434,10 +351,7 @@ describe('/api/tracking/locations API', () => {
           },
           {
             id: 'loc-2',
-            location_geojson: JSON.stringify({
-              type: 'Point',
-              coordinates: [-97.7531, 30.2772],
-            }),
+            location_geojson: JSON.stringify({ type: 'Point', coordinates: [-97.7531, 30.2772] }),
             accuracy: 15,
             speed: 30,
             heading: 90,
@@ -450,13 +364,11 @@ describe('/api/tracking/locations API', () => {
           },
         ];
 
-        mocks.poolQuery.mockResolvedValueOnce({ rows: mockLocations });
+        mockRawQuery.mockResolvedValueOnce(mockLocations);
 
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123'
+        const response = await GET(
+          createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123'),
         );
-
-        const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
 
         expect(data.success).toBe(true);
@@ -467,67 +379,39 @@ describe('/api/tracking/locations API', () => {
       });
 
       it('should use default hours parameter (24)', async () => {
-        mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123'
-        );
-
-        await GET(request);
-
-        const queryCall = mocks.poolQuery.mock.calls[0];
-        expect(queryCall[0]).toContain("24 hours");
+        mockRawQuery.mockResolvedValueOnce([]);
+        await GET(createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123'));
+        const queryCall = mockRawQuery.mock.calls[0];
+        expect(queryCall[0]).toContain('24 hours');
       });
 
       it('should use custom hours parameter', async () => {
-        mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123&hours=48'
-        );
-
-        await GET(request);
-
-        const queryCall = mocks.poolQuery.mock.calls[0];
-        expect(queryCall[0]).toContain("48 hours");
+        mockRawQuery.mockResolvedValueOnce([]);
+        await GET(createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123&hours=48'));
+        const queryCall = mockRawQuery.mock.calls[0];
+        expect(queryCall[0]).toContain('48 hours');
       });
 
       it('should use default limit (100)', async () => {
-        mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123'
-        );
-
-        await GET(request);
-
-        const queryCall = mocks.poolQuery.mock.calls[0];
-        expect(queryCall[1]).toContain(100); // limit parameter
+        mockRawQuery.mockResolvedValueOnce([]);
+        await GET(createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123'));
+        const queryCall = mockRawQuery.mock.calls[0];
+        expect(queryCall[1]).toContain(100); // [driver_id, limit]
       });
 
       it('should use custom limit parameter', async () => {
-        mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123&limit=50'
-        );
-
-        await GET(request);
-
-        const queryCall = mocks.poolQuery.mock.calls[0];
+        mockRawQuery.mockResolvedValueOnce([]);
+        await GET(createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123&limit=50'));
+        const queryCall = mockRawQuery.mock.calls[0];
         expect(queryCall[1]).toContain(50);
       });
 
       it('should return empty array when no locations found', async () => {
-        mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123'
+        mockRawQuery.mockResolvedValueOnce([]);
+        const response = await GET(
+          createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123'),
         );
-
-        const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
-
         expect(data.success).toBe(true);
         expect(data.data).toHaveLength(0);
         expect(data.metadata.total_points).toBe(0);
@@ -536,24 +420,17 @@ describe('/api/tracking/locations API', () => {
 
     describe('Validation Tests', () => {
       it('should return 400 for missing driver_id', async () => {
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations'
-        );
-
-        const response = await GET(request);
+        const response = await GET(createGetRequest('http://localhost:3000/api/tracking/locations'));
         await expectErrorResponse(response, 400, /Missing driver_id parameter/i);
       });
     });
 
     describe('Error Handling', () => {
       it('should handle database errors', async () => {
-        mocks.poolQuery.mockRejectedValueOnce(new Error('Database error'));
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/tracking/locations?driver_id=driver-123'
+        mockRawQuery.mockRejectedValueOnce(new Error('Database error'));
+        const response = await GET(
+          createGetRequest('http://localhost:3000/api/tracking/locations?driver_id=driver-123'),
         );
-
-        const response = await GET(request);
         await expectErrorResponse(response, 500, /Failed to fetch location history/i);
       });
     });

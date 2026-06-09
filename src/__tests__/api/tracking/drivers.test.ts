@@ -1,34 +1,25 @@
 import { NextRequest } from 'next/server';
 
-// Mock pg Pool - the route uses PostgreSQL directly, not Supabase
-// This must be set up before the route imports to ensure the pool created
-// at module load time (route.ts line 6) uses our mock
-jest.mock('pg', () => {
-  // Create the mock inside the factory to avoid hoisting issues
-  const mq = jest.fn();
-
-  return {
-    Pool: jest.fn(() => ({
-      query: mq,
-      connect: jest.fn(),
-      end: jest.fn(),
-    })),
-    // Export the mock query so we can access it in tests
-    __mockQuery: mq,
-  };
-});
+// The route uses the shared pooled-Prisma raw helpers (`@/lib/db/raw`) instead
+// of its own pg.Pool. Mock `rawQuery` (the only helper the drivers route uses).
+jest.mock('@/lib/db/raw', () => ({
+  __esModule: true,
+  rawQuery: jest.fn(),
+  rawExec: jest.fn(),
+  withRawTx: jest.fn(),
+  TRACKING_STATEMENT_TIMEOUT_MS: 8000,
+  DbHttpError: class DbHttpError extends Error {},
+}));
 
 // Route gained withAuth in the security-hardening pass — mock it (default ADMIN).
 jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
 
 import { GET, POST, PUT } from '@/app/api/tracking/drivers/route';
 import { withAuth } from '@/lib/auth-middleware';
-import type * as pg from 'pg';
+import { rawQuery } from '@/lib/db/raw';
 
 const mockWithAuth = withAuth as jest.Mock;
-
-// Access the mock query function
-const { __mockQuery: mockQuery } = jest.requireMock<typeof pg & { __mockQuery: jest.Mock }>('pg');
+const mockRawQuery = rawQuery as jest.Mock;
 
 describe('/api/tracking/drivers', () => {
   beforeEach(() => {
@@ -84,11 +75,7 @@ describe('/api/tracking/drivers', () => {
         },
       ];
 
-      // Mock successful pg query response
-      mockQuery.mockResolvedValue({
-        rows: mockDrivers,
-        rowCount: mockDrivers.length,
-      });
+      mockRawQuery.mockResolvedValue(mockDrivers);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
       const response = await GET(request);
@@ -96,7 +83,6 @@ describe('/api/tracking/drivers', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      // Route returns { success: true, data: drivers[], pagination: {...} }
       expect(data.data).toEqual(mockDrivers);
       expect(data.pagination.total).toBe(mockDrivers.length);
       expect(data.pagination.limit).toBe(50); // default limit
@@ -105,19 +91,9 @@ describe('/api/tracking/drivers', () => {
 
     it('filters drivers by status when status parameter provided', async () => {
       const mockActiveDrivers = [
-        {
-          id: 'driver-1',
-          employee_id: 'EMP001',
-          vehicle_number: 'VEH001',
-          is_active: true,
-          is_on_duty: true,
-        },
+        { id: 'driver-1', employee_id: 'EMP001', vehicle_number: 'VEH001', is_active: true, is_on_duty: true },
       ];
-
-      mockQuery.mockResolvedValue({
-        rows: mockActiveDrivers,
-        rowCount: 1,
-      });
+      mockRawQuery.mockResolvedValue(mockActiveDrivers);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers?active=true');
       const response = await GET(request);
@@ -128,21 +104,17 @@ describe('/api/tracking/drivers', () => {
       expect(data.data).toHaveLength(1);
     });
 
-    it('returns 400 for invalid status parameter', async () => {
-      // Route doesn't validate status parameter - this test should be removed or route updated
-      const mockDrivers: any[] = [];
-      mockQuery.mockResolvedValue({ rows: mockDrivers, rowCount: 0 });
-
+    it('returns 200 with empty data for unknown status parameter (no validation)', async () => {
+      mockRawQuery.mockResolvedValue([]);
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers?status=invalid');
       const response = await GET(request);
 
-      // Route returns 200 with empty data, not 400
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ success: true, data: [] });
     });
 
     it('handles database errors gracefully', async () => {
-      mockQuery.mockRejectedValue(new Error('Database connection failed'));
+      mockRawQuery.mockRejectedValue(new Error('Database connection failed'));
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
       const response = await GET(request);
@@ -155,19 +127,9 @@ describe('/api/tracking/drivers', () => {
 
     it('limits results when limit parameter provided', async () => {
       const mockLimitedDrivers = [
-        {
-          id: 'driver-1',
-          employee_id: 'EMP001',
-          vehicle_number: 'VEH001',
-          is_active: true,
-          is_on_duty: true,
-        },
+        { id: 'driver-1', employee_id: 'EMP001', vehicle_number: 'VEH001', is_active: true, is_on_duty: true },
       ];
-
-      mockQuery.mockResolvedValue({
-        rows: mockLimitedDrivers,
-        rowCount: 1,
-      });
+      mockRawQuery.mockResolvedValue(mockLimitedDrivers);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers?limit=1');
       const response = await GET(request);
@@ -179,16 +141,12 @@ describe('/api/tracking/drivers', () => {
       expect(data.pagination.limit).toBe(1);
     });
 
-    it('returns 400 for invalid limit parameter', async () => {
-      // Route parses limit with parseInt which returns NaN for invalid - uses default 50
-      const mockDrivers: any[] = [];
-      mockQuery.mockResolvedValue({ rows: mockDrivers, rowCount: 0 });
-
+    it('falls back to the default limit for an invalid limit parameter', async () => {
+      mockRawQuery.mockResolvedValue([]);
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers?limit=invalid');
       const response = await GET(request);
       const data = await response.json();
 
-      // Route returns 200 with default limit (NaN becomes 50), not 400
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
     });
@@ -203,7 +161,6 @@ describe('/api/tracking/drivers', () => {
         vehicle_number: 'V003',
         phone_number: '+1234567890',
       };
-
       const createdDriver = {
         id: 'driver-3',
         user_id: 'user-3',
@@ -216,16 +173,12 @@ describe('/api/tracking/drivers', () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
-      mockQuery.mockResolvedValue({
-        rows: [createdDriver],
-      });
+      mockRawQuery.mockResolvedValue([createdDriver]);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
         body: JSON.stringify(newDriver),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -236,17 +189,10 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('returns 400 when no identifier is provided', async () => {
-      const invalidDriver = {
-        vehicle_number: 'V003',
-        phone_number: '+1234567890',
-        // Missing employee_id, profile_id, and user_id
-      };
-
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
-        body: JSON.stringify(invalidDriver),
+        body: JSON.stringify({ vehicle_number: 'V003', phone_number: '+1234567890' }),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -255,21 +201,15 @@ describe('/api/tracking/drivers', () => {
       expect(data.error).toContain('Missing required fields');
     });
 
-    it('handles database insertion errors', async () => {
-      const newDriver = {
-        employee_id: 'EMP003',
-      };
-
-      // Mock duplicate employee_id error (PostgreSQL unique constraint violation)
+    it('handles database insertion errors (unique violation → 409)', async () => {
       const duplicateError = new Error('duplicate key value violates unique constraint') as any;
       duplicateError.code = '23505';
-      mockQuery.mockRejectedValue(duplicateError);
+      mockRawQuery.mockRejectedValue(duplicateError);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
-        body: JSON.stringify(newDriver),
+        body: JSON.stringify({ employee_id: 'EMP003' }),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -279,10 +219,6 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('accepts driver with only profile_id', async () => {
-      const newDriver = {
-        profile_id: 'profile-4',
-      };
-
       const createdDriver = {
         id: 'driver-4',
         user_id: null,
@@ -295,16 +231,12 @@ describe('/api/tracking/drivers', () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
-      mockQuery.mockResolvedValue({
-        rows: [createdDriver],
-      });
+      mockRawQuery.mockResolvedValue([createdDriver]);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
-        body: JSON.stringify(newDriver),
+        body: JSON.stringify({ profile_id: 'profile-4' }),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -314,10 +246,6 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('accepts driver with only user_id', async () => {
-      const newDriver = {
-        user_id: 'user-5',
-      };
-
       const createdDriver = {
         id: 'driver-5',
         user_id: 'user-5',
@@ -330,16 +258,12 @@ describe('/api/tracking/drivers', () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
-      mockQuery.mockResolvedValue({
-        rows: [createdDriver],
-      });
+      mockRawQuery.mockResolvedValue([createdDriver]);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
-        body: JSON.stringify(newDriver),
+        body: JSON.stringify({ user_id: 'user-5' }),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -352,15 +276,6 @@ describe('/api/tracking/drivers', () => {
   describe('PUT /api/tracking/drivers', () => {
     it('updates driver information successfully', async () => {
       const driverId = 'driver-1';
-      const updateData = {
-        driver_id: driverId,
-        location: {
-          latitude: 40.7128,
-          longitude: -74.006,
-        },
-        is_on_duty: true,
-      };
-
       const updatedDriver = {
         id: driverId,
         employee_id: 'EMP001',
@@ -369,16 +284,16 @@ describe('/api/tracking/drivers', () => {
         location_geojson: JSON.stringify({ type: 'Point', coordinates: [-74.006, 40.7128] }),
         last_location_update: new Date().toISOString(),
       };
+      mockRawQuery.mockResolvedValue([updatedDriver]);
 
-      mockQuery.mockResolvedValue({
-        rows: [updatedDriver],
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({
+          driver_id: driverId,
+          location: { latitude: 40.7128, longitude: -74.006 },
+          is_on_duty: true,
+        }),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
@@ -389,16 +304,10 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('returns 400 for invalid update data', async () => {
-      const invalidUpdate = {
-        // Missing driver_id which is required
-        location: { latitude: 40.7128, longitude: -74.006 },
-      };
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
-        body: JSON.stringify(invalidUpdate),
+        body: JSON.stringify({ location: { latitude: 40.7128, longitude: -74.006 } }),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
@@ -408,22 +317,11 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('returns 404 when driver not found', async () => {
-      const driverId = 'non-existent-driver';
-      const updateData = {
-        driver_id: driverId,
-        is_on_duty: false,
-      };
-
-      // Mock query returning no rows (driver not found)
-      mockQuery.mockResolvedValue({
-        rows: [],
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+      mockRawQuery.mockResolvedValue([]);
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({ driver_id: 'non-existent-driver', is_on_duty: false }),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
@@ -433,19 +331,11 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('handles database update errors', async () => {
-      const driverId = 'driver-1';
-      const updateData = {
-        driver_id: driverId,
-        is_on_duty: true,
-      };
-
-      mockQuery.mockRejectedValue(new Error('Update failed'));
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+      mockRawQuery.mockRejectedValue(new Error('Update failed'));
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({ driver_id: 'driver-1', is_on_duty: true }),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
@@ -456,11 +346,6 @@ describe('/api/tracking/drivers', () => {
 
     it('updates only is_on_duty when location not provided', async () => {
       const driverId = 'driver-1';
-      const updateData = {
-        driver_id: driverId,
-        is_on_duty: false,
-      };
-
       const updatedDriver = {
         id: driverId,
         employee_id: 'EMP001',
@@ -469,16 +354,12 @@ describe('/api/tracking/drivers', () => {
         location_geojson: null,
         last_location_update: new Date().toISOString(),
       };
+      mockRawQuery.mockResolvedValue([updatedDriver]);
 
-      mockQuery.mockResolvedValue({
-        rows: [updatedDriver],
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({ driver_id: driverId, is_on_duty: false }),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
@@ -494,11 +375,9 @@ describe('/api/tracking/drivers', () => {
         method: 'POST',
         body: 'invalid-json',
       });
-
       const response = await POST(request);
       const data = await response.json();
 
-      // Route catches JSON parse error and returns 500, not 400
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
       expect(data.error).toBe('Failed to create driver');
@@ -509,7 +388,6 @@ describe('/api/tracking/drivers', () => {
         method: 'POST',
         body: JSON.stringify({}),
       });
-
       const response = await POST(request);
       const data = await response.json();
 
@@ -519,8 +397,7 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('handles database query errors gracefully', async () => {
-      mockQuery.mockRejectedValue(new Error('Database connection error'));
-
+      mockRawQuery.mockRejectedValue(new Error('Database connection error'));
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
       const response = await GET(request);
       const data = await response.json();
@@ -535,7 +412,6 @@ describe('/api/tracking/drivers', () => {
         method: 'PUT',
         body: JSON.stringify({}),
       });
-
       const response = await PUT(request);
       const data = await response.json();
 
