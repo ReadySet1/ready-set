@@ -3,6 +3,42 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.2.0",
+      "date": "2026-06-09",
+      "title": "Release 2.2.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "The driver home screen's delivery count now always matches the list shown, and the list refreshes automatically.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver history screen now shows a friendly retry instead of an error page if data is briefly unavailable.",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver history and tracking stay reliable when many drivers use the app at once.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers get a clearer delivery detail screen with a step-by-step status timeline and one-tap directions.",
+          "type": "improved"
+        },
+        {
+          "text": "The driver app has a refreshed, mobile-first design with live shift tracking, clearer delivery status, and light/dark themes.",
+          "type": "improved"
+        },
+        {
+          "text": "Improved SEO metadata, structured data, and sitemap coverage across all public pages.",
+          "type": "improved"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.2.0"
+      }
+    },
+    {
       "version": "2.1.0",
       "date": "2026-05-13",
       "title": "Better order visibility and a smoother address picker",
