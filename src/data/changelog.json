@@ -5,8 +5,8 @@
     {
       "version": "2.2.0",
       "date": "2026-06-09",
-      "title": "Release 2.2.0",
-      "summary": "",
+      "title": "A brand-new driver app",
+      "summary": "This release is all about drivers: the driver app has been redesigned from the ground up for phones, with live shift tracking, a clearer step-by-step delivery flow, and improved reliability when many drivers are on the road at once. Our public pages are also now easier to find in search.",
       "changes": [
         {
           "text": "The driver home screen's delivery count now always matches the list shown, and the list refreshes automatically.",
