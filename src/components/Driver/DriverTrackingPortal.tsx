@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import {
   CheckCircle2,
   CloudOff,
@@ -151,7 +152,17 @@ export default function DriverTrackingPortal() {
   const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
     setUpdatingId(deliveryId);
     try {
-      await updateDeliveryStatus(deliveryId, status, currentLocation || undefined);
+      const ok = await updateDeliveryStatus(
+        deliveryId,
+        status,
+        currentLocation || undefined,
+      );
+      if (!ok) {
+        // The update failed server-side (auth, network, validation). Without
+        // this the button just does nothing and the driver assumes a freeze.
+        toast.error("Couldn't update the delivery status. Please try again.");
+      }
+      return ok;
     } finally {
       setUpdatingId(null);
     }
@@ -207,14 +218,19 @@ export default function DriverTrackingPortal() {
           queued={queuedItems}
         />
 
-        {locationError || shiftError || deliveriesError ? (
-          <div className="flex items-start gap-2 rounded-2xl border border-driver-error/30 bg-driver-error-bg px-4 py-3 text-driver-error-ink">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <span className="text-[13px] font-semibold">
-              {locationError || shiftError || deliveriesError}
-            </span>
-          </div>
-        ) : null}
+        {/* Show every active error — `a || b || c` masks shift/delivery
+            failures whenever a location-permission error is present. */}
+        {[locationError, shiftError, deliveriesError]
+          .filter((message): message is string => Boolean(message))
+          .map((message) => (
+            <div
+              key={message}
+              className="flex items-start gap-2 rounded-2xl border border-driver-error/30 bg-driver-error-bg px-4 py-3 text-driver-error-ink"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="text-[13px] font-semibold">{message}</span>
+            </div>
+          ))}
 
         {!isOnline ? (
           <div className="flex items-center gap-2 rounded-2xl border border-driver-warning/30 bg-driver-warning-bg px-4 py-3 text-driver-warning-ink">

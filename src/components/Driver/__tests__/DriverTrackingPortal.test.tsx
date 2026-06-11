@@ -12,6 +12,13 @@ jest.mock("@/contexts/DriverTrackingContext", () => ({
   DriverTrackingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+jest.mock("react-hot-toast", () => ({
+  __esModule: true,
+  default: { error: jest.fn(), success: jest.fn() },
+}));
+
+import toast from "react-hot-toast";
+
 // Light map mock (real one needs Mapbox + a token).
 jest.mock("@/components/Driver/DriverLiveMap", () => ({
   __esModule: true,
@@ -149,6 +156,68 @@ describe("DriverTrackingPortal (redesigned)", () => {
         sampleLocation,
       ),
     );
+  });
+
+  it("toasts when a status update fails instead of failing silently", async () => {
+    updateDeliveryStatus.mockResolvedValueOnce(false);
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ASSIGNED,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+    fireEvent.click(screen.getByText(/on my way to vendor/i));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/couldn't update the delivery status/i),
+      ),
+    );
+  });
+
+  it("does not toast when a status update succeeds", async () => {
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ASSIGNED,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+    fireEvent.click(screen.getByText(/on my way to vendor/i));
+    await waitFor(() => expect(updateDeliveryStatus).toHaveBeenCalled());
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("shows all error banners at once instead of masking later ones", () => {
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        locationError: "Location access denied",
+        deliveriesError: "Access denied",
+      }),
+    );
+    renderPortal();
+    expect(screen.getByText(/location access denied/i)).toBeInTheDocument();
+    expect(screen.getByText(/^access denied$/i)).toBeInTheDocument();
   });
 
   it("shows an offline banner when offline", () => {
