@@ -85,6 +85,29 @@ describe("updateDeliveryStatus security", () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
   });
 
+  it("checks ownership against profile_id as well as user_id", async () => {
+    // Most drivers rows only have profile_id set (user_id is a legacy,
+    // usually-NULL column). The ownership query must accept either link —
+    // a user_id-only check 403s every real driver. Regression for the
+    // "Access denied on own delivery" bug.
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) return Promise.resolve([{ driver_id: "driver-1" }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    await updateDeliveryStatus(VALID_ID, DriverStatus.PICKED_UP);
+
+    const ownershipSql = mockPrisma.$queryRawUnsafe.mock.calls
+      .map(([sql]) => sql as string)
+      .find((sql) => sql.includes("FROM drivers"));
+    expect(ownershipSql).toBeDefined();
+    expect(ownershipSql).toContain("profile_id");
+    expect(ownershipSql).toContain("user_id");
+  });
+
   it("lets an admin advance any delivery without an ownership row", async () => {
     mockAuth({ id: "user-admin" });
     mockGetUserRole.mockResolvedValue("ADMIN");

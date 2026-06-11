@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
+import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 // import { Pool } from 'pg';
 const Pool = require('pg').Pool;
 
@@ -70,12 +71,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if driver exists. A DRIVER may only write their OWN location:
-    // verify the target driver row belongs to the authenticated user
-    // (drivers.user_id === auth user id). Admins may write for any driver.
+    // verify the target driver row belongs to the authenticated user.
+    // Admins may write for any driver.
     const isDriver = auth.context.user.type === 'DRIVER';
     const driverCheck = isDriver
       ? await client.query(
-          'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND is_active = true',
+          `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)} AND is_active = true`,
           [driver_id, auth.context.user.id]
         )
       : await client.query(
@@ -202,7 +203,7 @@ export async function GET(request: NextRequest) {
     // A DRIVER may only read their own location history.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await pool.query(
-        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id]
       );
       if (owns.rows.length === 0) {

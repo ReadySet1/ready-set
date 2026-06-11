@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
+import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 // import { Pool } from 'pg';
 const Pool = require('pg').Pool;
 
@@ -245,7 +246,7 @@ export async function PUT(request: NextRequest) {
     // A DRIVER may only update their own record.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await pool.query(
-        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id]
       );
       if (owns.rows.length === 0) {

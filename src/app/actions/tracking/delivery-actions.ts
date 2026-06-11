@@ -8,6 +8,7 @@ import { DriverStatus } from '@/types/user';
 import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
 import { createClient } from '@/utils/supabase/server';
 import { getUserRole } from '@/lib/auth';
+import { userOwnsDriver } from '@/lib/auth/driver-ownership';
 
 /**
  * Update delivery status with location and optional proof of delivery
@@ -52,13 +53,11 @@ export async function updateDeliveryStatus(
     const deliveryRecord = delivery[0];
 
     // AuthZ: a non-admin caller may only mutate a delivery assigned to their
-    // own driver record (drivers.user_id === auth user id). Prevents one driver
-    // from advancing another driver's delivery (IDOR).
+    // own driver record. Prevents one driver from advancing another driver's
+    // delivery (IDOR).
     if (!isPrivileged) {
-      const owns = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-        SELECT id FROM drivers WHERE id = $1::uuid AND user_id = $2::uuid
-      `, deliveryRecord?.driver_id, user.id);
-      if (owns.length === 0) {
+      const owns = await userOwnsDriver(deliveryRecord?.driver_id, user.id);
+      if (!owns) {
         return { success: false, error: 'Access denied' };
       }
     }

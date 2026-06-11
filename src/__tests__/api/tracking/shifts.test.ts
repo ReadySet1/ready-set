@@ -178,9 +178,14 @@ describe('/api/tracking/shifts API', () => {
           },
         ];
 
-        (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce(mockShifts)
-          .mockResolvedValueOnce([]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM shift_breaks')) return Promise.resolve([]);
+          if (sql.includes('FROM driver_shifts')) return Promise.resolve(mockShifts);
+          // Driver row resolution (profile_id OR user_id linkage)
+          return Promise.resolve([
+            { id: 'driver-1', is_active: true, current_shift_id: 'shift-1' },
+          ]);
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/shifts'
@@ -190,9 +195,10 @@ describe('/api/tracking/shifts API', () => {
         const data = await expectSuccessResponse(response, 200);
 
         expect(data.data[0].driverInfo).toBeUndefined(); // Drivers shouldn't see driverInfo
+        // Scoped to the resolved driver id, not a user_id subquery
         expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('ds.driver_id = (SELECT id FROM drivers WHERE user_id = $'),
-          'driver-user-123',
+          expect.stringContaining('ds.driver_id = $'),
+          'driver-1',
           50,
           0
         );
@@ -347,7 +353,7 @@ describe('/api/tracking/shifts API', () => {
         });
 
         (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce([{ id: 'driver-1', current_shift_id: null }]) // Get driver
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]) // Get driver
           .mockResolvedValueOnce([{ id: 'shift-new-1' }]); // Create shift
 
         (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
@@ -381,7 +387,7 @@ describe('/api/tracking/shifts API', () => {
         });
 
         (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce([{ id: 'driver-1', current_shift_id: null }])
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }])
           .mockResolvedValueOnce([{ id: 'shift-new-2' }]);
 
         (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
@@ -480,7 +486,7 @@ describe('/api/tracking/shifts API', () => {
         });
 
         (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          { id: 'driver-1', current_shift_id: 'existing-shift' },
+          { id: 'driver-1', is_active: true, current_shift_id: 'existing-shift' },
         ]);
 
         const request = createPostRequest(
@@ -623,9 +629,12 @@ describe('/api/tracking/shifts API', () => {
           vehicle_number: null,
         };
 
-        (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce([mockShift])
-          .mockResolvedValueOnce([]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM shift_breaks')) return Promise.resolve([]);
+          if (sql.includes('FROM driver_shifts')) return Promise.resolve([mockShift]);
+          // Ownership lookup: driver-1 belongs to driver-user-123
+          return Promise.resolve([{ id: 'driver-1' }]);
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/shifts/shift-1'
@@ -673,13 +682,13 @@ describe('/api/tracking/shifts API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          {
-            driver_id: 'driver-1',
-            status: 'active',
-            user_id: 'driver-user-123',
-          },
-        ]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM driver_shifts')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'active' }]);
+          }
+          // Ownership lookup: driver-1 belongs to driver-user-123
+          return Promise.resolve([{ id: 'driver-1' }]);
+        });
 
         (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
@@ -710,13 +719,12 @@ describe('/api/tracking/shifts API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          {
-            driver_id: 'driver-1',
-            status: 'paused',
-            user_id: 'driver-user-123',
-          },
-        ]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM driver_shifts')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'paused' }]);
+          }
+          return Promise.resolve([{ id: 'driver-1' }]);
+        });
 
         (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
@@ -741,13 +749,12 @@ describe('/api/tracking/shifts API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          {
-            driver_id: 'driver-1',
-            status: 'completed',
-            user_id: 'driver-user-123',
-          },
-        ]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM driver_shifts')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'completed' }]);
+          }
+          return Promise.resolve([{ id: 'driver-1' }]);
+        });
 
         const request = createPutRequest(
           'http://localhost:3000/api/tracking/shifts/shift-1',
@@ -808,13 +815,13 @@ describe('/api/tracking/shifts API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          {
-            driver_id: 'driver-1',
-            status: 'active',
-            user_id: 'different-driver-user', // Different user
-          },
-        ]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM driver_shifts')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'active' }]);
+          }
+          // Ownership lookup: driver-1 is NOT linked to driver-user-123
+          return Promise.resolve([]);
+        });
 
         const request = createPutRequest(
           'http://localhost:3000/api/tracking/shifts/shift-1',

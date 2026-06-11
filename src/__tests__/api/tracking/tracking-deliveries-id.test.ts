@@ -456,13 +456,13 @@ describe('/api/tracking/deliveries/[id] API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
-          {
-            driver_id: 'driver-1',
-            status: 'ASSIGNED',
-            user_id: 'driver-user-1',
-          },
-        ]);
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM deliveries')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'ASSIGNED' }]);
+          }
+          // Ownership lookup: driver-1 is not linked to driver-user-2.
+          return Promise.resolve([]);
+        });
 
         const request = createPutRequest(
           'http://localhost:3000/api/tracking/deliveries/delivery-1',
