@@ -164,6 +164,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // profile_id and user_id both link a drivers row to the auth user and
+    // share one id space (profiles.id === auth.users.id). profile_id is
+    // canonical; user_id is the legacy duplicate (FK -> auth.users). Accept
+    // either on input but store them in sync so ownership checks
+    // (src/lib/auth/driver-ownership.ts) never see a divergent pair. The
+    // user_id subselect nulls itself out when no auth.users row exists
+    // (e.g. seeded profiles), since its FK would reject the insert.
+    const authLinkId = profile_id || user_id || null;
+
     const query = `
       INSERT INTO drivers (
         user_id,
@@ -172,7 +181,7 @@ export async function POST(request: NextRequest) {
         vehicle_number,
         phone_number
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ((SELECT id FROM auth.users WHERE id = $1::uuid), $2, $3, $4, $5)
       RETURNING
         id,
         user_id,
@@ -187,8 +196,8 @@ export async function POST(request: NextRequest) {
     `;
 
     const result = await pool.query(query, [
-      user_id || null,
-      profile_id || null,
+      authLinkId, // user_id (guarded by the auth.users subselect)
+      authLinkId, // profile_id
       employee_id || null,
       vehicle_number || null,
       phone_number || null,

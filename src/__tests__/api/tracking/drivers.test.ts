@@ -235,6 +235,41 @@ describe('/api/tracking/drivers', () => {
       expect(data.data.employee_id).toBe('EMP003');
     });
 
+    it('stores user_id in sync with profile_id when only profile_id is given', async () => {
+      mockQuery.mockResolvedValue({ rows: [{ id: 'driver-9' }] });
+
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
+        method: 'POST',
+        body: JSON.stringify({ profile_id: 'profile-9' }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      const insertCall = mockQuery.mock.calls.find(
+        ([sql]: [string]) => typeof sql === 'string' && sql.includes('INSERT INTO drivers')
+      );
+      // user_id ($1) and profile_id ($2) must never diverge at creation.
+      expect(insertCall?.[1]?.slice(0, 2)).toEqual(['profile-9', 'profile-9']);
+    });
+
+    it('stores profile_id in sync with user_id when only user_id is given', async () => {
+      mockQuery.mockResolvedValue({ rows: [{ id: 'driver-9' }] });
+
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: 'user-9' }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      const insertCall = mockQuery.mock.calls.find(
+        ([sql]: [string]) => typeof sql === 'string' && sql.includes('INSERT INTO drivers')
+      );
+      expect(insertCall?.[1]?.slice(0, 2)).toEqual(['user-9', 'user-9']);
+    });
+
     it('returns 400 when no identifier is provided', async () => {
       const invalidDriver = {
         vehicle_number: 'V003',
