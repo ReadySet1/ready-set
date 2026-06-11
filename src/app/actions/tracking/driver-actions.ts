@@ -20,6 +20,7 @@ import {
   calculateShiftMileageWithBreakdown,
   calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
+import { callerMayActOnDriver } from '@/lib/auth/driver-ownership';
 
 /**
  * Start a new driver shift
@@ -31,6 +32,15 @@ export async function startDriverShift(
   metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; shiftId?: string; error?: string }> {
   try {
+    if (!z.string().uuid().safeParse(driverId).success) {
+      return { success: false, error: 'Invalid driverId' };
+    }
+
+    // AuthZ: only the driver themself (or an admin) may start their shift.
+    if (!(await callerMayActOnDriver(driverId))) {
+      return { success: false, error: 'Access denied' };
+    }
+
     // Use raw SQL for PostGIS operations since Prisma doesn't support geography types well
     const result = await prisma.$executeRawUnsafe(`
       INSERT INTO driver_shifts (
@@ -129,6 +139,11 @@ export async function endDriverShift(
     }
 
     const shift = shiftInfo[0];
+
+    // AuthZ: only the shift's driver (or an admin) may end it.
+    if (!(await callerMayActOnDriver(shift?.driver_id))) {
+      return { success: false, error: 'Access denied' };
+    }
 
     // Always record the end location in the database first so that the
     // mileage calculation window has a proper closing point.
@@ -242,13 +257,18 @@ export async function startShiftBreak(
 ): Promise<{ success: boolean; breakId?: string; error?: string }> {
   try {
     // Verify shift exists and is active
-    const shiftExists = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      SELECT id FROM driver_shifts
+    const shiftExists = await prisma.$queryRawUnsafe<{ id: string; driver_id: string }[]>(`
+      SELECT id, driver_id FROM driver_shifts
       WHERE id = $1::uuid AND status = 'active' AND deleted_at IS NULL
     `, shiftId);
 
     if (shiftExists.length === 0) {
       return { success: false, error: 'Active shift not found' };
+    }
+
+    // AuthZ: only the shift's driver (or an admin) may pause it.
+    if (!(await callerMayActOnDriver(shiftExists[0]?.driver_id))) {
+      return { success: false, error: 'Access denied' };
     }
 
     // Update shift with break start time and set status to paused
@@ -294,14 +314,20 @@ export async function endShiftBreak(
     const shiftInfo = await prisma.$queryRawUnsafe<{
       id: string;
       status: string;
+      driver_id: string;
     }[]>(`
-      SELECT id, status
+      SELECT id, status, driver_id
       FROM driver_shifts
       WHERE id = $1::uuid AND status = 'paused' AND deleted_at IS NULL
     `, breakId);
 
     if (shiftInfo.length === 0) {
       return { success: false, error: 'Paused shift not found (no active break)' };
+    }
+
+    // AuthZ: only the shift's driver (or an admin) may resume it.
+    if (!(await callerMayActOnDriver(shiftInfo[0]?.driver_id))) {
+      return { success: false, error: 'Access denied' };
     }
 
     // End the break and resume shift
@@ -339,6 +365,12 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
       console.error('getActiveShift called with invalid driverId', { driverId });
       return null;
     }
+
+    // AuthZ: a driver may only read their own shift (admins any).
+    if (!(await callerMayActOnDriver(driverId))) {
+      return null;
+    }
+
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         ds.id,
@@ -443,6 +475,13 @@ export async function updateDriverLocation(
         success: false,
         error: rateLimit.message
       };
+    }
+
+    // AuthZ: a driver may only write their own location (admins any).
+    // Checked after the rate limiter so unauthenticated spam can't multiply
+    // DB lookups beyond the per-driver ping budget.
+    if (!(await callerMayActOnDriver(driverId))) {
+      return { success: false, error: 'Access denied' };
     }
 
     // Insert location record
@@ -566,6 +605,12 @@ export async function getDriverShiftHistory(
     if (!uuid.success) {
       return [];
     }
+
+    // AuthZ: a driver may only read their own shift history (admins any).
+    if (!(await callerMayActOnDriver(driverId))) {
+      return [];
+    }
+
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         ds.id,

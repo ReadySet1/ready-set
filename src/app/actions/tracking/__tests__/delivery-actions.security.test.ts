@@ -7,7 +7,13 @@
  *  - the deliveryId must be a valid UUID before it reaches raw SQL
  */
 
-import { updateDeliveryStatus } from "../delivery-actions";
+import {
+  updateDeliveryStatus,
+  assignDeliveryToDriver,
+  createDelivery,
+  getDriverActiveDeliveries,
+  uploadProofOfDelivery,
+} from "../delivery-actions";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { getUserRole } from "@/lib/auth";
@@ -118,6 +124,56 @@ describe("updateDeliveryStatus security", () => {
 
     const res = await updateDeliveryStatus(VALID_ID, DriverStatus.PICKED_UP);
     expect(res).toEqual({ success: true });
+  });
+
+  it("restricts delivery assignment to admins", async () => {
+    mockAuth({ id: "user-driver" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+
+    const res = await assignDeliveryToDriver(VALID_ID, VALID_ID);
+    expect(res).toEqual({ success: false, error: "Access denied" });
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("restricts delivery creation to admins", async () => {
+    mockAuth({ id: "user-driver" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+
+    const res = await createDelivery(
+      VALID_ID,
+      { lat: 1, lng: 1 },
+      { lat: 2, lng: 2 },
+    );
+    expect(res).toEqual({ success: false, error: "Access denied" });
+  });
+
+  it("returns no deliveries to a driver reading a foreign driver id", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]); // ownership lookup → not owned
+
+    const res = await getDriverActiveDeliveries(VALID_ID);
+    expect(res).toEqual([]);
+    // Only the ownership lookup ran — never the deliveries query.
+    const deliveriesQueried = mockPrisma.$queryRawUnsafe.mock.calls.some(
+      ([sql]) => typeof sql === "string" && sql.includes("FROM deliveries"),
+    );
+    expect(deliveriesQueried).toBe(false);
+  });
+
+  it("denies POD upload on a foreign delivery", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) {
+        return Promise.resolve([{ driver_id: "driver-victim" }]);
+      }
+      return Promise.resolve([]); // not owned
+    });
+
+    const res = await uploadProofOfDelivery(VALID_ID, new Blob(["x"]));
+    expect(res).toEqual({ success: false, error: "Access denied" });
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it("does not write a location when coordinates are out of range", async () => {

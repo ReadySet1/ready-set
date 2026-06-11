@@ -1,13 +1,16 @@
 import { prisma } from '@/utils/prismaDB';
+import { createClient } from '@/utils/supabase/server';
+import { getUserRole } from '@/lib/auth';
 
 /**
  * Driver ↔ auth-user linkage.
  *
  * The `drivers` table carries two columns that can point at the authenticated
- * user (`profiles.id` === Supabase auth uid):
+ * user, in one id space (`profiles.id` === `auth.users.id` === auth uid):
  *
  *  - `profile_id` — the canonical link: unique, FK to `profiles.id`.
- *  - `user_id`    — a legacy duplicate with no FK; NULL on most rows.
+ *  - `user_id`    — a legacy duplicate (FK to `auth.users.id`, which the
+ *                   Prisma schema does not model); NULL on most rows.
  *
  * Ownership checks MUST accept either column until `user_id` is backfilled
  * and dropped. Checking `user_id` alone denies every driver whose row only
@@ -27,6 +30,44 @@ import { prisma } from '@/utils/prismaDB';
 export function driverOwnershipCondition(paramIndex: number, alias = ''): string {
   const p = alias ? `${alias}.` : '';
   return `(${p}profile_id = $${paramIndex}::uuid OR ${p}user_id = $${paramIndex}::uuid)`;
+}
+
+export interface ActionCaller {
+  userId: string;
+  isPrivileged: boolean;
+}
+
+/**
+ * Resolve the authenticated caller of a server action. Server actions are
+ * plain POST endpoints — every action that reads or mutates driver data must
+ * authenticate the caller itself; nothing upstream does it for them.
+ * Returns null when unauthenticated.
+ */
+export async function getActionCaller(): Promise<ActionCaller | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const role = (await getUserRole(user.id))?.toUpperCase();
+  return {
+    userId: user.id,
+    isPrivileged: role === 'ADMIN' || role === 'SUPER_ADMIN',
+  };
+}
+
+/**
+ * Owner-or-admin gate for server actions acting on a driver's data:
+ * admins may act on any driver; everyone else only on their own driver row.
+ */
+export async function callerMayActOnDriver(
+  driverId: string | null | undefined
+): Promise<boolean> {
+  const caller = await getActionCaller();
+  if (!caller) return false;
+  if (caller.isPrivileged) return true;
+  return userOwnsDriver(driverId, caller.userId);
 }
 
 export interface DriverIdentity {
