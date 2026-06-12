@@ -649,6 +649,54 @@ describe('/api/tracking/shifts API', () => {
       });
     });
 
+    describe('Authorization Tests', () => {
+      it('should return 404 (not 403) when a driver fetches another drivers shift', async () => {
+        // Anti-oracle behavior: a non-owned shift must be indistinguishable
+        // from a non-existent one, so the route can't be used to probe ids.
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'driver-user-123', type: 'DRIVER' },
+          },
+        });
+
+        const mockShift = {
+          id: 'shift-1',
+          driver_id: 'driver-other',
+          start_time: new Date(),
+          end_time: null,
+          start_location_geojson: JSON.stringify({
+            coordinates: [-97.7431, 30.2672],
+          }),
+          end_location_geojson: null,
+          total_distance_km: 0,
+          delivery_count: 0,
+          status: 'active',
+          metadata: {},
+          created_at: new Date(),
+          updated_at: new Date(),
+          employee_id: null,
+          vehicle_number: null,
+        };
+
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM shift_breaks')) return Promise.resolve([]);
+          if (sql.includes('FROM driver_shifts')) return Promise.resolve([mockShift]);
+          // Ownership lookup: driver-other is NOT linked to driver-user-123
+          return Promise.resolve([]);
+        });
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/shifts/shift-1'
+        );
+
+        const response = await GET_SHIFT(request, {
+          params: Promise.resolve({ id: 'shift-1' }),
+        });
+        await expectErrorResponse(response, 404, /shift not found/i);
+      });
+    });
+
     describe('Not Found', () => {
       it('should return 404 for non-existent shift', async () => {
         (withAuth as jest.Mock).mockResolvedValue({

@@ -12,6 +12,7 @@ import {
   assignDeliveryToDriver,
   createDelivery,
   getDriverActiveDeliveries,
+  getDriverDeliveryHistory,
   uploadProofOfDelivery,
 } from "../delivery-actions";
 import { prisma } from "@/utils/prismaDB";
@@ -159,6 +160,63 @@ describe("updateDeliveryStatus security", () => {
       ([sql]) => typeof sql === "string" && sql.includes("FROM deliveries"),
     );
     expect(deliveriesQueried).toBe(false);
+  });
+
+  it("rejects an invalid driverId for delivery history before touching the DB", async () => {
+    const res = await getDriverDeliveryHistory("not-a-uuid");
+    expect(res).toEqual([]);
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("returns no delivery history to a driver reading a foreign driver id", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]); // ownership lookup → not owned
+
+    const res = await getDriverDeliveryHistory(VALID_ID);
+    expect(res).toEqual([]);
+    // Only the ownership lookup ran — never the deliveries history query.
+    const deliveriesQueried = mockPrisma.$queryRawUnsafe.mock.calls.some(
+      ([sql]) => typeof sql === "string" && sql.includes("FROM deliveries"),
+    );
+    expect(deliveriesQueried).toBe(false);
+  });
+
+  it("returns delivery history rows to the owning driver", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) {
+        return Promise.resolve([
+          {
+            id: "delivery-1",
+            driver_id: VALID_ID,
+            status: "COMPLETED",
+            pickup_location_geojson: null,
+            delivery_location_geojson: null,
+            estimated_delivery_time: null,
+            delivered_at: null,
+            delivery_photo_url: null,
+            delivery_notes: null,
+            assigned_at: new Date(),
+            arrived_at_vendor_at: null,
+            picked_up_at: null,
+            en_route_at: null,
+            arrived_at_client_at: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ]);
+      }
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: VALID_ID }]); // owned
+      return Promise.resolve([]);
+    });
+
+    const res = await getDriverDeliveryHistory(VALID_ID);
+    expect(res).toHaveLength(1);
+    expect(res[0]?.id).toBe("delivery-1");
+    expect(res[0]?.driverId).toBe(VALID_ID);
   });
 
   it("denies POD upload on a foreign delivery", async () => {

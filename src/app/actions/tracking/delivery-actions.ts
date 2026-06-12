@@ -41,6 +41,7 @@ export async function updateDeliveryStatus(
       SELECT driver_id
       FROM deliveries
       WHERE id = $1::uuid
+      AND deleted_at IS NULL
     `, deliveryId);
 
     if (delivery.length === 0) {
@@ -372,7 +373,7 @@ export async function uploadProofOfDelivery(
 
     // AuthZ: only the delivery's driver (or an admin) may attach a POD.
     const podDelivery = await prisma.$queryRawUnsafe<{ driver_id: string | null }[]>(`
-      SELECT driver_id FROM deliveries WHERE id = $1::uuid
+      SELECT driver_id FROM deliveries WHERE id = $1::uuid AND deleted_at IS NULL
     `, deliveryId);
     if (podDelivery.length === 0) {
       return { success: false, error: 'Delivery not found' };

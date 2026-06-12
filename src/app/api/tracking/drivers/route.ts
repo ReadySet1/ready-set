@@ -85,9 +85,10 @@ export async function GET(request: NextRequest) {
     const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
-    // Drivers are scoped to their own record (drivers.user_id === auth user id).
+    // Drivers are scoped to their own record (linked via profile_id or the
+    // legacy user_id column — see src/lib/auth/driver-ownership.ts).
     if (auth.context.user.type === 'DRIVER') {
-      query += ` AND user_id = $${paramCounter}`;
+      query += ` AND ${driverOwnershipCondition(paramCounter)}`;
       params.push(auth.context.user.id);
       paramCounter++;
     }

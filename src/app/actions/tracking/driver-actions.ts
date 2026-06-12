@@ -465,6 +465,14 @@ export async function updateDriverLocation(
       return { success: false, error: 'Invalid driverId' };
     }
 
+    // AuthZ: a driver may only write their own location (admins any).
+    // Checked BEFORE the rate limiter — the limiter is keyed by the target
+    // driverId, so recording denied attempts would let any authenticated
+    // caller burn a victim driver's ping budget and freeze their GPS stream.
+    if (!(await callerMayActOnDriver(driverId))) {
+      return { success: false, error: 'Access denied' };
+    }
+
     // Check rate limit atomically (1 update per 5 seconds per driver)
     // SECURITY FIX: Using checkAndRecordLimit() to prevent race conditions
     // This atomically checks AND records, preventing concurrent requests from bypassing the limit
@@ -475,13 +483,6 @@ export async function updateDriverLocation(
         success: false,
         error: rateLimit.message
       };
-    }
-
-    // AuthZ: a driver may only write their own location (admins any).
-    // Checked after the rate limiter so unauthenticated spam can't multiply
-    // DB lookups beyond the per-driver ping budget.
-    if (!(await callerMayActOnDriver(driverId))) {
-      return { success: false, error: 'Access denied' };
     }
 
     // Insert location record

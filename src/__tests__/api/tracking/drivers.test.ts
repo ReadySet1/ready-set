@@ -141,6 +141,30 @@ describe('/api/tracking/drivers', () => {
       expect(data.pagination.limit).toBe(1);
     });
 
+    it('scopes a DRIVER caller to their own row via both auth-link columns', async () => {
+      mockWithAuth.mockResolvedValue({
+        success: true,
+        context: { user: { id: 'driver-user-9', type: 'DRIVER' } },
+      });
+      mockRawQuery.mockResolvedValue([]);
+
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
+      const response = await GET(request);
+      expect(response.status).toBe(200);
+
+      const selectCall = mockRawQuery.mock.calls.find(
+        ([sql]: [string]) => typeof sql === 'string' && sql.includes('FROM drivers')
+      );
+      expect(selectCall).toBeDefined();
+      // Ownership must check BOTH auth-link columns (profile_id is canonical,
+      // user_id is the legacy duplicate — see src/lib/auth/driver-ownership.ts).
+      // A user_id-only condition returns nothing for most real drivers.
+      expect(selectCall?.[0]).toContain('profile_id = $1');
+      expect(selectCall?.[0]).toContain('user_id = $1');
+      // The auth user id is bound to that placeholder.
+      expect(selectCall?.[1]?.[0]).toBe('driver-user-9');
+    });
+
     it('falls back to the default limit for an invalid limit parameter', async () => {
       mockRawQuery.mockResolvedValue([]);
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers?limit=invalid');
@@ -189,7 +213,7 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('stores user_id in sync with profile_id when only profile_id is given', async () => {
-      mockQuery.mockResolvedValue({ rows: [{ id: 'driver-9' }] });
+      mockRawQuery.mockResolvedValue([{ id: 'driver-9' }]);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
@@ -199,7 +223,7 @@ describe('/api/tracking/drivers', () => {
       const response = await POST(request);
       expect(response.status).toBe(201);
 
-      const insertCall = mockQuery.mock.calls.find(
+      const insertCall = mockRawQuery.mock.calls.find(
         ([sql]: [string]) => typeof sql === 'string' && sql.includes('INSERT INTO drivers')
       );
       // user_id ($1) and profile_id ($2) must never diverge at creation.
@@ -207,7 +231,7 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('stores profile_id in sync with user_id when only user_id is given', async () => {
-      mockQuery.mockResolvedValue({ rows: [{ id: 'driver-9' }] });
+      mockRawQuery.mockResolvedValue([{ id: 'driver-9' }]);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
@@ -217,7 +241,7 @@ describe('/api/tracking/drivers', () => {
       const response = await POST(request);
       expect(response.status).toBe(201);
 
-      const insertCall = mockQuery.mock.calls.find(
+      const insertCall = mockRawQuery.mock.calls.find(
         ([sql]: [string]) => typeof sql === 'string' && sql.includes('INSERT INTO drivers')
       );
       expect(insertCall?.[1]?.slice(0, 2)).toEqual(['user-9', 'user-9']);
