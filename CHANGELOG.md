@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1](https://github.com/ReadySet1/ready-set/compare/v2.2.0...v2.2.1) (2026-06-12)
+
+
+### Fixed
+
+* accept profile_id linkage in driver ownership checks ([8670e76](https://github.com/ReadySet1/ready-set/commit/8670e76ea94d97d9edd12e5003cdcc981b7ff184))
+* backfill and sync the drivers auth-link columns ([1c5da15](https://github.com/ReadySet1/ready-set/commit/1c5da154877c01e2721f36624604d4f4d33db561))
+* driver "Access denied" — ownership via profile_id linkage + tracking authz hardening ([397ea96](https://github.com/ReadySet1/ready-set/commit/397ea96f176cb785f22e026a9af83bffc3b7c447))
+* keep the POD sheet open on failed status update; de-dupe banner keys ([c028a50](https://github.com/ReadySet1/ready-set/commit/c028a50c4cab6069ab2e147241ad028d0de8fc06))
+* surface delivery status-update failures in the driver tracking UI ([0435f37](https://github.com/ReadySet1/ready-set/commit/0435f3717b581802e6a3bf973a679392e9f062b1))
+
+
+### Security
+
+* harden tracking authz paths from pre-landing review findings ([23c1486](https://github.com/ReadySet1/ready-set/commit/23c14862ed9f6d6ec73fc8142f93a024a1726dec))
+* require caller ownership in driver tracking server actions ([83e54db](https://github.com/ReadySet1/ready-set/commit/83e54db393331ef8ecd758c6ce59b39cf7b87fd8))
+* validate delivery status server-side and make completion idempotent ([7058069](https://github.com/ReadySet1/ready-set/commit/7058069a312cdc172aa443d014de7cda93350971))
+
+
+### Documentation
+
+* changelog entry for the driver ownership/authz overhaul ([8d4ee73](https://github.com/ReadySet1/ready-set/commit/8d4ee73cdb527059ae62ef87c818492b329b885c))
+* document the driver-ownership authz module and server-action auth convention ([420d36f](https://github.com/ReadySet1/ready-set/commit/420d36fb589653b5f0231fa28db9ce88e5a1e789))
+
 ## [2.2.0](https://github.com/ReadySet1/ready-set/compare/v2.1.0...v2.2.0) (2026-06-09)
 
 
