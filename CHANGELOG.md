@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Driver "Access denied" on own deliveries**: ownership checks now accept either auth-link column (`profile_id` or legacy `user_id`) via the new `src/lib/auth/driver-ownership.ts` module — drivers whose row only carries `profile_id` (most of them) no longer get 403s on every tracking write
+- Driver tracking portal surfaces failed delivery status updates with an error toast instead of silently doing nothing; the proof-of-delivery sheet stays open on failure so the capture can be retried
+- Error banners in the driver portal no longer mask each other (all active location/shift/delivery errors render, keyed by source)
+- Backfill migration syncs the `drivers.user_id` / `profile_id` auth-link columns both ways (guarded by FK existence checks, idempotent)
+- Stale orders PATCH test assertions left behind by the earlier IDOR-hardening pass
+
+### Security
+- Driver tracking server actions (`delivery-actions.ts`, `driver-actions.ts`) now authenticate the caller and enforce owner-or-admin on every read/write; `createDelivery` / `assignDeliveryToDriver` are admin-only
+- `updateDeliveryStatus` validates the status value server-side (enum) and only increments the shift `delivery_count` on a genuine transition into COMPLETED (no replay inflation)
+- `updateDriverLocation` checks ownership before recording the rate limit, so a non-owner can no longer burn a victim driver's ping budget
+- Delivery ownership lookups filter soft-deleted rows; `GET /api/tracking/drivers` driver-scoping matches both auth-link columns
+
 ## [2.1.0] - 2026-05-13
 
 Periodic dev → main sync ([PR #402](https://github.com/ReadySet1/ready-set/pull/402)). 89 commits / ~25 PRs since the previous release window. First versioned release after baseline rebase — anchors retroactively to merge commit `c3803ac9`.
