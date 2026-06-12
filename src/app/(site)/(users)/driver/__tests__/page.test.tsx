@@ -111,15 +111,39 @@ describe('DriverPage (redesigned home)', () => {
       mockTrackingState = {
         isShiftActive: true,
         currentShift: { startTime: '2024-06-15T13:30:00' },
-        activeDeliveries: [{ id: 'd1' }, { id: 'd2' }],
+        activeDeliveries: [],
       };
+      // The "N active" count now derives from /api/driver-deliveries — the same
+      // single source the deliveries list uses — not the tracking context.
+      global.fetch = jest.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/profile')) {
+          return Promise.resolve(createMockApiResponse(mockProfileResponse));
+        }
+        if (url.includes('/api/tracking/drivers')) {
+          return Promise.resolve(createMockApiResponse(mockDriversResponse));
+        }
+        if (url.includes('/api/driver-deliveries')) {
+          return Promise.resolve(
+            createMockApiResponse({
+              deliveries: [
+                { id: 'd1', completeDateTime: null },
+                { id: 'd2', completeDateTime: null },
+              ],
+            }),
+          );
+        }
+        return Promise.resolve(createMockApiResponse({}));
+      });
+
       renderDriverHome();
 
       await waitFor(() => {
         expect(screen.getByText('On shift')).toBeInTheDocument();
       });
       expect(screen.getByText('Active shift')).toBeInTheDocument();
-      expect(screen.getByText('2 active')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('2 active')).toBeInTheDocument();
+      });
     });
   });
 

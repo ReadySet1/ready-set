@@ -1,0 +1,2 @@
+# Session cookies for the load test — never commit (auth secrets).
+.cookies

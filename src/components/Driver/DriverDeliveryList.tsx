@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Inbox, TriangleAlert } from "lucide-react";
 import { encodeOrderNumber } from "@/utils/order/urlEncoding";
@@ -12,25 +12,7 @@ import {
   StateBlock,
   formatTime,
 } from "@/components/Driver/ui";
-
-/** Minimal shape we consume from /api/driver-deliveries (full shape lives in
- *  DriverDeliveries.tsx). Kept local + permissive to tolerate API drift. */
-interface ApiDelivery {
-  id: string;
-  orderNumber: string;
-  delivery_type: "catering" | "on_demand";
-  status: string;
-  driverStatus?: string | null;
-  pickupDateTime: string;
-  completeDateTime?: string | null;
-  order_total: string | number;
-  client_attention?: string | null;
-  address?: { street1?: string | null; city?: string | null } | null;
-  delivery_address?: { street1?: string | null; city?: string | null } | null;
-  headcount?: number | null;
-  itemDelivered?: string | null;
-  user?: { name?: string | null; email?: string | null } | null;
-}
+import type { ApiDelivery } from "@/hooks/driver/useDriverDeliveriesFeed";
 
 type Tab = "today" | "upcoming" | "completed";
 
@@ -67,48 +49,30 @@ function metaFor(d: ApiDelivery): string | undefined {
   return undefined;
 }
 
-/**
- * Redesigned driver deliveries list (Home). Reuses the existing
- * /api/driver-deliveries endpoint + Today/Upcoming/Completed categorization,
- * rendering DeliveryCards that open the Delivery Detail view. Status
- * advancement now lives on Detail / Live Tracking (the "one dominant action").
- */
-export function DriverDeliveryList() {
-  const router = useRouter();
-  const [deliveries, setDeliveries] = useState<ApiDelivery[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("today");
+interface DriverDeliveryListProps {
+  deliveries: ApiDelivery[];
+  loading: boolean;
+  error: string | null;
+  /** Re-fetch the shared feed (used by the error-state retry). */
+  onRetry: () => void;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/driver-deliveries?page=1&limit=999");
-        if (!res.ok) throw new Error("Failed to fetch deliveries");
-        const data = await res.json();
-        const list: ApiDelivery[] =
-          data && typeof data === "object" && "deliveries" in data
-            ? Array.isArray(data.deliveries)
-              ? data.deliveries
-              : []
-            : Array.isArray(data)
-              ? data
-              : [];
-        if (!cancelled) setDeliveries(list);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "An error occurred");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+/**
+ * Redesigned driver deliveries list (Home). Renders the shared delivery feed
+ * (from `useDriverDeliveriesFeed`, lifted to the Home page) into Today/Upcoming/
+ * Completed tabs as DeliveryCards that open the Delivery Detail view. Because the
+ * data is passed in from the same feed that drives the Home "N active" count,
+ * the count and the list are always consistent. Status advancement lives on
+ * Detail / Live Tracking (the "one dominant action").
+ */
+export function DriverDeliveryList({
+  deliveries,
+  loading,
+  error,
+  onRetry,
+}: DriverDeliveryListProps) {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("today");
 
   const filtered = useMemo(() => {
     const today = new Date();
@@ -146,7 +110,7 @@ export function DriverDeliveryList() {
           title="Couldn't load deliveries"
           body={error}
           action={
-            <DriverButton variant="outline" onClick={() => router.refresh()}>
+            <DriverButton variant="outline" onClick={onRetry}>
               Retry
             </DriverButton>
           }

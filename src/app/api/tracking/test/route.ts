@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
-// import { Pool } from 'pg';
-const Pool = require('pg').Pool;
-
-// Database connection for tracking system
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+import { rawQuery, rawExec } from '@/lib/db/raw';
 
 // GET - Test tracking system connectivity and data
 export async function GET(request: NextRequest) {
@@ -28,14 +21,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const tests = [];
-    
+
     // Test 1: Database connectivity
     try {
-      const dbTest = await pool.query('SELECT NOW() as current_time, version() as db_version');
+      const dbTest = await rawQuery<any>('SELECT NOW() as current_time, version() as db_version');
       tests.push({
         name: 'Database Connectivity',
         status: 'PASS',
-        data: dbTest.rows[0]
+        data: dbTest[0]
       });
     } catch (error) {
       tests.push({
@@ -47,11 +40,11 @@ export async function GET(request: NextRequest) {
 
     // Test 2: PostGIS Extension
     try {
-      const postgisTest = await pool.query('SELECT PostGIS_Version() as postgis_version');
+      const postgisTest = await rawQuery<any>('SELECT PostGIS_Version() as postgis_version');
       tests.push({
         name: 'PostGIS Extension',
         status: 'PASS',
-        data: postgisTest.rows[0]
+        data: postgisTest[0]
       });
     } catch (error) {
       tests.push({
@@ -63,18 +56,18 @@ export async function GET(request: NextRequest) {
 
     // Test 3: Tables exist
     try {
-      const tablesTest = await pool.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+      const tablesTest = await rawQuery<any>(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name IN ('drivers', 'driver_locations', 'deliveries', 'tracking_events', 'geofences')
         ORDER BY table_name
       `);
-      
+
       const expectedTables = ['deliveries', 'driver_locations', 'drivers', 'geofences', 'tracking_events'];
-      const foundTables = tablesTest.rows.map((row: any) => row.table_name);
+      const foundTables = tablesTest.map((row: any) => row.table_name);
       const missingTables = expectedTables.filter(table => !foundTables.includes(table));
-      
+
       tests.push({
         name: 'Required Tables',
         status: missingTables.length === 0 ? 'PASS' : 'FAIL',
@@ -92,21 +85,21 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Test 4: Sample data counts
+    // Test 4: Sample data counts (cast to int so the result is a JS number, not BigInt)
     try {
-      const countsTest = await pool.query(`
-        SELECT 
-          (SELECT COUNT(*) FROM drivers) as drivers_count,
-          (SELECT COUNT(*) FROM deliveries) as deliveries_count,
-          (SELECT COUNT(*) FROM driver_locations) as locations_count,
-          (SELECT COUNT(*) FROM tracking_events) as events_count,
-          (SELECT COUNT(*) FROM geofences) as geofences_count
+      const countsTest = await rawQuery<any>(`
+        SELECT
+          (SELECT COUNT(*)::int FROM drivers) as drivers_count,
+          (SELECT COUNT(*)::int FROM deliveries) as deliveries_count,
+          (SELECT COUNT(*)::int FROM driver_locations) as locations_count,
+          (SELECT COUNT(*)::int FROM tracking_events) as events_count,
+          (SELECT COUNT(*)::int FROM geofences) as geofences_count
       `);
-      
+
       tests.push({
         name: 'Sample Data',
         status: 'PASS',
-        data: countsTest.rows[0]
+        data: countsTest[0]
       });
     } catch (error) {
       tests.push({
@@ -118,20 +111,20 @@ export async function GET(request: NextRequest) {
 
     // Test 5: Geographic queries
     try {
-      const geoTest = await pool.query(`
-        SELECT 
+      const geoTest = await rawQuery<any>(`
+        SELECT
           employee_id,
           ST_AsText(last_known_location) as location_text,
           ST_AsGeoJSON(last_known_location) as location_geojson
-        FROM drivers 
+        FROM drivers
         WHERE last_known_location IS NOT NULL
         LIMIT 1
       `);
-      
+
       tests.push({
         name: 'Geographic Queries',
         status: 'PASS',
-        data: geoTest.rows[0] || { message: 'No location data found' }
+        data: geoTest[0] || { message: 'No location data found' }
       });
     } catch (error) {
       tests.push({
@@ -143,25 +136,25 @@ export async function GET(request: NextRequest) {
 
     // Test 6: Recent activity
     try {
-      const activityTest = await pool.query(`
-        SELECT 
+      const activityTest = await rawQuery<any>(`
+        SELECT
           d.employee_id,
           d.is_on_duty,
           d.last_location_update,
-          COUNT(dl.id) as recent_location_updates
+          COUNT(dl.id)::int as recent_location_updates
         FROM drivers d
-        LEFT JOIN driver_locations dl ON d.id = dl.driver_id 
+        LEFT JOIN driver_locations dl ON d.id = dl.driver_id
           AND dl.recorded_at >= NOW() - INTERVAL '1 hour'
         WHERE d.is_active = true
         GROUP BY d.id, d.employee_id, d.is_on_duty, d.last_location_update
         ORDER BY d.last_location_update DESC NULLS LAST
         LIMIT 3
       `);
-      
+
       tests.push({
         name: 'Recent Activity',
         status: 'PASS',
-        data: activityTest.rows
+        data: activityTest
       });
     } catch (error) {
       tests.push({
@@ -194,8 +187,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error running tracking system tests:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to run tracking system tests',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -229,33 +222,35 @@ export async function POST(request: NextRequest) {
     if (test_type === 'basic' || test_type === 'all') {
       // Test location insert performance
       const startTime = Date.now();
-      
+
       try {
         // Get a test driver
-        const driverResult = await pool.query('SELECT id FROM drivers LIMIT 1');
-        if (driverResult.rows.length === 0) {
+        const driverResult = await rawQuery<{ id: string }>('SELECT id FROM drivers LIMIT 1');
+        const driverId = driverResult[0]?.id;
+        if (!driverId) {
           throw new Error('No test drivers available');
         }
-        
-        const driverId = driverResult.rows[0].id;
-        
-        // Insert 10 test locations
+
+        // Insert 10 test locations (coordinates bound as numeric params)
         const insertPromises = [];
         for (let i = 0; i < 10; i++) {
           const lat = 30.2672 + (Math.random() - 0.5) * 0.01;
           const lng = -97.7431 + (Math.random() - 0.5) * 0.01;
-          
+
           insertPromises.push(
-            pool.query(`
+            rawExec(
+              `
               INSERT INTO driver_locations (driver_id, location, accuracy, speed, is_moving, recorded_at)
-              VALUES ($1, ST_GeogFromText($2), $3, $4, $5, NOW())
-            `, [driverId, `POINT(${lng} ${lat})`, 5.0, 25.5, true])
+              VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4, $5, $6, NOW())
+              `,
+              [driverId, lng, lat, 5.0, 25.5, true],
+            )
           );
         }
-        
+
         await Promise.all(insertPromises);
         const endTime = Date.now();
-        
+
         performanceTests.push({
           name: 'Location Insert Performance',
           status: 'PASS',
@@ -275,21 +270,21 @@ export async function POST(request: NextRequest) {
     if (test_type === 'spatial' || test_type === 'all') {
       // Test spatial queries
       const startTime = Date.now();
-      
+
       try {
-        await pool.query(`
-          SELECT 
+        await rawQuery<any>(`
+          SELECT
             d.employee_id,
             ST_Distance(d.last_known_location, ST_GeogFromText('POINT(-97.7431 30.2672)')) as distance_meters
           FROM drivers d
-          WHERE 
+          WHERE
             d.last_known_location IS NOT NULL
             AND ST_DWithin(d.last_known_location, ST_GeogFromText('POINT(-97.7431 30.2672)'), 10000)
           ORDER BY distance_meters
         `);
-        
+
         const endTime = Date.now();
-        
+
         performanceTests.push({
           name: 'Spatial Query Performance',
           status: 'PASS',
@@ -320,12 +315,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error running performance tests:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to run performance tests',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
   }
-} 
+}

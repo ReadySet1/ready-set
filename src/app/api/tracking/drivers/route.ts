@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
-// import { Pool } from 'pg';
-const Pool = require('pg').Pool;
-
-// Database connection for tracking system
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+import { rawQuery } from '@/lib/db/raw';
 
 interface Driver {
   id: string;
@@ -38,6 +31,15 @@ interface Driver {
 interface DriverLocation {
   latitude: number;
   longitude: number;
+}
+
+/** True when a raw-query error is a Postgres unique-violation (SQLSTATE 23505). */
+function isUniqueViolation(error: any): boolean {
+  return (
+    error?.code === '23505' ||
+    error?.meta?.code === '23505' ||
+    String(error?.message ?? '').includes('23505')
+  );
 }
 
 // GET - List drivers (admins) / own record (drivers)
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
       FROM drivers
       WHERE deleted_at IS NULL
     `;
-    
+
     const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
@@ -105,9 +107,9 @@ export async function GET(request: NextRequest) {
     query += ` ORDER BY created_at DESC LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
-    
-    const drivers = result.rows.map((row: any) => ({
+    const rows = await rawQuery<any>(query, params);
+
+    const drivers = rows.map((row: any) => ({
       ...row,
       last_known_location: row.location_geojson ? JSON.parse(row.location_geojson) : null,
     }));
@@ -125,8 +127,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching drivers:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch drivers',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -173,7 +175,8 @@ export async function POST(request: NextRequest) {
     // (e.g. seeded profiles), since its FK would reject the insert.
     const authLinkId = profile_id || user_id || null;
 
-    const query = `
+    const rows = await rawQuery<any>(
+      `
       INSERT INTO drivers (
         user_id,
         profile_id,
@@ -193,40 +196,40 @@ export async function POST(request: NextRequest) {
         is_on_duty,
         created_at,
         updated_at
-    `;
-
-    const result = await pool.query(query, [
-      authLinkId, // user_id (guarded by the auth.users subselect)
-      authLinkId, // profile_id
-      employee_id || null,
-      vehicle_number || null,
-      phone_number || null,
-    ]);
+      `,
+      [
+        authLinkId, // user_id (guarded by the auth.users subselect)
+        authLinkId, // profile_id
+        employee_id || null,
+        vehicle_number || null,
+        phone_number || null,
+      ],
+    );
 
     return NextResponse.json({
       success: true,
-      data: result.rows[0]
+      data: rows[0]
     }, { status: 201 });
 
   } catch (error: any) {
     console.error('Error creating driver:', error);
-    
+
     // Handle unique constraint violation
-    if (error.code === '23505') {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Driver with this employee_id already exists' 
+        {
+          success: false,
+          error: 'Driver with this employee_id already exists'
         },
         { status: 409 }
       );
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to create driver',
-        details: error.message
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
@@ -254,11 +257,11 @@ export async function PUT(request: NextRequest) {
 
     // A DRIVER may only update their own record.
     if (auth.context.user.type === 'DRIVER') {
-      const owns = await pool.query(
+      const owns = await rawQuery<{ id: string }>(
         `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
-        [driver_id, auth.context.user.id]
+        [driver_id, auth.context.user.id],
       );
-      if (owns.rows.length === 0) {
+      if (owns.length === 0) {
         return NextResponse.json(
           { success: false, error: 'Access denied' },
           { status: 403 }
@@ -290,7 +293,7 @@ export async function PUT(request: NextRequest) {
       paramCounter++;
     }
 
-    query += ` WHERE id = $${paramCounter} RETURNING 
+    query += ` WHERE id = $${paramCounter} RETURNING
       id,
       employee_id,
       is_active,
@@ -300,9 +303,9 @@ export async function PUT(request: NextRequest) {
     `;
     params.push(driver_id);
 
-    const result = await pool.query(query, params);
+    const rows = await rawQuery<any>(query, params);
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Driver not found' },
         { status: 404 }
@@ -310,9 +313,9 @@ export async function PUT(request: NextRequest) {
     }
 
     const driver = {
-      ...result.rows[0],
-      last_known_location: result.rows[0].location_geojson ? 
-        JSON.parse(result.rows[0].location_geojson) : null,
+      ...rows[0],
+      last_known_location: rows[0].location_geojson ?
+        JSON.parse(rows[0].location_geojson) : null,
     };
 
     return NextResponse.json({
@@ -323,8 +326,8 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error('Error updating driver:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to update driver',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -353,10 +356,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const query = 'DELETE FROM drivers WHERE id = $1 RETURNING id';
-    const result = await pool.query(query, [driverId]);
+    const rows = await rawQuery<{ id: string }>(
+      'DELETE FROM drivers WHERE id = $1 RETURNING id',
+      [driverId],
+    );
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Driver not found' },
         { status: 404 }
@@ -371,12 +376,12 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Error deleting driver:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to delete driver',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
   }
-} 
+}
