@@ -14,6 +14,20 @@ import {
 // Mock dependencies BEFORE imports
 jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
+  // Used by the fire-and-forget realtime broadcast on driver-status updates
+  createAdminClient: jest.fn(async () => {
+    const channel = {
+      subscribe: (cb: (status: string) => void) => {
+        cb('SUBSCRIBED');
+        return channel;
+      },
+      send: async () => 'ok',
+    };
+    return {
+      channel: () => channel,
+      removeChannel: async () => undefined,
+    };
+  }),
 }));
 
 jest.mock('@/utils/prismaDB', () => ({
@@ -29,6 +43,13 @@ jest.mock('@/utils/prismaDB', () => ({
     address: {
       create: jest.fn(),
       update: jest.fn(),
+    },
+    delivery: {
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
+    },
+    driver: {
+      findFirst: jest.fn(),
     },
   },
 }));
@@ -644,9 +665,8 @@ describe('/api/orders/[order_number] PATCH API - Edit Order', () => {
     });
   });
 
-  describe('📊 Status-Only Updates (Legacy Behavior)', () => {
-    it('should allow status updates without role check (driver updates)', async () => {
-      // Drivers can update status but not other fields
+  describe('📊 Driver Status Updates (IDOR protection)', () => {
+    const setupAuthenticatedDriver = () => {
       mockCreateClient.mockResolvedValue({
         auth: {
           getUser: jest.fn().mockResolvedValue({
@@ -665,14 +685,34 @@ describe('/api/orders/[order_number] PATCH API - Edit Order', () => {
           }),
         }),
       });
+    };
 
+    it('should allow the assigned driver to update driverStatus without admin role', async () => {
+      setupAuthenticatedDriver();
+
+      // The caller's auth user id matches the dispatch driver's profile id
       const mockOrder = createMockCateringOrder({
         orderNumber: 'CAT001',
         status: 'ASSIGNED',
         driverStatus: 'ASSIGNED',
+        dispatches: [
+          {
+            id: 'dispatch-1',
+            driver: {
+              id: 'driver-id',
+              name: 'Test Driver',
+              email: 'driver@example.com',
+              contactNumber: '555-0100',
+            },
+          },
+        ],
       });
       mockCateringFindFirst.mockResolvedValue(mockOrder);
-      mockCateringUpdate.mockResolvedValue({ ...mockOrder, driverStatus: 'EN_ROUTE_TO_VENDOR' });
+      mockCateringUpdate.mockResolvedValue({
+        ...mockOrder,
+        driverStatus: 'EN_ROUTE_TO_VENDOR',
+        status: 'IN_PROGRESS',
+      });
 
       const request = createPatchRequest(
         'http://localhost:3000/api/orders/CAT001',
@@ -682,6 +722,31 @@ describe('/api/orders/[order_number] PATCH API - Edit Order', () => {
       const response = await PATCH(request, createMockParams('CAT001'));
 
       expect(response.status).toBe(200);
+    });
+
+    it('should return 403 when a driver is not assigned to the order', async () => {
+      setupAuthenticatedDriver();
+
+      // No dispatches — the caller is not the assigned driver, so the
+      // IDOR guard added in the driver-tracking hardening must reject this.
+      const mockOrder = createMockCateringOrder({
+        orderNumber: 'CAT001',
+        status: 'ASSIGNED',
+        driverStatus: 'ASSIGNED',
+      });
+      mockCateringFindFirst.mockResolvedValue(mockOrder);
+
+      const request = createPatchRequest(
+        'http://localhost:3000/api/orders/CAT001',
+        { driverStatus: 'EN_ROUTE_TO_VENDOR' }
+      );
+
+      const response = await PATCH(request, createMockParams('CAT001'));
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.message).toBe('You are not assigned to this delivery');
+      expect(mockCateringUpdate).not.toHaveBeenCalled();
     });
   });
 
