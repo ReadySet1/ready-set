@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Driver with this employee_id already exists'
+          error: 'Driver with this employee_id or profile already exists'
         },
         { status: 409 }
       );

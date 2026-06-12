@@ -115,6 +115,51 @@ describe("updateDeliveryStatus security", () => {
     expect(ownershipSql).toContain("user_id");
   });
 
+  it("rejects a status value outside the DriverStatus enum before touching the DB", async () => {
+    // The DriverStatus type is compile-time only; a server action is a public
+    // POST endpoint, so arbitrary strings must be rejected server-side.
+    const res = await updateDeliveryStatus(VALID_ID, "TOTALLY_BOGUS" as DriverStatus);
+    expect(res).toEqual({ success: false, error: "Invalid status" });
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("does not re-increment the shift delivery_count when the delivery is already COMPLETED", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries"))
+        return Promise.resolve([{ driver_id: "driver-1", status: DriverStatus.COMPLETED }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    const res = await updateDeliveryStatus(VALID_ID, DriverStatus.COMPLETED);
+    expect(res).toEqual({ success: true });
+    const countBump = mockPrisma.$executeRawUnsafe.mock.calls.find(([sql]) =>
+      (sql as string).includes("delivery_count"),
+    );
+    expect(countBump).toBeUndefined();
+  });
+
+  it("increments the shift delivery_count on a genuine transition into COMPLETED", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries"))
+        return Promise.resolve([{ driver_id: "driver-1", status: DriverStatus.ARRIVED_AT_DROPOFF }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    const res = await updateDeliveryStatus(VALID_ID, DriverStatus.COMPLETED);
+    expect(res).toEqual({ success: true });
+    const countBump = mockPrisma.$executeRawUnsafe.mock.calls.find(([sql]) =>
+      (sql as string).includes("delivery_count"),
+    );
+    expect(countBump).toBeDefined();
+  });
+
   it("lets an admin advance any delivery without an ownership row", async () => {
     mockAuth({ id: "user-admin" });
     mockGetUserRole.mockResolvedValue("ADMIN");

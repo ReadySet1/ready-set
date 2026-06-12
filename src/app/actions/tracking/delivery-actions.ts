@@ -28,6 +28,13 @@ export async function updateDeliveryStatus(
       return { success: false, error: 'Invalid deliveryId' };
     }
 
+    // Server actions are public POST endpoints — the DriverStatus type is
+    // compile-time only, so reject anything outside the enum before it is
+    // written to the (unconstrained varchar) status column.
+    if (!z.nativeEnum(DriverStatus).safeParse(status).success) {
+      return { success: false, error: 'Invalid status' };
+    }
+
     // AuthN: the caller must be signed in.
     const caller = await getActionCaller();
     if (!caller) {
@@ -37,8 +44,9 @@ export async function updateDeliveryStatus(
     // Get current delivery info
     const delivery = await prisma.$queryRawUnsafe<{
       driver_id: string;
+      status: string;
     }[]>(`
-      SELECT driver_id
+      SELECT driver_id, status
       FROM deliveries
       WHERE id = $1::uuid
       AND deleted_at IS NULL
@@ -121,8 +129,14 @@ export async function updateDeliveryStatus(
       );
     }
 
-    // Update delivery count in current shift if delivery is completed
-    if (status === DriverStatus.COMPLETED && deliveryRecord?.driver_id) {
+    // Update delivery count in current shift if delivery is completed.
+    // Only on an actual transition into COMPLETED — re-sending COMPLETED
+    // (retry, replay) must not inflate the shift's delivery_count.
+    if (
+      status === DriverStatus.COMPLETED &&
+      deliveryRecord?.driver_id &&
+      deliveryRecord.status !== DriverStatus.COMPLETED
+    ) {
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts 
         SET 

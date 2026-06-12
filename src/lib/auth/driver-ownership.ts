@@ -26,6 +26,9 @@ import { getUserRole } from '@/lib/auth';
  * column. For routes that must embed the condition in a larger query (e.g.
  * inside a pg transaction). `paramIndex` is the 1-based placeholder position
  * of the auth user id; it may be referenced by other parts of the query too.
+ *
+ * `alias` is interpolated raw into SQL — it must ALWAYS be a hardcoded
+ * literal at the call site, never request-derived data.
  */
 export function driverOwnershipCondition(paramIndex: number, alias = ''): string {
   const p = alias ? `${alias}.` : '';
