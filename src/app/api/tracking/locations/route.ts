@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
+import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { rawQuery, withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 
@@ -69,13 +70,14 @@ export async function POST(request: NextRequest) {
     const isDriver = auth.context.user.type === 'DRIVER';
 
     // One transaction: ownership/existence check + insert + denormalized update.
-    // A DRIVER may only write their OWN location (drivers.user_id === auth user
-    // id); admins may write for any driver. Coordinates are bound as numeric
-    // params via ST_MakePoint (never string-interpolated).
+    // A DRIVER may only write their OWN location (drivers row linked to the
+    // auth user via profile_id or legacy user_id); admins may write for any
+    // driver. Coordinates are bound as numeric params via ST_MakePoint (never
+    // string-interpolated).
     const locationRow = await withRawTx(async (tx) => {
       const driverCheck = isDriver
         ? await tx.$queryRawUnsafe<{ id: string }[]>(
-            'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND is_active = true',
+            `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)} AND is_active = true`,
             driver_id,
             auth.context.user.id,
           )
@@ -201,7 +203,7 @@ export async function GET(request: NextRequest) {
     // A DRIVER may only read their own location history.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await rawQuery<{ id: string }>(
-        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id],
       );
       if (owns.length === 0) {

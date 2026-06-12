@@ -516,8 +516,14 @@ describe("/api/tracking/locations", () => {
       );
       expect(response.status).toBe(201);
       const ownershipCall = mockTxQuery.mock.calls.find(
-        ([sql]: any[]) => typeof sql === "string" && sql.includes("AND user_id"),
+        ([sql]: any[]) =>
+          typeof sql === "string" &&
+          sql.includes("SELECT id FROM drivers") &&
+          sql.includes("user_id"),
       );
+      // Ownership must match either linkage column (profile_id is canonical;
+      // user_id is the legacy duplicate), scoped to the caller's auth id.
+      expect(ownershipCall?.[0]).toContain("profile_id");
       // tx.$queryRawUnsafe(sql, driver_id, userId) → args after the sql.
       expect(ownershipCall?.slice(1)).toEqual([mockDriverId, "user-owner"]);
     });

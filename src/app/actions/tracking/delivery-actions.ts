@@ -6,8 +6,11 @@ import { revalidatePath } from 'next/cache';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
 import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
-import { createClient } from '@/utils/supabase/server';
-import { getUserRole } from '@/lib/auth';
+import {
+  callerMayActOnDriver,
+  getActionCaller,
+  userOwnsDriver,
+} from '@/lib/auth/driver-ownership';
 
 /**
  * Update delivery status with location and optional proof of delivery
@@ -25,24 +28,28 @@ export async function updateDeliveryStatus(
       return { success: false, error: 'Invalid deliveryId' };
     }
 
+    // Server actions are public POST endpoints — the DriverStatus type is
+    // compile-time only, so reject anything outside the enum before it is
+    // written to the (unconstrained varchar) status column.
+    if (!z.nativeEnum(DriverStatus).safeParse(status).success) {
+      return { success: false, error: 'Invalid status' };
+    }
+
     // AuthN: the caller must be signed in.
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const caller = await getActionCaller();
+    if (!caller) {
       return { success: false, error: 'Authentication required' };
     }
-    const role = (await getUserRole(user.id))?.toUpperCase();
-    const isPrivileged = role === 'ADMIN' || role === 'SUPER_ADMIN';
 
     // Get current delivery info
     const delivery = await prisma.$queryRawUnsafe<{
       driver_id: string;
+      status: string;
     }[]>(`
-      SELECT driver_id
+      SELECT driver_id, status
       FROM deliveries
       WHERE id = $1::uuid
+      AND deleted_at IS NULL
     `, deliveryId);
 
     if (delivery.length === 0) {
@@ -52,13 +59,11 @@ export async function updateDeliveryStatus(
     const deliveryRecord = delivery[0];
 
     // AuthZ: a non-admin caller may only mutate a delivery assigned to their
-    // own driver record (drivers.user_id === auth user id). Prevents one driver
-    // from advancing another driver's delivery (IDOR).
-    if (!isPrivileged) {
-      const owns = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-        SELECT id FROM drivers WHERE id = $1::uuid AND user_id = $2::uuid
-      `, deliveryRecord?.driver_id, user.id);
-      if (owns.length === 0) {
+    // own driver record. Prevents one driver from advancing another driver's
+    // delivery (IDOR).
+    if (!caller.isPrivileged) {
+      const owns = await userOwnsDriver(deliveryRecord?.driver_id, caller.userId);
+      if (!owns) {
         return { success: false, error: 'Access denied' };
       }
     }
@@ -124,8 +129,14 @@ export async function updateDeliveryStatus(
       );
     }
 
-    // Update delivery count in current shift if delivery is completed
-    if (status === DriverStatus.COMPLETED && deliveryRecord?.driver_id) {
+    // Update delivery count in current shift if delivery is completed.
+    // Only on an actual transition into COMPLETED — re-sending COMPLETED
+    // (retry, replay) must not inflate the shift's delivery_count.
+    if (
+      status === DriverStatus.COMPLETED &&
+      deliveryRecord?.driver_id &&
+      deliveryRecord.status !== DriverStatus.COMPLETED
+    ) {
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts 
         SET 
@@ -169,6 +180,13 @@ export async function assignDeliveryToDriver(
     if (!z.string().uuid().safeParse(driverId).success) {
       return { success: false, error: 'Invalid driverId' };
     }
+
+    // AuthZ: assignment is a dispatch operation — admins only.
+    const caller = await getActionCaller();
+    if (!caller?.isPrivileged) {
+      return { success: false, error: 'Access denied' };
+    }
+
     // Verify driver exists and is active
     const driver = await prisma.$queryRawUnsafe<{ id: string; is_active: boolean }[]>(`
       SELECT id, is_active 
@@ -223,6 +241,13 @@ export async function createDelivery(
     if (!z.string().uuid().safeParse(driverId).success) {
       return { success: false, error: 'Invalid driverId' };
     }
+
+    // AuthZ: creating deliveries is a dispatch operation — admins only.
+    const caller = await getActionCaller();
+    if (!caller?.isPrivileged) {
+      return { success: false, error: 'Access denied' };
+    }
+
     // Insert delivery record
     const result = await prisma.$queryRawUnsafe<{ id: string }[]>(`
       INSERT INTO deliveries (
@@ -278,6 +303,12 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
     if (!z.string().uuid().safeParse(driverId).success) {
       return [];
     }
+
+    // AuthZ: a driver may only read their own deliveries (admins any).
+    if (!(await callerMayActOnDriver(driverId))) {
+      return [];
+    }
+
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         d.id,
@@ -354,6 +385,17 @@ export async function uploadProofOfDelivery(
       return { success: false, error: 'Invalid deliveryId' };
     }
 
+    // AuthZ: only the delivery's driver (or an admin) may attach a POD.
+    const podDelivery = await prisma.$queryRawUnsafe<{ driver_id: string | null }[]>(`
+      SELECT driver_id FROM deliveries WHERE id = $1::uuid AND deleted_at IS NULL
+    `, deliveryId);
+    if (podDelivery.length === 0) {
+      return { success: false, error: 'Delivery not found' };
+    }
+    if (!(await callerMayActOnDriver(podDelivery[0]?.driver_id))) {
+      return { success: false, error: 'Access denied' };
+    }
+
     // Import upload function
     const { uploadPODImage } = await import('@/utils/supabase/storage');
 
@@ -402,6 +444,15 @@ export async function getDriverDeliveryHistory(
   limit: number = 20
 ): Promise<DeliveryTracking[]> {
   try {
+    if (!z.string().uuid().safeParse(driverId).success) {
+      return [];
+    }
+
+    // AuthZ: a driver may only read their own delivery history (admins any).
+    if (!(await callerMayActOnDriver(driverId))) {
+      return [];
+    }
+
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         d.id,

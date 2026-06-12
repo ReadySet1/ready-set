@@ -7,7 +7,14 @@
  *  - the deliveryId must be a valid UUID before it reaches raw SQL
  */
 
-import { updateDeliveryStatus } from "../delivery-actions";
+import {
+  updateDeliveryStatus,
+  assignDeliveryToDriver,
+  createDelivery,
+  getDriverActiveDeliveries,
+  getDriverDeliveryHistory,
+  uploadProofOfDelivery,
+} from "../delivery-actions";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { getUserRole } from "@/lib/auth";
@@ -85,6 +92,74 @@ describe("updateDeliveryStatus security", () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
   });
 
+  it("checks ownership against profile_id as well as user_id", async () => {
+    // Most drivers rows only have profile_id set (user_id is a legacy,
+    // usually-NULL column). The ownership query must accept either link —
+    // a user_id-only check 403s every real driver. Regression for the
+    // "Access denied on own delivery" bug.
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) return Promise.resolve([{ driver_id: "driver-1" }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    await updateDeliveryStatus(VALID_ID, DriverStatus.PICKED_UP);
+
+    const ownershipSql = mockPrisma.$queryRawUnsafe.mock.calls
+      .map(([sql]) => sql as string)
+      .find((sql) => sql.includes("FROM drivers"));
+    expect(ownershipSql).toBeDefined();
+    expect(ownershipSql).toContain("profile_id");
+    expect(ownershipSql).toContain("user_id");
+  });
+
+  it("rejects a status value outside the DriverStatus enum before touching the DB", async () => {
+    // The DriverStatus type is compile-time only; a server action is a public
+    // POST endpoint, so arbitrary strings must be rejected server-side.
+    const res = await updateDeliveryStatus(VALID_ID, "TOTALLY_BOGUS" as DriverStatus);
+    expect(res).toEqual({ success: false, error: "Invalid status" });
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("does not re-increment the shift delivery_count when the delivery is already COMPLETED", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries"))
+        return Promise.resolve([{ driver_id: "driver-1", status: DriverStatus.COMPLETED }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    const res = await updateDeliveryStatus(VALID_ID, DriverStatus.COMPLETED);
+    expect(res).toEqual({ success: true });
+    const countBump = mockPrisma.$executeRawUnsafe.mock.calls.find(([sql]) =>
+      (sql as string).includes("delivery_count"),
+    );
+    expect(countBump).toBeUndefined();
+  });
+
+  it("increments the shift delivery_count on a genuine transition into COMPLETED", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries"))
+        return Promise.resolve([{ driver_id: "driver-1", status: DriverStatus.ARRIVED_AT_DROPOFF }]);
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: "driver-1" }]);
+      return Promise.resolve([]);
+    });
+
+    const res = await updateDeliveryStatus(VALID_ID, DriverStatus.COMPLETED);
+    expect(res).toEqual({ success: true });
+    const countBump = mockPrisma.$executeRawUnsafe.mock.calls.find(([sql]) =>
+      (sql as string).includes("delivery_count"),
+    );
+    expect(countBump).toBeDefined();
+  });
+
   it("lets an admin advance any delivery without an ownership row", async () => {
     mockAuth({ id: "user-admin" });
     mockGetUserRole.mockResolvedValue("ADMIN");
@@ -95,6 +170,113 @@ describe("updateDeliveryStatus security", () => {
 
     const res = await updateDeliveryStatus(VALID_ID, DriverStatus.PICKED_UP);
     expect(res).toEqual({ success: true });
+  });
+
+  it("restricts delivery assignment to admins", async () => {
+    mockAuth({ id: "user-driver" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+
+    const res = await assignDeliveryToDriver(VALID_ID, VALID_ID);
+    expect(res).toEqual({ success: false, error: "Access denied" });
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("restricts delivery creation to admins", async () => {
+    mockAuth({ id: "user-driver" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+
+    const res = await createDelivery(
+      VALID_ID,
+      { lat: 1, lng: 1 },
+      { lat: 2, lng: 2 },
+    );
+    expect(res).toEqual({ success: false, error: "Access denied" });
+  });
+
+  it("returns no deliveries to a driver reading a foreign driver id", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]); // ownership lookup → not owned
+
+    const res = await getDriverActiveDeliveries(VALID_ID);
+    expect(res).toEqual([]);
+    // Only the ownership lookup ran — never the deliveries query.
+    const deliveriesQueried = mockPrisma.$queryRawUnsafe.mock.calls.some(
+      ([sql]) => typeof sql === "string" && sql.includes("FROM deliveries"),
+    );
+    expect(deliveriesQueried).toBe(false);
+  });
+
+  it("rejects an invalid driverId for delivery history before touching the DB", async () => {
+    const res = await getDriverDeliveryHistory("not-a-uuid");
+    expect(res).toEqual([]);
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("returns no delivery history to a driver reading a foreign driver id", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]); // ownership lookup → not owned
+
+    const res = await getDriverDeliveryHistory(VALID_ID);
+    expect(res).toEqual([]);
+    // Only the ownership lookup ran — never the deliveries history query.
+    const deliveriesQueried = mockPrisma.$queryRawUnsafe.mock.calls.some(
+      ([sql]) => typeof sql === "string" && sql.includes("FROM deliveries"),
+    );
+    expect(deliveriesQueried).toBe(false);
+  });
+
+  it("returns delivery history rows to the owning driver", async () => {
+    mockAuth({ id: "user-owner" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) {
+        return Promise.resolve([
+          {
+            id: "delivery-1",
+            driver_id: VALID_ID,
+            status: "COMPLETED",
+            pickup_location_geojson: null,
+            delivery_location_geojson: null,
+            estimated_delivery_time: null,
+            delivered_at: null,
+            delivery_photo_url: null,
+            delivery_notes: null,
+            assigned_at: new Date(),
+            arrived_at_vendor_at: null,
+            picked_up_at: null,
+            en_route_at: null,
+            arrived_at_client_at: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ]);
+      }
+      if (sql.includes("FROM drivers")) return Promise.resolve([{ id: VALID_ID }]); // owned
+      return Promise.resolve([]);
+    });
+
+    const res = await getDriverDeliveryHistory(VALID_ID);
+    expect(res).toHaveLength(1);
+    expect(res[0]?.id).toBe("delivery-1");
+    expect(res[0]?.driverId).toBe(VALID_ID);
+  });
+
+  it("denies POD upload on a foreign delivery", async () => {
+    mockAuth({ id: "user-attacker" });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockPrisma.$queryRawUnsafe.mockImplementation((sql: string) => {
+      if (sql.includes("FROM deliveries")) {
+        return Promise.resolve([{ driver_id: "driver-victim" }]);
+      }
+      return Promise.resolve([]); // not owned
+    });
+
+    const res = await uploadProofOfDelivery(VALID_ID, new Blob(["x"]));
+    expect(res).toEqual({ success: false, error: "Access denied" });
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it("does not write a location when coordinates are out of range", async () => {

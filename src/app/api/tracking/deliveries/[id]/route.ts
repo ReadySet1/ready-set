@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { DriverStatus } from '@/types/user';
 import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
+import { userOwnsDriver } from '@/lib/auth/driver-ownership';
 
 // GET - Get specific delivery details
 export async function GET(
@@ -43,20 +44,13 @@ export async function GET(
         d.created_at,
         d.updated_at,
         dr.employee_id,
-        dr.vehicle_number,
-        dr.user_id
+        dr.vehicle_number
       FROM deliveries d
       LEFT JOIN drivers dr ON d.driver_id = dr.id
       WHERE d.id = $1
     `;
 
     const params_array = [id];
-
-    // If user is DRIVER, verify they own this delivery
-    if (authResult.context.user.type === 'DRIVER') {
-      query += ` AND dr.user_id = $2`;
-      params_array.push(authResult.context.user.id);
-    }
 
     const result = await prisma.$queryRawUnsafe<any[]>(query, ...params_array);
 
@@ -68,6 +62,18 @@ export async function GET(
     }
 
     const delivery = result[0];
+
+    // If user is DRIVER, verify they own this delivery. Report non-owned
+    // deliveries as 404 (not 403) so the route is not an existence oracle.
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(delivery.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Delivery not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     const deliveryData = {
       id: delivery.id,
@@ -139,16 +145,14 @@ export async function PUT(
 
     // Verify delivery exists and user has permission
     let verifyQuery = `
-      SELECT d.driver_id, d.status, dr.user_id
+      SELECT d.driver_id, d.status
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
       WHERE d.id = $1
     `;
 
     const verifyResult = await prisma.$queryRawUnsafe<{
       driver_id: string;
       status: string;
-      user_id?: string;
     }[]>(verifyQuery, id);
 
     if (verifyResult.length === 0) {
@@ -161,11 +165,14 @@ export async function PUT(
     const delivery = verifyResult[0];
 
     // If user is DRIVER, verify they own this delivery
-    if (authResult.context.user.type === 'DRIVER' && delivery?.user_id !== authResult.context.user.id) {
-      return NextResponse.json(
-        { success: false, error: 'Access denied' },
-        { status: 403 }
-      );
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(delivery?.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     // Validate status transition

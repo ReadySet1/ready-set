@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
+import { userOwnsDriver } from '@/lib/auth/driver-ownership';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -32,9 +33,8 @@ export async function POST(
 
     // Verify delivery exists and user has permission
     const verifyQuery = `
-      SELECT d.id, d.proof_of_delivery, dr.user_id
+      SELECT d.id, d.proof_of_delivery, d.driver_id
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
       WHERE d.id = $1
     `;
 
@@ -42,7 +42,7 @@ export async function POST(
       {
         id: string;
         proof_of_delivery: string | null;
-        user_id: string | null;
+        driver_id: string | null;
       }[]
     >(verifyQuery, deliveryId);
 
@@ -56,14 +56,14 @@ export async function POST(
     const delivery = verifyResult[0]!;
 
     // If user is DRIVER, verify they own this delivery
-    if (
-      authResult.context.user.type === 'DRIVER' &&
-      delivery.user_id !== authResult.context.user.id
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'Access denied' },
-        { status: 403 }
-      );
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(delivery.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse form data
@@ -174,9 +174,8 @@ export async function GET(
         d.id,
         d.proof_of_delivery,
         d.metadata,
-        dr.user_id
+        d.driver_id
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
       WHERE d.id = $1
     `;
 
@@ -185,7 +184,7 @@ export async function GET(
         id: string;
         proof_of_delivery: string | null;
         metadata: Record<string, unknown> | null;
-        user_id: string | null;
+        driver_id: string | null;
       }[]
     >(query, deliveryId);
 
@@ -199,14 +198,14 @@ export async function GET(
     const delivery = result[0]!;
 
     // If user is DRIVER, verify they own this delivery
-    if (
-      authResult.context.user.type === 'DRIVER' &&
-      delivery.user_id !== authResult.context.user.id
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'Access denied' },
-        { status: 403 }
-      );
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(delivery.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     if (!delivery.proof_of_delivery) {

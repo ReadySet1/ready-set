@@ -50,19 +50,23 @@ describe('Delivery Status Transitions', () => {
     });
   };
 
-  // Helper to mock delivery lookup
+  // Helper to mock delivery lookup. The route now verifies ownership with a
+  // separate drivers query (profile_id OR user_id linkage), so answer both.
   const mockDeliveryLookup = (
     status: string,
     driverId: string = 'driver-1',
-    userId: string = 'driver-user-1'
+    _userId: string = 'driver-user-1'
   ) => {
-    (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-      {
-        driver_id: driverId,
-        status,
-        user_id: userId,
-      },
-    ]);
+    (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+      if (sql.includes('FROM deliveries')) {
+        return Promise.resolve([{ driver_id: driverId, status }]);
+      }
+      if (sql.includes('FROM drivers')) {
+        // Ownership lookup: the calling driver owns this delivery.
+        return Promise.resolve([{ id: driverId }]);
+      }
+      return Promise.resolve([]);
+    });
   };
 
   describe('Status Transition State Machine', () => {
@@ -422,7 +426,13 @@ describe('Delivery Status Transitions', () => {
 
       it('should deny driver updating another driver delivery', async () => {
         setupDriverAuth('driver-user-2');
-        mockDeliveryLookup('ASSIGNED', 'driver-1', 'driver-user-1');
+        (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
+          if (sql.includes('FROM deliveries')) {
+            return Promise.resolve([{ driver_id: 'driver-1', status: 'ASSIGNED' }]);
+          }
+          // Ownership lookup: driver-1 is not linked to driver-user-2.
+          return Promise.resolve([]);
+        });
 
         const request = createPutRequest(
           'http://localhost:3000/api/tracking/deliveries/delivery-1',

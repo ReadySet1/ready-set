@@ -22,11 +22,36 @@ jest.mock('@/utils/prismaDB', () => ({
       findFirst: jest.fn(),
       update: jest.fn(),
     },
+    delivery: {
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
+    },
+    driver: {
+      findFirst: jest.fn(),
+    },
   },
 }));
 
 jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
+  // Used by the fire-and-forget realtime broadcast on driver-status updates
+  createAdminClient: jest.fn(async () => {
+    const channel = {
+      subscribe: (cb: (status: string) => void) => {
+        cb('SUBSCRIBED');
+        return channel;
+      },
+      send: async () => 'ok',
+    };
+    return {
+      channel: () => channel,
+      removeChannel: async () => undefined,
+    };
+  }),
+}));
+
+jest.mock('@/services/notifications/delivery-status', () => ({
+  sendDispatchStatusNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('/api/orders/[order_number] - Get and Update Order', () => {
@@ -34,6 +59,22 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
     auth: {
       getUser: jest.fn(),
     },
+    from: jest.fn(),
+  };
+
+  // Configures the `profiles` lookup the PATCH route performs for
+  // driver-status updates and full field edits.
+  const mockProfileType = (type: string) => {
+    mockSupabaseClient.from.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      }),
+    });
   };
 
   beforeEach(() => {
@@ -288,6 +329,9 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123' } },
         });
+        // Driver-status updates require the caller to be the assigned driver
+        // (dispatch driver profile id === auth user id) unless privileged.
+        mockProfileType('DRIVER');
 
         // No catering order found
         (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(null);
@@ -300,7 +344,17 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           user: { name: 'Jane Smith', email: 'jane@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'TX' },
-          dispatches: [],
+          dispatches: [
+            {
+              id: 'dispatch-1',
+              driver: {
+                id: 'user-123',
+                name: 'Jane Driver',
+                email: 'driver@example.com',
+                contactNumber: '555-0100',
+              },
+            },
+          ],
           fileUploads: [],
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -331,6 +385,8 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123' } },
         });
+        // Caller is the driver assigned to this order via Dispatch
+        mockProfileType('DRIVER');
 
         const mockExistingOrder = {
           id: 'order-1',
@@ -340,7 +396,17 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },
-          dispatches: [],
+          dispatches: [
+            {
+              id: 'dispatch-1',
+              driver: {
+                id: 'user-123',
+                name: 'John Driver',
+                email: 'driver@example.com',
+                contactNumber: '555-0100',
+              },
+            },
+          ],
           fileUploads: [],
           createdAt: new Date(),
           updatedAt: new Date(),
