@@ -163,6 +163,8 @@ mobile app  →  POST /api/tracking/locations
 
 Source: `src/app/api/tracking/locations/route.ts`. The simulator at `/admin/tracking/test-driver` posts to the same endpoint.
 
+**Driver ownership / authz:** the `drivers` table carries two auth-link columns in one id space — `profile_id` (canonical, FK to `profiles.id`) and `user_id` (legacy, NULL on most rows). Every ownership check must accept either column; checking `user_id` alone 403s most real drivers. `src/lib/auth/driver-ownership.ts` is the single home for these checks (`driverOwnershipCondition()` for raw-SQL embedding, `userOwnsDriver()`, `getDriverForUser()`, `callerMayActOnDriver()`) — never inline `user_id = $n` in a route. Tracking **server actions** (`src/app/actions/tracking/*`) authenticate their own caller via `getActionCaller()`: `createDelivery` / `assignDeliveryToDriver` are admin-only; all other reads/writes are owner-or-admin. A guarded, idempotent migration (`prisma/migrations/20260611000000_backfill_driver_user_id`) syncs the two columns both ways until `user_id` can be dropped.
+
 **State machine:** order/driver state transitions live in `src/lib/state-machine/`:
 
 - `driver-state.ts` — valid `DriverStatus` transitions.

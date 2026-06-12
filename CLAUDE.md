@@ -44,6 +44,8 @@ pnpm studio                 # Open Prisma Studio
 
 **Stack**: Next.js 15 (App Router), PostgreSQL, Prisma 6, Supabase Auth, TanStack Query, Shadcn UI
 
+Full architecture deep-dive (domain models, data flows, authz, realtime): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 ### Directory Structure
 
 ```
@@ -78,6 +80,7 @@ src/
 - `src/lib/auth/token-refresh-service.ts` - Automatic background refresh
 - `src/utils/supabase/client.ts` - Browser client (singleton)
 - `src/utils/supabase/server.ts` - Server-side client (SSR-safe)
+- `src/lib/auth/driver-ownership.ts` - Driver ↔ auth-user linkage. The `drivers` table has two auth-link columns (`profile_id` canonical, `user_id` legacy); ownership checks must accept either. **All driver-ownership decisions belong in this module** — never inline `user_id = $n` / `profile_id = $n` checks in routes or actions.
 
 **Database**: PostgreSQL with Prisma
 - Schema: `prisma/schema.prisma`
@@ -106,6 +109,7 @@ API Route → Server Action → Service Layer → Utils → Prisma
 - Routes: `/admin/*`, `/driver/*`, `/client/*`, `/helpdesk/*`
 - Config: `src/middleware/routeProtection.ts`
 - **Middleware does NOT run for `/api/*`** — each API route must handle its own auth via `withAuth({ allowedRoles })` from `src/lib/auth-middleware.ts`.
+- **Server actions are plain POST endpoints** — nothing upstream authenticates them. Actions that touch driver data must resolve the caller themselves via `getActionCaller()` / `callerMayActOnDriver()` from `src/lib/auth/driver-ownership.ts` (admin-only for `createDelivery` / `assignDeliveryToDriver`, owner-or-admin for the rest).
 
 **Debug / test routes**: if you add a route under `src/app/api/debug/`, `src/app/api/test-*`, `src/app/api/test/`, or any page that exists only for engineering (e.g. SSR-error pages), it MUST be gated by `devOnlyGuard()` from `src/lib/auth/dev-only-guard.ts` (returns 404 in production) AND by `withAuth({ allowedRoles: ['SUPER_ADMIN'], requireAuth: true })`. See `docs/architecture/REMEDIATION_PLAN.md` → Appendix A for the gating pattern.
 
