@@ -183,8 +183,10 @@ export default function DriverTrackingPortal() {
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
-    setPodTarget(null);
+    // Keep the POD sheet open on failure so the driver can retry instead of
+    // having to re-capture the proof after only seeing the error toast.
+    const ok = await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
+    if (ok) setPodTarget(null);
   };
 
   const headerRight = useMemo(() => {
@@ -220,11 +222,17 @@ export default function DriverTrackingPortal() {
 
         {/* Show every active error — `a || b || c` masks shift/delivery
             failures whenever a location-permission error is present. */}
-        {[locationError, shiftError, deliveriesError]
-          .filter((message): message is string => Boolean(message))
-          .map((message) => (
+        {(
+          [
+            ["location", locationError],
+            ["shift", shiftError],
+            ["deliveries", deliveriesError],
+          ] as Array<[string, string | null | undefined]>
+        )
+          .filter(([, message]) => Boolean(message))
+          .map(([source, message]) => (
             <div
-              key={message}
+              key={source}
               className="flex items-start gap-2 rounded-2xl border border-driver-error/30 bg-driver-error-bg px-4 py-3 text-driver-error-ink"
             >
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
