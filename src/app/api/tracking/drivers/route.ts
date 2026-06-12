@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
+import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { rawQuery } from '@/lib/db/raw';
 
 interface Driver {
@@ -84,9 +85,10 @@ export async function GET(request: NextRequest) {
     const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
-    // Drivers are scoped to their own record (drivers.user_id === auth user id).
+    // Drivers are scoped to their own record (linked via profile_id or the
+    // legacy user_id column — see src/lib/auth/driver-ownership.ts).
     if (auth.context.user.type === 'DRIVER') {
-      query += ` AND user_id = $${paramCounter}`;
+      query += ` AND ${driverOwnershipCondition(paramCounter)}`;
       params.push(auth.context.user.id);
       paramCounter++;
     }
@@ -165,6 +167,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // profile_id and user_id both link a drivers row to the auth user and
+    // share one id space (profiles.id === auth.users.id). profile_id is
+    // canonical; user_id is the legacy duplicate (FK -> auth.users). Accept
+    // either on input but store them in sync so ownership checks
+    // (src/lib/auth/driver-ownership.ts) never see a divergent pair. The
+    // user_id subselect nulls itself out when no auth.users row exists
+    // (e.g. seeded profiles), since its FK would reject the insert.
+    const authLinkId = profile_id || user_id || null;
+
     const rows = await rawQuery<any>(
       `
       INSERT INTO drivers (
@@ -174,7 +185,7 @@ export async function POST(request: NextRequest) {
         vehicle_number,
         phone_number
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ((SELECT id FROM auth.users WHERE id = $1::uuid), $2, $3, $4, $5)
       RETURNING
         id,
         user_id,
@@ -188,8 +199,8 @@ export async function POST(request: NextRequest) {
         updated_at
       `,
       [
-        user_id || null,
-        profile_id || null,
+        authLinkId, // user_id (guarded by the auth.users subselect)
+        authLinkId, // profile_id
         employee_id || null,
         vehicle_number || null,
         phone_number || null,
@@ -209,7 +220,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Driver with this employee_id already exists'
+          error: 'Driver with this employee_id or profile already exists'
         },
         { status: 409 }
       );
@@ -248,7 +259,7 @@ export async function PUT(request: NextRequest) {
     // A DRIVER may only update their own record.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await rawQuery<{ id: string }>(
-        'SELECT id FROM drivers WHERE id = $1 AND user_id = $2',
+        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id],
       );
       if (owns.length === 0) {

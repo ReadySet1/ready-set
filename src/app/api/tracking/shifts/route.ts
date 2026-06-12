@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
+import { getDriverForUser } from '@/lib/auth/driver-ownership';
 import type { DriverShift } from '@/types/tracking';
 
 // GET - Get shifts for a driver or all active shifts (admin)
@@ -47,9 +48,17 @@ export async function GET(request: NextRequest) {
 
     // If user is DRIVER, only show their own shifts
     if (authResult.context.user.type === 'DRIVER') {
-      // Assume driver has a profile linking to the drivers table
-      query += ` AND ds.driver_id = (SELECT id FROM drivers WHERE user_id = $${paramCounter})`;
-      params.push(authResult.context.user.id);
+      const ownDriver = await getDriverForUser(authResult.context.user.id);
+      if (!ownDriver) {
+        // No driver row for this user — they have no shifts.
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: { limit, offset, total: 0 }
+        });
+      }
+      query += ` AND ds.driver_id = $${paramCounter}`;
+      params.push(ownDriver.id);
       paramCounter++;
     } else if (driverId) {
       query += ` AND ds.driver_id = $${paramCounter}`;
@@ -165,23 +174,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get driver ID from user profile
-    const driverResult = await prisma.$queryRawUnsafe<{ id: string; current_shift_id?: string }[]>(`
-      SELECT id, current_shift_id 
-      FROM drivers 
-      WHERE user_id = $1 AND is_active = true
-    `, authResult.context.user.id);
+    const driver = await getDriverForUser(authResult.context.user.id);
 
-    if (driverResult.length === 0) {
+    if (!driver || !driver.isActive) {
       return NextResponse.json(
         { success: false, error: 'Driver profile not found or inactive' },
         { status: 404 }
       );
     }
 
-    const driver = driverResult[0];
-
     // Check if driver already has an active shift
-    if (driver?.current_shift_id) {
+    if (driver.currentShiftId) {
       return NextResponse.json(
         { success: false, error: 'Driver already has an active shift' },
         { status: 409 }

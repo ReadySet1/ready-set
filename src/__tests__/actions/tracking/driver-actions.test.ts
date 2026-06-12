@@ -22,6 +22,15 @@ jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
 
+// Mock the ownership/auth helper — these unit tests target the actions' own
+// logic. beforeEach re-primes the caller as the owning driver (resetAllMocks
+// wipes implementations); the AuthZ block overrides per-test.
+jest.mock('@/lib/auth/driver-ownership', () => ({
+  callerMayActOnDriver: jest.fn(),
+  getActionCaller: jest.fn(),
+  userOwnsDriver: jest.fn(),
+}));
+
 // Mock rate limiter
 jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
   locationRateLimiter: {
@@ -73,8 +82,14 @@ jest.mock('@/services/tracking/mileage', () => ({
 import { prisma } from '@/utils/prismaDB';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { revalidatePath } from 'next/cache';
+import {
+  callerMayActOnDriver,
+  getActionCaller,
+} from '@/lib/auth/driver-ownership';
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockCallerMayActOnDriver = callerMayActOnDriver as jest.Mock;
+const mockGetActionCaller = getActionCaller as jest.Mock;
 
 describe('Driver Tracking Actions', () => {
   const validDriverId = '550e8400-e29b-41d4-a716-446655440000';
@@ -99,6 +114,9 @@ describe('Driver Tracking Actions', () => {
     jest.resetAllMocks();
     // Default rate limiter to allow requests
     (locationRateLimiter.checkAndRecordLimit as jest.Mock).mockReturnValue({ allowed: true });
+    // Default caller: the owning driver (authorized)
+    mockCallerMayActOnDriver.mockResolvedValue(true);
+    mockGetActionCaller.mockResolvedValue({ userId: 'driver-user-1', isPrivileged: false });
   });
 
   describe('startDriverShift', () => {
@@ -629,6 +647,59 @@ describe('Driver Tracking Actions', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to start shift');
+    });
+  });
+
+  describe('AuthZ (IDOR guards)', () => {
+    beforeEach(() => {
+      // A caller who does NOT own the target driver and is not an admin.
+      mockCallerMayActOnDriver.mockResolvedValue(false);
+      mockGetActionCaller.mockResolvedValue({ userId: 'attacker', isPrivileged: false });
+    });
+
+    it('denies starting a shift for a foreign driver', async () => {
+      const result = await startDriverShift(validDriverId, mockLocationUpdate);
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('denies ending a foreign driver shift', async () => {
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
+        { driver_id: 'driver-victim', status: 'active' },
+      ]);
+      const result = await endDriverShift(validShiftId, mockLocationUpdate);
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('denies pausing a foreign driver shift', async () => {
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
+        { id: validShiftId, driver_id: 'driver-victim' },
+      ]);
+      const result = await startShiftBreak(validShiftId);
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('denies resuming a foreign driver break', async () => {
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
+        { id: validBreakId, status: 'paused', driver_id: 'driver-victim' },
+      ]);
+      const result = await endShiftBreak(validBreakId);
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('denies writing a foreign driver location', async () => {
+      const result = await updateDriverLocation(validDriverId, mockLocationUpdate);
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('scopes shift reads to the owning driver', async () => {
+      expect(await getActiveShift(validDriverId)).toBeNull();
+      expect(await getDriverShiftHistory(validDriverId)).toEqual([]);
+      expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalled();
     });
   });
 

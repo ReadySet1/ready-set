@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
+import { userOwnsDriver } from '@/lib/auth/driver-ownership';
 
 // GET - Get specific shift details
 export async function GET(
@@ -42,12 +43,6 @@ export async function GET(
 
     const params_array = [id];
 
-    // If user is DRIVER, verify they own this shift
-    if (authResult.context.user.type === 'DRIVER') {
-      query += ` AND ds.driver_id = (SELECT id FROM drivers WHERE user_id = $2)`;
-      params_array.push(authResult.context.user.id);
-    }
-
     const result = await prisma.$queryRawUnsafe<any[]>(query, ...params_array);
 
     if (result.length === 0) {
@@ -58,6 +53,18 @@ export async function GET(
     }
 
     const shift = result[0];
+
+    // If user is DRIVER, verify they own this shift. Report non-owned shifts
+    // as 404 (not 403) so the route is not an existence oracle.
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(shift.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Shift not found' },
+          { status: 404 }
+        );
+      }
+    }
 
     // Get breaks for this shift
     const breaks = await prisma.$queryRawUnsafe<any[]>(`
@@ -146,16 +153,14 @@ export async function PUT(
 
     // Verify shift exists and user has permission
     let verifyQuery = `
-      SELECT ds.driver_id, ds.status, d.user_id
+      SELECT ds.driver_id, ds.status
       FROM driver_shifts ds
-      LEFT JOIN drivers d ON ds.driver_id = d.id
       WHERE ds.id = $1
     `;
 
     const verifyResult = await prisma.$queryRawUnsafe<{
       driver_id: string;
       status: string;
-      user_id?: string;
     }[]>(verifyQuery, id);
 
     if (verifyResult.length === 0) {
@@ -168,11 +173,14 @@ export async function PUT(
     const shift = verifyResult[0];
 
     // If user is DRIVER, verify they own this shift
-    if (authResult.context.user.type === 'DRIVER' && shift?.user_id !== authResult.context.user.id) {
-      return NextResponse.json(
-        { success: false, error: 'Access denied' },
-        { status: 403 }
-      );
+    if (authResult.context.user.type === 'DRIVER') {
+      const owns = await userOwnsDriver(shift?.driver_id, authResult.context.user.id);
+      if (!owns) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     switch (action) {
@@ -186,36 +194,57 @@ export async function PUT(
 
         // End shift: record end location and mark as completed. Detailed mileage
         // calculation is now handled by the mileage service and driver actions.
-        await prisma.$executeRawUnsafe(`
-          UPDATE driver_shifts 
-          SET 
-            end_time = NOW(),
-            end_location = ${location ? 'ST_GeogFromText($2)' : 'NULL'},
-            status = 'completed',
-            metadata = metadata || $4::jsonb,
-            updated_at = NOW()
-          WHERE id = $1::uuid
-        `,
-          id,
-          location ? `POINT(${location.coordinates.lng} ${location.coordinates.lat})` : null,
-          JSON.stringify(metadata)
-        );
+        // Postgres rejects statements whose bind parameters don't line up with
+        // the placeholders, so the with/without-location variants are split.
+        if (location) {
+          const endPoint = `POINT(${location.coordinates.lng} ${location.coordinates.lat})`;
+          await prisma.$executeRawUnsafe(`
+            UPDATE driver_shifts
+            SET
+              end_time = NOW(),
+              end_location = ST_GeogFromText($2),
+              status = 'completed',
+              metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+              updated_at = NOW()
+            WHERE id = $1::uuid
+          `, id, endPoint, JSON.stringify(metadata));
 
-        // Update driver status
-        await prisma.$executeRawUnsafe(`
-          UPDATE drivers 
-          SET 
-            is_on_duty = false,
-            current_shift_id = NULL,
-            shift_start_time = NULL,
-            ${location ? 'last_known_location = ST_GeogFromText($2),' : ''}
-            last_location_update = NOW(),
-            updated_at = NOW()
-          WHERE id = $1::uuid
-        `,
-          shift.driver_id,
-          location ? `POINT(${location.coordinates.lng} ${location.coordinates.lat})` : null
-        );
+          // Update driver status
+          await prisma.$executeRawUnsafe(`
+            UPDATE drivers
+            SET
+              is_on_duty = false,
+              current_shift_id = NULL,
+              shift_start_time = NULL,
+              last_known_location = ST_GeogFromText($2),
+              last_location_update = NOW(),
+              updated_at = NOW()
+            WHERE id = $1::uuid
+          `, shift?.driver_id, endPoint);
+        } else {
+          await prisma.$executeRawUnsafe(`
+            UPDATE driver_shifts
+            SET
+              end_time = NOW(),
+              end_location = NULL,
+              status = 'completed',
+              metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+              updated_at = NOW()
+            WHERE id = $1::uuid
+          `, id, JSON.stringify(metadata));
+
+          // Update driver status
+          await prisma.$executeRawUnsafe(`
+            UPDATE drivers
+            SET
+              is_on_duty = false,
+              current_shift_id = NULL,
+              shift_start_time = NULL,
+              last_location_update = NOW(),
+              updated_at = NOW()
+            WHERE id = $1::uuid
+          `, shift?.driver_id);
+        }
 
         break;
 
