@@ -11,16 +11,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
-import { createClient } from '@/utils/supabase/server';
+import { z } from 'zod';
+import { withAuth } from '@/lib/auth-middleware';
+import { getDriverForUser } from '@/lib/auth/driver-ownership';
 import { prisma } from '@/utils/prismaDB';
 import { format, parseISO, subWeeks, startOfWeek } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-interface AppMetadata {
-  role?: string;
-}
+const paramsSchema = z.object({
+  driverId: z.string().uuid('Invalid driver ID format'),
+});
 
 interface RouteParams {
   params: Promise<{ driverId: string }>;
@@ -37,22 +39,28 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, context: RouteParams) {
   try {
-    const { driverId } = await context.params;
+    // Authenticate request
+    const authResult = await withAuth(request, {
+      allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+      requireAuth: true,
+    });
 
-    // Authorize user
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!authResult.success) {
+      return authResult.response!;
     }
 
-    const isAdminUser = (user.app_metadata as AppMetadata)?.role === 'admin';
-    const isSuperAdmin = (user.app_metadata as AppMetadata)?.role === 'super_admin';
+    const { context: authContext } = authResult;
 
-    // Check if user can access this driver's data
+    // Validate route params before they reach Prisma (non-UUID ids throw)
+    const paramsValidation = paramsSchema.safeParse(await context.params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { error: 'Invalid driver ID', details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+    const { driverId } = paramsValidation.data;
+
     const driver = await prisma.driver.findFirst({
       where: { id: driverId, deletedAt: null },
       include: {
@@ -66,15 +74,16 @@ export async function GET(request: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: 'Driver not found' }, { status: 404 });
     }
 
-    // Drivers can only access their own history
-    const isOwnData = driver.profile?.id === user.id;
-    const isAuthorized = isOwnData || isAdminUser || isSuperAdmin;
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: 'Unauthorized - you can only access your own history' },
-        { status: 403 }
-      );
+    // Drivers can only access their own history; ownership goes through the
+    // driver-ownership module (accepts either profile_id or legacy user_id).
+    if (authContext.user.type === 'DRIVER') {
+      const ownDriver = await getDriverForUser(authContext.user.id);
+      if (!ownDriver || ownDriver.id !== driverId) {
+        return NextResponse.json(
+          { error: 'Unauthorized - you can only access your own history' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse query parameters
