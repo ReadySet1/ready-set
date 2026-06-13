@@ -17,6 +17,16 @@
 
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 
+// Reuse the driver session created by e2e/auth/setup.ts
+test.use({ storageState: 'e2e/.auth/driver.json' });
+
+// The driver portal acquires geolocation, loads shift state, and (on a dev
+// server) cold-compiles routes on first hit — give each test headroom beyond
+// the default 30s so the settle waits don't collide with the test timeout.
+test.beforeEach(() => {
+  test.setTimeout(60_000);
+});
+
 // Test coordinates for geolocation simulation
 const TEST_LOCATIONS = {
   // Starting location: Los Angeles downtown
@@ -45,18 +55,32 @@ async function setGeolocation(
  * Helper to wait for page to be ready after navigation
  */
 async function waitForPageReady(page: Page) {
-  await page.waitForLoadState('networkidle');
-  // Additional wait for React hydration
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('domcontentloaded');
+  // The driver portal polls continuously and never reaches network idle. Wait
+  // for the portal to settle into a RESOLVED state — geolocation is acquired
+  // asynchronously, so "Request location permission" shows transiently before
+  // "Start shift". Waiting for the resolved control (start/end shift / on shift)
+  // avoids inspecting the portal mid-acquisition. Generous timeout covers
+  // Next.js dev cold-compile of the route on first hit. Catches so the
+  // location-denied test (which never resolves) still proceeds.
+  await page
+    .getByRole('button', { name: /start shift|end shift/i })
+    .or(page.getByText(/on shift/i))
+    .first()
+    .waitFor({ state: 'visible', timeout: 30000 })
+    .catch(() => {});
+  // Additional wait for React hydration / context shift-state load
+  await page.waitForTimeout(1000);
 }
 
 /**
  * Helper to check if driver authentication is required
  */
 async function checkAuthRequired(page: Page): Promise<boolean> {
-  const signInButton = page.locator('text=Sign In, text=Log in, text=Login').first();
-  const authRequired = (await signInButton.count()) > 0;
-  return authRequired;
+  // Unauthenticated access to a protected route redirects to the sign-in page.
+  if (/\/sign-in|\/login/.test(page.url())) return true;
+  const signInLink = page.getByRole('link', { name: /sign in|log ?in/i });
+  return (await signInLink.count()) > 0;
 }
 
 test.describe('Driver Shift Workflow', () => {
@@ -93,14 +117,19 @@ test.describe('Driver Shift Workflow', () => {
         return;
       }
 
-      // Wait for location to be displayed (coordinates format)
-      // The component displays coordinates like "34.0522, -118.2437"
-      const coordsPattern = /34\.\d+.*-118\.\d+/;
-
-      // Look for location display - may take time for GPS to acquire
+      // The redesigned portal no longer prints raw lat/lng. Location acquisition
+      // is reflected by (a) the HealthBar GPS chip showing a "<n>m" accuracy
+      // reading, or (b) the pre-shift "Start shift" CTA, which only appears once
+      // currentLocation resolves, or (c) an already-active shift.
       await expect(async () => {
-        const pageContent = await page.content();
-        expect(pageContent).toMatch(coordsPattern);
+        const gpsAccuracy = page.getByText(/\d+\s*m\b/);
+        const startShift = page.getByRole('button', { name: /start shift/i });
+        const onShift = page.getByText(/on shift/i);
+        const located =
+          (await gpsAccuracy.count()) > 0 ||
+          (await startShift.count()) > 0 ||
+          (await onShift.count()) > 0;
+        expect(located).toBe(true);
       }).toPass({ timeout: 10000 });
     });
 
@@ -153,11 +182,10 @@ test.describe('Driver Shift Workflow', () => {
 
       // Wait for shift to start - should see shift status change
       await expect(async () => {
-        const endShiftButton = page.getByRole('button', { name: /end shift/i });
-        const activeShiftIndicator = page.locator('text=Active Shift, text=Active');
-
-        const hasEndButton = await endShiftButton.count() > 0;
-        const hasActiveIndicator = await activeShiftIndicator.count() > 0;
+        const hasEndButton =
+          (await page.getByRole('button', { name: /end shift/i }).count()) > 0;
+        const hasActiveIndicator =
+          (await page.getByText(/on shift/i).count()) > 0;
 
         expect(hasEndButton || hasActiveIndicator).toBe(true);
       }).toPass({ timeout: 10000 });
@@ -175,36 +203,31 @@ test.describe('Driver Shift Workflow', () => {
         return;
       }
 
-      // Check for active shift indicators
-      const shiftStatusIndicators = [
-        page.locator('text=Active Shift'),
-        page.locator('text=Active'),
-        page.getByRole('button', { name: /end shift/i }),
-        page.locator('text=Duration'),
-      ];
-
-      // At least one indicator should be visible if shift is active
-      let hasActiveShift = false;
-      for (const indicator of shiftStatusIndicators) {
-        if ((await indicator.count()) > 0) {
-          hasActiveShift = true;
-          break;
-        }
-      }
+      // Active shift is signalled by the "On shift" label / "End shift" button.
+      // waitForPageReady already waited for the portal to settle, so the shift
+      // state loaded from the server is reflected before we decide whether to
+      // start one (avoids clicking "Start shift" while one is already active).
+      const isActive = async () =>
+        (await page.getByRole('button', { name: /end shift/i }).count()) > 0 ||
+        (await page.getByText(/on shift/i).count()) > 0;
 
       // If no active shift, start one first
-      if (!hasActiveShift) {
+      if (!(await isActive())) {
         const startButton = page.getByRole('button', { name: /start shift/i });
         if ((await startButton.count()) > 0) {
           await startButton.click();
-          await page.waitForTimeout(2000);
+        } else {
+          test.skip(true, 'Could not start a shift (no Start shift button — location unavailable)');
+          return;
         }
       }
 
       // Now verify shift is active
       await expect(async () => {
-        const activeIndicator = page.locator('text=Active Shift, text=Active, text=Duration').first();
-        expect(await activeIndicator.count()).toBeGreaterThan(0);
+        const active =
+          (await page.getByRole('button', { name: /end shift/i }).count()) > 0 ||
+          (await page.getByText(/on shift/i).count()) > 0;
+        expect(active).toBe(true);
       }).toPass({ timeout: 10000 });
     });
   });
@@ -461,78 +484,11 @@ test.describe('Driver Shift Workflow', () => {
   });
 
   test.describe('Break Management', () => {
-    test('should show break buttons when shift is active', async ({ page, context }) => {
-      await context.grantPermissions(['geolocation']);
-      await setGeolocation(context, TEST_LOCATIONS.start);
-
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
-      // Check if shift is active first
-      const endShiftButton = page.getByRole('button', { name: /end shift/i });
-      if ((await endShiftButton.count()) === 0) {
-        test.skip(true, 'No active shift - break buttons only visible during shift');
-        return;
-      }
-
-      // Look for break buttons
-      const breakButtons = [
-        page.getByRole('button', { name: /break/i }),
-        page.getByRole('button', { name: /meal/i }),
-      ];
-
-      let hasBreakButton = false;
-      for (const button of breakButtons) {
-        if ((await button.count()) > 0) {
-          hasBreakButton = true;
-          break;
-        }
-      }
-
-      expect(hasBreakButton).toBe(true);
-    });
-
-    test('should start break when break button is clicked', async ({ page, context }) => {
-      await context.grantPermissions(['geolocation']);
-      await setGeolocation(context, TEST_LOCATIONS.start);
-
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
-      const breakButton = page.getByRole('button', { name: /break/i }).first();
-
-      if ((await breakButton.count()) === 0) {
-        test.skip(true, 'No break button found');
-        return;
-      }
-
-      // Check if already on break
-      const onBreakIndicator = page.locator('text=On Break');
-      if ((await onBreakIndicator.count()) > 0) {
-        test.skip(true, 'Already on break');
-        return;
-      }
-
-      await breakButton.click();
-      await page.waitForTimeout(2000);
-
-      // Should now show "On Break" status or "End Break" button
-      const endBreakButton = page.getByRole('button', { name: /end break/i });
-      const onBreak = page.locator('text=On Break');
-
-      const isOnBreak = (await endBreakButton.count()) > 0 || (await onBreak.count()) > 0;
-      expect.soft(isOnBreak).toBe(true);
-    });
+    // Break / meal tracking was removed from the redesigned driver portal
+    // (the portal now exposes start shift, advance-delivery, end shift only).
+    // Kept as skipped so the intent is documented if breaks are reintroduced.
+    test.skip('should show break buttons when shift is active', async () => {});
+    test.skip('should start break when break button is clicked', async () => {});
   });
 
   test.describe('End Shift', () => {
@@ -578,13 +534,15 @@ test.describe('Driver Shift Workflow', () => {
       }
 
       await endShiftButton.click();
-      await page.waitForTimeout(2000);
 
-      // Should now show Start Shift button or shift summary
-      const startShiftButton = page.getByRole('button', { name: /start shift/i });
-      const hasStartButton = await startShiftButton.count() > 0;
-
-      expect.soft(hasStartButton).toBe(true);
+      // Ending a shift returns to the pre-shift view ("Start shift" / "Request
+      // location permission"). Poll instead of a fixed wait.
+      await expect(async () => {
+        const backToPreShift =
+          (await page.getByRole('button', { name: /start shift/i }).count()) > 0 ||
+          (await page.getByRole('button', { name: /request location|enable location|try again/i }).count()) > 0;
+        expect(backToPreShift).toBe(true);
+      }).toPass({ timeout: 10000 });
     });
 
     test('should display shift statistics during active shift', async ({ page, context }) => {
@@ -599,21 +557,21 @@ test.describe('Driver Shift Workflow', () => {
         return;
       }
 
-      // Check for shift statistics
-      const statsIndicators = [
-        page.locator('text=Duration'),
-        page.locator('text=Distance'),
-        page.locator('text=Deliveries'),
-        page.locator('text=/\\d+h \\d+m/'), // Duration format
-        page.locator('text=/\\d+ mi/'), // Distance format
-      ];
-
       // Only check if shift is active
       const endShiftButton = page.getByRole('button', { name: /end shift/i });
       if ((await endShiftButton.count()) === 0) {
         test.skip(true, 'No active shift - statistics only visible during shift');
         return;
       }
+
+      // The redesigned portal surfaces live shift stats via the ShiftPill:
+      // an "On shift" label plus a running duration ("M:SS" / "H:MM:SS"), and
+      // "Since <time>" on the control bar.
+      const statsIndicators = [
+        page.getByText(/on shift/i),
+        page.getByText(/\d+:\d{2}/), // running duration
+        page.getByText(/since/i),
+      ];
 
       let hasStats = false;
       for (const indicator of statsIndicators) {
@@ -629,9 +587,16 @@ test.describe('Driver Shift Workflow', () => {
 
   test.describe('Error Handling', () => {
     test('should show error message when location services are denied', async ({ page, context }) => {
-      // Do NOT grant geolocation permission
+      // Do NOT grant geolocation permission. Don't use waitForPageReady here:
+      // it waits for the resolved "Start shift" state, which never appears
+      // without location — wait only for the location-permission prompt.
       await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await page.waitForLoadState('domcontentloaded');
+      await page
+        .getByRole('button', { name: /request location|enable location|try again/i })
+        .first()
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .catch(() => {});
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -748,9 +713,8 @@ test.describe('Full Shift Workflow Integration', () => {
     await setGeolocation(context, TEST_LOCATIONS.enRoute);
     await page.waitForTimeout(2000);
 
-    // Step 4: Check shift statistics are displayed
-    const durationText = page.locator('text=Duration');
-    await expect.soft(durationText.first()).toBeVisible();
+    // Step 4: Check live shift stats are displayed (ShiftPill: "On shift" + duration)
+    await expect.soft(page.getByText(/on shift/i).first()).toBeVisible();
 
     // Step 5: End shift
     const endButton = page.getByRole('button', { name: /end shift/i });

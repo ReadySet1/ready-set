@@ -48,12 +48,16 @@ const TEST_USERS = {
     password: getRequiredEnv('TEST_VENDOR_PASSWORD', 'E2E test vendor authentication'),
     role: 'VENDOR',
   },
-  // Add ADMIN when available
-  // ADMIN: {
-  //   email: getRequiredEnv('TEST_ADMIN_EMAIL', 'E2E test admin authentication'),
-  //   password: getRequiredEnv('TEST_ADMIN_PASSWORD', 'E2E test admin authentication'),
-  //   role: 'ADMIN',
-  // },
+  DRIVER: {
+    email: getRequiredEnv('TEST_DRIVER_EMAIL', 'E2E test driver authentication'),
+    password: getRequiredEnv('TEST_DRIVER_PASSWORD', 'E2E test driver authentication'),
+    role: 'DRIVER',
+  },
+  ADMIN: {
+    email: getRequiredEnv('TEST_ADMIN_EMAIL', 'E2E test admin authentication'),
+    password: getRequiredEnv('TEST_ADMIN_PASSWORD', 'E2E test admin authentication'),
+    role: 'ADMIN',
+  },
 };
 
 const authDir = path.join(__dirname, '..', '.auth');
@@ -96,16 +100,18 @@ async function authenticate(
     console.log(`  → Waiting for authentication (timeout: ${timeout}ms, isCI: ${isCI})...`);
 
     try {
-      await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
+      // 'load' instead of 'networkidle': the driver dashboard polls continuously
+      // (live tracking), so it never reaches network idle.
+      await page.waitForURL(/\/(admin|client|vendor|dashboard|driver)/, {
         timeout,
-        waitUntil: 'networkidle',
+        waitUntil: 'load',
       });
     } catch (error) {
       // Enhanced error logging for debugging
       const currentURL = page.url();
       console.error(`  ❌ Authentication timeout after ${timeout}ms`);
       console.error(`  Current URL: ${currentURL}`);
-      console.error(`  Expected URL pattern: /(admin|client|vendor|dashboard)/`);
+      console.error(`  Expected URL pattern: /(admin|client|vendor|dashboard|driver)/`);
 
       // Take screenshot for debugging (only in CI)
       if (isCI) {
