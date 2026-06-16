@@ -15,22 +15,55 @@
  * @see REA-313
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, request as playwrightRequest, type Page } from '@playwright/test';
+
+// Reuse the driver session created by e2e/auth/setup.ts
+test.use({ storageState: 'e2e/.auth/driver.json' });
+
+// A syntactically valid UUID that does not belong to any driver — used to
+// assert the 404 path on the (now uuid-validated) history routes.
+const UNKNOWN_DRIVER_UUID = '00000000-0000-4000-8000-0000000000ff';
+
+// The seeded e2e test driver's drivers-table row id (driver.test@example.com).
+// Stable fixture in the rs-dev database; see e2e/test-data-setup.ts.
+const TEST_DRIVER_ROW_ID = '05295b7a-df7d-4ea4-aae8-e9cba3f1c071';
+
+// The history view cold-compiles its route and fetches data client-side — give
+// each test headroom beyond the default 30s so settle waits + downloads fit.
+test.beforeEach(() => {
+  test.setTimeout(60_000);
+});
 
 /**
  * Helper to wait for page to be ready after navigation
  */
 async function waitForPageReady(page: Page) {
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('domcontentloaded');
+  // The history view fetches its data client-side and shows a spinner until it
+  // resolves — `networkidle` is unreliable here because the page hits a brief
+  // idle window *before* the fetch starts. Instead wait for the settled UI:
+  // the export/date controls (success), the error state, or a sign-in redirect.
+  // Generous timeout covers Next.js dev cold-compile of the history route on
+  // first hit (the page shows a spinner until the data fetch resolves).
+  await page
+    .locator('input[type="date"]')
+    .or(page.getByRole('button', { name: /export|download|pdf|csv/i }))
+    .or(page.getByText(/couldn.t load history/i))
+    .or(page.getByRole('link', { name: /sign in|log ?in/i }))
+    .first()
+    .waitFor({ state: 'visible', timeout: 30000 })
+    .catch(() => {});
+  await page.waitForTimeout(300);
 }
 
 /**
  * Helper to check if authentication is required
  */
 async function checkAuthRequired(page: Page): Promise<boolean> {
-  const signInButton = page.locator('text=Sign In, text=Log in, text=Login').first();
-  return (await signInButton.count()) > 0;
+  // Unauthenticated access to a protected route redirects to the sign-in page.
+  if (/\/sign-in|\/login/.test(page.url())) return true;
+  const signInLink = page.getByRole('link', { name: /sign in|log ?in/i });
+  return (await signInLink.count()) > 0;
 }
 
 /**
@@ -265,8 +298,16 @@ test.describe('Driver History Export', () => {
   });
 
   test.describe('Admin Downloads Driver History', () => {
-    test('should navigate to admin driver management', async ({ page }) => {
-      await page.goto('/admin/drivers');
+    // This section acts as an admin, not the driver. The admin views a specific
+    // driver's history at /admin/drivers/[driverId]/history (there is no
+    // /admin/drivers index page); admin authorization on the underlying
+    // /api/drivers/[driverId]/history route is what this exercises.
+    test.use({ storageState: 'e2e/.auth/admin.json' });
+
+    const adminHistoryUrl = `/admin/drivers/${TEST_DRIVER_ROW_ID}/history`;
+
+    test('admin can reach a driver history page', async ({ page }) => {
+      await page.goto(adminHistoryUrl);
       await waitForPageReady(page);
 
       if (await checkAuthRequired(page)) {
@@ -274,12 +315,12 @@ test.describe('Driver History Export', () => {
         return;
       }
 
-      // Verify we're on an admin page
-      await expect(page).toHaveURL(/\/admin/);
+      // Stays on the admin history route (not redirected to / or /sign-in)
+      await expect(page).toHaveURL(new RegExp(`/admin/drivers/${TEST_DRIVER_ROW_ID}/history`));
     });
 
-    test('should display list of drivers', async ({ page }) => {
-      await page.goto('/admin/drivers');
+    test('admin sees the driver history view (summary / breakdown)', async ({ page }) => {
+      await page.goto(adminHistoryUrl);
       await waitForPageReady(page);
 
       if (await checkAuthRequired(page)) {
@@ -287,28 +328,28 @@ test.describe('Driver History Export', () => {
         return;
       }
 
-      // Look for driver list elements
-      const driverListIndicators = [
-        page.locator('text=Drivers'),
+      // The admin history view renders the same summary + weekly breakdown the
+      // driver sees. Accept any of the section markers.
+      const indicators = [
+        page.getByText(/history/i),
+        page.getByText(/total/i),
+        page.getByText(/week/i),
         page.locator('table'),
-        page.locator('[data-testid*="driver"]'),
-        page.locator('text=Employee ID'),
-        page.locator('text=Name'),
       ];
 
-      let hasDriverList = false;
-      for (const indicator of driverListIndicators) {
+      let hasHistoryView = false;
+      for (const indicator of indicators) {
         if ((await indicator.count()) > 0) {
-          hasDriverList = true;
+          hasHistoryView = true;
           break;
         }
       }
 
-      expect(hasDriverList).toBe(true);
+      expect(hasHistoryView).toBe(true);
     });
 
-    test('should access driver history from driver details', async ({ page }) => {
-      await page.goto('/admin/drivers');
+    test('admin sees export buttons on the driver history page', async ({ page }) => {
+      await page.goto(adminHistoryUrl);
       await waitForPageReady(page);
 
       if (await checkAuthRequired(page)) {
@@ -316,130 +357,93 @@ test.describe('Driver History Export', () => {
         return;
       }
 
-      // Click on first driver in list
-      const driverRow = page.locator('tr').filter({ hasText: /@/ }).first();
-      const driverLink = page.getByRole('link').filter({ hasText: /view|details|history/i }).first();
+      const exportButton = page
+        .getByRole('button', { name: /export|download|pdf|csv/i })
+        .first();
 
-      if ((await driverRow.count()) > 0) {
-        await driverRow.click();
-        await waitForPageReady(page);
-      } else if ((await driverLink.count()) > 0) {
-        await driverLink.click();
-        await waitForPageReady(page);
-      } else {
-        test.skip(true, 'No driver found in list');
-        return;
-      }
-
-      // Look for history section or link
-      const historyIndicators = [
-        page.locator('text=History'),
-        page.getByRole('link', { name: /history/i }),
-        page.getByRole('tab', { name: /history/i }),
-      ];
-
-      let hasHistoryAccess = false;
-      for (const indicator of historyIndicators) {
-        if ((await indicator.count()) > 0) {
-          hasHistoryAccess = true;
-          break;
-        }
-      }
-
-      expect.soft(hasHistoryAccess).toBe(true);
-    });
-
-    test('should download driver history PDF as admin', async ({ page }) => {
-      // Navigate to a specific driver's history
-      await page.goto('/admin/drivers');
-      await waitForPageReady(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Admin authentication required');
-        return;
-      }
-
-      // This test requires navigating to a specific driver's history page
-      // The exact flow depends on the admin UI implementation
-
-      // Look for export functionality
-      const exportButton = page.getByRole('button', { name: /export|download/i }).first();
-
-      if ((await exportButton.count()) === 0) {
-        test.skip(true, 'No export button found on admin page');
-        return;
-      }
-
-      // Verify button is accessible
+      await expect(exportButton).toBeVisible();
       await expect(exportButton).toBeEnabled();
+    });
+
+    test('admin can fetch the driver history via API', async ({ request }) => {
+      // request inherits the admin storageState from this describe block.
+      const response = await request.get(
+        `/api/drivers/${TEST_DRIVER_ROW_ID}/history`
+      );
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(body).toHaveProperty('summary');
     });
   });
 
+  // The `request` fixture inherits the driver storageState (test.use above),
+  // so it is authenticated. For the unauthenticated cases we spin up a fresh
+  // request context with no storage state.
   test.describe('History API Endpoints', () => {
-    test('should return 401 when not authenticated', async ({ request }) => {
+    test('should return 401 when not authenticated', async ({ baseURL }) => {
+      // storageState: undefined overrides the file-level driver session, which
+      // Playwright otherwise applies as the default for request.newContext().
+      const anon = await playwrightRequest.newContext({ baseURL, storageState: undefined });
+      const response = await anon.get(`/api/drivers/${UNKNOWN_DRIVER_UUID}/history`);
+      expect(response.status()).toBe(401);
+      await anon.dispose();
+    });
+
+    test('should return 400 for a non-UUID driver id when authenticated', async ({ request }) => {
       const response = await request.get('/api/drivers/test-driver-id/history');
-
-      expect(response.status()).toBe(401);
-
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
+      expect(response.status()).toBe(400);
     });
 
-    test('should return JSON history data when authenticated', async ({ page, request }) => {
-      // First authenticate via page
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Authentication required - skipping API test');
-        return;
-      }
-
-      // Get current driver ID from page context or URL
-      // This depends on how the driver ID is exposed in the UI
-
-      // For now, test the endpoint format
-      const testResponse = await request.get('/api/drivers/test/history', {
-        headers: {
-          'Accept': 'application/json',
-        },
+    test('should return 404 for an unknown (valid UUID) driver when authenticated', async ({ request }) => {
+      const response = await request.get(`/api/drivers/${UNKNOWN_DRIVER_UUID}/history`, {
+        headers: { Accept: 'application/json' },
       });
-
-      // Should return 401 (unauthorized) or 404 (not found) or 200 (success)
-      expect([200, 401, 403, 404]).toContain(testResponse.status());
+      // The authed driver does not own this id and it does not exist → 403/404.
+      expect([403, 404]).toContain(response.status());
     });
 
-    test('should support format parameter for CSV', async ({ request }) => {
-      const response = await request.get('/api/drivers/test-driver-id/history?format=csv');
-
-      // Without auth, should return 401
-      expect(response.status()).toBe(401);
-    });
-
-    test('should support date range parameters', async ({ request }) => {
-      const startDate = '2025-01-01';
-      const endDate = '2025-01-31';
-
-      const response = await request.get(
-        `/api/drivers/test-driver-id/history?startDate=${startDate}&endDate=${endDate}`
+    test('should support format parameter for CSV (unauthenticated → 401)', async ({ baseURL }) => {
+      // storageState: undefined overrides the file-level driver session, which
+      // Playwright otherwise applies as the default for request.newContext().
+      const anon = await playwrightRequest.newContext({ baseURL, storageState: undefined });
+      const response = await anon.get(
+        `/api/drivers/${UNKNOWN_DRIVER_UUID}/history?format=csv`
       );
-
-      // Without auth, should return 401
       expect(response.status()).toBe(401);
+      await anon.dispose();
+    });
+
+    test('should support date range parameters (unauthenticated → 401)', async ({ baseURL }) => {
+      // storageState: undefined overrides the file-level driver session, which
+      // Playwright otherwise applies as the default for request.newContext().
+      const anon = await playwrightRequest.newContext({ baseURL, storageState: undefined });
+      const response = await anon.get(
+        `/api/drivers/${UNKNOWN_DRIVER_UUID}/history?startDate=2025-01-01&endDate=2025-01-31`
+      );
+      expect(response.status()).toBe(401);
+      await anon.dispose();
     });
   });
 
   test.describe('Export API Endpoints', () => {
-    test('should return 401 for unauthenticated PDF export', async ({ request }) => {
-      const response = await request.get('/api/drivers/test-driver-id/history/export');
-
+    test('should return 401 for unauthenticated PDF export', async ({ baseURL }) => {
+      // storageState: undefined overrides the file-level driver session, which
+      // Playwright otherwise applies as the default for request.newContext().
+      const anon = await playwrightRequest.newContext({ baseURL, storageState: undefined });
+      const response = await anon.get(`/api/drivers/${UNKNOWN_DRIVER_UUID}/history/export`);
       expect(response.status()).toBe(401);
+      await anon.dispose();
     });
 
-    test('should return 401 for unauthenticated CSV export', async ({ request }) => {
-      const response = await request.get('/api/drivers/test-driver-id/history/export?format=csv');
-
+    test('should return 401 for unauthenticated CSV export', async ({ baseURL }) => {
+      // storageState: undefined overrides the file-level driver session, which
+      // Playwright otherwise applies as the default for request.newContext().
+      const anon = await playwrightRequest.newContext({ baseURL, storageState: undefined });
+      const response = await anon.get(
+        `/api/drivers/${UNKNOWN_DRIVER_UUID}/history/export?format=csv`
+      );
       expect(response.status()).toBe(401);
+      await anon.dispose();
     });
   });
 
@@ -521,7 +525,7 @@ test.describe('Driver History Export', () => {
         }
 
         // Look for error message
-        const errorMessage = page.locator('text=Invalid, text=Error, [role="alert"]').first();
+        const errorMessage = page.getByText(/invalid|error/i).or(page.locator('[role="alert"]')).first();
         // This is expected behavior - soft assertion
         expect.soft(await errorMessage.count()).toBeGreaterThanOrEqual(0);
       }
@@ -556,7 +560,7 @@ test.describe('Full Driver History Export Workflow', () => {
     console.log('✅ Step 1: Navigated to history page');
 
     // Step 2: Verify history data is displayed
-    const historyContent = page.locator('text=Shift, text=Week, text=Total').first();
+    const historyContent = page.getByText(/shift|week|total|deliver/i).first();
     await expect.soft(historyContent).toBeVisible({ timeout: 10000 });
     console.log('✅ Step 2: History data displayed');
 
