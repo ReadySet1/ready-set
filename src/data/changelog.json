@@ -3,6 +3,30 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.2.1",
+      "date": "2026-06-12",
+      "title": "Release 2.2.1",
+      "summary": "",
+      "changes": [
+        {
+          "text": "If completing a delivery fails, the proof-of-delivery screen now stays open so you can retry without re-capturing.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver app now tells you when a delivery status update fails instead of silently doing nothing.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers can advance deliveries, track location, and end shifts again.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.2.1"
+      }
+    },
+    {
       "version": "2.2.0",
       "date": "2026-06-09",
       "title": "A brand-new driver app",
