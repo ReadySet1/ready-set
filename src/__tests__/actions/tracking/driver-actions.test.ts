@@ -607,6 +607,34 @@ describe('Driver Tracking Actions', () => {
 
       expect(result).toBeNull();
     });
+
+    it('prefers the GPS-derived total_distance_miles column over the legacy km value', async () => {
+      // The row carries BOTH the new GPS-derived miles column (12.3 mi) and the
+      // legacy total_distance km column (99 km). The miles column must win
+      // verbatim — the legacy km→mi conversion (99 * 0.621371 ≈ 61.5) is the
+      // fallback only and must NOT be applied here.
+      const mockShiftData = {
+        id: validShiftId,
+        driver_id: validDriverId,
+        start_time: new Date(),
+        end_time: null,
+        start_location_geojson: null,
+        end_location_geojson: null,
+        total_distance: 99, // legacy km value (would convert to ~61.5 mi)
+        total_distance_miles: 12.3, // GPS-derived miles — should win
+        delivery_count: 0,
+        status: 'active',
+        metadata: {},
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([mockShiftData]);
+
+      const result = await getActiveShift(validDriverId);
+
+      expect(result?.totalDistanceMiles).toBe(12.3);
+    });
   });
 
   describe('getDriverShiftHistory', () => {

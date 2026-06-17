@@ -3,13 +3,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DriverShift, LocationUpdate } from '@/types/tracking';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
-import { 
-  startDriverShift, 
-  endDriverShift, 
-  getActiveShift,
+import {
   startShiftBreak,
-  endShiftBreak 
+  endShiftBreak
 } from '@/app/actions/tracking/driver-actions';
+
+/**
+ * Fetch the driver's active shift via the stable API route. Was the `getActiveShift`
+ * Server Action; the shift ops moved off Server Actions because a stale action digest
+ * (after a mid-shift deploy) throws "Server Action not found" and broke shift state.
+ * See /api/tracking/shifts/*.
+ */
+async function fetchActiveShift(driverId: string): Promise<DriverShift | null> {
+  const res = await fetch(
+    `/api/tracking/shifts/active?driverId=${encodeURIComponent(driverId)}`,
+    { credentials: 'include' },
+  );
+  if (!res.ok) throw new Error(`Failed to load shift (${res.status})`);
+  const data = await res.json();
+  return (data?.shift ?? null) as DriverShift | null;
+}
 
 interface UseDriverShiftReturn {
   currentShift: DriverShift | null;
@@ -61,7 +74,7 @@ export function useDriverShift(): UseDriverShiftReturn {
         return;
       }
 
-      const shift = await getActiveShift(driverId);
+      const shift = await fetchActiveShift(driverId);
       setCurrentShift(shift);
     } catch (error) {
       console.error('Error loading active shift:', error);
@@ -90,19 +103,31 @@ export function useDriverShift(): UseDriverShiftReturn {
       }
 
       // Check if there's already an active shift
-      const existingShift = await getActiveShift(driverId);
+      const existingShift = await fetchActiveShift(driverId);
       if (existingShift) {
         throw new Error('You already have an active shift');
       }
 
-      const result = await startDriverShift(driverId, location, {
-        startedFromApp: true,
-        appVersion: '2.0.0',
-        deviceInfo: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform
-        }
+      const res = await fetch('/api/tracking/shifts/start', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId,
+          location,
+          metadata: {
+            startedFromApp: true,
+            appVersion: '2.0.0',
+            deviceInfo: {
+              userAgent: navigator.userAgent,
+              platform: navigator.platform,
+            },
+          },
+        }),
       });
+      const result = await res
+        .json()
+        .catch(() => ({ success: false, error: `HTTP ${res.status}` }));
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to start shift');
@@ -136,10 +161,19 @@ export function useDriverShift(): UseDriverShiftReturn {
       setLoading(true);
       setError(null);
 
-      const result = await endDriverShift(shiftId, location, undefined, {
-        endedFromApp: true,
-        finalLocation: location.coordinates
+      const res = await fetch('/api/tracking/shifts/end', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftId,
+          location,
+          metadata: { endedFromApp: true, finalLocation: location.coordinates },
+        }),
       });
+      const result = await res
+        .json()
+        .catch(() => ({ success: false, error: `HTTP ${res.status}` }));
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to end shift');
@@ -160,11 +194,15 @@ export function useDriverShift(): UseDriverShiftReturn {
         handled: true,
         metadata: { shiftId },
       });
+      // The shift may have ended server-side even though the client saw an error
+      // (transient network / rate limit). Re-sync the authoritative state so the UI
+      // doesn't get stuck showing an active shift that's actually over.
+      await loadActiveShift();
       return false;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadActiveShift]);
 
   // Start a break
   const startBreak = useCallback(async (

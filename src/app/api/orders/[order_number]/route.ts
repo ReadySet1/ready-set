@@ -411,12 +411,14 @@ export async function PATCH(
       return NextResponse.json({ message: "Order not found" }, { status: 404 });
     }
 
-    // AuthZ for driver-status updates (OWASP A01 / IDOR): a DRIVER may only
-    // advance the status of an order assigned to THEM via Dispatch. Dispatch.driver
+    // AuthZ for status-changing updates (OWASP A01 / IDOR): a DRIVER may only
+    // change the status of an order assigned to THEM via Dispatch. Dispatch.driver
     // references Profile, whose id equals the auth user id. Admins/helpdesk are
-    // exempt (they manage all orders). Without this, any authenticated driver
-    // could advance any order's driverStatus.
-    if (driverStatus) {
+    // exempt (they manage all orders). This guards BOTH `driverStatus` and a
+    // status-only PATCH (`{ status }`) — the driver client sends the latter on
+    // completion, and without this any authenticated user could drive any order's
+    // status by order number (the role check below only runs for field updates).
+    if (driverStatus || status) {
       const { data: callerProfile } = await supabase
         .from('profiles')
         .select('type')
@@ -430,11 +432,13 @@ export async function PATCH(
 
       if (!privileged) {
         const dispatches = (existingOrder as any).dispatches;
-        const assignedDriverProfileId =
-          Array.isArray(dispatches) && dispatches.length > 0
-            ? dispatches[0]?.driver?.id
-            : undefined;
-        if (!assignedDriverProfileId || assignedDriverProfileId !== user.id) {
+        // Check ALL dispatch rows, not just [0]: dispatch ordering isn't
+        // guaranteed and an order can (rarely) carry more than one row, so a
+        // [0]-only check could 403 the genuinely-assigned driver.
+        const isAssignedDriver =
+          Array.isArray(dispatches) &&
+          dispatches.some((d: any) => d?.driver?.id === user.id);
+        if (!isAssignedDriver) {
           return NextResponse.json(
             { message: "You are not assigned to this delivery" },
             { status: 403 },
@@ -540,6 +544,17 @@ export async function PATCH(
         // Only auto-update order status if not explicitly provided
         updateData.status = mappedOrderStatus;
       }
+    }
+
+    // Stamp the completion time when the order reaches a completed state. The
+    // driver feed treats "active" as `completeDateTime IS NULL`, so without this
+    // a finished delivery keeps showing as active (the "2 active" walk-test bug).
+    // Covers both the driverStatus=COMPLETED transition and the explicit
+    // status=COMPLETED follow-up PATCH. Idempotent: only set if not already set.
+    const reachesCompleted =
+      driverStatus === DriverStatus.COMPLETED || updateData.status === 'COMPLETED';
+    if (reachesCompleted && !(existingOrder as any).completeDateTime) {
+      updateData.completeDateTime = new Date();
     }
 
     // Handle field updates
@@ -656,7 +671,9 @@ export async function PATCH(
 
             await prisma.delivery.upsert({
               where: { orderNumber: dbOrderNumber },
-              update: { [timestampField]: now },
+              // Keep status in sync on every transition (not just create), so the
+              // admin `deliveries` mirror doesn't drift from the order's driverStatus.
+              update: { [timestampField]: now, status: driverStatus },
               create: {
                 orderNumber: dbOrderNumber,
                 deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',

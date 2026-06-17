@@ -176,6 +176,26 @@ export async function POST(
       },
     });
 
+    // Mirror the photo URL onto the standalone `deliveries` row so the admin
+    // tracking map + POD gallery (which read delivery_photo_url) see it too.
+    // The driver-facing source of truth is the FileUpload above; this keeps the
+    // two stores in sync. No-op if no deliveries row exists yet (it is created
+    // by the orders status PATCH on the first stage advance). Non-fatal.
+    try {
+      await prisma.$executeRawUnsafe(
+        `UPDATE deliveries
+           SET delivery_photo_url = $1, updated_at = NOW()
+         WHERE LOWER(order_number) = LOWER($2) AND deleted_at IS NULL`,
+        uploadResult.url,
+        orderNumber,
+      );
+    } catch (mirrorErr) {
+      Sentry.captureException(mirrorErr, {
+        tags: { operation: 'pod_mirror_deliveries', route: 'orders' },
+        extra: { orderNumber },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       url: uploadResult.url,
