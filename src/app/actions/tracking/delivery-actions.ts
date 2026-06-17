@@ -329,7 +329,7 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
         d.updated_at
       FROM deliveries d
       WHERE d.driver_id = $1::uuid
-      AND d.status NOT IN ('DELIVERED', 'CANCELLED')
+      AND d.status NOT IN ('COMPLETED', 'DELIVERED', 'CANCELLED')
       AND d.deleted_at IS NULL
       ORDER BY d.assigned_at ASC
     `, driverId);
