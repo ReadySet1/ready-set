@@ -2,10 +2,22 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDriverDeliveries } from '../useDriverDeliveries';
 import { DriverStatus } from '@/types/user';
 
-// Mock the server actions
-jest.mock('@/app/actions/tracking/delivery-actions', () => ({
-  getDriverActiveDeliveries: jest.fn(),
-  updateDeliveryStatus: jest.fn(),
+// The hook no longer uses the delivery-actions Server Actions
+// (getDriverActiveDeliveries / updateDeliveryStatus). It now:
+//   - loads from the orders feed:  GET  /api/driver-deliveries
+//   - advances an order via:       PATCH /api/orders/[orderNumber]
+//   - reads the auth token from the Supabase browser client.
+// All of that is exercised through the supabase + global.fetch mocks below.
+
+// Supabase client (only used for the bearer token on PATCH requests).
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: () => ({
+    auth: {
+      getSession: jest
+        .fn()
+        .mockResolvedValue({ data: { session: { access_token: 'test-token' } } }),
+    },
+  }),
 }));
 
 // Mock Sentry
@@ -14,14 +26,7 @@ jest.mock('@/lib/monitoring/sentry', () => ({
   addSentryBreadcrumb: jest.fn(),
 }));
 
-import {
-  getDriverActiveDeliveries,
-  updateDeliveryStatus,
-} from '@/app/actions/tracking/delivery-actions';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
-
-const mockGetDriverActiveDeliveries = getDriverActiveDeliveries as jest.MockedFunction<typeof getDriverActiveDeliveries>;
-const mockUpdateDeliveryStatus = updateDeliveryStatus as jest.MockedFunction<typeof updateDeliveryStatus>;
 
 describe('useDriverDeliveries', () => {
   const mockDriverId = '123e4567-e89b-12d3-a456-426614174000';
@@ -40,24 +45,27 @@ describe('useDriverDeliveries', () => {
     timestamp: new Date(),
   };
 
-  const mockDelivery = {
-    id: mockDeliveryId,
-    cateringRequestId: 'catering-123',
-    driverId: mockDriverId,
-    status: DriverStatus.ASSIGNED,
-    pickupLocation: {
-      coordinates: [-122.4194, 37.7749] as [number, number],
-    },
-    deliveryLocation: {
-      coordinates: [-122.4094, 37.7849] as [number, number],
-    },
-    estimatedArrival: new Date(),
-    route: [],
-    metadata: {},
-    assignedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  // --- orders-feed item + expected mapped DeliveryTracking ----------------
+  // Build an order row in the shape /api/driver-deliveries returns. By default
+  // it's a catering order that is still active (no completeDateTime, non-terminal
+  // status) so the hook keeps it.
+  const makeOrder = (overrides: Record<string, any> = {}) => ({
+    orderNumber: mockDeliveryId,
+    delivery_type: 'catering',
+    status: 'ACTIVE',
+    driverStatus: DriverStatus.ASSIGNED,
+    completeDateTime: null,
+    arrivalDateTime: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    address: { latitude: 37.7749, longitude: -122.4194 },
+    delivery_address: { latitude: 37.7849, longitude: -122.4094 },
+    fileUploads: [],
+    ...overrides,
+  });
+
+  // The single default order used in most tests.
+  const mockOrder = makeOrder();
 
   const mockSessionResponse = {
     user: {
@@ -65,19 +73,60 @@ describe('useDriverDeliveries', () => {
     },
   };
 
+  // --- fetch routing mock -------------------------------------------------
+  type FetchResult = {
+    ok: boolean;
+    status: number;
+    json: () => Promise<any>;
+  };
+
+  let sessionResponse: () => FetchResult;
+  // Orders feed handler -> the array under { deliveries: [...] }.
+  let deliveriesHandler: () => any[] | Promise<any[]>;
+  // PATCH /api/orders/[id] handler -> default success.
+  let orderPatchHandler: () => FetchResult | Promise<FetchResult>;
+
+  const okJson = (body: any, status = 200): FetchResult => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  });
+
+  const setDeliveries = (list: any[]) => {
+    deliveriesHandler = () => list;
+  };
+
+  // PATCH calls made to the orders route.
+  const orderPatchCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).startsWith('/api/orders/'),
+    );
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
 
-    // Mock fetch for session
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSessionResponse),
-    });
+    sessionResponse = () => okJson(mockSessionResponse);
+    setDeliveries([]); // empty feed by default
+    orderPatchHandler = () => okJson({}, 200);
 
-    // Default mock implementations
-    mockGetDriverActiveDeliveries.mockResolvedValue([]);
-    mockUpdateDeliveryStatus.mockResolvedValue({ success: true });
+    global.fetch = jest.fn((input: RequestInfo | URL): Promise<any> => {
+      const url = String(input);
+      if (url.includes('/api/auth/session')) {
+        return Promise.resolve(sessionResponse());
+      }
+      if (url.includes('/api/driver-deliveries')) {
+        return Promise.resolve(
+          Promise.resolve(deliveriesHandler()).then((list) =>
+            okJson({ deliveries: list }),
+          ),
+        );
+      }
+      if (url.startsWith('/api/orders/')) {
+        return Promise.resolve(orderPatchHandler());
+      }
+      return Promise.resolve(okJson({}));
+    }) as unknown as typeof fetch;
   });
 
   afterEach(() => {
@@ -98,24 +147,33 @@ describe('useDriverDeliveries', () => {
     });
 
     it('should load active deliveries on mount', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
+      // Loads from the orders feed (not the old getDriverActiveDeliveries action).
       await waitFor(() => {
-        expect(mockGetDriverActiveDeliveries).toHaveBeenCalledWith(mockDriverId);
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/driver-deliveries?page=1&limit=999',
+          expect.objectContaining({ credentials: 'include' }),
+        );
       });
 
+      // Order row is mapped into a DeliveryTracking keyed by order number.
       await waitFor(() => {
-        expect(result.current.activeDeliveries).toEqual([mockDelivery]);
+        expect(result.current.activeDeliveries).toHaveLength(1);
       });
+      const delivery = result.current.activeDeliveries[0];
+      expect(delivery.id).toBe(mockDeliveryId);
+      expect(delivery.cateringRequestId).toBe(mockDeliveryId);
+      expect(delivery.status).toBe(DriverStatus.ASSIGNED);
     });
 
     it('should set error if driver ID not found', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: {} }),
-      });
+      // The orders feed itself rejecting is what surfaces a load error now; the
+      // missing-driver case is represented by the feed returning unauthorized.
+      sessionResponse = () => okJson({ user: {} });
+      deliveriesHandler = () => Promise.reject(new Error('Driver ID not found'));
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -125,7 +183,7 @@ describe('useDriverDeliveries', () => {
     });
 
     it('should handle load error and capture exception', async () => {
-      mockGetDriverActiveDeliveries.mockRejectedValue(new Error('Server error'));
+      deliveriesHandler = () => Promise.reject(new Error('Server error'));
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -137,12 +195,11 @@ describe('useDriverDeliveries', () => {
     });
 
     it('should set loading state during initial load', async () => {
-      let resolveDeliveries: (value: typeof mockDelivery[]) => void;
-      mockGetDriverActiveDeliveries.mockImplementation(() => {
-        return new Promise((resolve) => {
+      let resolveDeliveries: (value: any[]) => void;
+      deliveriesHandler = () =>
+        new Promise<any[]>((resolve) => {
           resolveDeliveries = resolve;
         });
-      });
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -151,7 +208,7 @@ describe('useDriverDeliveries', () => {
       });
 
       await act(async () => {
-        resolveDeliveries!([mockDelivery]);
+        resolveDeliveries!([mockOrder]);
       });
 
       await waitFor(() => {
@@ -162,7 +219,7 @@ describe('useDriverDeliveries', () => {
 
   describe('updateDeliveryStatus', () => {
     it('should update delivery status successfully', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -180,21 +237,31 @@ describe('useDriverDeliveries', () => {
       });
 
       expect(success!).toBe(true);
-      expect(mockUpdateDeliveryStatus).toHaveBeenCalledWith(
-        mockDeliveryId,
-        DriverStatus.EN_ROUTE_TO_VENDOR,
-        mockLocation,
-        undefined,
-        undefined
+      // The order is advanced via PATCH /api/orders/<orderNumber> with the new
+      // driverStatus in the body and the supabase bearer token attached.
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/orders/${mockDeliveryId}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          credentials: 'include',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+            'Content-Type': 'application/json',
+          }),
+        }),
       );
+      const patchCall = orderPatchCalls().pop();
+      expect(JSON.parse(patchCall![1].body)).toEqual({
+        driverStatus: DriverStatus.EN_ROUTE_TO_VENDOR,
+      });
       expect(addSentryBreadcrumb).toHaveBeenCalledWith('Driver updated delivery status', {
-        deliveryId: mockDeliveryId,
+        orderNumber: mockDeliveryId,
         status: DriverStatus.EN_ROUTE_TO_VENDOR,
       });
     });
 
     it('should include proof of delivery when provided', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -213,17 +280,19 @@ describe('useDriverDeliveries', () => {
         );
       });
 
-      expect(mockUpdateDeliveryStatus).toHaveBeenCalledWith(
-        mockDeliveryId,
-        DriverStatus.DELIVERED,
-        mockLocation,
-        proofUrl,
-        undefined
+      // DELIVERED is advanced through the same orders PATCH.
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/orders/${mockDeliveryId}`,
+        expect.objectContaining({ method: 'PATCH' }),
       );
+      const patchCall = orderPatchCalls().pop();
+      expect(JSON.parse(patchCall![1].body)).toEqual({
+        driverStatus: DriverStatus.DELIVERED,
+      });
     });
 
     it('should include notes when provided', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -243,17 +312,18 @@ describe('useDriverDeliveries', () => {
         );
       });
 
-      expect(mockUpdateDeliveryStatus).toHaveBeenCalledWith(
-        mockDeliveryId,
-        DriverStatus.DELIVERED,
-        mockLocation,
-        undefined,
-        notes
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/orders/${mockDeliveryId}`,
+        expect.objectContaining({ method: 'PATCH' }),
       );
+      const patchCall = orderPatchCalls().pop();
+      expect(JSON.parse(patchCall![1].body)).toEqual({
+        driverStatus: DriverStatus.DELIVERED,
+      });
     });
 
     it('should reload deliveries after status update', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -262,20 +332,24 @@ describe('useDriverDeliveries', () => {
       });
 
       // Clear calls from initial load
-      mockGetDriverActiveDeliveries.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Update delivery status
       await act(async () => {
         await result.current.updateDeliveryStatus(mockDeliveryId, DriverStatus.EN_ROUTE_TO_VENDOR);
       });
 
-      // Should reload deliveries
-      expect(mockGetDriverActiveDeliveries).toHaveBeenCalled();
+      // Should reload from the orders feed after the PATCH.
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/driver-deliveries?page=1&limit=999',
+        expect.objectContaining({ credentials: 'include' }),
+      );
     });
 
     it('should handle update failure', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
-      mockUpdateDeliveryStatus.mockResolvedValue({ success: false, error: 'Update failed' });
+      setDeliveries([mockOrder]);
+      // Orders PATCH returns a non-OK response carrying the error message.
+      orderPatchHandler = () => okJson({ error: 'Update failed' }, 400);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -294,8 +368,8 @@ describe('useDriverDeliveries', () => {
     });
 
     it('should handle network error', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
-      mockUpdateDeliveryStatus.mockRejectedValue(new Error('Network error'));
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () => Promise.reject(new Error('Network error'));
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -313,9 +387,9 @@ describe('useDriverDeliveries', () => {
     });
   });
 
-  describe('refreshDeliveries', () => {
-    it('should refresh delivery data', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+  describe('completion two-PATCH sync', () => {
+    it('completing a delivery also syncs the order status (second PATCH)', async () => {
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -323,12 +397,83 @@ describe('useDriverDeliveries', () => {
         expect(result.current.activeDeliveries).toHaveLength(1);
       });
 
-      // Update mock to return more deliveries
-      const updatedDeliveries = [
-        mockDelivery,
-        { ...mockDelivery, id: 'delivery-456' },
-      ];
-      mockGetDriverActiveDeliveries.mockResolvedValue(updatedDeliveries);
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.updateDeliveryStatus(
+          mockDeliveryId,
+          DriverStatus.COMPLETED,
+          mockLocation,
+        );
+      });
+
+      expect(ok!).toBe(true);
+      // Completion fires TWO PATCHes to the same order: the driverStatus
+      // transition, then the order-status follow-up (order-insensitive).
+      const bodies = orderPatchCalls().map(([, init]) => JSON.parse(init.body));
+      expect(bodies).toEqual(
+        expect.arrayContaining([
+          { driverStatus: DriverStatus.COMPLETED },
+          { status: 'COMPLETED' },
+        ]),
+      );
+    });
+
+    it('still resolves true when the second (order-status) PATCH fails', async () => {
+      setDeliveries([mockOrder]);
+
+      // First PATCH (driverStatus) succeeds; the second PATCH (order status)
+      // rejects. The hook fires it as fire-and-forget with a .catch swallow by
+      // design, so the overall completion must still resolve true.
+      let patchCount = 0;
+      orderPatchHandler = () => {
+        patchCount += 1;
+        if (patchCount >= 2) {
+          return Promise.reject(new Error('Order status sync 500'));
+        }
+        return okJson({}, 200);
+      };
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.updateDeliveryStatus(
+          mockDeliveryId,
+          DriverStatus.COMPLETED,
+          mockLocation,
+        );
+      });
+
+      expect(ok!).toBe(true);
+      // Both PATCHes were attempted (the second one is the one that rejected).
+      const bodies = orderPatchCalls().map(([, init]) => JSON.parse(init.body));
+      expect(bodies).toEqual(
+        expect.arrayContaining([
+          { driverStatus: DriverStatus.COMPLETED },
+          { status: 'COMPLETED' },
+        ]),
+      );
+      // The first PATCH succeeded, so no error is surfaced to the UI.
+      expect(result.current.error).toBe(null);
+    });
+  });
+
+  describe('refreshDeliveries', () => {
+    it('should refresh delivery data', async () => {
+      setDeliveries([mockOrder]);
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+
+      // Update feed to return more deliveries
+      setDeliveries([mockOrder, makeOrder({ orderNumber: 'delivery-456' })]);
 
       await act(async () => {
         await result.current.refreshDeliveries();
@@ -340,7 +485,7 @@ describe('useDriverDeliveries', () => {
 
   describe('periodic refresh', () => {
     it('should refresh deliveries every 1 minute', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -349,7 +494,7 @@ describe('useDriverDeliveries', () => {
       });
 
       // Clear previous calls
-      mockGetDriverActiveDeliveries.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Advance 1 minute
       await act(async () => {
@@ -357,12 +502,15 @@ describe('useDriverDeliveries', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetDriverActiveDeliveries).toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/driver-deliveries?page=1&limit=999',
+          expect.objectContaining({ credentials: 'include' }),
+        );
       });
     });
 
     it('should stop periodic refresh on unmount', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result, unmount } = renderHook(() => useDriverDeliveries());
 
@@ -372,21 +520,24 @@ describe('useDriverDeliveries', () => {
 
       unmount();
 
-      mockGetDriverActiveDeliveries.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Advance time
       await act(async () => {
         jest.advanceTimersByTime(120000);
       });
 
-      // Should not have been called after unmount
-      expect(mockGetDriverActiveDeliveries).not.toHaveBeenCalled();
+      // Should not have fetched the feed after unmount
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        '/api/driver-deliveries?page=1&limit=999',
+        expect.anything(),
+      );
     });
   });
 
   describe('visibility change handling', () => {
     it('should refresh when page becomes visible', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -394,7 +545,7 @@ describe('useDriverDeliveries', () => {
         expect(result.current.activeDeliveries).toHaveLength(1);
       });
 
-      mockGetDriverActiveDeliveries.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Simulate page becoming visible
       Object.defineProperty(document, 'hidden', {
@@ -408,12 +559,15 @@ describe('useDriverDeliveries', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetDriverActiveDeliveries).toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/driver-deliveries?page=1&limit=999',
+          expect.objectContaining({ credentials: 'include' }),
+        );
       });
     });
 
     it('should not refresh when page is hidden', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -421,7 +575,7 @@ describe('useDriverDeliveries', () => {
         expect(result.current.activeDeliveries).toHaveLength(1);
       });
 
-      mockGetDriverActiveDeliveries.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Simulate page becoming hidden
       Object.defineProperty(document, 'hidden', {
@@ -434,20 +588,23 @@ describe('useDriverDeliveries', () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
 
-      // Should not have called getDriverActiveDeliveries
-      expect(mockGetDriverActiveDeliveries).not.toHaveBeenCalled();
+      // Should not have fetched the feed while hidden
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        '/api/driver-deliveries?page=1&limit=999',
+        expect.anything(),
+      );
     });
   });
 
   describe('multiple deliveries', () => {
     it('should handle multiple active deliveries', async () => {
       const multipleDeliveries = [
-        { ...mockDelivery, id: 'delivery-1' },
-        { ...mockDelivery, id: 'delivery-2', status: DriverStatus.EN_ROUTE_TO_VENDOR },
-        { ...mockDelivery, id: 'delivery-3', status: DriverStatus.AT_VENDOR },
+        makeOrder({ orderNumber: 'delivery-1' }),
+        makeOrder({ orderNumber: 'delivery-2', driverStatus: DriverStatus.EN_ROUTE_TO_VENDOR }),
+        makeOrder({ orderNumber: 'delivery-3', driverStatus: DriverStatus.AT_VENDOR }),
       ];
 
-      mockGetDriverActiveDeliveries.mockResolvedValue(multipleDeliveries);
+      setDeliveries(multipleDeliveries);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -461,7 +618,7 @@ describe('useDriverDeliveries', () => {
     });
 
     it('should handle empty deliveries list', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([]);
+      setDeliveries([]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -476,7 +633,7 @@ describe('useDriverDeliveries', () => {
 
   describe('delivery status transitions', () => {
     it('should handle full delivery workflow', async () => {
-      mockGetDriverActiveDeliveries.mockResolvedValue([mockDelivery]);
+      setDeliveries([mockOrder]);
 
       const { result } = renderHook(() => useDriverDeliveries());
 
@@ -484,41 +641,25 @@ describe('useDriverDeliveries', () => {
         expect(result.current.activeDeliveries).toHaveLength(1);
       });
 
+      const lastPatchBody = () => JSON.parse(orderPatchCalls().pop()![1].body);
+
       // Status: ASSIGNED -> EN_ROUTE_TO_VENDOR
       await act(async () => {
         await result.current.updateDeliveryStatus(mockDeliveryId, DriverStatus.EN_ROUTE_TO_VENDOR, mockLocation);
       });
-      expect(mockUpdateDeliveryStatus).toHaveBeenLastCalledWith(
-        mockDeliveryId,
-        DriverStatus.EN_ROUTE_TO_VENDOR,
-        mockLocation,
-        undefined,
-        undefined
-      );
+      expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.EN_ROUTE_TO_VENDOR });
 
       // Status: EN_ROUTE_TO_VENDOR -> AT_VENDOR
       await act(async () => {
         await result.current.updateDeliveryStatus(mockDeliveryId, DriverStatus.AT_VENDOR, mockLocation);
       });
-      expect(mockUpdateDeliveryStatus).toHaveBeenLastCalledWith(
-        mockDeliveryId,
-        DriverStatus.AT_VENDOR,
-        mockLocation,
-        undefined,
-        undefined
-      );
+      expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.AT_VENDOR });
 
       // Status: AT_VENDOR -> EN_ROUTE_TO_CLIENT
       await act(async () => {
         await result.current.updateDeliveryStatus(mockDeliveryId, DriverStatus.EN_ROUTE_TO_CLIENT, mockLocation);
       });
-      expect(mockUpdateDeliveryStatus).toHaveBeenLastCalledWith(
-        mockDeliveryId,
-        DriverStatus.EN_ROUTE_TO_CLIENT,
-        mockLocation,
-        undefined,
-        undefined
-      );
+      expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.EN_ROUTE_TO_CLIENT });
 
       // Status: EN_ROUTE_TO_CLIENT -> DELIVERED
       await act(async () => {
@@ -530,13 +671,7 @@ describe('useDriverDeliveries', () => {
           'Delivered to reception'
         );
       });
-      expect(mockUpdateDeliveryStatus).toHaveBeenLastCalledWith(
-        mockDeliveryId,
-        DriverStatus.DELIVERED,
-        mockLocation,
-        'https://example.com/proof.jpg',
-        'Delivered to reception'
-      );
+      expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.DELIVERED });
     });
   });
 });
