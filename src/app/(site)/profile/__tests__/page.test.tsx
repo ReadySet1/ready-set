@@ -5,6 +5,18 @@ import userEvent from "@testing-library/user-event";
 // System under test
 import ProfilePage from "../page";
 
+// Mock next/dynamic to render a simple stub (avoids QueryClientProvider dep)
+jest.mock("next/dynamic", () => {
+  return (importFn: () => Promise<unknown>) => {
+    // Return a component that renders a recognizable test ID
+    const DynamicMock = () => (
+      <div data-testid="vendor-calculator-card">Vendor Calculator Card</div>
+    );
+    DynamicMock.displayName = "DynamicMock";
+    return DynamicMock;
+  };
+});
+
 // Mock Next.js router
 const pushMock = jest.fn();
 jest.mock("next/navigation", () => ({
@@ -179,5 +191,57 @@ describe("Profile Page Quick Actions", () => {
         screen.getByText("Enter your current password and choose a new one")
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe("Profile Page — Vendor Calculator Card visibility", () => {
+  it("renders the VendorCalculatorCard for a VENDOR profile", async () => {
+    // Override fetch to return a VENDOR-type profile
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/users/") && !url.endsWith("/files")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: "test-user-id",
+              email: "vendor@example.com",
+              name: "Vendor User",
+              type: "VENDOR",
+              status: "active",
+              company_name: "Destino",
+              created_at: new Date().toISOString(),
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      if (url.endsWith("/files")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(new Response("Not Found", { status: 404 }));
+    }) as unknown as typeof fetch;
+
+    render(<ProfilePage />);
+
+    // Wait for profile data to load and the calculator section to render
+    await waitFor(() => {
+      expect(screen.getByTestId("vendor-calculator-card")).toBeInTheDocument();
+    });
+  });
+
+  it("does NOT render the VendorCalculatorCard for a CLIENT profile", async () => {
+    // Default beforeEach mock returns type: "client" (lowercase)
+    render(<ProfilePage />);
+
+    // Wait for profile to load
+    await screen.findByText("Quick Actions");
+
+    // Calculator should NOT be present for CLIENT
+    expect(screen.queryByTestId("vendor-calculator-card")).not.toBeInTheDocument();
   });
 });

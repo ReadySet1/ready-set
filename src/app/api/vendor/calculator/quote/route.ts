@@ -208,8 +208,8 @@ export async function POST(request: NextRequest) {
 
     // 4. Load the caller's profile to get company_name
     const userId = auth.context.user.id;
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { companyName: true },
     });
 

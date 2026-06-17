@@ -26,7 +26,7 @@ jest.mock('@/lib/auth-middleware', () => ({
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     profile: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     deliveryConfiguration: {
       findFirst: jest.fn(),
@@ -42,7 +42,7 @@ jest.mock('@/lib/monitoring/sentry', () => ({
 
 const mockWithAuth = withAuth as jest.MockedFunction<typeof withAuth>;
 const mockPrisma = prisma as unknown as {
-  profile: { findUnique: jest.MockedFunction<() => Promise<unknown>> };
+  profile: { findFirst: jest.MockedFunction<() => Promise<unknown>> };
   deliveryConfiguration: { findFirst: jest.MockedFunction<() => Promise<unknown>> };
 };
 
@@ -169,7 +169,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('response shape (customer-safe only)', () => {
     it('contains no driver-pay, margin, or RS-fee keys', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -185,7 +185,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('returns all expected customer-facing fields', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -212,7 +212,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('unmapped vendor fallback', () => {
     it('returns isFallbackPricing: true for unknown company name', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Acme Catering (Unknown)',
       });
 
@@ -226,7 +226,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('returns isFallbackPricing: true when profile has no company name', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: null,
       });
 
@@ -239,7 +239,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('returns isFallbackPricing: false for a known vendor', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -256,7 +256,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('TBD tier handling', () => {
     it('returns requiresCustomQuote: true for 300+ headcount (HTTP 200)', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -272,7 +272,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('returns requiresCustomQuote: true for $2,500+ food cost (HTTP 200)', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -287,7 +287,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('does NOT throw a 500 for TBD-tier input', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -304,7 +304,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('lesser-fee tier rule', () => {
     it('picks the tier with the lower fee when headcount and food cost map to different tiers', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -331,7 +331,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('picks headcount tier when it has the lower fee', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -360,7 +360,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('CAL-08 guardrails', () => {
     it('clamps totalDeliveryFee to >= 0', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -386,7 +386,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('caps multiDriveDiscount so it cannot exceed deliveryCost + mileageSurcharge', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -458,7 +458,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('bridge toll', () => {
     it('includes default bridge toll when requiresBridge is true', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -474,7 +474,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('returns zero bridge toll when requiresBridge is false', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -493,7 +493,7 @@ describe('POST /api/vendor/calculator/quote', () => {
   describe('mileage surcharge', () => {
     it('charges mileage only for miles over the 10-mile threshold', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
@@ -509,7 +509,7 @@ describe('POST /api/vendor/calculator/quote', () => {
 
     it('charges zero mileage within the threshold', async () => {
       authAsVendor();
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: 'Destino',
       });
 
