@@ -36,10 +36,10 @@ function toCoords(addr: any): [number, number] {
  * Sources from the SAME orders feed (`/api/driver-deliveries`) and advances through
  * the SAME endpoint (`PATCH /api/orders/[orderNumber]`) as the Home + Detail screens,
  * so every driver surface agrees on one delivery. Previously this read the standalone
- * `deliveries` table (`getDriverActiveDeliveries`), which has no link back to the
- * order — so the Track tab showed "ON-DEMAND #<uuid-suffix>" and its progress drifted
- * from the Detail page (the walk-test "progress reset"). Going through the orders API
- * (not the `delivery-actions` Server Actions) also makes it deployment-proof.
+ * `deliveries` table, which has no link back to the order — so the Track tab showed
+ * "ON-DEMAND #<uuid-suffix>" and its progress drifted from the Detail page (the
+ * walk-test "progress reset"); it now reads the orders feed. Going through the orders
+ * API (not the `delivery-actions` Server Actions) also makes it deployment-proof.
  *
  * The returned `DeliveryTracking.id` is the ORDER NUMBER (what the portal passes back
  * to `updateDeliveryStatus` and the POD sheet), and `cateringRequestId`/`onDemandId`
