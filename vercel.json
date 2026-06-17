@@ -37,7 +37,7 @@
     "env": {
       "PRISMA_SKIP_POSTINSTALL_GENERATE": "true",
       "NEXT_TELEMETRY_DISABLED": "1",
-      "NODE_OPTIONS": "--max-old-space-size=4096"
+      "NODE_OPTIONS": "--max-old-space-size=6144"
     }
   },
   "headers": [
