@@ -12,8 +12,8 @@ import {
 } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
+jest.mock('@/utils/prismaDB', () => {
+  const prisma: any = {
     cateringRequest: {
       findFirst: jest.fn(),
       update: jest.fn(),
@@ -29,8 +29,13 @@ jest.mock('@/utils/prismaDB', () => ({
     driver: {
       findFirst: jest.fn(),
     },
-  },
-}));
+  };
+  // The PATCH route wraps the order update + deliveries-mirror upsert in an
+  // interactive prisma.$transaction; run the callback with the same mock so
+  // tx.* resolves to the mocked methods.
+  prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
+  return { prisma };
+});
 
 jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
@@ -285,6 +290,9 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123' } },
         });
+        // A status change now requires the caller to be the assigned driver or
+        // privileged — the IDOR guard covers status-only PATCH. Act as an admin.
+        mockProfileType('ADMIN');
 
         const mockExistingOrder = {
           id: 'order-1',
@@ -494,6 +502,9 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
       });
 
       it('should handle database errors during update', async () => {
+        // Authorize the status change (IDOR guard) so the request reaches the
+        // DB-update path being tested.
+        mockProfileType('ADMIN');
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',

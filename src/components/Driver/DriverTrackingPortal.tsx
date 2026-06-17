@@ -350,11 +350,12 @@ export default function DriverTrackingPortal() {
                     >
                       <div className="flex items-center gap-2">
                         <TypeBadge type={orderType} />
-                        <span className="font-mono text-[12.5px] font-bold text-driver-muted">
-                          #{orderNumber.slice(-6)}
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-bold text-driver-muted">
+                          #{orderNumber}
                         </span>
-                        <div className="flex-1" />
-                        <StatusPill status={delivery.status} size="sm" />
+                        <div className="shrink-0">
+                          <StatusPill status={delivery.status} size="sm" />
+                        </div>
                       </div>
 
                       {delivery.estimatedArrival ? (
@@ -475,6 +476,7 @@ export default function DriverTrackingPortal() {
           onOpenChange={(o) => !o && setPodTarget(null)}
           deliveryId={podTarget.deliveryId}
           orderNumber={podTarget.orderNumber}
+          uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
           onComplete={onPodComplete}
         />
       ) : null}

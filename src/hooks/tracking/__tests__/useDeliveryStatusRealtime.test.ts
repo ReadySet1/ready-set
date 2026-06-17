@@ -36,6 +36,20 @@ jest.mock('@/lib/realtime', () => ({
   },
 }));
 
+// The hook now does a pre-connection auth check (getSession) before
+// subscribing (REA-DRT-07 guard) — mock a valid session so the channel
+// connects in tests.
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: jest.fn().mockResolvedValue({
+        data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+        error: null,
+      }),
+    },
+  })),
+}));
+
 import toast from 'react-hot-toast';
 import { createDriverStatusChannel, REALTIME_EVENTS } from '@/lib/realtime';
 

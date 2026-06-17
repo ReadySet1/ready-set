@@ -49,6 +49,9 @@ function parseDeliveries(data: unknown): ApiDelivery[] {
  * list fetched once on mount and went stale (showing an empty list while the
  * count, from a different polling source, claimed deliveries existed).
  */
+/** Terminal driver/order statuses that should never count as an active delivery. */
+const TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "DELIVERED"]);
+
 export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
   const [deliveries, setDeliveries] = useState<ApiDelivery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +95,16 @@ export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [load]);
 
-  const activeCount = deliveries.filter((d) => !d.completeDateTime).length;
+  // "Active" = still to be done. Guard on terminal status as well as
+  // completeDateTime, so a completed order whose completion timestamp is missing
+  // (historical-data bug) can't resurrect itself as active. The orders PATCH
+  // route now stamps completeDateTime on completion; this is belt-and-suspenders.
+  const activeCount = deliveries.filter(
+    (d) =>
+      !d.completeDateTime &&
+      !TERMINAL_STATUSES.has((d.status ?? "").toUpperCase()) &&
+      !TERMINAL_STATUSES.has((d.driverStatus ?? "").toUpperCase()),
+  ).length;
 
   return { deliveries, loading, error, refresh: load, activeCount };
 }

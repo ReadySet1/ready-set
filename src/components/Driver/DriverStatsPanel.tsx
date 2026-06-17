@@ -82,18 +82,18 @@ export function DriverStatsPanel({ driverId }: DriverStatsPanelProps) {
           <StatTile
             icon={Route}
             label="Miles"
-            value={Math.round(data.distanceStats.totalMiles)}
+            value={Math.round(data.distanceStats.totalMiles ?? 0)}
             delta={showTrends ? pct(data.trends?.distanceChange) : undefined}
           />
           <StatTile
             icon={Gauge}
             label="Avg mi/drop"
-            value={data.distanceStats.averageMilesPerDelivery.toFixed(1)}
+            value={(data.distanceStats.averageMilesPerDelivery ?? 0).toFixed(1)}
           />
           <StatTile
             icon={Clock}
             label="Hours"
-            value={data.shiftStats.totalHoursWorked.toFixed(1)}
+            value={(data.shiftStats.totalHoursWorked ?? 0).toFixed(1)}
             sub={`${data.shiftStats.totalShifts} shifts`}
           />
         </div>

@@ -201,7 +201,7 @@ export async function getDriverDeliveryStats(
         SELECT
           COUNT(DISTINCT d.id) as total,
           COUNT(DISTINCT d.id) FILTER (
-            WHERE (cr.status IN ('completed', 'delivered') OR od.status IN ('completed', 'delivered'))
+            WHERE (cr.status IN ('COMPLETED', 'DELIVERED') OR od.status IN ('COMPLETED', 'DELIVERED'))
           ) as completed
         FROM dispatches d
         LEFT JOIN catering_requests cr ON d."cateringRequestId" = cr.id

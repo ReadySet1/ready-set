@@ -48,7 +48,7 @@ interface DriverStatusCardProps {
 // Update the status maps to use the enum with UPPERCASE keys
 const driverStatusMap: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "🚗 Assigned",
-  [DriverStatus.EN_ROUTE_TO_VENDOR]: "🚗 En Route to Resto",
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: "🚗 En Route to Restaurant",
   [DriverStatus.ARRIVED_AT_VENDOR]: "🏪 Arrived at Vendor",
   [DriverStatus.PICKED_UP]: "📦 Pick Up Completed",
   [DriverStatus.EN_ROUTE_TO_CLIENT]: "🚚 En Route to Client",
@@ -241,7 +241,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                   indicatorClassName="transition-all duration-500 bg-amber-600"
                 />
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
-                  <span className="text-center">En Route to Resto</span>
+                  <span className="text-center">En Route to Restaurant</span>
                   <span className="text-center">Arrived at Vendor</span>
                   <span className="text-center">Pick Up Completed</span>
                   <span className="text-center">En Route to Client</span>
@@ -281,7 +281,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                     })}
                   />
                   <div className="mt-1 flex justify-between text-[11px] text-slate-500">
-                    <span className="text-center">En Route<br />to Resto</span>
+                    <span className="text-center">En Route<br />to Restaurant</span>
                     <span className="text-center">Arrived<br />at Vendor</span>
                     <span className="text-center">Pick Up<br />Completed</span>
                   </div>

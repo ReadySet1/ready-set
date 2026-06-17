@@ -20,7 +20,7 @@ import {
   calculateShiftMileageWithBreakdown,
   calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
-import { callerMayActOnDriver } from '@/lib/auth/driver-ownership';
+import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
 
 /**
  * Start a new driver shift
@@ -120,7 +120,7 @@ export async function endDriverShift(
   endLocation: LocationUpdate,
   finalMileage?: number,
   metadata: Record<string, any> = {}
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; activeDeliveries?: number }> {
   try {
     // Get shift info and ensure it is active before proceeding
     const shiftInfo = await prisma.$queryRawUnsafe<{
@@ -143,6 +143,48 @@ export async function endDriverShift(
     // AuthZ: only the shift's driver (or an admin) may end it.
     if (!(await callerMayActOnDriver(shift?.driver_id))) {
       return { success: false, error: 'Access denied' };
+    }
+
+    // Guard: a driver may not end a shift while they still have active
+    // deliveries — doing so would strand an in-progress order. Admins may
+    // override by passing metadata.force. "Active" = a non-terminal row in the
+    // `deliveries` table (what the live portal shows), or a catering/on-demand
+    // order the driver has actually started (driverStatus in a movement stage).
+    const caller = await getActionCaller();
+    const force = metadata?.force === true && (caller?.isPrivileged ?? false);
+    if (!force) {
+      const blocking = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`
+        SELECT
+          (
+            SELECT COUNT(*) FROM deliveries
+            WHERE driver_id = $1::uuid
+              AND deleted_at IS NULL
+              AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+          )
+          +
+          (
+            SELECT COUNT(*)
+            FROM dispatches di
+            LEFT JOIN catering_requests cr ON cr.id = di."cateringRequestId"
+            LEFT JOIN on_demand_requests od ON od.id = di."onDemandId"
+            WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
+              AND (
+                (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
+                  AND cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+                OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
+                  AND od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+              )
+          ) AS n
+      `, shift?.driver_id);
+
+      const activeCount = Number(blocking[0]?.n ?? 0);
+      if (activeCount > 0) {
+        return {
+          success: false,
+          error: `You still have ${activeCount} active ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete or cancel ${activeCount === 1 ? 'it' : 'them'} before ending your shift.`,
+          activeDeliveries: activeCount,
+        };
+      }
     }
 
     // Always record the end location in the database first so that the
@@ -380,6 +422,7 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
         ds.total_distance,
+        ds.total_distance_miles,
         ds.status,
         ds.notes,
         ds.created_at,
@@ -406,7 +449,14 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      // Prefer the GPS-derived miles column (written by calculateShiftMileage);
+      // fall back to the legacy total_distance (km) column for older rows.
+      totalDistanceMiles:
+        shift.total_distance_miles != null
+          ? Number(shift.total_distance_miles)
+          : shift.total_distance
+            ? shift.total_distance * 0.621371
+            : 0,
       deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
       breaks: [], // shift_breaks table doesn't exist
@@ -621,6 +671,7 @@ export async function getDriverShiftHistory(
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
         ds.total_distance,
+        ds.total_distance_miles,
         ds.status,
         ds.notes,
         ds.created_at,
@@ -641,7 +692,14 @@ export async function getDriverShiftHistory(
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      // Prefer the GPS-derived miles column (written by calculateShiftMileage);
+      // fall back to the legacy total_distance (km) column for older rows.
+      totalDistanceMiles:
+        shift.total_distance_miles != null
+          ? Number(shift.total_distance_miles)
+          : shift.total_distance
+            ? shift.total_distance * 0.621371
+            : 0,
       deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
       breaks: [], // shift_breaks table doesn't exist

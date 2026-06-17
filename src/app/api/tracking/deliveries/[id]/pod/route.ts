@@ -33,7 +33,7 @@ export async function POST(
 
     // Verify delivery exists and user has permission
     const verifyQuery = `
-      SELECT d.id, d.proof_of_delivery, d.driver_id
+      SELECT d.id, d.driver_id
       FROM deliveries d
       WHERE d.id = $1
     `;
@@ -41,7 +41,6 @@ export async function POST(
     const verifyResult = await prisma.$queryRawUnsafe<
       {
         id: string;
-        proof_of_delivery: string | null;
         driver_id: string | null;
       }[]
     >(verifyQuery, deliveryId);
@@ -108,23 +107,24 @@ export async function POST(
       );
     }
 
-    // Update the delivery record with the photo URL
+    // Update the delivery record with the photo URL. NOTE: the `deliveries`
+    // table has no `proof_of_delivery`/`metadata` columns — the real column is
+    // `delivery_photo_url`. Audit details (uploader, timestamp, storage path)
+    // are appended to `delivery_notes`, mirroring uploadProofOfDelivery in
+    // src/app/actions/tracking/delivery-actions.ts. The storage path is kept in
+    // the note so DELETE can recover it without a metadata column.
     await prisma.$executeRawUnsafe(
       `
       UPDATE deliveries
       SET
-        proof_of_delivery = $2,
-        metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+        delivery_photo_url = $2,
+        delivery_notes = COALESCE(delivery_notes, '') || $3,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       deliveryId,
       uploadResult.url,
-      JSON.stringify({
-        podUploadedAt: new Date().toISOString(),
-        podUploadedBy: authResult.context.user.id,
-        podStoragePath: uploadResult.path,
-      })
+      ` [POD photo uploaded ${new Date().toISOString()} by ${authResult.context.user.id} | path:${uploadResult.path}]`
     );
 
     return NextResponse.json({
@@ -172,8 +172,7 @@ export async function GET(
     const query = `
       SELECT
         d.id,
-        d.proof_of_delivery,
-        d.metadata,
+        d.delivery_photo_url,
         d.driver_id
       FROM deliveries d
       WHERE d.id = $1
@@ -182,8 +181,7 @@ export async function GET(
     const result = await prisma.$queryRawUnsafe<
       {
         id: string;
-        proof_of_delivery: string | null;
-        metadata: Record<string, unknown> | null;
+        delivery_photo_url: string | null;
         driver_id: string | null;
       }[]
     >(query, deliveryId);
@@ -208,7 +206,7 @@ export async function GET(
       }
     }
 
-    if (!delivery.proof_of_delivery) {
+    if (!delivery.delivery_photo_url) {
       return NextResponse.json({
         success: true,
         hasPhoto: false,
@@ -216,16 +214,10 @@ export async function GET(
       });
     }
 
-    const metadata = delivery.metadata as Record<string, unknown> | null;
-
     return NextResponse.json({
       success: true,
       hasPhoto: true,
-      url: delivery.proof_of_delivery,
-      metadata: {
-        uploadedAt: metadata?.podUploadedAt || null,
-        storagePath: metadata?.podStoragePath || null,
-      },
+      url: delivery.delivery_photo_url,
     });
   } catch (error) {
     Sentry.captureException(error, {
@@ -262,17 +254,16 @@ export async function DELETE(
       return authResult.response;
     }
 
-    // Get the current POD storage path
+    // Get the current POD URL
     const query = `
-      SELECT proof_of_delivery, metadata
+      SELECT delivery_photo_url
       FROM deliveries
       WHERE id = $1
     `;
 
     const result = await prisma.$queryRawUnsafe<
       {
-        proof_of_delivery: string | null;
-        metadata: Record<string, unknown> | null;
+        delivery_photo_url: string | null;
       }[]
     >(query, deliveryId);
 
@@ -285,16 +276,16 @@ export async function DELETE(
 
     const delivery = result[0]!;
 
-    if (!delivery.proof_of_delivery) {
+    if (!delivery.delivery_photo_url) {
       return NextResponse.json(
         { success: false, error: 'No proof of delivery photo to delete' },
         { status: 400 }
       );
     }
 
-    // Delete from storage if we have the path
-    const deliveryMetadata = delivery.metadata as Record<string, unknown> | null;
-    const storagePath = deliveryMetadata?.podStoragePath as string | undefined;
+    // Delete from storage. Recover the storage path from the public URL
+    // (.../delivery-proofs/<path>) since there is no metadata column.
+    const storagePath = delivery.delivery_photo_url.split('/delivery-proofs/')[1];
     if (storagePath) {
       const deleteResult = await deletePODImage(storagePath);
       if (deleteResult.error) {
@@ -312,17 +303,13 @@ export async function DELETE(
       `
       UPDATE deliveries
       SET
-        proof_of_delivery = NULL,
-        metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+        delivery_photo_url = NULL,
+        delivery_notes = COALESCE(delivery_notes, '') || $2,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       deliveryId,
-      JSON.stringify({
-        podDeletedAt: new Date().toISOString(),
-        podDeletedBy: authResult.context.user.id,
-        podStoragePath: null,
-      })
+      ` [POD deleted ${new Date().toISOString()} by ${authResult.context.user.id}]`
     );
 
     return NextResponse.json({
