@@ -172,5 +172,24 @@ describe('Orders API PATCH — completion regression', () => {
     expect(upsertArg.update.status).toBe('COMPLETED');
     expect(upsertArg.update.deliveredAt).toBeInstanceOf(Date);
     expect(upsertArg.create.status).toBe('COMPLETED');
+    // P3b: driver_id is synced on the UPDATE branch (not just create) so a
+    // reassigned order's mirror stays attributed to the current driver.
+    expect(upsertArg.update.driverId).toBe('delivery-driver-1');
+  });
+
+  it('propagates a deliveries-mirror failure as a 500 (no silent terminal order)', async () => {
+    // P1: the order update + mirror upsert run in one transaction. If the mirror
+    // upsert throws, the request fails (retryable) instead of swallowing the error
+    // and leaving a COMPLETED order with a stale non-terminal deliveries.status —
+    // which the end-shift guard counts as active (a permanent shift-end deadlock).
+    setupMocks();
+    (mockedPrisma.delivery.upsert as jest.Mock).mockRejectedValue(new Error('mirror write failed'));
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ driverStatus: 'COMPLETED' }), {
+      params: Promise.resolve({ order_number: 'CAT-001' }),
+    });
+
+    expect(res.status).toBe(500);
   });
 });

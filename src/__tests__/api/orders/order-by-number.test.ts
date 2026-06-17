@@ -12,8 +12,8 @@ import {
 } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
+jest.mock('@/utils/prismaDB', () => {
+  const prisma: any = {
     cateringRequest: {
       findFirst: jest.fn(),
       update: jest.fn(),
@@ -29,8 +29,13 @@ jest.mock('@/utils/prismaDB', () => ({
     driver: {
       findFirst: jest.fn(),
     },
-  },
-}));
+  };
+  // The PATCH route wraps the order update + deliveries-mirror upsert in an
+  // interactive prisma.$transaction; run the callback with the same mock so
+  // tx.* resolves to the mocked methods.
+  prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
+  return { prisma };
+});
 
 jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
