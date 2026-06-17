@@ -99,7 +99,7 @@ function Stop({ tone, name }: { tone: "info" | "brand"; name: string }) {
         )}
       />
       <span className="truncate text-[13.5px] font-bold text-driver-text">
-        {name}
+        {name || "—"}
       </span>
     </div>
   );

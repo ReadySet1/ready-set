@@ -149,6 +149,40 @@ export function ProofOfDeliveryCapture({
   }, [state.previewUrl]);
 
   /**
+   * Queue the captured photo for background upload and let the delivery
+   * complete now. Used when offline, on a network error, or when the driver
+   * taps "Complete anyway" after a failed upload — a failed photo must never
+   * trap the driver mid-delivery (the real URL lands when the queue syncs).
+   */
+  const queueForLater = useCallback(async () => {
+    if (!state.file) return;
+    const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
+    try {
+      await queuePODUpload(deliveryId, orderNumber, state.file, apiEndpoint, {
+        capturedAt: new Date(),
+        compressionApplied: true,
+        originalSize: state.file.size,
+      });
+      setState((prev) => ({ ...prev, status: 'queued' }));
+      const metadata: PODMetadata = {
+        deliveryId,
+        capturedAt: new Date(),
+        uploadedAt: new Date(),
+        compressionApplied: true,
+        compressedSize: state.file.size,
+        originalFilename: state.file.name,
+      };
+      // Use the local preview as a temporary URL; the persisted URL is written
+      // when the queued upload syncs in the background.
+      onUploadComplete(state.previewUrl || '', metadata);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to queue upload';
+      setState((prev) => ({ ...prev, status: 'error', error: errorMessage }));
+      onError?.(errorMessage);
+    }
+  }, [state.file, state.previewUrl, deliveryId, orderNumber, uploadEndpoint, queuePODUpload, onUploadComplete, onError]);
+
+  /**
    * Upload the captured photo (with offline support)
    */
   const handleUpload = useCallback(async () => {
@@ -163,49 +197,10 @@ export function ProofOfDeliveryCapture({
 
     const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
 
-    // Check if we're offline - queue for later
+    // Offline → queue for later and let completion proceed.
     if (!offlineStatus.isOnline) {
-      try {
-        await queuePODUpload(
-          deliveryId,
-          orderNumber,
-          state.file,
-          apiEndpoint,
-          {
-            capturedAt: new Date(),
-            compressionApplied: true,
-            originalSize: state.file.size,
-          }
-        );
-
-        setState((prev) => ({
-          ...prev,
-          status: 'queued',
-        }));
-
-        // Create metadata for parent callback
-        const metadata: PODMetadata = {
-          deliveryId,
-          capturedAt: new Date(),
-          uploadedAt: new Date(),
-          compressionApplied: true,
-          compressedSize: state.file.size,
-          originalFilename: state.file.name,
-        };
-
-        // Notify parent - use preview URL as temporary URL
-        onUploadComplete(state.previewUrl || '', metadata);
-        return;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to queue upload';
-        setState((prev) => ({
-          ...prev,
-          status: 'error',
-          error: errorMessage,
-        }));
-        onError?.(errorMessage);
-        return;
-      }
+      await queueForLater();
+      return;
     }
 
     // Online - proceed with direct upload
@@ -254,42 +249,14 @@ export function ProofOfDeliveryCapture({
       // Notify parent of successful upload
       onUploadComplete(result.url, metadata);
     } catch (err) {
-      // Check if this is a network error - queue for later
+      // Network error → queue silently for background sync and complete.
       if (!navigator.onLine || (err instanceof TypeError && err.message.includes('fetch'))) {
-        try {
-          await queuePODUpload(
-            deliveryId,
-            orderNumber,
-            state.file,
-            apiEndpoint,
-            {
-              capturedAt: new Date(),
-              compressionApplied: true,
-              originalSize: state.file.size,
-            }
-          );
-
-          setState((prev) => ({
-            ...prev,
-            status: 'queued',
-          }));
-
-          const metadata: PODMetadata = {
-            deliveryId,
-            capturedAt: new Date(),
-            uploadedAt: new Date(),
-            compressionApplied: true,
-            compressedSize: state.file.size,
-            originalFilename: state.file.name,
-          };
-
-          onUploadComplete(state.previewUrl || '', metadata);
-          return;
-        } catch (queueErr) {
-          // If queuing also fails, show error
-        }
+        await queueForLater();
+        return;
       }
 
+      // Server/other error → surface it, but the error UI offers "Complete
+      // anyway" (queueForLater) so a failed upload never traps the driver.
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setState((prev) => ({
         ...prev,
@@ -298,7 +265,7 @@ export function ProofOfDeliveryCapture({
       }));
       onError?.(errorMessage);
     }
-  }, [state.file, state.previewUrl, deliveryId, orderNumber, uploadEndpoint, offlineStatus.isOnline, queuePODUpload, onUploadComplete, onError]);
+  }, [state.file, deliveryId, uploadEndpoint, offlineStatus.isOnline, queueForLater, onUploadComplete, onError]);
 
   /**
    * Render camera permission error state
@@ -448,10 +415,20 @@ export function ProofOfDeliveryCapture({
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>{state.error}</AlertDescription>
       </Alert>
-      <Button variant="outline" onClick={handleRetake} className="gap-2">
-        <RotateCcw className="h-4 w-4" />
-        Try Again
-      </Button>
+      <div className="flex w-full flex-col gap-2">
+        <Button variant="outline" onClick={handleRetake} className="gap-2">
+          <RotateCcw className="h-4 w-4" />
+          Try Again
+        </Button>
+        {/* A failed upload must never trap the driver: let them complete now;
+            the photo is queued and uploaded in the background. */}
+        {state.file ? (
+          <Button onClick={queueForLater} className="gap-2">
+            <CloudUpload className="h-4 w-4" />
+            Complete anyway — upload photo later
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 

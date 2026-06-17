@@ -32,25 +32,26 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * pageSize;
 
     // Build dynamic query with parameterized filters
+    // NOTE: the `deliveries` table carries its own order_number/customer_name/
+    // delivery_address and has NO catering_request_id/on_demand_id/proof_of_delivery/
+    // completed_at columns — query its real columns directly (no order-table joins).
     let query = `
       SELECT
         d.id,
         d.id as delivery_id,
-        COALESCE(cr.order_number, od.order_number, d.id::text) as order_number,
-        COALESCE(d.delivery_photo_url, d.proof_of_delivery::text) as photo_url,
-        COALESCE(d.delivered_at, d.completed_at, d.created_at) as captured_at,
+        COALESCE(d.order_number, d.id::text) as order_number,
+        d.delivery_photo_url as photo_url,
+        COALESCE(d.delivered_at, d.created_at) as captured_at,
         d.status,
         dr.id as driver_id,
-        COALESCE(p.name, p.contact_name, 'Unknown Driver') as driver_name,
-        COALESCE(cr.contact_name, od.contact_name, '') as customer_name,
-        COALESCE(cr.address, od.address, '') as delivery_address
+        COALESCE(p.name, 'Unknown Driver') as driver_name,
+        COALESCE(d.customer_name, '') as customer_name,
+        COALESCE(d.delivery_address, '') as delivery_address
       FROM deliveries d
       LEFT JOIN drivers dr ON d.driver_id = dr.id
       LEFT JOIN profiles p ON dr.profile_id = p.id
-      LEFT JOIN catering_requests cr ON d.catering_request_id = cr.id
-      LEFT JOIN on_demand od ON d.on_demand_id = od.id
       WHERE d.deleted_at IS NULL
-        AND (d.delivery_photo_url IS NOT NULL OR d.proof_of_delivery IS NOT NULL)
+        AND d.delivery_photo_url IS NOT NULL
     `;
 
     const params: any[] = [];
@@ -66,9 +67,9 @@ export async function GET(request: NextRequest) {
     // Add search filter (search across order number, driver name, customer name)
     if (search) {
       query += ` AND (
-        COALESCE(cr.order_number, od.order_number, '') ILIKE $${paramCounter}
-        OR COALESCE(p.name, p.contact_name, '') ILIKE $${paramCounter}
-        OR COALESCE(cr.contact_name, od.contact_name, '') ILIKE $${paramCounter}
+        COALESCE(d.order_number, '') ILIKE $${paramCounter}
+        OR COALESCE(p.name, '') ILIKE $${paramCounter}
+        OR COALESCE(d.customer_name, '') ILIKE $${paramCounter}
       )`;
       params.push(`%${search}%`);
       paramCounter++;
@@ -76,13 +77,13 @@ export async function GET(request: NextRequest) {
 
     // Add date range filters
     if (dateFrom) {
-      query += ` AND COALESCE(d.delivered_at, d.completed_at, d.created_at) >= $${paramCounter}::timestamptz`;
+      query += ` AND COALESCE(d.delivered_at, d.created_at) >= $${paramCounter}::timestamptz`;
       params.push(dateFrom);
       paramCounter++;
     }
 
     if (dateTo) {
-      query += ` AND COALESCE(d.delivered_at, d.completed_at, d.created_at) <= $${paramCounter}::timestamptz`;
+      query += ` AND COALESCE(d.delivered_at, d.created_at) <= $${paramCounter}::timestamptz`;
       params.push(dateTo);
       paramCounter++;
     }
@@ -93,15 +94,13 @@ export async function GET(request: NextRequest) {
       FROM deliveries d
       LEFT JOIN drivers dr ON d.driver_id = dr.id
       LEFT JOIN profiles p ON dr.profile_id = p.id
-      LEFT JOIN catering_requests cr ON d.catering_request_id = cr.id
-      LEFT JOIN on_demand od ON d.on_demand_id = od.id
       WHERE d.deleted_at IS NULL
-        AND (d.delivery_photo_url IS NOT NULL OR d.proof_of_delivery IS NOT NULL)
+        AND d.delivery_photo_url IS NOT NULL
         ${driverId ? `AND d.driver_id = $1::uuid` : ''}
         ${search ? `AND (
-          COALESCE(cr.order_number, od.order_number, '') ILIKE $${driverId ? 2 : 1}
-          OR COALESCE(p.name, p.contact_name, '') ILIKE $${driverId ? 2 : 1}
-          OR COALESCE(cr.contact_name, od.contact_name, '') ILIKE $${driverId ? 2 : 1}
+          COALESCE(d.order_number, '') ILIKE $${driverId ? 2 : 1}
+          OR COALESCE(p.name, '') ILIKE $${driverId ? 2 : 1}
+          OR COALESCE(d.customer_name, '') ILIKE $${driverId ? 2 : 1}
         )` : ''}
     `;
 
@@ -111,7 +110,7 @@ export async function GET(request: NextRequest) {
     if (search) countParams.push(`%${search}%`);
 
     // Add ordering and pagination to main query
-    query += ` ORDER BY COALESCE(d.delivered_at, d.completed_at, d.created_at) DESC NULLS LAST`;
+    query += ` ORDER BY COALESCE(d.delivered_at, d.created_at) DESC NULLS LAST`;
     query += ` LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
     params.push(pageSize, offset);
 
