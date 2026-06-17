@@ -422,6 +422,7 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
         ds.total_distance,
+        ds.total_distance_miles,
         ds.status,
         ds.notes,
         ds.created_at,
@@ -448,7 +449,14 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      // Prefer the GPS-derived miles column (written by calculateShiftMileage);
+      // fall back to the legacy total_distance (km) column for older rows.
+      totalDistanceMiles:
+        shift.total_distance_miles != null
+          ? Number(shift.total_distance_miles)
+          : shift.total_distance
+            ? shift.total_distance * 0.621371
+            : 0,
       deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
       breaks: [], // shift_breaks table doesn't exist
@@ -663,6 +671,7 @@ export async function getDriverShiftHistory(
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
         ds.total_distance,
+        ds.total_distance_miles,
         ds.status,
         ds.notes,
         ds.created_at,
@@ -683,7 +692,14 @@ export async function getDriverShiftHistory(
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      // Prefer the GPS-derived miles column (written by calculateShiftMileage);
+      // fall back to the legacy total_distance (km) column for older rows.
+      totalDistanceMiles:
+        shift.total_distance_miles != null
+          ? Number(shift.total_distance_miles)
+          : shift.total_distance
+            ? shift.total_distance * 0.621371
+            : 0,
       deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
       breaks: [], // shift_breaks table doesn't exist

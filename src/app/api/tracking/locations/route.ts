@@ -14,7 +14,6 @@ interface LocationUpdate {
   altitude?: number;
   battery_level?: number;
   is_moving?: boolean;
-  activity_type?: 'walking' | 'driving' | 'stationary';
 }
 
 // POST - Record driver location
@@ -44,8 +43,7 @@ export async function POST(request: NextRequest) {
       heading,
       altitude,
       battery_level,
-      is_moving,
-      activity_type
+      is_moving
     }: LocationUpdate = body;
 
     // Validate required fields
@@ -98,16 +96,17 @@ export async function POST(request: NextRequest) {
         INSERT INTO driver_locations (
           driver_id,
           location,
+          latitude,
+          longitude,
           accuracy,
           speed,
           heading,
           altitude,
           battery_level,
           is_moving,
-          activity_type,
           recorded_at
         )
-        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4, $5, $6, $7, $8, $9, $10, NOW())
+        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
         RETURNING
           id,
           ST_AsGeoJSON(location) as location_geojson,
@@ -117,7 +116,6 @@ export async function POST(request: NextRequest) {
           altitude,
           battery_level,
           is_moving,
-          activity_type,
           recorded_at,
           created_at
         `,
@@ -130,7 +128,6 @@ export async function POST(request: NextRequest) {
         altitude ?? null,
         battery_level ?? null,
         is_moving ?? null,
-        activity_type ?? null,
       );
 
       // Update driver's last known location
@@ -225,7 +222,6 @@ export async function GET(request: NextRequest) {
         altitude,
         battery_level,
         is_moving,
-        activity_type,
         recorded_at,
         created_at
       FROM driver_locations

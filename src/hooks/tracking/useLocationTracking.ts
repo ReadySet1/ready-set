@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LocationUpdate } from '@/types/tracking';
-import { updateDriverLocation } from '@/app/actions/tracking/driver-actions';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
 interface UseLocationTrackingReturn {
@@ -205,6 +204,55 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     return 'driving';
   };
 
+  // POST a single location to the tracking API route. Replaces the legacy
+  // `updateDriverLocation` Server Action: server-action digests break when the
+  // deployed bundle changes mid-shift ("Server Action not found"), which silently
+  // dropped every breadcrumb (driver_locations had no inserts for weeks). A stable
+  // API route is deployment-proof. Returns the {success,error} shape callers expect.
+  const postLocation = useCallback(
+    async (location: LocationUpdate): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetch('/api/tracking/locations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driver_id: location.driverId,
+            latitude: location.coordinates.lat,
+            longitude: location.coordinates.lng,
+            accuracy: location.accuracy,
+            speed: location.speed,
+            heading: location.heading,
+            altitude: location.altitude,
+            battery_level:
+              location.batteryLevel != null ? Math.round(location.batteryLevel) : undefined,
+            is_moving: location.isMoving,
+          }),
+        });
+        if (res.status === 429) {
+          return { success: false, error: 'Rate limit exceeded' };
+        }
+        if (!res.ok) {
+          let error = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            error = body.error || body.message || error;
+          } catch {
+            /* non-JSON error body */
+          }
+          return { success: false, error };
+        }
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to post location',
+        };
+      }
+    },
+    [],
+  );
+
   // Sync offline locations to server
   const syncOfflineLocations = useCallback(async () => {
     if (!isOnline) return;
@@ -237,7 +285,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
             timestamp: new Date(storedLocation.timestamp)
           };
 
-          const result = await updateDriverLocation(storedLocation.driverId, locationUpdate);
+          const result = await postLocation(locationUpdate);
 
           if (result.success) {
             await locationStore.markAsSynced(storedLocation.id);
@@ -268,7 +316,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     } catch (error) {
       console.error('Error during offline sync:', error);
     }
-  }, [isOnline]);
+  }, [isOnline, postLocation]);
 
   // Update location to server with client-side throttling
   // Skips server sync if less than 5s since last successful sync (matches server rate limit)
@@ -281,7 +329,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
 
     try {
-      const result = await updateDriverLocation(location.driverId, location);
+      const result = await postLocation(location);
       if (!result.success) {
         if (result.error?.includes('Rate limit')) {
           return;
@@ -307,7 +355,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         console.error('Failed to store location offline:', storageError);
       }
     }
-  }, []);
+  }, [postLocation]);
 
   // Handle position update
   const handlePositionUpdate = useCallback(async (position: GeolocationPosition) => {
