@@ -7,7 +7,7 @@ import { DriverStatus } from '@/types/user';
 
 /**
  * Ordered list of driver statuses representing the delivery lifecycle
- * Flow: Assigned → En Route to Resto → Arrived at Vendor → Pick Up Completed → En Route to Client → Arrived at Client → Delivered
+ * Flow: Assigned → En Route to Restaurant → Arrived at Vendor → Pick Up Completed → En Route to Client → Arrived at Client → Delivered
  */
 export const STATUS_ORDER: DriverStatus[] = [
   DriverStatus.ASSIGNED,
@@ -24,7 +24,7 @@ export const STATUS_ORDER: DriverStatus[] = [
  */
 export const STATUS_LABELS: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: 'Assigned',
-  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'En Route to Resto',
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'En Route to Restaurant',
   [DriverStatus.ARRIVED_AT_VENDOR]: 'Arrived at Vendor',
   [DriverStatus.PICKED_UP]: 'Pick Up Completed',
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'En Route to Client',
