@@ -48,30 +48,30 @@ Surfaced by `/ship` test gate; pre-existing failure, not introduced by this bran
 
 ## Driver Tracking
 
-### End-shift can deadlock if the deliveries-mirror upsert fails
-
-**Priority:** P1
-**Noticed on:** `fix/driver-tracking-single-source` (2026-06-17, /ship red-team)
-**Status:** Open
-
-In `PATCH /api/orders/[order_number]`, the order update (sets `completeDateTime` + `status=COMPLETED`) and the `deliveries` mirror upsert (`status: driverStatus`) are NOT in one transaction — the mirror runs in a swallow-all try/catch (`route.ts` ~line 670). If the mirror upsert fails transiently, the order is terminal but `deliveries.status` stays non-terminal, and the end-shift guard (`driver-actions.ts:159-162`) counts it → the driver can't end their shift (admin `force` end is the only escape). Now that the Live-Tracking single-source change made the orders PATCH the sole maintainer of `deliveries.status`, the guard is newly sensitive to this drift. Fix: wrap order-update + mirror in one `prisma.$transaction`, OR make the guard's deliveries subquery exclude rows whose linked order is already terminal (join `deliveries`→orders by `order_number`, ignore `completeDateTime IS NOT NULL`). Needs runtime-tested raw SQL — deferred from the ship to avoid rushing the critical end-shift path.
-
-### Remove now-dead tracking Server Actions
-
-**Priority:** P2
-**Noticed on:** `fix/driver-tracking-single-source` (2026-06-17, /ship review)
-**Status:** Open
-
-After the Live-Tracking single-source change, `getDriverActiveDeliveries` and `updateDeliveryStatus` in `src/app/actions/tracking/delivery-actions.ts` have no production callers (only `assignDeliveryToDriver` remains used). Remove them + their security tests, or document why they're retained.
-
-### Order-status auto-derive bypasses canTransitionOrder; mirror driver_id not re-synced
+### Order-status auto-derive bypasses canTransitionOrder
 
 **Priority:** P3
 **Noticed on:** `fix/driver-tracking-single-source` (2026-06-17, /ship red-team)
 **Status:** Open
 
-Two pre-existing-adjacent edges in `PATCH /api/orders/[order_number]`: (1) a `{driverStatus: COMPLETED}`-only request sets `updateData.status = deriveOrderStatusFromDriver(...)` without running `canTransitionOrder`, so the order-level state machine is silently violable (e.g. ASSIGNED→COMPLETED early-finish that `ORDER_TRANSITIONS` rejects) — route it through the shared `transitionOrder()` or validate the derived status. (2) The `deliveries` mirror upsert UPDATE branch syncs `status` but not `driver_id`, so reassignment mid-delivery can misattribute the end-shift guard's per-driver count — also set `driverId` in the update branch (only when resolved/non-null).
+In `PATCH /api/orders/[order_number]`, a `{driverStatus: COMPLETED}`-only request sets `updateData.status = deriveOrderStatusFromDriver(...)` without running `canTransitionOrder`, so the order-level state machine is silently violable: the driver graph permits early-finish (`any→COMPLETED`, `driver-state.ts:16`) but `ORDER_TRANSITIONS` (`order-state.ts:10`) does not (e.g. ASSIGNED→COMPLETED). In practice the driver UI advances one stage at a time, so the order always follows a valid path and the outcome is correct today — a validation-consistency nit, not a functional bug. Proper fix: reconcile `ORDER_TRANSITIONS` with the driver early-finish edges, then route the orders PATCH through the shared `transitionOrder()` (`transition.ts:32`) so one graph governs both fields. Own PR with full transition tests.
 
 ## Completed
 
-_(none yet)_
+### End-shift deadlock from a non-atomic deliveries mirror
+
+**Completed:** `fix/driver-tracking-hardening` (2026-06-17)
+
+The order update + `deliveries`-mirror upsert in `PATCH /api/orders/[order_number]` now run in one `prisma.$transaction`; a mirror failure rolls the order update back (retryable 500) instead of stranding a terminal order with a stale non-terminal `deliveries.status` that the end-shift guard counts as active. Regression test added.
+
+### Remove now-dead tracking Server Actions
+
+**Completed:** `fix/driver-tracking-hardening` (2026-06-17)
+
+Removed `getDriverActiveDeliveries` + `updateDeliveryStatus` from `src/app/actions/tracking/delivery-actions.ts` (no production callers after the single-source change) and pruned their cases from `delivery-actions.security.test.ts`.
+
+### Sync deliveries-mirror driver_id on reassignment
+
+**Completed:** `fix/driver-tracking-hardening` (2026-06-17)
+
+The mirror upsert's UPDATE branch now also sets `driverId` (when resolved), so a reassigned order's mirror stays attributed to the current driver (the end-shift guard counts by `driver_id`).
