@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           is_moving,
           recorded_at
         )
-        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
+        VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
         RETURNING
           id,
           ST_AsGeoJSON(location) as location_geojson,

@@ -141,4 +141,19 @@ describe('locations POST — uuid cast regression', () => {
     expect(updateCall).toBeDefined();
     expect(updateCall![0]).toContain('WHERE id = $3::uuid');
   });
+
+  it('casts the driver-id param to ::uuid in the driver_locations INSERT', async () => {
+    mockWithAuth.mockResolvedValue({ success: true, context: { user: { id: 'admin-1', type: 'ADMIN' } } });
+
+    await POST(createPostRequest('http://localhost:3000/api/tracking/locations', validBody));
+
+    const insertCall = mockTxQuery.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO driver_locations'),
+    );
+    expect(insertCall).toBeDefined();
+    // driver_id ($1) goes into a uuid column; Prisma binds it as text, so the
+    // VALUES expression must cast or PG throws "column is of type uuid but
+    // expression is of type text".
+    expect(insertCall![0]).toContain('VALUES ($1::uuid');
+  });
 });
