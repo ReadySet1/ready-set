@@ -344,4 +344,56 @@ describe("Client Dashboard Link Integration", () => {
       expect(link).toHaveClass("hover:bg-gray-50");
     });
   });
+
+  it("should NOT show Delivery Cost Estimator link for CLIENT role", async () => {
+    const ClientPageComponent = await ClientPage();
+    render(ClientPageComponent);
+
+    const calculatorLink = screen.queryByRole("link", {
+      name: /delivery cost estimator/i,
+    });
+    expect(calculatorLink).not.toBeInTheDocument();
+  });
+});
+
+describe("Vendor Dashboard Quick Actions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getCurrentUser as jest.Mock).mockResolvedValue({
+      id: "test-vendor-id",
+      email: "vendor@example.com",
+      name: "Test Vendor",
+      role: "VENDOR",
+    });
+  });
+
+  it("should show Delivery Cost Estimator link for VENDOR role", async () => {
+    const ClientPageComponent = await ClientPage();
+    render(ClientPageComponent);
+
+    const calculatorLink = screen.getByRole("link", {
+      name: /delivery cost estimator/i,
+    });
+    expect(calculatorLink).toBeInTheDocument();
+    expect(calculatorLink).toHaveAttribute("href", "/client/calculator");
+  });
+
+  it("should include Delivery Cost Estimator in the full set of VENDOR quick action links", async () => {
+    const ClientPageComponent = await ClientPage();
+    render(ClientPageComponent);
+
+    const expectedLinks = [
+      { name: /new catering order/i, href: "/catering-request" },
+      { name: /new on-demand order/i, href: "/client/orders/new" },
+      { name: /delivery cost estimator/i, href: "/client/calculator" },
+      { name: /manage addresses/i, href: "/addresses" },
+      { name: /update profile/i, href: "/profile" },
+      { name: /contact us/i, href: "/contact" },
+    ];
+
+    expectedLinks.forEach(({ name, href }) => {
+      const link = screen.getByRole("link", { name });
+      expect(link).toHaveAttribute("href", href);
+    });
+  });
 });

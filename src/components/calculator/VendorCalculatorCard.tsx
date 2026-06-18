@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -36,6 +37,7 @@ import {
   Loader2,
   Phone,
   Info,
+  RotateCcw,
 } from 'lucide-react';
 import {
   useVendorQuote,
@@ -94,6 +96,16 @@ export default function VendorCalculatorCard() {
     return isNaN(n) ? 0 : Math.max(0, n);
   }
 
+  /** Reset all fields to their initial defaults. */
+  const handleReset = useCallback(() => {
+    setHeadcount(50);
+    setFoodCost(500);
+    setTotalMileage(8);
+    setNumberOfDrives(1);
+    setNumberOfStops(1);
+    setRequiresBridge(false);
+  }, []);
+
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
@@ -102,10 +114,10 @@ export default function VendorCalculatorCard() {
       <Card className="border-0 shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg">
-              <Calculator className="h-5 w-5 text-white" />
+            <div className="p-2 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-lg">
+              <Calculator className="h-5 w-5 text-gray-900" />
             </div>
-            <span className="text-emerald-700">Delivery Cost Estimator</span>
+            <span className="text-gray-900">Delivery Cost Estimator</span>
           </CardTitle>
           <CardDescription>
             Estimate the delivery fee for an upcoming order.
@@ -224,6 +236,20 @@ export default function VendorCalculatorCard() {
               </div>
             </div>
           </div>
+
+          {/* Reset button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" />
+              Reset
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -231,10 +257,10 @@ export default function VendorCalculatorCard() {
       <Card className="border-0 shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg">
-              <DollarSign className="h-5 w-5 text-white" />
+            <div className="p-2 bg-gradient-to-br from-yellow-500 to-amber-500 rounded-lg">
+              <DollarSign className="h-5 w-5 text-gray-900" />
             </div>
-            <span className="text-purple-700">Estimated Delivery Fee</span>
+            <span className="text-gray-900">Estimated Delivery Fee</span>
           </CardTitle>
         </CardHeader>
 
@@ -323,12 +349,12 @@ export default function VendorCalculatorCard() {
               <Separator className="my-3" />
 
               {/* Total */}
-              <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl border border-purple-200">
-                <span className="text-lg font-bold text-purple-800">
+              <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-300">
+                <span className="text-lg font-bold text-gray-900">
                   Total Delivery Fee
                 </span>
                 <span
-                  className="text-2xl font-bold text-purple-900"
+                  className="text-2xl font-bold text-gray-900"
                   data-testid="total-delivery-fee"
                 >
                   ${formatCurrency(quote.totalDeliveryFee)}
