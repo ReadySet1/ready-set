@@ -18,8 +18,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
-import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR } from '@/constants/tracking-colors';
+import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
 import { MAP_CONFIG, MARKER_CONFIG, BATTERY_THRESHOLDS } from '@/constants/tracking-config';
+import { isLocationStale } from '@/lib/realtime/stale-detection';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 // Ensure Mapbox token is available
@@ -63,6 +64,7 @@ export default function LiveDriverMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const deliveryMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const pickupMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>('streets');
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -133,14 +135,17 @@ export default function LiveDriverMap({
       // Capture refs at the time of effect setup for cleanup
       const markersRefCurrent = markersRef.current;
       const deliveryMarkersRefCurrent = deliveryMarkersRef.current;
+      const pickupMarkersRefCurrent = pickupMarkersRef.current;
 
       return () => {
         // Clean up markers before removing map to prevent memory leaks
         // Use captured refs to avoid stale closure issues
         markersRefCurrent.forEach(marker => marker.remove());
         deliveryMarkersRefCurrent.forEach(marker => marker.remove());
+        pickupMarkersRefCurrent.forEach(marker => marker.remove());
         markersRefCurrent.clear();
         deliveryMarkersRefCurrent.clear();
+        pickupMarkersRefCurrent.clear();
 
         map.remove();
         mapRef.current = null;
@@ -171,6 +176,9 @@ export default function LiveDriverMap({
   // Get driver color based on status
   const getDriverColor = useCallback((driver: TrackedDriver): string => {
     if (!driver.isOnDuty) return DRIVER_STATUS_COLORS.offDuty;
+
+    // On duty but no recent GPS fix (app closed / lost signal) → offline, not "stopped".
+    if (isLocationStale(driver.lastLocationUpdate)) return DRIVER_STATUS_COLORS.stale;
 
     const recentLocation = recentLocations.find(loc => loc.driverId === driver.id);
     if (recentLocation) {
@@ -274,6 +282,37 @@ export default function LiveDriverMap({
     return el;
   }, []);
 
+  // Create pickup (restaurant) marker element — distinct violet rounded-square
+  // with a shopping-bag glyph, so it reads differently from the orange drop-off pin.
+  const createPickupMarkerElement = useCallback((): HTMLDivElement => {
+    const el = document.createElement('div');
+    el.className = 'pickup-marker';
+    el.style.width = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+    el.style.height = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+
+    el.innerHTML = `
+      <div style="
+        width: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+        height: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+        background-color: ${PICKUP_MARKER_COLOR};
+        border-radius: 6px;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
+          <path d="M3 6h18"/>
+          <path d="M16 10a4 4 0 0 1-8 0"/>
+        </svg>
+      </div>
+    `;
+
+    return el;
+  }, []);
+
   // Create popup content
   const createPopupContent = useCallback((driver: TrackedDriver): string => {
     const battery = getBatteryStatus(driver.id);
@@ -282,9 +321,9 @@ export default function LiveDriverMap({
 
     return `
       <div style="padding: 8px; min-width: 200px;">
-        <div style="font-weight: 600; margin-bottom: 8px;">Driver #${driver.employeeId}</div>
+        <div style="font-weight: 600; margin-bottom: 8px;">${driver.name || `Driver #${driver.employeeId}`}</div>
         <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
-          Vehicle: ${driver.vehicleNumber || 'N/A'}
+          Vehicle: ${driver.vehicleNumber || 'Not set'}
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <span style="
@@ -303,10 +342,10 @@ export default function LiveDriverMap({
             </span>
           ` : ''}
         </div>
-        ${driver.currentShift ? `
+        ${driver.isOnDuty ? `
           <div style="font-size: 11px; color: #6b7280;">
-            <div>Deliveries: ${driver.currentShift.deliveryCount || 0}</div>
-            <div>Distance: ${Math.round((driver.currentShift.totalDistanceMiles || 0) * 10) / 10} mi</div>
+            <div>Deliveries: ${driver.deliveryCount || 0}</div>
+            <div>Distance: ${Math.round((driver.totalDistanceMiles || 0) * 10) / 10} mi</div>
           </div>
         ` : ''}
       </div>
@@ -483,6 +522,54 @@ export default function LiveDriverMap({
     });
   }, [deliveries, mapLoaded, createDeliveryMarkerElement]);
 
+  // Update pickup (restaurant) markers — one per delivery that has a known pickup point
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+
+    const currentDeliveryIds = new Set(deliveries.map(d => d.id));
+
+    // Remove pickup markers for deliveries that are no longer in the list
+    pickupMarkersRef.current.forEach((marker, deliveryId) => {
+      if (!currentDeliveryIds.has(deliveryId)) {
+        marker.remove();
+        pickupMarkersRef.current.delete(deliveryId);
+      }
+    });
+
+    // Add or update a pickup marker for each delivery with pickup coordinates
+    deliveries.forEach(delivery => {
+      if (!delivery.pickupLocation?.coordinates) return;
+
+      const [lng, lat] = delivery.pickupLocation.coordinates;
+
+      if (pickupMarkersRef.current.has(delivery.id)) {
+        const marker = pickupMarkersRef.current.get(delivery.id)!;
+        marker.setLngLat([lng, lat]);
+      } else {
+        const el = createPickupMarkerElement();
+        const popup = new mapboxgl.Popup({ offset: 15 })
+          .setHTML(`
+            <div style="padding: 8px;">
+              <div style="font-weight: 600; margin-bottom: 4px;">Pickup Location</div>
+              <div style="font-size: 12px; color: #6b7280;">
+                Order #${delivery.id.substring(0, 8)}
+              </div>
+            </div>
+          `);
+
+        const marker = new mapboxgl.Marker({
+          element: el,
+          anchor: 'center'
+        })
+          .setLngLat([lng, lat])
+          .setPopup(popup)
+          .addTo(mapRef.current!);
+
+        pickupMarkersRef.current.set(delivery.id, marker);
+      }
+    });
+  }, [deliveries, mapLoaded, createPickupMarkerElement]);
+
   // Zoom controls
   const zoomIn = () => {
     mapRef.current?.zoomIn();
@@ -618,8 +705,16 @@ export default function LiveDriverMap({
             <span>Off Duty</span>
           </div>
           <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-slate-500 rounded-full" />
+            <span>Offline (no GPS)</span>
+          </div>
+          <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-orange-500 rounded-full" />
             <span>Delivery</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-violet-500 rounded-sm" />
+            <span>Pickup</span>
           </div>
         </div>
       </div>

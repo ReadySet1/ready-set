@@ -14,6 +14,8 @@ export const DRIVER_STATUS_COLORS = {
   onDuty: '#3b82f6',
   /** Driver is off duty - gray-400 */
   offDuty: '#94a3b8',
+  /** Driver is on duty but hasn't reported GPS recently (app closed / lost signal) - slate-500 */
+  stale: '#64748b',
 } as const;
 
 export const BATTERY_STATUS_COLORS = {
@@ -26,6 +28,7 @@ export const BATTERY_STATUS_COLORS = {
 } as const;
 
 export const DELIVERY_MARKER_COLOR = '#f97316'; // orange-500
+export const PICKUP_MARKER_COLOR = '#8b5cf6'; // violet-500 (restaurant / pickup point)
 
 export type DriverStatusColor = typeof DRIVER_STATUS_COLORS[keyof typeof DRIVER_STATUS_COLORS];
 export type BatteryStatusColor = typeof BATTERY_STATUS_COLORS[keyof typeof BATTERY_STATUS_COLORS];
