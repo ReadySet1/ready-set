@@ -95,6 +95,13 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
+  // Mirror isTracking into a ref so the long-lived watchPosition callback always
+  // reads the live value. The callback registered in startTracking() captures the
+  // isTracking *state* from the same render that calls setIsTracking(true) — i.e.
+  // still false — so the `if (isTracking)` sync gate stayed shut: the device
+  // painted the dot but never POSTed. Bit iOS Safari specifically (Android's
+  // render/callback timing happened to resolve the gate open).
+  const isTrackingRef = useRef(false);
 
   // Get driver ID from session, cached to avoid repeated /api/auth/session fetches
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -370,15 +377,17 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       // Update last location reference
       lastLocationRef.current = locationUpdate;
 
-      // Sync to server if tracking is active
-      if (isTracking) {
+      // Sync to server if tracking is active. Read the ref, not the captured
+      // `isTracking` state, so the long-lived watchPosition callback always sees
+      // the current value (see isTrackingRef note above).
+      if (isTrackingRef.current) {
         await syncLocationToServer(locationUpdate);
       }
     } catch (error) {
       console.error('Error handling position update:', error);
       setError(error instanceof Error ? error.message : 'Location update failed');
     }
-  }, [formatLocationUpdate, isTracking, syncLocationToServer]);
+  }, [formatLocationUpdate, syncLocationToServer]);
 
   // Handle geolocation errors
   const handleGeolocationError = useCallback((err: unknown, silent = false) => {
@@ -434,6 +443,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
 
     setIsTracking(true);
+    isTrackingRef.current = true;
     setError(null);
 
     // Start watching position — watchPosition provides continuous updates,
@@ -457,6 +467,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // Stop location tracking
   const stopTracking = useCallback(() => {
     setIsTracking(false);
+    isTrackingRef.current = false;
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
@@ -632,6 +643,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       stopTracking();
     };
   }, [stopTracking]);
+
+  // Keep the tracking ref in lock-step with state (belt-and-suspenders for the
+  // eager assignments in start/stopTracking).
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   // Monitor online/offline status
   useEffect(() => {
