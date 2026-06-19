@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -59,51 +59,56 @@ function formatCurrency(value: number | undefined | null): string {
 
 export default function VendorCalculatorCard() {
   // ── Form state ────────────────────────────────────────────────────────
-  const [headcount, setHeadcount] = useState(50);
-  const [foodCost, setFoodCost] = useState(500);
-  const [totalMileage, setTotalMileage] = useState(8);
+  // Text inputs stored as strings so they can be empty after reset.
+  const [headcountRaw, setHeadcountRaw] = useState('');
+  const [foodCostRaw, setFoodCostRaw] = useState('');
+  const [totalMileageRaw, setTotalMileageRaw] = useState('');
+  const [numberOfStopsRaw, setNumberOfStopsRaw] = useState('');
   const [numberOfDrives, setNumberOfDrives] = useState(1);
-  const [numberOfStops, setNumberOfStops] = useState(1);
   const [requiresBridge, setRequiresBridge] = useState(false);
 
-  // Build the request object for the hook (null = don't query)
-  const quoteInput = useMemo<VendorQuoteRequest | null>(() => {
-    // Don't query if any required field is missing or invalid
-    if (headcount < 0 || foodCost < 0 || totalMileage < 0) return null;
-    return {
-      headcount,
-      foodCost,
+  // Parsed numeric values (NaN when empty)
+  const headcount = headcountRaw === '' ? NaN : Math.max(0, parseInt(headcountRaw, 10));
+  const foodCost = foodCostRaw === '' ? NaN : Math.max(0, parseFloat(foodCostRaw));
+  const totalMileage = totalMileageRaw === '' ? NaN : Math.max(0, parseFloat(totalMileageRaw));
+  const numberOfStops = numberOfStopsRaw === '' ? NaN : Math.max(1, parseInt(numberOfStopsRaw, 10));
+
+  // Whether the current form inputs are valid (used to enable/disable Calculate)
+  // Rule: at least one of headcount/foodCost, plus totalMileage and numberOfStops.
+  // Drives is always valid (Select, never empty).
+  const hasHeadcount = !isNaN(headcount);
+  const hasFoodCost = !isNaN(foodCost);
+  const isFormValid = (hasHeadcount || hasFoodCost) && !isNaN(totalMileage) && !isNaN(numberOfStops);
+
+  // Only query when the user explicitly clicks Calculate
+  const [submittedInput, setSubmittedInput] = useState<VendorQuoteRequest | null>(null);
+
+  const { data: quote, isLoading, error } = useVendorQuote(submittedInput);
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+
+  /** Submit current form values for calculation. */
+  const handleCalculate = useCallback(() => {
+    if (!isFormValid) return;
+    setSubmittedInput({
+      headcount: hasHeadcount ? headcount : 0,
+      foodCost: hasFoodCost ? foodCost : 0,
       totalMileage,
       numberOfDrives,
       numberOfStops,
       requiresBridge,
-    };
-  }, [headcount, foodCost, totalMileage, numberOfDrives, numberOfStops, requiresBridge]);
+    });
+  }, [isFormValid, hasHeadcount, hasFoodCost, headcount, foodCost, totalMileage, numberOfDrives, numberOfStops, requiresBridge]);
 
-  const { data: quote, isLoading, error } = useVendorQuote(quoteInput);
-
-  // ── Helpers ───────────────────────────────────────────────────────────
-
-  /** Parse a string input to a non-negative integer (clamped to 0 min). */
-  function toNonNegativeInt(raw: string): number {
-    const n = parseInt(raw, 10);
-    return isNaN(n) ? 0 : Math.max(0, n);
-  }
-
-  /** Parse a string input to a non-negative float. */
-  function toNonNegativeFloat(raw: string): number {
-    const n = parseFloat(raw);
-    return isNaN(n) ? 0 : Math.max(0, n);
-  }
-
-  /** Reset all fields to their initial defaults. */
+  /** Reset all fields to empty and clear results. */
   const handleReset = useCallback(() => {
-    setHeadcount(50);
-    setFoodCost(500);
-    setTotalMileage(8);
+    setHeadcountRaw('');
+    setFoodCostRaw('');
+    setTotalMileageRaw('');
+    setNumberOfStopsRaw('');
     setNumberOfDrives(1);
-    setNumberOfStops(1);
     setRequiresBridge(false);
+    setSubmittedInput(null);
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -136,8 +141,8 @@ export default function VendorCalculatorCard() {
                 id="vc-headcount"
                 type="number"
                 min={0}
-                value={headcount}
-                onChange={(e) => setHeadcount(toNonNegativeInt(e.target.value))}
+                value={headcountRaw}
+                onChange={(e) => setHeadcountRaw(e.target.value)}
                 className="h-11"
                 placeholder="e.g. 50"
               />
@@ -153,8 +158,8 @@ export default function VendorCalculatorCard() {
                 type="number"
                 min={0}
                 step={0.01}
-                value={foodCost}
-                onChange={(e) => setFoodCost(toNonNegativeFloat(e.target.value))}
+                value={foodCostRaw}
+                onChange={(e) => setFoodCostRaw(e.target.value)}
                 className="h-11"
                 placeholder="e.g. 500"
               />
@@ -173,8 +178,8 @@ export default function VendorCalculatorCard() {
                 type="number"
                 min={0}
                 step={0.1}
-                value={totalMileage}
-                onChange={(e) => setTotalMileage(toNonNegativeFloat(e.target.value))}
+                value={totalMileageRaw}
+                onChange={(e) => setTotalMileageRaw(e.target.value)}
                 className="h-11"
                 placeholder="e.g. 12"
               />
@@ -213,8 +218,8 @@ export default function VendorCalculatorCard() {
                 id="vc-stops"
                 type="number"
                 min={1}
-                value={numberOfStops}
-                onChange={(e) => setNumberOfStops(Math.max(1, toNonNegativeInt(e.target.value)))}
+                value={numberOfStopsRaw}
+                onChange={(e) => setNumberOfStopsRaw(e.target.value)}
                 className="h-11"
                 placeholder="1"
               />
@@ -237,8 +242,8 @@ export default function VendorCalculatorCard() {
             </div>
           </div>
 
-          {/* Reset button */}
-          <div className="flex justify-end pt-2">
+          {/* Action buttons */}
+          <div className="flex justify-end gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
@@ -248,6 +253,20 @@ export default function VendorCalculatorCard() {
             >
               <RotateCcw className="mr-1.5 h-4 w-4" />
               Reset
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!isFormValid || isLoading}
+              onClick={handleCalculate}
+              className="bg-amber-400 text-gray-900 hover:bg-amber-500"
+            >
+              {isLoading ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Calculator className="mr-1.5 h-4 w-4" />
+              )}
+              Calculate
             </Button>
           </div>
         </CardContent>
