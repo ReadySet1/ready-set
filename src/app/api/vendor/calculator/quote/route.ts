@@ -58,6 +58,19 @@ interface VendorQuoteResponse {
   requiresCustomQuote: boolean;
 }
 
+/** Reusable response for TBD-tier / manual-review scenarios */
+const CUSTOM_QUOTE_RESPONSE: VendorQuoteResponse = {
+  deliveryCost: 0,
+  mileageSurcharge: 0,
+  multiDriveDiscount: 0,
+  extraStopsCharge: 0,
+  bridgeToll: 0,
+  totalDeliveryFee: 0,
+  pricingProfileLabel: 'Custom Quote Required',
+  isFallbackPricing: false,
+  requiresCustomQuote: true,
+};
+
 // ---------------------------------------------------------------------------
 // Config resolution helpers
 // ---------------------------------------------------------------------------
@@ -120,11 +133,15 @@ async function resolveConfig(
       return { config, fromDb: true };
     }
   } catch (dbError) {
-    // Log but don't fail — fall through to in-memory fallback
+    // Log AND track — fall through to in-memory fallback
     console.warn(
       '[vendor-quote] DB lookup failed for config, falling back to in-memory:',
-      dbError,
+      (dbError as Error).message,
     );
+    captureException(dbError, {
+      action: 'vendor_calculator_resolve_config',
+      feature: 'vendor-calculator',
+    });
   }
 
   // In-memory fallback
@@ -186,17 +203,7 @@ export async function POST(request: NextRequest) {
 
       if (isTbdTier) {
         // TBD tier — return 200 with requiresCustomQuote flag, not a 500
-        return NextResponse.json<VendorQuoteResponse>({
-          deliveryCost: 0,
-          mileageSurcharge: 0,
-          multiDriveDiscount: 0,
-          extraStopsCharge: 0,
-          bridgeToll: 0,
-          totalDeliveryFee: 0,
-          pricingProfileLabel: 'Custom Quote Required',
-          isFallbackPricing: false,
-          requiresCustomQuote: true,
-        });
+        return NextResponse.json<VendorQuoteResponse>(CUSTOM_QUOTE_RESPONSE);
       }
 
       // Genuine validation error
@@ -292,20 +299,10 @@ export async function POST(request: NextRequest) {
     // If the engine throws due to a config issue (e.g., manual review required),
     // surface it as a custom-quote scenario rather than a 500
     if (error instanceof Error && error.message.includes('manual review')) {
-      return NextResponse.json<VendorQuoteResponse>({
-        deliveryCost: 0,
-        mileageSurcharge: 0,
-        multiDriveDiscount: 0,
-        extraStopsCharge: 0,
-        bridgeToll: 0,
-        totalDeliveryFee: 0,
-        pricingProfileLabel: 'Custom Quote Required',
-        isFallbackPricing: false,
-        requiresCustomQuote: true,
-      });
+      return NextResponse.json<VendorQuoteResponse>(CUSTOM_QUOTE_RESPONSE);
     }
 
-    console.error('[vendor-quote] Unexpected error:', error);
+    console.error('[vendor-quote] Unexpected error:', (error as Error).message);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 },
