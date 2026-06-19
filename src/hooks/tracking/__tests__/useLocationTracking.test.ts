@@ -256,7 +256,7 @@ describe('useLocationTracking', () => {
       expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
     });
 
-    it('should set up periodic location updates', async () => {
+    it('sets up continuous tracking + the periodic offline sync', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
       // Wait for initial mount effects
@@ -264,20 +264,19 @@ describe('useLocationTracking', () => {
         expect(result.current.isTracking).toBe(false);
       });
 
-      // Clear initial calls from mount
-      (navigator.geolocation.getCurrentPosition as jest.Mock).mockClear();
-
       await act(async () => {
         result.current.startTracking();
       });
 
-      // Fast-forward 30 seconds (TRACKING_INTERVAL)
+      // Fast-forward to the 2-minute offline-sync interval
       await act(async () => {
-        jest.advanceTimersByTime(30000);
+        jest.advanceTimersByTime(120000);
       });
 
-      // getCurrentPosition should be called for periodic update
-      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+      // Continuous GPS comes from watchPosition (not a getCurrentPosition poll —
+      // that was removed); startTracking also schedules a 2-minute offline sync.
+      expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
+      expect(mockLocationStore.getUnsyncedLocations).toHaveBeenCalled();
     });
 
     it('should sync location to server when tracking', async () => {

@@ -75,12 +75,12 @@ export async function POST(request: NextRequest) {
     const locationRow = await withRawTx(async (tx) => {
       const driverCheck = isDriver
         ? await tx.$queryRawUnsafe<{ id: string }[]>(
-            `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)} AND is_active = true`,
+            `SELECT id FROM drivers WHERE id = $1::uuid AND ${driverOwnershipCondition(2)} AND is_active = true`,
             driver_id,
             auth.context.user.id,
           )
         : await tx.$queryRawUnsafe<{ id: string }[]>(
-            'SELECT id FROM drivers WHERE id = $1 AND is_active = true',
+            'SELECT id FROM drivers WHERE id = $1::uuid AND is_active = true',
             driver_id,
           );
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           is_moving,
           recorded_at
         )
-        VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
+        VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
         RETURNING
           id,
           ST_AsGeoJSON(location) as location_geojson,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
           last_location_update = NOW(),
           updated_at = NOW()
-        WHERE id = $3
+        WHERE id = $3::uuid
         `,
         longitude,
         latitude,
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
     // A DRIVER may only read their own location history.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await rawQuery<{ id: string }>(
-        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
+        `SELECT id FROM drivers WHERE id = $1::uuid AND ${driverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id],
       );
       if (owns.length === 0) {
@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
         created_at
       FROM driver_locations
       WHERE
-        driver_id = $1
+        driver_id = $1::uuid
         AND recorded_at >= NOW() - INTERVAL '${hours} hours'
       ORDER BY recorded_at DESC
       LIMIT $2
