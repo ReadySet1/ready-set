@@ -101,7 +101,7 @@ async function resolveConfig(
         vendorName: dbConfig.vendorName,
         description: dbConfig.description ?? undefined,
         isActive: dbConfig.isActive,
-        pricingTiers: dbConfig.pricingTiers as ClientDeliveryConfiguration['pricingTiers'],
+        pricingTiers: dbConfig.pricingTiers as unknown as ClientDeliveryConfiguration['pricingTiers'],
         mileageRate: parseFloat(dbConfig.mileageRate.toString()),
         distanceThreshold: parseFloat(dbConfig.distanceThreshold.toString()),
         dailyDriveDiscounts:
