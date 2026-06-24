@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   MapPin,
-  Navigation,
   Package,
   StickyNote,
   Store,
@@ -32,6 +31,7 @@ import {
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
+import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 
 /**
  * Driver-specific Delivery Detail.
@@ -120,13 +120,12 @@ function formatAddressLines(addr?: AddressLike | null): string[] {
   return [line1, line2].filter((l) => l.length > 0);
 }
 
-function mapsHref(addr?: AddressLike | null): string | null {
+function addressQuery(addr?: AddressLike | null): string | null {
   if (!addr) return null;
   const q = [addr.street1, addr.street2, addr.city, addr.state, addr.zip]
     .filter(Boolean)
     .join(", ");
-  if (!q) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  return q || null;
 }
 
 interface DriverDeliveryDetailProps {
@@ -355,8 +354,8 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     (order.pickupAddress?.isRestaurant ? "Restaurant" : "Pickup");
   const pickupLines = formatAddressLines(order.pickupAddress);
   const deliveryLines = formatAddressLines(order.deliveryAddress);
-  const pickupMaps = mapsHref(order.pickupAddress);
-  const deliveryMaps = mapsHref(order.deliveryAddress);
+  const pickupQuery = addressQuery(order.pickupAddress);
+  const deliveryQuery = addressQuery(order.deliveryAddress);
 
   return (
     <div className="flex flex-col gap-3 px-2 pb-32">
@@ -425,16 +424,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             <span>{order.pickupNotes}</span>
           </div>
         ) : null}
-        {pickupMaps ? (
-          <a
-            href={pickupMaps}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-driver-touch items-center justify-center gap-2 rounded-xl border border-driver-border bg-driver-surface-alt px-4 text-[13.5px] font-extrabold text-driver-text active:translate-y-px"
-          >
-            <Navigation className="h-4 w-4" strokeWidth={2.4} />
-            Directions to pickup
-          </a>
+        {pickupQuery ? (
+          <NavigateButton
+            target={{ address: pickupQuery }}
+            label="Directions to pickup"
+            className="mt-0.5"
+          />
         ) : null}
       </DriverCard>
 
@@ -473,16 +468,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             <span>{order.specialNotes}</span>
           </div>
         ) : null}
-        {deliveryMaps ? (
-          <a
-            href={deliveryMaps}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-driver-touch items-center justify-center gap-2 rounded-xl border border-driver-border bg-driver-surface-alt px-4 text-[13.5px] font-extrabold text-driver-text active:translate-y-px"
-          >
-            <Navigation className="h-4 w-4" strokeWidth={2.4} />
-            Directions to drop-off
-          </a>
+        {deliveryQuery ? (
+          <NavigateButton
+            target={{ address: deliveryQuery }}
+            label="Directions to drop-off"
+            className="mt-0.5"
+          />
         ) : null}
       </DriverCard>
 

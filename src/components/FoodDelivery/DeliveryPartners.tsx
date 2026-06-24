@@ -85,6 +85,18 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
       alt: "La BBQ logo",
       url: "https://labarbecue.com/#",
     },
+    {
+      name: "CaterCow",
+      image: getCloudinaryUrl("food/partners/catercow"),
+      alt: "CaterCow logo",
+      url: "https://www.catercow.com/",
+    },
+    {
+      name: "FreshRoll",
+      image: getCloudinaryUrl("food/partners/freshroll"),
+      alt: "FreshRoll Vietnamese Rolls & Bowls logo",
+      url: "https://freshroll.square.site/",
+    },
   ];
 
 const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({

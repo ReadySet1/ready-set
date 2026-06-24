@@ -102,6 +102,10 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // painted the dot but never POSTed. Bit iOS Safari specifically (Android's
   // render/callback timing happened to resolve the gate open).
   const isTrackingRef = useRef(false);
+  // Screen wake lock held while a shift is actively tracking, so the device
+  // doesn't sleep mid-delivery (sleeping suspends watchPosition). The browser
+  // auto-releases it when the page is hidden; we re-acquire it on the way back.
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
 
   // Get driver ID from session, cached to avoid repeated /api/auth/session fetches
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -435,6 +439,48 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
   }, []);
 
+  // Acquire a screen wake lock so the device doesn't sleep mid-shift (sleeping
+  // suspends watchPosition). Best-effort: unsupported/denied is non-fatal.
+  const requestWakeLock = useCallback(async () => {
+    try {
+      const nav = navigator as any;
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        nav?.wakeLock?.request
+      ) {
+        wakeLockRef.current = await nav.wakeLock.request('screen');
+      }
+    } catch {
+      /* wake lock denied or unsupported — non-fatal */
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      await wakeLockRef.current?.release();
+    } catch {
+      /* already released — ignore */
+    }
+    wakeLockRef.current = null;
+  }, []);
+
+  // Tear down any existing watch and start a fresh one. Used on return to the
+  // foreground: the OS may have suspended or killed the long-lived watch while
+  // backgrounded (notably iOS Safari), leaving a stale watchId that never fires.
+  const reArmWatch = useCallback(() => {
+    if (!navigator.geolocation) return;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePositionUpdate,
+      handleGeolocationError,
+      HIGH_ACCURACY_OPTIONS,
+    );
+  }, [handlePositionUpdate, handleGeolocationError]);
+
   // Start continuous location tracking
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -462,7 +508,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     // Trigger initial sync on start
     syncOfflineLocations();
 
-      }, [handlePositionUpdate, handleGeolocationError, syncOfflineLocations]);
+    // Keep the screen awake for the active shift (best-effort).
+    void requestWakeLock();
+  }, [handlePositionUpdate, handleGeolocationError, syncOfflineLocations, requestWakeLock]);
 
   // Stop location tracking
   const stopTracking = useCallback(() => {
@@ -488,7 +536,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     cachedDriverIdRef.current = null;
     lastSyncTimeRef.current = 0;
 
-      }, []);
+    // Release the screen wake lock.
+    void releaseWakeLock();
+  }, [releaseWakeLock]);
 
   // Manually update location once
   const updateLocationManually = useCallback(async () => {
@@ -689,52 +739,25 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     loadUnsyncedCount();
   }, []);
 
-  // Handle page visibility changes (pause tracking when hidden)
+  // Re-arm tracking when returning to the foreground. While backgrounded the OS
+  // can suspend or kill the long-lived watchPosition (notably iOS Safari), and the
+  // browser auto-releases the screen wake lock. On the way back we re-arm the
+  // watch, grab an immediate fix, and re-acquire the wake lock so the breadcrumb
+  // trail (and shift mileage) doesn't silently stall after a tab switch.
+  //
+  // NOTE: this does NOT give true background tracking — web JS is suspended while
+  // backgrounded, so points aren't captured until the app is foregrounded again.
+  // Continuous background capture requires the native wrapper (see the
+  // 2026-06-17 native-driver-app spec).
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Skip if component is unmounting or not tracking
-      if (!isMountedRef.current || !isTracking) return;
-
-      if (document.hidden) {
-        // Reduce update frequency when app is in background
-        if (intervalIdRef.current) {
-          clearInterval(intervalIdRef.current);
-          intervalIdRef.current = setInterval(async () => {
-            // Check mounted state before async operations
-            if (!isMountedRef.current) return;
-            try {
-              const position = await getCurrentPosition();
-              if (isMountedRef.current) {
-                await handlePositionUpdate(position);
-              }
-            } catch (error) {
-              // Only log if still mounted (ignore errors during navigation)
-              if (isMountedRef.current) {
-                console.debug('Background location update skipped:', error);
-              }
-            }
-          }, TRACKING_INTERVAL * 2); // Double the interval when in background
-        }
-      } else {
-        // Resume normal frequency when app is visible
-        if (intervalIdRef.current) {
-          clearInterval(intervalIdRef.current);
-          intervalIdRef.current = setInterval(async () => {
-            // Check mounted state before async operations
-            if (!isMountedRef.current) return;
-            try {
-              const position = await getCurrentPosition();
-              if (isMountedRef.current) {
-                await handlePositionUpdate(position);
-              }
-            } catch (error) {
-              // Only log if still mounted (ignore errors during navigation)
-              if (isMountedRef.current) {
-                console.debug('Foreground location update skipped:', error);
-              }
-            }
-          }, TRACKING_INTERVAL);
-        }
+      // Read the live ref, not the captured `isTracking` state, so a tab return
+      // is honored even when the effect closed over a stale value.
+      if (!isMountedRef.current || !isTrackingRef.current) return;
+      if (!document.hidden) {
+        reArmWatch();
+        void updateLocationManually();
+        void requestWakeLock();
       }
     };
 
@@ -742,7 +765,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isTracking, getCurrentPosition, handlePositionUpdate]);
+  }, [reArmWatch, updateLocationManually, requestWakeLock]);
 
   // Listen for geolocation mock state changes (development only)
   // When the location simulator enables/disables the mock, we need to restart our watch
