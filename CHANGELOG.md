@@ -5,6 +5,165 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/ReadySet1/ready-set/compare/v2.2.1...v2.3.0) (2026-06-24)
+
+
+### Added
+
+* add CaterCow and FreshRoll partner logos ([ad9baef](https://github.com/ReadySet1/ready-set/commit/ad9baef40456344a161c863c256b10c65955c7f0))
+* **calculator:** vendor delivery cost estimator with dashboard entry point ([2a9ac88](https://github.com/ReadySet1/ready-set/commit/2a9ac88d5e61235f891c2eeb3c3b07c6ebbd5a81))
+* **driver:** clearer Navigate button + choose maps app (Waze/Google/Apple) ([7e9424c](https://github.com/ReadySet1/ready-set/commit/7e9424c8779a0eb16035b366ae572562f17dd810))
+* **driver:** clearer Navigate button + choose maps app (Waze/Google/Apple) ([823ed42](https://github.com/ReadySet1/ready-set/commit/823ed42f1c709874c5aa15957411fffa39fa12cd))
+* **driver:** require a vendor-staff signature at pickup ([66285a5](https://github.com/ReadySet1/ready-set/commit/66285a599e5e2ac55c40eac6424700875009eeba))
+* **driver:** require a vendor-staff signature at pickup ([fc87310](https://github.com/ReadySet1/ready-set/commit/fc87310f59fa0eef36f6213380a55e0857021534))
+
+
+### Fixed
+
+* **auth:** redirect to /sign-in (not the 404 /auth/login) on session expiry ([f93597a](https://github.com/ReadySet1/ready-set/commit/f93597a56709f0c51c6b5829f9ad70178f249962))
+* **auth:** redirect to /sign-in (not the 404 /auth/login) on session expiry ([c995445](https://github.com/ReadySet1/ready-set/commit/c995445046a9bea0b790c6649bbeca858ee7608b))
+* **build:** raise Next build heap ceiling 4GB-&gt;6GB to stop Vercel OOM ([7dc190d](https://github.com/ReadySet1/ready-set/commit/7dc190d733f8f6d9d94ad251dc8b20c9dc394ac2))
+* **build:** raise Next build heap ceiling 4GB→6GB to stop Vercel OOM ([f87373c](https://github.com/ReadySet1/ready-set/commit/f87373c388abe52b288040cb6c17a7c148f03b3d))
+* **calculator:** resolve TS2352 on Prisma JSON→PricingTier cast ([0bed57f](https://github.com/ReadySet1/ready-set/commit/0bed57fd07c2a41efa48b095ff8591760ec58f18))
+* **calculator:** review fixes — stale test, log sanitization, DRY constant ([d7c89ba](https://github.com/ReadySet1/ready-set/commit/d7c89ba8e47ffc84a0d2b10ad837b9ee46172c1c))
+* driver-history authz + runnable driver e2e suite ([2e53178](https://github.com/ReadySet1/ready-set/commit/2e5317805fa3a0fa12b49f7f422d0865264095ac))
+* **driver:** atomic order completion + remove dead tracking actions ([ebbffc2](https://github.com/ReadySet1/ready-set/commit/ebbffc23437cb35a521fbdcab09363caa880507c))
+* **driver:** cast driver_id to ::uuid in driver_locations INSERT ([ed9b012](https://github.com/ReadySet1/ready-set/commit/ed9b0126f41201e98f31a6e1b3275bfbb06c5c7c))
+* **driver:** cast driver_id to ::uuid in driver_locations INSERT (re-walk follow-up to [#451](https://github.com/ReadySet1/ready-set/issues/451)) ([55f7b2b](https://github.com/ReadySet1/ready-set/commit/55f7b2b69e925aa5c6da356f59663b534bac3a79))
+* **driver:** cast uuid params in tracking locations route ([5a13e20](https://github.com/ReadySet1/ready-set/commit/5a13e20773aa80934bf201f3f682876358791489))
+* **driver:** cast uuid params in tracking locations route (GPS writes were 500'ing) ([017bfff](https://github.com/ReadySet1/ready-set/commit/017bfffa1af2d95d409f8603dfc5f2acba037f33))
+* **driver:** complete orders correctly + close status-PATCH IDOR ([5ec100c](https://github.com/ReadySet1/ready-set/commit/5ec100ce08df1e21d34f596591cbd00da60570bf))
+* **driver:** correct CateringStatus enum casing in driver stats ([ce8a59b](https://github.com/ReadySet1/ready-set/commit/ce8a59be1a0fa5f126b85aa2df6ab81aa8674de7))
+* **driver:** gate GPS sync on a ref so iOS Safari posts locations ([0e0bf45](https://github.com/ReadySet1/ready-set/commit/0e0bf45aa9e0cd6adfc7e257c4304f4feb30f54b))
+* **driver:** gate GPS sync on a ref so iOS Safari posts locations ([2a4a01f](https://github.com/ReadySet1/ready-set/commit/2a4a01f8e8b576c79f2321eedd73f4891671f108))
+* **driver:** harden foreground GPS persistence (wake lock + re-arm + flush) ([b39e9f2](https://github.com/ReadySet1/ready-set/commit/b39e9f26922db4b9ab0ed212b40d7e7dd4dc65c3))
+* **driver:** harden foreground GPS persistence (wake lock + re-arm + flush) ([57cab14](https://github.com/ReadySet1/ready-set/commit/57cab14fc820374c5c643afabca1a32fdaac9c16))
+* **driver:** Live-Tracking reads the orders feed (single source of truth) ([13b64f3](https://github.com/ReadySet1/ready-set/commit/13b64f3d8522cd4b8945e56f8776be0e9bb291f2))
+* **driver:** make order completion atomic + sync mirror driver_id ([b19acdb](https://github.com/ReadySet1/ready-set/commit/b19acdb4632adbb3004744ba5a9efef6a0b54d5a))
+* **driver:** persist GPS + run shift start/end/active via API routes ([859a195](https://github.com/ReadySet1/ready-set/commit/859a1959272e2ad18fc24ea5c99b6d70563ecdec))
+* **driver:** resolve admin connecting hang, status-label and empty-state bugs ([b3f4808](https://github.com/ReadySet1/ready-set/commit/b3f48088fc30cd50c684cf99a3f5243b9c4272aa))
+* **driver:** unblock proof-of-delivery and shift completion ([c1b8381](https://github.com/ReadySet1/ready-set/commit/c1b838146c9608b1dc172df2077f113289961b21))
+* **driver:** unify tracking on the orders system + restore GPS/shift reliability ([1022a9a](https://github.com/ReadySet1/ready-set/commit/1022a9a74baadf74b67c640d985df1700a5d9585))
+* **driver:** walk-test blockers — POD upload, end-shift guard, Connecting hang, labels & empty states ([37066f4](https://github.com/ReadySet1/ready-set/commit/37066f48cc73d73b0280d3a407c2b956b0ca5ff9))
+
+
+### Security
+
+* clear npm-audit HIGH vulnerabilities via pnpm overrides ([ede8985](https://github.com/ReadySet1/ready-set/commit/ede8985f5d59f3a05ac16658b536a00b5f8ba289))
+
+
+### Changed
+
+* **driver:** remove dead tracking Server Actions ([cc3c833](https://github.com/ReadySet1/ready-set/commit/cc3c833131f6d006e7102e57f8e21722f66103c0))
+
+
+### Documentation
+
+* mark driver-tracking follow-ups complete ([e989c53](https://github.com/ReadySet1/ready-set/commit/e989c533c1e9442754a5c67f59a5ec36a57874dd))
+* track deferred driver-tracking follow-ups ([76303a9](https://github.com/ReadySet1/ready-set/commit/76303a98179ce8a2288ae6d441062e0f165d7157))
+
+## [2.2.1](https://github.com/ReadySet1/ready-set/compare/v2.2.0...v2.2.1) (2026-06-12)
+
+
+### Fixed
+
+* accept profile_id linkage in driver ownership checks ([8670e76](https://github.com/ReadySet1/ready-set/commit/8670e76ea94d97d9edd12e5003cdcc981b7ff184))
+* backfill and sync the drivers auth-link columns ([1c5da15](https://github.com/ReadySet1/ready-set/commit/1c5da154877c01e2721f36624604d4f4d33db561))
+* driver "Access denied" — ownership via profile_id linkage + tracking authz hardening ([397ea96](https://github.com/ReadySet1/ready-set/commit/397ea96f176cb785f22e026a9af83bffc3b7c447))
+* keep the POD sheet open on failed status update; de-dupe banner keys ([c028a50](https://github.com/ReadySet1/ready-set/commit/c028a50c4cab6069ab2e147241ad028d0de8fc06))
+* surface delivery status-update failures in the driver tracking UI ([0435f37](https://github.com/ReadySet1/ready-set/commit/0435f3717b581802e6a3bf973a679392e9f062b1))
+
+
+### Security
+
+* harden tracking authz paths from pre-landing review findings ([23c1486](https://github.com/ReadySet1/ready-set/commit/23c14862ed9f6d6ec73fc8142f93a024a1726dec))
+* require caller ownership in driver tracking server actions ([83e54db](https://github.com/ReadySet1/ready-set/commit/83e54db393331ef8ecd758c6ce59b39cf7b87fd8))
+* validate delivery status server-side and make completion idempotent ([7058069](https://github.com/ReadySet1/ready-set/commit/7058069a312cdc172aa443d014de7cda93350971))
+
+
+### Documentation
+
+* changelog entry for the driver ownership/authz overhaul ([8d4ee73](https://github.com/ReadySet1/ready-set/commit/8d4ee73cdb527059ae62ef87c818492b329b885c))
+* document the driver-ownership authz module and server-action auth convention ([420d36f](https://github.com/ReadySet1/ready-set/commit/420d36fb589653b5f0231fa28db9ce88e5a1e789))
+
+## [2.2.0](https://github.com/ReadySet1/ready-set/compare/v2.1.0...v2.2.0) (2026-06-09)
+
+
+### Added
+
+* add admin technical changelog page ([787de4a](https://github.com/ReadySet1/ready-set/commit/787de4a73932525de06e1576cfea23b4405c4eff))
+* add automated SMS reminders for driver deliveries ([42769ac](https://github.com/ReadySet1/ready-set/commit/42769ac0b1a79e05f20bfd24cbcb14f55ac21ad7))
+* add commit-trailer changelog extractor + release-please wiring ([6631f37](https://github.com/ReadySet1/ready-set/commit/6631f3709fe186b18c4fbd10eb8a0eb8568daa73))
+* add public changelog page and what's new badge ([20799b6](https://github.com/ReadySet1/ready-set/commit/20799b67294ea4917059edc8fbe3cd24d67da152))
+* add v2 design token foundation (additive, no visual changes) ([d5414e0](https://github.com/ReadySet1/ready-set/commit/d5414e021515ffe1ff55d42309212eb62a4b21b3))
+* add v2 design token foundation (PR-A, additive, no visual changes) ([9c53fc6](https://github.com/ReadySet1/ready-set/commit/9c53fc62d063c56b20eb71192fe4303b94e6d5d3))
+* **apply:** require equipment photo for driver role ([b33a2f5](https://github.com/ReadySet1/ready-set/commit/b33a2f553f20f708ae611b7fa4089a1533672c46))
+* **apply:** require equipment photo for driver role (client + server) ([17954c7](https://github.com/ReadySet1/ready-set/commit/17954c7a95d513a645a09355759010b4709391f7))
+* driver app mobile-first redesign ([e0e5d98](https://github.com/ReadySet1/ready-set/commit/e0e5d9849c10a66d76f9d5ad2a4248f3fd83251a))
+* driver app theme foundations (scoped tokens + tailwind) ([bea97cb](https://github.com/ReadySet1/ready-set/commit/bea97cba2892fcf12dcbb86fa3ae4a68511d0051))
+* driver UI primitive kit ([44ed295](https://github.com/ReadySet1/ready-set/commit/44ed295e13fff2ac638c7239dce8702804753699))
+* driver-native delivery detail view ([6710c9a](https://github.com/ReadySet1/ready-set/commit/6710c9a1f7187620712f5f5388ec74356c8e1ed7))
+* dual changelog — public What's New page, admin technical changelog, localStorage badge, commit-trailer automation ([e2d0aa9](https://github.com/ReadySet1/ready-set/commit/e2d0aa9bb9ea99425fd5a7de80312636f609e40b))
+* implement SEO improvements (P0–P3) ([8bdb97e](https://github.com/ReadySet1/ready-set/commit/8bdb97e9f649af1c627652565eb625b22b4d7bec))
+* **lib:** add devOnlyGuard() helper ([bb90e50](https://github.com/ReadySet1/ready-set/commit/bb90e500ff9d8b8d49b72d5d5fe11080f1e999e5))
+* outbound partner status webhooks + GET /orders/{id} (CaterCow integration) ([e3594cf](https://github.com/ReadySet1/ready-set/commit/e3594cf17d918ebb16629150629ae83f1dd3c517))
+* outbound partner status webhooks + GET /orders/{id} for partner API ([50d7887](https://github.com/ReadySet1/ready-set/commit/50d788733deaa8fab6ed69772257df8bce7a40b1))
+* redesign AddressSelector with RouteBuilder, MiniMap & geocoding ([837687b](https://github.com/ReadySet1/ready-set/commit/837687b6e54e469592816bc29377a6263dfc4314))
+* redesign driver app screens (home, tracking, history, training) ([38906c7](https://github.com/ReadySet1/ready-set/commit/38906c7d0e12eb17245e98133c40cec21984b259))
+* **security:** gate debug + test routes with devOnlyGuard + SUPER_ADMIN ([8b99c35](https://github.com/ReadySet1/ready-set/commit/8b99c357525f8367edc0d2c4a68c2acbd3827a11))
+* SEO improvements — metadata, structured data, sitemap ([5831b5e](https://github.com/ReadySet1/ready-set/commit/5831b5e225039b1eb06b51c23708f40c22423e27))
+
+
+### Fixed
+
+* **auth:** bridge SSR cookie to browser supabase-js session (REA-DRT-07) ([649d15c](https://github.com/ReadySet1/ready-set/commit/649d15c4bb39c146dfa9af1b9cf15a2baf059f51))
+* **auth:** catch fire-and-forget token refresh rejections ([06afb52](https://github.com/ReadySet1/ready-set/commit/06afb522086032ae44b4fd28c477dc5071253df2))
+* **auth:** catch fire-and-forget token refresh rejections and force re-auth ([83051ce](https://github.com/ReadySet1/ready-set/commit/83051ce29d98e8d58c83782369fb13162e825599))
+* **auth:** drop httpOnly from Supabase auth cookies so browser session bridges (REA-DRT-07) ([a463e3f](https://github.com/ReadySet1/ready-set/commit/a463e3f0dfdc63218258e2e5230ebcc428b9e454))
+* **build:** inline app version via next.config env, not JSON import ([5c22902](https://github.com/ReadySet1/ready-set/commit/5c22902d7e4a82d55f5959ac1529d778e4077014))
+* bundle Prisma query engine into standalone output (GHCR image) ([a963d07](https://github.com/ReadySet1/ready-set/commit/a963d07326a389c554bb6b27c2897a0e608cc6f0))
+* bundle Prisma query engine into standalone output for the GHCR image ([8c65a41](https://github.com/ReadySet1/ready-set/commit/8c65a41990f0e236827763e78d8e40a545ba079f))
+* don't flash a connection error on the SSE stream's planned 50s rotation ([8f385f1](https://github.com/ReadySet1/ready-set/commit/8f385f14c5c299eb523ce88d7989e54a9c4e20eb))
+* driver route resilience — error boundary + graceful history fallback ([aa05d23](https://github.com/ReadySet1/ready-set/commit/aa05d23476b8f7e228d71850f31db775de7616eb))
+* driver route resilience — error boundary + graceful history fallback ([0855f33](https://github.com/ReadySet1/ready-set/commit/0855f334dbc93970ddb0228c1c93d52fb9e742c6))
+* escape `*/` in CSS comment that prematurely closed the comment block ([9ed7e36](https://github.com/ReadySet1/ready-set/commit/9ed7e36798beb7346fbc146bca3a977f74ea807f))
+* harden JSON-LD and correct BlogPosting datePublished ([ed4dc17](https://github.com/ReadySet1/ready-set/commit/ed4dc1723816116e568327f700ed042e9a79555a))
+* **health:** read version from package.json at build time ([3efe2f0](https://github.com/ReadySet1/ready-set/commit/3efe2f03667cfbec731bf63442b8be23fe27f94e))
+* rate-limit driver location writes (abuse protection) ([d8e0814](https://github.com/ReadySet1/ready-set/commit/d8e0814891780f4f925cf041fd01af680a78499c))
+* read package.json once at next.config.js load time and expose just the version string via the env block (next inlines env entries as build-time string literals). /api/health now reads process.env.APP_VERSION, which is the single string '2.1.0' baked in at build time — no JSON in the bundle. ([5c22902](https://github.com/ReadySet1/ready-set/commit/5c22902d7e4a82d55f5959ac1529d778e4077014))
+* **realtime:** stop calling non-existent channel.off() (REA-367) ([3735ed8](https://github.com/ReadySet1/ready-set/commit/3735ed846632c5b2a1fd6b1b56260716af622f46))
+* **realtime:** stop calling non-existent channel.off(); stable broadcast dispatcher (REA-367) ([7f6d82c](https://github.com/ReadySet1/ready-set/commit/7f6d82cbab2d2f24f6b1db747fd6f107e161f905))
+* retry Supabase Realtime CHANNEL_ERROR with backoff, downgrade Sentry noise ([3a8e686](https://github.com/ReadySet1/ready-set/commit/3a8e686b516129b33fde26d8e6ad1db732b21129))
+* route driver-tracking endpoints through the shared pooled Prisma client ([4d4ad94](https://github.com/ReadySet1/ready-set/commit/4d4ad94f730d7ecc671e7d5cbe13ddd1a7e539d2))
+* route driver-tracking endpoints through the shared pooled Prisma client ([1904914](https://github.com/ReadySet1/ready-set/commit/1904914956eea2fecf61b3bc240e8146c9be9a14))
+* silence Sentry tracking noise (NEXTJS-1F) + fix 3 stale test suites ([1d96e0b](https://github.com/ReadySet1/ready-set/commit/1d96e0b938efa505eaf03166d3cbcb066ac66d20))
+* silence Supabase auth lock 'steal' AbortError noise in Sentry ([67cc490](https://github.com/ReadySet1/ready-set/commit/67cc490b9630f253468b685e2cb69c8690ee1703))
+* silence Supabase auth lock "steal" AbortError noise in Sentry ([42e9486](https://github.com/ReadySet1/ready-set/commit/42e9486983f9dd512ead38c659b0a5fb849f2ec0))
+* single-source the driver home deliveries count and list ([1e2b304](https://github.com/ReadySet1/ready-set/commit/1e2b30485135c3c4964007390dbfa6bcb2929b9f))
+* single-source the driver home deliveries count and list ([e152263](https://github.com/ReadySet1/ready-set/commit/e15226345df4330f306b8ad8f465b64018cb8a2f))
+* stop /api/tracking/live SSE from hitting Vercel runtime timeout ([514a3e3](https://github.com/ReadySet1/ready-set/commit/514a3e3bcf6ed3000edabbd560e287c089bc390f))
+* stop /api/tracking/live SSE from hitting Vercel runtime timeout ([fefc81d](https://github.com/ReadySet1/ready-set/commit/fefc81d499b3bfe8e108a99ce2ec5d84af9aeff5))
+* tag Sentry environment correctly so dev deploys stop reporting as production ([72eb586](https://github.com/ReadySet1/ready-set/commit/72eb586f847ae605654ec1d000346207815ce48b))
+
+
+### Security
+
+* harden driver tracking routes against IDOR + SQL injection (OWASP A01/A03) ([79ac13a](https://github.com/ReadySet1/ready-set/commit/79ac13a35ee839de3d6c6b957da873e32491fd90))
+
+
+### Changed
+
+* drop no-op CHANNEL_ERROR backoff delay, correct retry comment ([7ddd862](https://github.com/ReadySet1/ready-set/commit/7ddd862a8b838e30bd6e0610136ec883764e0879))
+* refit Shadcn display atoms to v2 token system (batch 1b) ([9eef4d4](https://github.com/ReadySet1/ready-set/commit/9eef4d446120d92a2d4d1c2f88d54ab3ed71047f))
+* refit Shadcn form atoms to v2 token system (batch 1a) ([167a28f](https://github.com/ReadySet1/ready-set/commit/167a28fd1769396ba39c4fa1cfc22bf495ea5b12))
+* remove legacy driver components superseded by the redesign ([548e3c4](https://github.com/ReadySet1/ready-set/commit/548e3c45aa90fdbbfad67cb873684d685ead3b74))
+
+
+### Documentation
+
+* **claude:** add Versioning section covering release-please flow ([b866ffc](https://github.com/ReadySet1/ready-set/commit/b866ffc864a5af52040d71d86156f1be7952a59f))
+* introduce ARCHITECTURE.md + REMEDIATION_PLAN.md, mark item [#4](https://github.com/ReadySet1/ready-set/issues/4) shipped ([19b1590](https://github.com/ReadySet1/ready-set/commit/19b15907ea8116e4e49e505241a95953e9e20e7f))
+
 ## [Unreleased]
 
 ### Fixed
