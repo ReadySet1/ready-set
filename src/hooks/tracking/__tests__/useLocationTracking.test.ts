@@ -339,6 +339,66 @@ describe('useLocationTracking', () => {
     });
   });
 
+  describe('wake lock + foreground re-arm (Track C)', () => {
+    it('acquires a screen wake lock on start and releases it on stop', async () => {
+      const release = jest.fn().mockResolvedValue(undefined);
+      const request = jest.fn().mockResolvedValue({ release });
+      mockNavigatorProperty('wakeLock', { request });
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(request).toHaveBeenCalledWith('screen'));
+
+      // Let the wakeLockRef assignment settle before tearing down.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        result.current.stopTracking();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(release).toHaveBeenCalled());
+    });
+
+    it('re-arms watchPosition when returning to the foreground while tracking', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      (navigator.geolocation.clearWatch as jest.Mock).mockClear();
+      const watchCallsBefore = (navigator.geolocation.watchPosition as jest.Mock).mock.calls.length;
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // Stale watch cleared + a fresh watch armed.
+      expect(navigator.geolocation.clearWatch).toHaveBeenCalled();
+      expect(
+        (navigator.geolocation.watchPosition as jest.Mock).mock.calls.length,
+      ).toBeGreaterThan(watchCallsBefore);
+    });
+
+    it('does not re-arm on a visibility change when not tracking', async () => {
+      renderHook(() => useLocationTracking());
+
+      (navigator.geolocation.clearWatch as jest.Mock).mockClear();
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(navigator.geolocation.clearWatch).not.toHaveBeenCalled();
+    });
+  });
+
   describe('stopTracking', () => {
     it('should stop watching position when stopTracking is called', async () => {
       const { result } = renderHook(() => useLocationTracking());
