@@ -32,6 +32,7 @@ import {
   getStatusProgress,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 
 interface PodTarget {
   deliveryId: string;
@@ -397,15 +398,7 @@ export default function DriverTrackingPortal() {
                       )}
 
                       {typeof lat === "number" && typeof lng === "number" ? (
-                        <a
-                          href={`https://maps.google.com/?q=${lat},${lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-driver-on-brand"
-                        >
-                          <Navigation2 className="h-3.5 w-3.5" />
-                          Navigate
-                        </a>
+                        <NavigateButton target={{ lat, lng }} label="Navigate" />
                       ) : null}
                     </DriverCard>
                   );
