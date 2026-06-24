@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/ReadySet1/ready-set/compare/v2.2.1...v2.3.0) (2026-06-24)
+
+
+### Added
+
+* add CaterCow and FreshRoll partner logos ([ad9baef](https://github.com/ReadySet1/ready-set/commit/ad9baef40456344a161c863c256b10c65955c7f0))
+* **calculator:** vendor delivery cost estimator with dashboard entry point ([2a9ac88](https://github.com/ReadySet1/ready-set/commit/2a9ac88d5e61235f891c2eeb3c3b07c6ebbd5a81))
+* **driver:** clearer Navigate button + choose maps app (Waze/Google/Apple) ([7e9424c](https://github.com/ReadySet1/ready-set/commit/7e9424c8779a0eb16035b366ae572562f17dd810))
+* **driver:** clearer Navigate button + choose maps app (Waze/Google/Apple) ([823ed42](https://github.com/ReadySet1/ready-set/commit/823ed42f1c709874c5aa15957411fffa39fa12cd))
+* **driver:** require a vendor-staff signature at pickup ([66285a5](https://github.com/ReadySet1/ready-set/commit/66285a599e5e2ac55c40eac6424700875009eeba))
+* **driver:** require a vendor-staff signature at pickup ([fc87310](https://github.com/ReadySet1/ready-set/commit/fc87310f59fa0eef36f6213380a55e0857021534))
+
+
+### Fixed
+
+* **auth:** redirect to /sign-in (not the 404 /auth/login) on session expiry ([f93597a](https://github.com/ReadySet1/ready-set/commit/f93597a56709f0c51c6b5829f9ad70178f249962))
+* **auth:** redirect to /sign-in (not the 404 /auth/login) on session expiry ([c995445](https://github.com/ReadySet1/ready-set/commit/c995445046a9bea0b790c6649bbeca858ee7608b))
+* **build:** raise Next build heap ceiling 4GB-&gt;6GB to stop Vercel OOM ([7dc190d](https://github.com/ReadySet1/ready-set/commit/7dc190d733f8f6d9d94ad251dc8b20c9dc394ac2))
+* **build:** raise Next build heap ceiling 4GB→6GB to stop Vercel OOM ([f87373c](https://github.com/ReadySet1/ready-set/commit/f87373c388abe52b288040cb6c17a7c148f03b3d))
+* **calculator:** resolve TS2352 on Prisma JSON→PricingTier cast ([0bed57f](https://github.com/ReadySet1/ready-set/commit/0bed57fd07c2a41efa48b095ff8591760ec58f18))
+* **calculator:** review fixes — stale test, log sanitization, DRY constant ([d7c89ba](https://github.com/ReadySet1/ready-set/commit/d7c89ba8e47ffc84a0d2b10ad837b9ee46172c1c))
+* driver-history authz + runnable driver e2e suite ([2e53178](https://github.com/ReadySet1/ready-set/commit/2e5317805fa3a0fa12b49f7f422d0865264095ac))
+* **driver:** atomic order completion + remove dead tracking actions ([ebbffc2](https://github.com/ReadySet1/ready-set/commit/ebbffc23437cb35a521fbdcab09363caa880507c))
+* **driver:** cast driver_id to ::uuid in driver_locations INSERT ([ed9b012](https://github.com/ReadySet1/ready-set/commit/ed9b0126f41201e98f31a6e1b3275bfbb06c5c7c))
+* **driver:** cast driver_id to ::uuid in driver_locations INSERT (re-walk follow-up to [#451](https://github.com/ReadySet1/ready-set/issues/451)) ([55f7b2b](https://github.com/ReadySet1/ready-set/commit/55f7b2b69e925aa5c6da356f59663b534bac3a79))
+* **driver:** cast uuid params in tracking locations route ([5a13e20](https://github.com/ReadySet1/ready-set/commit/5a13e20773aa80934bf201f3f682876358791489))
+* **driver:** cast uuid params in tracking locations route (GPS writes were 500'ing) ([017bfff](https://github.com/ReadySet1/ready-set/commit/017bfffa1af2d95d409f8603dfc5f2acba037f33))
+* **driver:** complete orders correctly + close status-PATCH IDOR ([5ec100c](https://github.com/ReadySet1/ready-set/commit/5ec100ce08df1e21d34f596591cbd00da60570bf))
+* **driver:** correct CateringStatus enum casing in driver stats ([ce8a59b](https://github.com/ReadySet1/ready-set/commit/ce8a59be1a0fa5f126b85aa2df6ab81aa8674de7))
+* **driver:** gate GPS sync on a ref so iOS Safari posts locations ([0e0bf45](https://github.com/ReadySet1/ready-set/commit/0e0bf45aa9e0cd6adfc7e257c4304f4feb30f54b))
+* **driver:** gate GPS sync on a ref so iOS Safari posts locations ([2a4a01f](https://github.com/ReadySet1/ready-set/commit/2a4a01f8e8b576c79f2321eedd73f4891671f108))
+* **driver:** harden foreground GPS persistence (wake lock + re-arm + flush) ([b39e9f2](https://github.com/ReadySet1/ready-set/commit/b39e9f26922db4b9ab0ed212b40d7e7dd4dc65c3))
+* **driver:** harden foreground GPS persistence (wake lock + re-arm + flush) ([57cab14](https://github.com/ReadySet1/ready-set/commit/57cab14fc820374c5c643afabca1a32fdaac9c16))
+* **driver:** Live-Tracking reads the orders feed (single source of truth) ([13b64f3](https://github.com/ReadySet1/ready-set/commit/13b64f3d8522cd4b8945e56f8776be0e9bb291f2))
+* **driver:** make order completion atomic + sync mirror driver_id ([b19acdb](https://github.com/ReadySet1/ready-set/commit/b19acdb4632adbb3004744ba5a9efef6a0b54d5a))
+* **driver:** persist GPS + run shift start/end/active via API routes ([859a195](https://github.com/ReadySet1/ready-set/commit/859a1959272e2ad18fc24ea5c99b6d70563ecdec))
+* **driver:** resolve admin connecting hang, status-label and empty-state bugs ([b3f4808](https://github.com/ReadySet1/ready-set/commit/b3f48088fc30cd50c684cf99a3f5243b9c4272aa))
+* **driver:** unblock proof-of-delivery and shift completion ([c1b8381](https://github.com/ReadySet1/ready-set/commit/c1b838146c9608b1dc172df2077f113289961b21))
+* **driver:** unify tracking on the orders system + restore GPS/shift reliability ([1022a9a](https://github.com/ReadySet1/ready-set/commit/1022a9a74baadf74b67c640d985df1700a5d9585))
+* **driver:** walk-test blockers — POD upload, end-shift guard, Connecting hang, labels & empty states ([37066f4](https://github.com/ReadySet1/ready-set/commit/37066f48cc73d73b0280d3a407c2b956b0ca5ff9))
+
+
+### Security
+
+* clear npm-audit HIGH vulnerabilities via pnpm overrides ([ede8985](https://github.com/ReadySet1/ready-set/commit/ede8985f5d59f3a05ac16658b536a00b5f8ba289))
+
+
+### Changed
+
+* **driver:** remove dead tracking Server Actions ([cc3c833](https://github.com/ReadySet1/ready-set/commit/cc3c833131f6d006e7102e57f8e21722f66103c0))
+
+
+### Documentation
+
+* mark driver-tracking follow-ups complete ([e989c53](https://github.com/ReadySet1/ready-set/commit/e989c533c1e9442754a5c67f59a5ec36a57874dd))
+* track deferred driver-tracking follow-ups ([76303a9](https://github.com/ReadySet1/ready-set/commit/76303a98179ce8a2288ae6d441062e0f165d7157))
+
 ## [2.2.1](https://github.com/ReadySet1/ready-set/compare/v2.2.0...v2.2.1) (2026-06-12)
 
 
