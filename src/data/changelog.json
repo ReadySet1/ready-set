@@ -3,6 +3,54 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.3.0",
+      "date": "2026-06-24",
+      "title": "Release 2.3.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Fixed a broken redirect that sent you to a 404 page instead of the sign-in screen when your session expired.",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver location tracking is steadier — your trail keeps recording after switching apps or tabs, and full mileage is saved when a shift ends.",
+          "type": "improved"
+        },
+        {
+          "text": "Drivers now capture the restaurant's signature when they pick up an order, for accountability.",
+          "type": "new"
+        },
+        {
+          "text": "Drivers can now choose their preferred maps app (Google Maps, Apple Maps, or Waze) for navigation, and the Navigate button is easier to find.",
+          "type": "improved"
+        },
+        {
+          "text": "Driver location tracking now works on iPhone (Safari), not just Android.",
+          "type": "fixed"
+        },
+        {
+          "text": "Live driver tracking now records GPS location again during a shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver app: your live tracking, delivery progress, and proof-of-delivery now stay in sync across every screen, and the map shows the real order number.",
+          "type": "fixed"
+        },
+        {
+          "text": "Fixed a stuck Connecting indicator on the admin order page, plus clearer driver status labels and tidier empty states.",
+          "type": "fixed"
+        },
+        {
+          "text": "Proof-of-delivery photos now upload reliably, and if the photo cannot upload you can still finish the delivery and it syncs in the background.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.3.0"
+      }
+    },
+    {
       "version": "2.2.1",
       "date": "2026-06-12",
       "title": "Release 2.2.1",
