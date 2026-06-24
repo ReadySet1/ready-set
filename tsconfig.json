@@ -68,6 +68,7 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/__tests__/**",
-    "scripts/migrate-images-to-cloudinary.ts"
+    "scripts/migrate-images-to-cloudinary.ts",
+    "native"
   ]
 }
