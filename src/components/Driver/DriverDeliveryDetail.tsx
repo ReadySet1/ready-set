@@ -31,6 +31,7 @@ import {
   resolveDriverStatus,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 
 /**
  * Driver-specific Delivery Detail.
@@ -141,6 +142,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [notFound, setNotFound] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [podOpen, setPodOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
 
   // Cache the session per mount cycle to reduce auth-lock contention (same
   // pattern SingleOrder uses).
@@ -280,12 +282,18 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     [order, getValidSession, router],
   );
 
-  /** Next-Action handler: POD-gate the final step, otherwise advance. */
+  /** Next-Action handler: gate the signature (pickup) + POD (delivery) steps,
+   *  otherwise advance. */
   const handleNextAction = useCallback(() => {
     if (!order) return;
     const current = order.driverStatus as DriverStatus | undefined;
     const next = current ? getNextStatus(current) : DriverStatus.ASSIGNED;
     if (!next) return;
+    // Require a vendor-staff signature before marking the pickup done.
+    if (current === DriverStatus.ARRIVED_AT_VENDOR && next === DriverStatus.PICKED_UP) {
+      setSignatureOpen(true);
+      return;
+    }
     // Require proof of delivery before completing.
     if (current === DriverStatus.ARRIVED_TO_CLIENT && next === DriverStatus.COMPLETED) {
       setPodOpen(true);
@@ -293,6 +301,11 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     }
     void advanceStatus(next);
   }, [order, advanceStatus]);
+
+  const onSignatureComplete = useCallback(async () => {
+    setSignatureOpen(false);
+    await advanceStatus(DriverStatus.PICKED_UP);
+  }, [advanceStatus]);
 
   const onPodComplete = useCallback(async () => {
     setPodOpen(false);
@@ -521,6 +534,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           )}
         </div>
       </div>
+
+      {signatureOpen ? (
+        <DriverSignatureSheet
+          open={signatureOpen}
+          onOpenChange={setSignatureOpen}
+          orderNumber={order.orderNumber}
+          onComplete={onSignatureComplete}
+        />
+      ) : null}
 
       {podOpen ? (
         <DriverPodSheet
