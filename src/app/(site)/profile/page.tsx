@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useUser } from "@/contexts/UserContext";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import {
   X,
   Shield,
   Calendar,
+  Calculator,
   Clock,
   FileText,
   Settings,
@@ -52,6 +54,14 @@ import {
   PasswordChangeModal,
   PasswordChangeSuccessModal,
 } from "@/components/Profile";
+
+const VendorCalculatorCard = dynamic(
+  () => import("@/components/calculator/VendorCalculatorCard"),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-96 w-full rounded-2xl" />,
+  }
+);
 
 interface UserProfile {
   id: string;
@@ -1599,6 +1609,23 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Vendor Delivery Cost Estimator */}
+        {profile.type === "VENDOR" && (
+          <div className="mt-8">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 p-6">
+                <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
+                  <Calculator className="h-5 w-5 text-emerald-600" />
+                  Delivery Cost Estimator
+                </h2>
+              </div>
+              <div className="p-6">
+                <VendorCalculatorCard />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Password Change Modals */}
         <PasswordChangeModal

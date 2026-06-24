@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import {
+  Calculator,
   Calendar,
   Clock,
   DollarSign,
@@ -522,7 +523,7 @@ const ClientDashboardSkeleton: React.FC = () => (
   </div>
 );
 
-const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
+const ClientDashboardContent = ({ data, userRole }: { data: ClientDashboardData; userRole?: string }) => {
   const hasRecentOrders = data.recentOrders.length > 0;
 
   // Format currency for display
@@ -738,6 +739,23 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
               </div>
             </Link>
 
+            {userRole?.toUpperCase() === "VENDOR" && (
+              <Link
+                href="/client/calculator"
+                className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+              >
+                <div className="mr-3 rounded-md bg-teal-50 p-2">
+                  <Calculator className="h-5 w-5 text-teal-600" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Delivery Cost Estimator</h4>
+                  <p className="text-xs text-gray-500">
+                    Estimate your delivery cost
+                  </p>
+                </div>
+              </Link>
+            )}
+
             <Link
               href="/addresses"
               className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
@@ -848,7 +866,7 @@ const ClientPage = async () => {
           </p>
 
           <Suspense fallback={<ClientDashboardSkeleton />}>
-            <ClientDashboardContent data={dashboardData} />
+            <ClientDashboardContent data={dashboardData} userRole={userRole} />
           </Suspense>
         </div>
       </div>

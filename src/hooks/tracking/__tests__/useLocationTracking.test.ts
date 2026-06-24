@@ -1,10 +1,9 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useLocationTracking } from '../useLocationTracking';
 
-// Mock the server action
-jest.mock('@/app/actions/tracking/driver-actions', () => ({
-  updateDriverLocation: jest.fn(),
-}));
+// The hook no longer uses the updateDriverLocation Server Action; it POSTs each
+// location to the /api/tracking/locations route. Location sync is therefore
+// driven and asserted through the global.fetch routing mock below.
 
 // Mock the location store
 const mockLocationStore = {
@@ -23,10 +22,7 @@ jest.mock('@/utils/indexedDB/locationStore', () => ({
 }));
 
 // Import mocked modules
-import { updateDriverLocation } from '@/app/actions/tracking/driver-actions';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
-
-const mockUpdateDriverLocation = updateDriverLocation as jest.MockedFunction<typeof updateDriverLocation>;
 
 // Helper to mock navigator properties
 const mockNavigatorProperty = (property: string, value: unknown) => {
@@ -72,6 +68,32 @@ describe('useLocationTracking', () => {
   let mockWatchId: number;
   let mockWatchCallback: PositionCallback;
   let mockWatchErrorCallback: PositionErrorCallback;
+
+  // --- fetch routing mock -------------------------------------------------
+  // '/api/auth/session'        -> driver-id session json
+  // '/api/tracking/locations'  -> POST result for a single location (replaces
+  //                               the old updateDriverLocation action).
+  type FetchResult = {
+    ok: boolean;
+    status: number;
+    json: () => Promise<any>;
+  };
+
+  let sessionResponse: () => FetchResult;
+  // Handler for the locations POST route; default = success (201).
+  let postLocationHandler: () => FetchResult | Promise<FetchResult>;
+
+  const okJson = (body: any, status = 200): FetchResult => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  });
+
+  // Convenience: number of POSTs made to the locations route.
+  const locationPostCalls = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(
+      ([url]) => String(url).includes('/api/tracking/locations'),
+    );
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -121,14 +143,21 @@ describe('useLocationTracking', () => {
       writable: true,
     });
 
-    // Mock fetch for session
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSessionResponse),
-    });
+    // Default route handlers.
+    sessionResponse = () => okJson(mockSessionResponse);
+    postLocationHandler = () => okJson({ success: true }, 201);
 
-    // Mock updateDriverLocation server action
-    mockUpdateDriverLocation.mockResolvedValue({ success: true });
+    // Mock fetch with URL routing.
+    global.fetch = jest.fn((input: RequestInfo | URL): Promise<any> => {
+      const url = String(input);
+      if (url.includes('/api/auth/session')) {
+        return Promise.resolve(sessionResponse());
+      }
+      if (url.includes('/api/tracking/locations')) {
+        return Promise.resolve(postLocationHandler());
+      }
+      return Promise.resolve(okJson({}));
+    }) as unknown as typeof fetch;
 
     // Reset location store mocks
     mockLocationStore.init.mockResolvedValue(undefined);
@@ -227,7 +256,7 @@ describe('useLocationTracking', () => {
       expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
     });
 
-    it('should set up periodic location updates', async () => {
+    it('sets up continuous tracking + the periodic offline sync', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
       // Wait for initial mount effects
@@ -235,20 +264,19 @@ describe('useLocationTracking', () => {
         expect(result.current.isTracking).toBe(false);
       });
 
-      // Clear initial calls from mount
-      (navigator.geolocation.getCurrentPosition as jest.Mock).mockClear();
-
       await act(async () => {
         result.current.startTracking();
       });
 
-      // Fast-forward 30 seconds (TRACKING_INTERVAL)
+      // Fast-forward to the 2-minute offline-sync interval
       await act(async () => {
-        jest.advanceTimersByTime(30000);
+        jest.advanceTimersByTime(120000);
       });
 
-      // getCurrentPosition should be called for periodic update
-      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+      // Continuous GPS comes from watchPosition (not a getCurrentPosition poll —
+      // that was removed); startTracking also schedules a 2-minute offline sync.
+      expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
+      expect(mockLocationStore.getUnsyncedLocations).toHaveBeenCalled();
     });
 
     it('should sync location to server when tracking', async () => {
@@ -269,7 +297,10 @@ describe('useLocationTracking', () => {
       });
 
       await waitFor(() => {
-        expect(mockUpdateDriverLocation).toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/tracking/locations',
+          expect.objectContaining({ method: 'POST' }),
+        );
       });
     });
 
@@ -305,6 +336,66 @@ describe('useLocationTracking', () => {
         expect(result.current.error).toContain('not supported');
       });
       expect(result.current.isTracking).toBe(false);
+    });
+  });
+
+  describe('wake lock + foreground re-arm (Track C)', () => {
+    it('acquires a screen wake lock on start and releases it on stop', async () => {
+      const release = jest.fn().mockResolvedValue(undefined);
+      const request = jest.fn().mockResolvedValue({ release });
+      mockNavigatorProperty('wakeLock', { request });
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(request).toHaveBeenCalledWith('screen'));
+
+      // Let the wakeLockRef assignment settle before tearing down.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        result.current.stopTracking();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(release).toHaveBeenCalled());
+    });
+
+    it('re-arms watchPosition when returning to the foreground while tracking', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      (navigator.geolocation.clearWatch as jest.Mock).mockClear();
+      const watchCallsBefore = (navigator.geolocation.watchPosition as jest.Mock).mock.calls.length;
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // Stale watch cleared + a fresh watch armed.
+      expect(navigator.geolocation.clearWatch).toHaveBeenCalled();
+      expect(
+        (navigator.geolocation.watchPosition as jest.Mock).mock.calls.length,
+      ).toBeGreaterThan(watchCallsBefore);
+    });
+
+    it('does not re-arm on a visibility change when not tracking', async () => {
+      renderHook(() => useLocationTracking());
+
+      (navigator.geolocation.clearWatch as jest.Mock).mockClear();
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(navigator.geolocation.clearWatch).not.toHaveBeenCalled();
     });
   });
 
@@ -382,7 +473,8 @@ describe('useLocationTracking', () => {
 
   describe('offline handling', () => {
     it('should store location in IndexedDB when server sync fails', async () => {
-      mockUpdateDriverLocation.mockRejectedValue(new Error('Network error'));
+      // Server POST rejects (network error) -> falls back to IndexedDB.
+      postLocationHandler = () => Promise.reject(new Error('Network error'));
 
       const { result } = renderHook(() => useLocationTracking());
 
@@ -400,8 +492,40 @@ describe('useLocationTracking', () => {
       });
     });
 
+    it('should NOT store offline when the server returns 429 (rate limited)', async () => {
+      // A 429 maps to { success:false, error:'Rate limit exceeded' }. Unlike the
+      // generic-error path above, a rate-limited POST must be dropped silently:
+      // the location is NOT queued to IndexedDB (queuing it would replay the same
+      // burst and keep tripping the limiter), and unsyncedCount must not grow.
+      postLocationHandler = () => okJson({ error: 'Rate limit exceeded' }, 429);
+      mockLocationStore.getUnsyncedCount.mockResolvedValue(0);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      // Trigger a position update (this attempts the server sync).
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+
+      // Wait until the POST actually happened so we know the sync path ran.
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/tracking/locations',
+          expect.objectContaining({ method: 'POST' }),
+        );
+      });
+
+      // The rate-limited location must NOT be persisted offline.
+      expect(mockLocationStore.addLocation).not.toHaveBeenCalled();
+      expect(result.current.unsyncedCount).toBe(0);
+    });
+
     it('should update unsyncedCount when storing offline', async () => {
-      mockUpdateDriverLocation.mockRejectedValue(new Error('Network error'));
+      postLocationHandler = () => Promise.reject(new Error('Network error'));
       mockLocationStore.getUnsyncedCount.mockResolvedValue(1);
 
       const { result } = renderHook(() => useLocationTracking());
@@ -496,13 +620,19 @@ describe('useLocationTracking', () => {
         await result.current.syncOfflineLocations();
       });
 
-      expect(mockUpdateDriverLocation).toHaveBeenCalledWith(
-        mockDriverId,
-        expect.objectContaining({
-          driverId: mockDriverId,
-          coordinates: unsyncedLocation.coordinates,
-        })
-      );
+      // The stored location is POSTed to the locations route in the flat
+      // wire shape (driver_id/latitude/longitude), then marked as synced.
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/tracking/locations',
+          expect.objectContaining({ method: 'POST' }),
+        );
+      });
+      const lastPost = locationPostCalls().pop();
+      const body = JSON.parse(lastPost![1].body);
+      expect(body.driver_id).toBe(mockDriverId);
+      expect(body.latitude).toBe(unsyncedLocation.coordinates.lat);
+      expect(body.longitude).toBe(unsyncedLocation.coordinates.lng);
       expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
     });
 
@@ -523,7 +653,8 @@ describe('useLocationTracking', () => {
       };
 
       mockLocationStore.getUnsyncedLocations.mockResolvedValue([unsyncedLocation]);
-      mockUpdateDriverLocation.mockResolvedValue({ success: false, error: 'Server error' });
+      // Server returns a non-OK response -> postLocation reports {success:false}.
+      postLocationHandler = () => okJson({ error: 'Server error' }, 500);
 
       const { result } = renderHook(() => useLocationTracking());
 
@@ -551,7 +682,7 @@ describe('useLocationTracking', () => {
       };
 
       mockLocationStore.getUnsyncedLocations.mockResolvedValue([unsyncedLocation]);
-      mockUpdateDriverLocation.mockResolvedValue({ success: false, error: 'Server error' });
+      postLocationHandler = () => okJson({ error: 'Server error' }, 500);
 
       const { result } = renderHook(() => useLocationTracking());
 
@@ -817,10 +948,7 @@ describe('useLocationTracking', () => {
     });
 
     it('should set error if driver ID not found', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: {} }), // No driverId
-      });
+      sessionResponse = () => okJson({ user: {} }); // No driverId
 
       const { result } = renderHook(() => useLocationTracking());
 
@@ -840,7 +968,9 @@ describe('useLocationTracking', () => {
     });
 
     it('should handle session fetch failure', async () => {
-      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+      sessionResponse = () => {
+        throw new Error('Network error');
+      };
 
       const { result } = renderHook(() => useLocationTracking());
 

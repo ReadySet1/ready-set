@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 interface StatTileProps {
   icon: LucideIcon;
   label: string;
-  value: string | number;
+  /** Accepts nullish/NaN defensively — rendered as "—" so a missing stat
+   *  never shows a blank tile. */
+  value: string | number | null | undefined;
   sub?: string;
   /** Trend delta, e.g. "+12%" (green) or "-3%" (red). */
   delta?: string;
@@ -57,7 +59,12 @@ export function StatTile({
         ) : null}
       </div>
       <div className="text-[20px] font-extrabold leading-[1.05] tracking-[-0.02em] text-driver-text">
-        {value}
+        {value === null ||
+        value === undefined ||
+        value === "" ||
+        (typeof value === "number" && Number.isNaN(value))
+          ? "—"
+          : value}
       </div>
       <div className="text-[11px] font-bold leading-tight text-driver-muted">
         {label}

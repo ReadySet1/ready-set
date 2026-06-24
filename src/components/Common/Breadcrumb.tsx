@@ -41,7 +41,7 @@ const Breadcrumb = ({
         />
       )}
       <div
-        className="relative z-10 overflow-hidden bg-cover bg-center bg-no-repeat pb-[40px] pt-[80px] sm:pb-[50px] sm:pt-page-y-sm md:pb-[60px] md:pt-[130px] lg:pt-page-y-xl"
+        className="relative z-10 overflow-hidden bg-cover bg-center bg-no-repeat pb-[40px] pt-page-y sm:pb-[50px] sm:pt-page-y-sm md:pb-[60px] md:pt-[130px] lg:pt-page-y-xl"
         style={{
           backgroundImage: `url('${getCloudinaryUrl("header/header-bg")}')`,
         }}

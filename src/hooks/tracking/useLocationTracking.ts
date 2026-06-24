@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LocationUpdate } from '@/types/tracking';
-import { updateDriverLocation } from '@/app/actions/tracking/driver-actions';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
 interface UseLocationTrackingReturn {
@@ -96,6 +95,17 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
+  // Mirror isTracking into a ref so the long-lived watchPosition callback always
+  // reads the live value. The callback registered in startTracking() captures the
+  // isTracking *state* from the same render that calls setIsTracking(true) — i.e.
+  // still false — so the `if (isTracking)` sync gate stayed shut: the device
+  // painted the dot but never POSTed. Bit iOS Safari specifically (Android's
+  // render/callback timing happened to resolve the gate open).
+  const isTrackingRef = useRef(false);
+  // Screen wake lock held while a shift is actively tracking, so the device
+  // doesn't sleep mid-delivery (sleeping suspends watchPosition). The browser
+  // auto-releases it when the page is hidden; we re-acquire it on the way back.
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
 
   // Get driver ID from session, cached to avoid repeated /api/auth/session fetches
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -205,6 +215,55 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     return 'driving';
   };
 
+  // POST a single location to the tracking API route. Replaces the legacy
+  // `updateDriverLocation` Server Action: server-action digests break when the
+  // deployed bundle changes mid-shift ("Server Action not found"), which silently
+  // dropped every breadcrumb (driver_locations had no inserts for weeks). A stable
+  // API route is deployment-proof. Returns the {success,error} shape callers expect.
+  const postLocation = useCallback(
+    async (location: LocationUpdate): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetch('/api/tracking/locations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driver_id: location.driverId,
+            latitude: location.coordinates.lat,
+            longitude: location.coordinates.lng,
+            accuracy: location.accuracy,
+            speed: location.speed,
+            heading: location.heading,
+            altitude: location.altitude,
+            battery_level:
+              location.batteryLevel != null ? Math.round(location.batteryLevel) : undefined,
+            is_moving: location.isMoving,
+          }),
+        });
+        if (res.status === 429) {
+          return { success: false, error: 'Rate limit exceeded' };
+        }
+        if (!res.ok) {
+          let error = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            error = body.error || body.message || error;
+          } catch {
+            /* non-JSON error body */
+          }
+          return { success: false, error };
+        }
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to post location',
+        };
+      }
+    },
+    [],
+  );
+
   // Sync offline locations to server
   const syncOfflineLocations = useCallback(async () => {
     if (!isOnline) return;
@@ -237,7 +296,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
             timestamp: new Date(storedLocation.timestamp)
           };
 
-          const result = await updateDriverLocation(storedLocation.driverId, locationUpdate);
+          const result = await postLocation(locationUpdate);
 
           if (result.success) {
             await locationStore.markAsSynced(storedLocation.id);
@@ -268,7 +327,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     } catch (error) {
       console.error('Error during offline sync:', error);
     }
-  }, [isOnline]);
+  }, [isOnline, postLocation]);
 
   // Update location to server with client-side throttling
   // Skips server sync if less than 5s since last successful sync (matches server rate limit)
@@ -281,7 +340,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
 
     try {
-      const result = await updateDriverLocation(location.driverId, location);
+      const result = await postLocation(location);
       if (!result.success) {
         if (result.error?.includes('Rate limit')) {
           return;
@@ -307,7 +366,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         console.error('Failed to store location offline:', storageError);
       }
     }
-  }, []);
+  }, [postLocation]);
 
   // Handle position update
   const handlePositionUpdate = useCallback(async (position: GeolocationPosition) => {
@@ -322,15 +381,17 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       // Update last location reference
       lastLocationRef.current = locationUpdate;
 
-      // Sync to server if tracking is active
-      if (isTracking) {
+      // Sync to server if tracking is active. Read the ref, not the captured
+      // `isTracking` state, so the long-lived watchPosition callback always sees
+      // the current value (see isTrackingRef note above).
+      if (isTrackingRef.current) {
         await syncLocationToServer(locationUpdate);
       }
     } catch (error) {
       console.error('Error handling position update:', error);
       setError(error instanceof Error ? error.message : 'Location update failed');
     }
-  }, [formatLocationUpdate, isTracking, syncLocationToServer]);
+  }, [formatLocationUpdate, syncLocationToServer]);
 
   // Handle geolocation errors
   const handleGeolocationError = useCallback((err: unknown, silent = false) => {
@@ -378,6 +439,48 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
   }, []);
 
+  // Acquire a screen wake lock so the device doesn't sleep mid-shift (sleeping
+  // suspends watchPosition). Best-effort: unsupported/denied is non-fatal.
+  const requestWakeLock = useCallback(async () => {
+    try {
+      const nav = navigator as any;
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        nav?.wakeLock?.request
+      ) {
+        wakeLockRef.current = await nav.wakeLock.request('screen');
+      }
+    } catch {
+      /* wake lock denied or unsupported — non-fatal */
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      await wakeLockRef.current?.release();
+    } catch {
+      /* already released — ignore */
+    }
+    wakeLockRef.current = null;
+  }, []);
+
+  // Tear down any existing watch and start a fresh one. Used on return to the
+  // foreground: the OS may have suspended or killed the long-lived watch while
+  // backgrounded (notably iOS Safari), leaving a stale watchId that never fires.
+  const reArmWatch = useCallback(() => {
+    if (!navigator.geolocation) return;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePositionUpdate,
+      handleGeolocationError,
+      HIGH_ACCURACY_OPTIONS,
+    );
+  }, [handlePositionUpdate, handleGeolocationError]);
+
   // Start continuous location tracking
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -386,6 +489,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
 
     setIsTracking(true);
+    isTrackingRef.current = true;
     setError(null);
 
     // Start watching position — watchPosition provides continuous updates,
@@ -404,11 +508,14 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     // Trigger initial sync on start
     syncOfflineLocations();
 
-      }, [handlePositionUpdate, handleGeolocationError, syncOfflineLocations]);
+    // Keep the screen awake for the active shift (best-effort).
+    void requestWakeLock();
+  }, [handlePositionUpdate, handleGeolocationError, syncOfflineLocations, requestWakeLock]);
 
   // Stop location tracking
   const stopTracking = useCallback(() => {
     setIsTracking(false);
+    isTrackingRef.current = false;
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
@@ -429,7 +536,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     cachedDriverIdRef.current = null;
     lastSyncTimeRef.current = 0;
 
-      }, []);
+    // Release the screen wake lock.
+    void releaseWakeLock();
+  }, [releaseWakeLock]);
 
   // Manually update location once
   const updateLocationManually = useCallback(async () => {
@@ -585,6 +694,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     };
   }, [stopTracking]);
 
+  // Keep the tracking ref in lock-step with state (belt-and-suspenders for the
+  // eager assignments in start/stopTracking).
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
+
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
@@ -624,52 +739,25 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     loadUnsyncedCount();
   }, []);
 
-  // Handle page visibility changes (pause tracking when hidden)
+  // Re-arm tracking when returning to the foreground. While backgrounded the OS
+  // can suspend or kill the long-lived watchPosition (notably iOS Safari), and the
+  // browser auto-releases the screen wake lock. On the way back we re-arm the
+  // watch, grab an immediate fix, and re-acquire the wake lock so the breadcrumb
+  // trail (and shift mileage) doesn't silently stall after a tab switch.
+  //
+  // NOTE: this does NOT give true background tracking — web JS is suspended while
+  // backgrounded, so points aren't captured until the app is foregrounded again.
+  // Continuous background capture requires the native wrapper (see the
+  // 2026-06-17 native-driver-app spec).
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Skip if component is unmounting or not tracking
-      if (!isMountedRef.current || !isTracking) return;
-
-      if (document.hidden) {
-        // Reduce update frequency when app is in background
-        if (intervalIdRef.current) {
-          clearInterval(intervalIdRef.current);
-          intervalIdRef.current = setInterval(async () => {
-            // Check mounted state before async operations
-            if (!isMountedRef.current) return;
-            try {
-              const position = await getCurrentPosition();
-              if (isMountedRef.current) {
-                await handlePositionUpdate(position);
-              }
-            } catch (error) {
-              // Only log if still mounted (ignore errors during navigation)
-              if (isMountedRef.current) {
-                console.debug('Background location update skipped:', error);
-              }
-            }
-          }, TRACKING_INTERVAL * 2); // Double the interval when in background
-        }
-      } else {
-        // Resume normal frequency when app is visible
-        if (intervalIdRef.current) {
-          clearInterval(intervalIdRef.current);
-          intervalIdRef.current = setInterval(async () => {
-            // Check mounted state before async operations
-            if (!isMountedRef.current) return;
-            try {
-              const position = await getCurrentPosition();
-              if (isMountedRef.current) {
-                await handlePositionUpdate(position);
-              }
-            } catch (error) {
-              // Only log if still mounted (ignore errors during navigation)
-              if (isMountedRef.current) {
-                console.debug('Foreground location update skipped:', error);
-              }
-            }
-          }, TRACKING_INTERVAL);
-        }
+      // Read the live ref, not the captured `isTracking` state, so a tab return
+      // is honored even when the effect closed over a stale value.
+      if (!isMountedRef.current || !isTrackingRef.current) return;
+      if (!document.hidden) {
+        reArmWatch();
+        void updateLocationManually();
+        void requestWakeLock();
       }
     };
 
@@ -677,7 +765,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isTracking, getCurrentPosition, handlePositionUpdate]);
+  }, [reArmWatch, updateLocationManually, requestWakeLock]);
 
   // Listen for geolocation mock state changes (development only)
   // When the location simulator enables/disables the mock, we need to restart our watch

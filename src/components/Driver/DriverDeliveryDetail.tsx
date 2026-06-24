@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   MapPin,
-  Navigation,
   Package,
   StickyNote,
   Store,
@@ -31,6 +30,8 @@ import {
   resolveDriverStatus,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
+import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 
 /**
  * Driver-specific Delivery Detail.
@@ -119,13 +120,12 @@ function formatAddressLines(addr?: AddressLike | null): string[] {
   return [line1, line2].filter((l) => l.length > 0);
 }
 
-function mapsHref(addr?: AddressLike | null): string | null {
+function addressQuery(addr?: AddressLike | null): string | null {
   if (!addr) return null;
   const q = [addr.street1, addr.street2, addr.city, addr.state, addr.zip]
     .filter(Boolean)
     .join(", ");
-  if (!q) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  return q || null;
 }
 
 interface DriverDeliveryDetailProps {
@@ -141,6 +141,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [notFound, setNotFound] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [podOpen, setPodOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
 
   // Cache the session per mount cycle to reduce auth-lock contention (same
   // pattern SingleOrder uses).
@@ -171,7 +172,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       const session = await getValidSession();
       if (!session) {
         toast.error("Authentication error. Please log in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
       const res = await fetch(
@@ -186,7 +187,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       );
       if (res.status === 401) {
         toast.error("Session expired. Please log in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
       if (res.status === 404) {
@@ -220,7 +221,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         const session = await getValidSession();
         if (!session) {
           toast.error("Authentication error. Please log in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
         const res = await fetch(
@@ -280,12 +281,18 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     [order, getValidSession, router],
   );
 
-  /** Next-Action handler: POD-gate the final step, otherwise advance. */
+  /** Next-Action handler: gate the signature (pickup) + POD (delivery) steps,
+   *  otherwise advance. */
   const handleNextAction = useCallback(() => {
     if (!order) return;
     const current = order.driverStatus as DriverStatus | undefined;
     const next = current ? getNextStatus(current) : DriverStatus.ASSIGNED;
     if (!next) return;
+    // Require a vendor-staff signature before marking the pickup done.
+    if (current === DriverStatus.ARRIVED_AT_VENDOR && next === DriverStatus.PICKED_UP) {
+      setSignatureOpen(true);
+      return;
+    }
     // Require proof of delivery before completing.
     if (current === DriverStatus.ARRIVED_TO_CLIENT && next === DriverStatus.COMPLETED) {
       setPodOpen(true);
@@ -293,6 +300,11 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     }
     void advanceStatus(next);
   }, [order, advanceStatus]);
+
+  const onSignatureComplete = useCallback(async () => {
+    setSignatureOpen(false);
+    await advanceStatus(DriverStatus.PICKED_UP);
+  }, [advanceStatus]);
 
   const onPodComplete = useCallback(async () => {
     setPodOpen(false);
@@ -342,8 +354,8 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     (order.pickupAddress?.isRestaurant ? "Restaurant" : "Pickup");
   const pickupLines = formatAddressLines(order.pickupAddress);
   const deliveryLines = formatAddressLines(order.deliveryAddress);
-  const pickupMaps = mapsHref(order.pickupAddress);
-  const deliveryMaps = mapsHref(order.deliveryAddress);
+  const pickupQuery = addressQuery(order.pickupAddress);
+  const deliveryQuery = addressQuery(order.deliveryAddress);
 
   return (
     <div className="flex flex-col gap-3 px-2 pb-32">
@@ -412,16 +424,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             <span>{order.pickupNotes}</span>
           </div>
         ) : null}
-        {pickupMaps ? (
-          <a
-            href={pickupMaps}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-driver-touch items-center justify-center gap-2 rounded-xl border border-driver-border bg-driver-surface-alt px-4 text-[13.5px] font-extrabold text-driver-text active:translate-y-px"
-          >
-            <Navigation className="h-4 w-4" strokeWidth={2.4} />
-            Directions to pickup
-          </a>
+        {pickupQuery ? (
+          <NavigateButton
+            target={{ address: pickupQuery }}
+            label="Directions to pickup"
+            className="mt-0.5"
+          />
         ) : null}
       </DriverCard>
 
@@ -460,16 +468,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             <span>{order.specialNotes}</span>
           </div>
         ) : null}
-        {deliveryMaps ? (
-          <a
-            href={deliveryMaps}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-driver-touch items-center justify-center gap-2 rounded-xl border border-driver-border bg-driver-surface-alt px-4 text-[13.5px] font-extrabold text-driver-text active:translate-y-px"
-          >
-            <Navigation className="h-4 w-4" strokeWidth={2.4} />
-            Directions to drop-off
-          </a>
+        {deliveryQuery ? (
+          <NavigateButton
+            target={{ address: deliveryQuery }}
+            label="Directions to drop-off"
+            className="mt-0.5"
+          />
         ) : null}
       </DriverCard>
 
@@ -521,6 +525,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           )}
         </div>
       </div>
+
+      {signatureOpen ? (
+        <DriverSignatureSheet
+          open={signatureOpen}
+          onOpenChange={setSignatureOpen}
+          orderNumber={order.orderNumber}
+          onComplete={onSignatureComplete}
+        />
+      ) : null}
 
       {podOpen ? (
         <DriverPodSheet

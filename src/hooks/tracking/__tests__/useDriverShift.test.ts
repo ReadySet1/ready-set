@@ -1,11 +1,10 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDriverShift } from '../useDriverShift';
 
-// Mock the server actions
+// Mock the server actions that are STILL used by the hook (break ops).
+// The shift start/end/active operations moved to fetch() API routes and are
+// asserted via the global.fetch routing mock below.
 jest.mock('@/app/actions/tracking/driver-actions', () => ({
-  startDriverShift: jest.fn(),
-  endDriverShift: jest.fn(),
-  getActiveShift: jest.fn(),
   startShiftBreak: jest.fn(),
   endShiftBreak: jest.fn(),
 }));
@@ -17,17 +16,11 @@ jest.mock('@/lib/monitoring/sentry', () => ({
 }));
 
 import {
-  startDriverShift,
-  endDriverShift,
-  getActiveShift,
   startShiftBreak,
   endShiftBreak,
 } from '@/app/actions/tracking/driver-actions';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
-const mockStartDriverShift = startDriverShift as jest.MockedFunction<typeof startDriverShift>;
-const mockEndDriverShift = endDriverShift as jest.MockedFunction<typeof endDriverShift>;
-const mockGetActiveShift = getActiveShift as jest.MockedFunction<typeof getActiveShift>;
 const mockStartShiftBreak = startShiftBreak as jest.MockedFunction<typeof startShiftBreak>;
 const mockEndShiftBreak = endShiftBreak as jest.MockedFunction<typeof endShiftBreak>;
 
@@ -71,20 +64,76 @@ describe('useDriverShift', () => {
     },
   };
 
+  // --- fetch routing mock -------------------------------------------------
+  // The hook now talks to API routes instead of Server Actions. We model each
+  // route's response with an overridable handler so individual tests can swap
+  // in success/failure/queued responses exactly like they used to with the
+  // action mocks (mockGetActiveShift/mockStartDriverShift/mockEndDriverShift).
+  type FetchResult = {
+    ok: boolean;
+    status: number;
+    json: () => Promise<any>;
+  };
+
+  let sessionResponse: () => FetchResult;
+  // Active-shift route: a queue of values mirroring mockResolvedValueOnce(...).
+  // Each call dequeues the next; once empty it sticks on the last value.
+  let activeShiftQueue: Array<any>;
+  let startShiftResult: () => FetchResult | Promise<FetchResult>;
+  let endShiftResult: () => FetchResult | Promise<FetchResult>;
+
+  const okJson = (body: any, status = 200): FetchResult => ({
+    ok: true,
+    status,
+    json: async () => body,
+  });
+
+  const setActiveShift = (...values: any[]) => {
+    activeShiftQueue = values;
+  };
+
+  const nextActiveShift = (): any => {
+    if (activeShiftQueue.length > 1) {
+      return activeShiftQueue.shift();
+    }
+    return activeShiftQueue[0];
+  };
+
   beforeEach(() => {
     // Reset all mocks to clear implementations AND call history
     jest.resetAllMocks();
 
-    // Mock fetch for session
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSessionResponse),
-    });
+    // Defaults — equivalent to the old action defaults.
+    sessionResponse = () => okJson(mockSessionResponse);
+    setActiveShift(null); // getActiveShift -> null by default
+    startShiftResult = () => okJson({ success: true, shiftId: mockShiftId });
+    endShiftResult = () => okJson({ success: true });
 
-    // Default mock implementations - these get set after resetAllMocks
-    mockGetActiveShift.mockResolvedValue(null);
-    mockStartDriverShift.mockResolvedValue({ success: true, shiftId: mockShiftId });
-    mockEndDriverShift.mockResolvedValue({ success: true });
+    global.fetch = jest.fn((input: RequestInfo | URL): Promise<any> => {
+      const url = String(input);
+
+      if (url.includes('/api/auth/session')) {
+        return Promise.resolve(sessionResponse());
+      }
+      if (url.includes('/api/tracking/shifts/active')) {
+        const value = nextActiveShift();
+        // An Error in the queue models the active-shift route itself failing
+        // (e.g. the post-end re-sync that loadActiveShift performs).
+        if (value instanceof Error) {
+          return Promise.reject(value);
+        }
+        return Promise.resolve(okJson({ success: true, shift: value }));
+      }
+      if (url.includes('/api/tracking/shifts/start')) {
+        return Promise.resolve(startShiftResult());
+      }
+      if (url.includes('/api/tracking/shifts/end')) {
+        return Promise.resolve(endShiftResult());
+      }
+      return Promise.resolve(okJson({}));
+    }) as unknown as typeof fetch;
+
+    // Default implementations for the still-mocked break actions.
     mockStartShiftBreak.mockResolvedValue({ success: true, breakId: mockBreakId });
     mockEndShiftBreak.mockResolvedValue({ success: true });
   });
@@ -106,12 +155,15 @@ describe('useDriverShift', () => {
     });
 
     it('should load active shift on mount', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
       await waitFor(() => {
-        expect(mockGetActiveShift).toHaveBeenCalledWith(mockDriverId);
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining(`/api/tracking/shifts/active?driverId=${mockDriverId}`),
+          expect.objectContaining({ credentials: 'include' }),
+        );
       });
 
       await waitFor(() => {
@@ -121,10 +173,7 @@ describe('useDriverShift', () => {
     });
 
     it('should set error if driver ID not found', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: {} }),
-      });
+      sessionResponse = () => okJson({ user: {} });
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -134,7 +183,9 @@ describe('useDriverShift', () => {
     });
 
     it('should handle session fetch error', async () => {
-      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+      sessionResponse = () => {
+        throw new Error('Network error');
+      };
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -153,9 +204,9 @@ describe('useDriverShift', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // startShift calls getActiveShift to check for existing shift (should return null),
-      // then after success calls loadActiveShift which calls getActiveShift again (return mockShift)
-      mockGetActiveShift.mockResolvedValueOnce(null).mockResolvedValue(mockShift);
+      // startShift calls the active route to check for existing shift (null),
+      // then after success loadActiveShift hits the active route again (mockShift)
+      setActiveShift(null, mockShift);
 
       let success: boolean;
       await act(async () => {
@@ -163,19 +214,28 @@ describe('useDriverShift', () => {
       });
 
       expect(success!).toBe(true);
-      expect(mockStartDriverShift).toHaveBeenCalledWith(
-        mockDriverId,
-        mockLocation,
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/tracking/shifts/start',
         expect.objectContaining({
-          startedFromApp: true,
-          appVersion: '2.0.0',
-        })
+          method: 'POST',
+          credentials: 'include',
+        }),
+      );
+      // Verify the request body carries the driver id, location and metadata.
+      const startCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/start',
+      );
+      const startBody = JSON.parse(startCall![1].body);
+      expect(startBody.driverId).toBe(mockDriverId);
+      expect(startBody.location).toBeDefined();
+      expect(startBody.metadata).toEqual(
+        expect.objectContaining({ startedFromApp: true, appVersion: '2.0.0' }),
       );
       expect(addSentryBreadcrumb).toHaveBeenCalledWith('Driver shift started', expect.any(Object));
     });
 
     it('should fail if there is already an active shift', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -193,10 +253,7 @@ describe('useDriverShift', () => {
     });
 
     it('should fail if driver ID not found', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: {} }),
-      });
+      sessionResponse = () => okJson({ user: {} });
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -214,7 +271,7 @@ describe('useDriverShift', () => {
     });
 
     it('should handle server error', async () => {
-      mockStartDriverShift.mockResolvedValue({ success: false, error: 'Server error' });
+      startShiftResult = () => okJson({ success: false, error: 'Server error' }, 400);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -241,7 +298,7 @@ describe('useDriverShift', () => {
       });
 
       // Perform a shift start operation
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       await act(async () => {
         await result.current.startShift(mockLocation);
@@ -254,7 +311,7 @@ describe('useDriverShift', () => {
 
   describe('endShift', () => {
     it('should end shift successfully', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -268,22 +325,35 @@ describe('useDriverShift', () => {
       });
 
       expect(success!).toBe(true);
-      expect(mockEndDriverShift).toHaveBeenCalledWith(
-        mockShiftId,
-        mockLocation,
-        undefined,
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/tracking/shifts/end',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      );
+      const endCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/end',
+      );
+      const endBody = JSON.parse(endCall![1].body);
+      expect(endBody.shiftId).toBe(mockShiftId);
+      expect(endBody.location).toBeDefined();
+      expect(endBody.metadata).toEqual(
         expect.objectContaining({
           endedFromApp: true,
           finalLocation: mockLocation.coordinates,
-        })
+        }),
       );
       expect(result.current.currentShift).toBe(null);
       expect(addSentryBreadcrumb).toHaveBeenCalledWith('Driver shift ended', { shiftId: mockShiftId });
     });
 
     it('should handle server error', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
-      mockEndDriverShift.mockResolvedValue({ success: false, error: 'Cannot end shift' });
+      // Mount loads the active shift; on end-failure the hook re-syncs via
+      // loadActiveShift. Model that re-sync also failing (transient outage) so
+      // the surfaced end-shift error isn't silently cleared.
+      setActiveShift(mockShift, new Error('Cannot end shift'));
+      endShiftResult = () => okJson({ success: false, error: 'Cannot end shift' }, 400);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -304,7 +374,7 @@ describe('useDriverShift', () => {
 
   describe('startBreak', () => {
     it('should start a break successfully', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -312,8 +382,8 @@ describe('useDriverShift', () => {
         expect(result.current.currentShift).toEqual(mockShift);
       });
 
-      // Update mock to return shift with break
-      mockGetActiveShift.mockResolvedValue({
+      // Update active route to return shift with break
+      setActiveShift({
         ...mockShift,
         status: 'paused',
         breaks: [{ id: mockBreakId, shiftId: mockShiftId, startTime: new Date(), breakType: 'meal', createdAt: new Date() }],
@@ -329,7 +399,7 @@ describe('useDriverShift', () => {
     });
 
     it('should use default break type of rest', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -345,7 +415,7 @@ describe('useDriverShift', () => {
     });
 
     it('should handle break start failure', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
       mockStartShiftBreak.mockResolvedValue({ success: false, error: 'Cannot start break' });
 
       const { result } = renderHook(() => useDriverShift());
@@ -371,7 +441,7 @@ describe('useDriverShift', () => {
         status: 'paused' as const,
         breaks: [{ id: mockBreakId, shiftId: mockShiftId, startTime: new Date(), breakType: 'rest' as const, createdAt: new Date() }],
       };
-      mockGetActiveShift.mockResolvedValue(shiftWithBreak);
+      setActiveShift(shiftWithBreak);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -379,8 +449,8 @@ describe('useDriverShift', () => {
         expect(result.current.currentShift).toEqual(shiftWithBreak);
       });
 
-      // Update mock to return active shift without break
-      mockGetActiveShift.mockResolvedValue({ ...mockShift, status: 'active' });
+      // Update active route to return active shift without break
+      setActiveShift({ ...mockShift, status: 'active' });
 
       let success: boolean;
       await act(async () => {
@@ -392,7 +462,7 @@ describe('useDriverShift', () => {
     });
 
     it('should handle break end failure', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
       mockEndShiftBreak.mockResolvedValue({ success: false, error: 'Cannot end break' });
 
       const { result } = renderHook(() => useDriverShift());
@@ -413,7 +483,7 @@ describe('useDriverShift', () => {
 
   describe('refreshShift', () => {
     it('should refresh shift data', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -421,9 +491,9 @@ describe('useDriverShift', () => {
         expect(result.current.currentShift).toEqual(mockShift);
       });
 
-      // Update mock to return updated shift
+      // Update active route to return updated shift
       const updatedShift = { ...mockShift, deliveryCount: 5 };
-      mockGetActiveShift.mockResolvedValue(updatedShift);
+      setActiveShift(updatedShift);
 
       await act(async () => {
         await result.current.refreshShift();
@@ -435,7 +505,7 @@ describe('useDriverShift', () => {
 
   describe('isShiftActive', () => {
     it('should return true for active shift', async () => {
-      mockGetActiveShift.mockResolvedValue({ ...mockShift, status: 'active' });
+      setActiveShift({ ...mockShift, status: 'active' });
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -445,7 +515,7 @@ describe('useDriverShift', () => {
     });
 
     it('should return true for paused shift', async () => {
-      mockGetActiveShift.mockResolvedValue({ ...mockShift, status: 'paused' });
+      setActiveShift({ ...mockShift, status: 'paused' });
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -455,7 +525,7 @@ describe('useDriverShift', () => {
     });
 
     it('should return false for completed shift', async () => {
-      mockGetActiveShift.mockResolvedValue({ ...mockShift, status: 'completed' });
+      setActiveShift({ ...mockShift, status: 'completed' });
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -465,7 +535,7 @@ describe('useDriverShift', () => {
     });
 
     it('should return false when no shift', async () => {
-      mockGetActiveShift.mockResolvedValue(null);
+      setActiveShift(null);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -480,7 +550,7 @@ describe('useDriverShift', () => {
 
   describe('periodic refresh', () => {
     it('should have refreshShift function available', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -493,21 +563,24 @@ describe('useDriverShift', () => {
       expect(typeof result.current.refreshShift).toBe('function');
 
       // Clear initial calls
-      mockGetActiveShift.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Call refresh manually
       await act(async () => {
         await result.current.refreshShift();
       });
 
-      // getActiveShift should have been called
-      expect(mockGetActiveShift).toHaveBeenCalled();
+      // The active-shift route should have been called
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/tracking/shifts/active'),
+        expect.objectContaining({ credentials: 'include' }),
+      );
     });
   });
 
   describe('visibility change handling', () => {
     it('should refresh when page becomes visible with active shift', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -517,7 +590,7 @@ describe('useDriverShift', () => {
       });
 
       // Clear calls from initial load
-      mockGetActiveShift.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Simulate page becoming visible
       Object.defineProperty(document, 'hidden', {
@@ -532,12 +605,15 @@ describe('useDriverShift', () => {
 
       // Should trigger refresh
       await waitFor(() => {
-        expect(mockGetActiveShift).toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/tracking/shifts/active'),
+          expect.objectContaining({ credentials: 'include' }),
+        );
       });
     });
 
     it('should not refresh when page is hidden', async () => {
-      mockGetActiveShift.mockResolvedValue(mockShift);
+      setActiveShift(mockShift);
 
       const { result } = renderHook(() => useDriverShift());
 
@@ -547,7 +623,7 @@ describe('useDriverShift', () => {
       });
 
       // Clear calls from initial load
-      mockGetActiveShift.mockClear();
+      (global.fetch as jest.Mock).mockClear();
 
       // Simulate page becoming hidden
       Object.defineProperty(document, 'hidden', {
@@ -561,7 +637,10 @@ describe('useDriverShift', () => {
       });
 
       // Should not trigger refresh when hidden
-      expect(mockGetActiveShift).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/tracking/shifts/active'),
+        expect.anything(),
+      );
     });
   });
 });

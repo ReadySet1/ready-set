@@ -193,6 +193,8 @@ describe('Driver Tracking Actions', () => {
         driver_id: validDriverId,
         status: 'active',
       }]);
+      // End-shift guard: blocking active-delivery count (none).
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
       // Mock UPDATE shift with end time
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       // Mock UPDATE shift with mileage (safety net)
@@ -233,6 +235,8 @@ describe('Driver Tracking Actions', () => {
         driver_id: validDriverId,
         status: 'paused',
       }]);
+      // End-shift guard: blocking active-delivery count (none).
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
       const result = await endDriverShift(validShiftId, mockLocationUpdate);
@@ -245,6 +249,8 @@ describe('Driver Tracking Actions', () => {
         driver_id: validDriverId,
         status: 'active',
       }]);
+      // End-shift guard: blocking active-delivery count (none).
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Database error')
       );
@@ -260,9 +266,45 @@ describe('Driver Tracking Actions', () => {
         driver_id: validDriverId,
         status: 'active',
       }]);
+      // End-shift guard: blocking active-delivery count (none).
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
       const result = await endDriverShift(validShiftId, mockLocationUpdate, 25.5);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('blocks ending a shift while active deliveries remain', async () => {
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{
+        driver_id: validDriverId,
+        status: 'active',
+      }]);
+      // Blocking guard reports active deliveries → end is refused.
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 2 }]);
+
+      const result = await endDriverShift(validShiftId, mockLocationUpdate);
+
+      expect(result.success).toBe(false);
+      expect(result.activeDeliveries).toBe(2);
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin force-end a shift with active deliveries', async () => {
+      mockGetActionCaller.mockResolvedValue({ userId: 'admin-1', isPrivileged: true });
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{
+        driver_id: validDriverId,
+        status: 'active',
+      }]);
+      // force=true + privileged skips the blocking query entirely.
+      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+
+      const result = await endDriverShift(
+        validShiftId,
+        mockLocationUpdate,
+        undefined,
+        { force: true },
+      );
 
       expect(result.success).toBe(true);
     });
@@ -564,6 +606,34 @@ describe('Driver Tracking Actions', () => {
       const result = await getActiveShift(validDriverId);
 
       expect(result).toBeNull();
+    });
+
+    it('prefers the GPS-derived total_distance_miles column over the legacy km value', async () => {
+      // The row carries BOTH the new GPS-derived miles column (12.3 mi) and the
+      // legacy total_distance km column (99 km). The miles column must win
+      // verbatim — the legacy km→mi conversion (99 * 0.621371 ≈ 61.5) is the
+      // fallback only and must NOT be applied here.
+      const mockShiftData = {
+        id: validShiftId,
+        driver_id: validDriverId,
+        start_time: new Date(),
+        end_time: null,
+        start_location_geojson: null,
+        end_location_geojson: null,
+        total_distance: 99, // legacy km value (would convert to ~61.5 mi)
+        total_distance_miles: 12.3, // GPS-derived miles — should win
+        delivery_count: 0,
+        status: 'active',
+        metadata: {},
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([mockShiftData]);
+
+      const result = await getActiveShift(validDriverId);
+
+      expect(result?.totalDistanceMiles).toBe(12.3);
     });
   });
 

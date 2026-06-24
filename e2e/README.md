@@ -41,6 +41,28 @@ pnpm playwright test --headed
 pnpm playwright test --project=chromium
 ```
 
+### Driver-flow specs (driver-shift-workflow, driver-history-export)
+
+These specs require the driver and admin test accounts and load `.env.test`
+explicitly (Playwright's config does not). Run them serially — they share a
+single driver account + dev server, so parallel workers overload the dev server
+and race on shift state:
+
+```bash
+# Seed the driver's assigned delivery first (idempotent)
+pnpm exec dotenv -e .env.test -- tsx e2e/test-data-setup.ts setup
+
+# Run the driver specs serially against Chromium
+pnpm exec dotenv -e .env.test -- playwright test driver --project=chromium --workers=1
+```
+
+Notes:
+- `DATABASE_URL` in `.env.test` must use the Supabase **connection pooler**
+  (port 6543); the direct host crashes Prisma when the dev server boots.
+- Geolocation is provided by Playwright (`grantPermissions` + `setGeolocation`);
+  the portal acquires it asynchronously, so the specs wait for the resolved
+  "Start shift"/"On shift" state rather than network idle.
+
 ## Test Infrastructure
 
 ### Authentication
@@ -81,9 +103,13 @@ test.withRole('my test', async ({ authenticatedPage, role }) => {
 Test data is managed through:
 - **Setup Script**: `e2e/test-data-setup.ts` creates test users and data
 - **Test Users**:
-  - `test-client@example.com` (CLIENT role)
-  - `test-vendor@example.com` (VENDOR role)
-  - Password: `TestPassword123!`
+  - `test-client@example.com` (CLIENT role) — password `TestPassword123!`
+  - `test-vendor@example.com` (VENDOR role) — password `TestPassword123!`
+  - `driver.test@example.com` (DRIVER role) — password `TestDriver123!`
+  - `admin.test@example.com` (ADMIN role) — password `TestAdmin123!`
+- **Seeded driver delivery**: `createDriverDeliveryData()` assigns an active
+  catering delivery to the driver so the shift-workflow specs render the
+  "Active deliveries" section.
 
 **Creating test data:**
 

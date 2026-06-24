@@ -123,6 +123,70 @@ export async function uploadPODImage(
 }
 
 /**
+ * Upload a pickup-stage signature image (a PNG from the in-app signature pad).
+ *
+ * Reuses the delivery-proofs bucket but a distinct `signatures/` path prefix so
+ * pickup signatures are easy to tell apart from POD photos in storage.
+ *
+ * @param file - The signature image (File or Blob)
+ * @param orderId - The order UUID (catering or on-demand)
+ * @returns Object with url, path, and optional error message
+ */
+export async function uploadPickupSignatureImage(
+  file: File | Blob,
+  orderId: string
+): Promise<{ url: string; path?: string; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Validate file size (max 2MB — signature PNGs are tiny)
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return { url: '', error: 'File too large (max 2MB)' };
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    const fileType = file.type || 'image/png';
+    if (!allowedTypes.includes(fileType)) {
+      return { url: '', error: 'Invalid file type. Only PNG, JPEG, and WebP images are allowed.' };
+    }
+
+    const timestamp = Date.now();
+    const filename = `signatures/${orderId}/pickup-signature-${orderId}-${timestamp}.png`;
+
+    const { data, error } = await supabase.storage
+      .from(POD_BUCKET_NAME)
+      .upload(filename, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: fileType,
+      });
+
+    if (error) {
+      Sentry.captureException(error, {
+        tags: { operation: 'pickup_signature_upload', component: 'storage' },
+      });
+      return { url: '', error: error.message || 'Upload failed' };
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(POD_BUCKET_NAME)
+      .getPublicUrl(data.path);
+
+    return { url: publicUrl, path: data.path };
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: 'pickup_signature_upload', component: 'storage' },
+    });
+    return {
+      url: '',
+      error: error instanceof Error ? error.message : 'Upload failed',
+    };
+  }
+}
+
+/**
  * Delete a Proof of Delivery image
  *
  * @param path - The storage path of the image to delete

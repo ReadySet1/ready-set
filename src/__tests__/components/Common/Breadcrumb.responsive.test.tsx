@@ -38,7 +38,7 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
 
       const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass(
-        "pt-[80px]",
+        "pt-page-y",
         "sm:pt-page-y-sm",
         "md:pt-[130px]",
         "lg:pt-page-y-xl",
@@ -256,7 +256,7 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       const contentWrapper = getContentWrapper();
 
       // Mobile-first padding on main container
-      expect(mainContainer).toHaveClass("pt-[80px]", "pb-[40px]");
+      expect(mainContainer).toHaveClass("pt-page-y", "pb-[40px]");
 
       // Responsive padding variants on content wrapper
       expect(contentWrapper).toHaveClass("px-3", "sm:px-4", "md:px-6", "lg:px-8");

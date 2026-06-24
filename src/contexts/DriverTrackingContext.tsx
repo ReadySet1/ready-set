@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, ReactNode } from 'react';
 import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
@@ -80,6 +80,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     stopTracking,
     requestLocationPermission,
     updateLocationManually,
+    syncOfflineLocations,
   } = useRealtimeLocationTracking();
 
   // Shift management
@@ -87,10 +88,25 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     currentShift,
     isShiftActive,
     startShift,
-    endShift,
+    endShift: endShiftBase,
     loading: shiftLoading,
     error: shiftError,
   } = useDriverShift();
+
+  // Flush any queued GPS points before ending the shift, so the server-side
+  // shift mileage (summed from driver_locations) reflects the full trail rather
+  // than dropping breadcrumbs that were only sitting in the offline queue.
+  const endShift = useCallback(
+    async (shiftId: string, location: LocationUpdate) => {
+      try {
+        await syncOfflineLocations();
+      } catch {
+        /* best-effort flush — never block ending the shift */
+      }
+      return endShiftBase(shiftId, location);
+    },
+    [syncOfflineLocations, endShiftBase],
+  );
 
   // Deliveries
   const {

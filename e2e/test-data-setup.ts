@@ -237,10 +237,124 @@ async function createTestOrders(userId: string, userEmail: string) {
   }
 }
 
+// Driver e2e tests (driver-shift-workflow.spec.ts) need the test driver to
+// have at least one active assigned delivery so the "Active deliveries"
+// section, status buttons and POD flow render. The driver portal resolves
+// deliveries via dispatches.driverId = the driver's PROFILE id (see
+// src/app/api/driver-deliveries/route.ts), not the drivers-table row id.
+const TEST_DRIVER_EMAIL = 'driver.test@example.com';
+const DRIVER_ORDER_NUMBER = 'TEST-DRIVER-001';
+
+async function createDriverDeliveryData() {
+  const driverProfile = await prisma.profile.findUnique({
+    where: { email: TEST_DRIVER_EMAIL },
+  });
+  if (!driverProfile) {
+    console.log(`Driver ${TEST_DRIVER_EMAIL} not found - skipping driver delivery seed`);
+    return;
+  }
+
+  const client = await prisma.profile.findUnique({
+    where: { email: 'test-client@example.com' },
+  });
+  if (!client) {
+    console.log('test-client@example.com not found - run setup first');
+    return;
+  }
+
+  // Idempotent: reuse the order if it already exists, just ensure the dispatch
+  const existing = await prisma.cateringRequest.findUnique({
+    where: { orderNumber: DRIVER_ORDER_NUMBER },
+  });
+
+  let orderId: string;
+  let orderUserId: string;
+
+  if (existing) {
+    orderId = existing.id;
+    orderUserId = existing.userId;
+    // Keep the seeded order perpetually "active" for reruns
+    await prisma.cateringRequest.update({
+      where: { id: orderId },
+      data: {
+        status: 'ASSIGNED' as any,
+        driverStatus: 'ASSIGNED' as any,
+        completeDateTime: null,
+        deletedAt: null,
+        pickupDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        arrivalDateTime: new Date(Date.now() + 3 * 60 * 60 * 1000),
+      },
+    });
+    console.log(`Driver delivery order ${DRIVER_ORDER_NUMBER} already exists - refreshed`);
+  } else {
+    const pickupAddress = await prisma.address.create({
+      data: {
+        street1: '789 Driver Pickup St',
+        city: 'San Francisco',
+        state: 'CA',
+        zip: '94103',
+        createdBy: client.id,
+      },
+    });
+    const deliveryAddress = await prisma.address.create({
+      data: {
+        street1: '321 Driver Dropoff Ave',
+        city: 'San Francisco',
+        state: 'CA',
+        zip: '94110',
+        createdBy: client.id,
+      },
+    });
+
+    const order = await prisma.cateringRequest.create({
+      data: {
+        userId: client.id,
+        orderNumber: DRIVER_ORDER_NUMBER,
+        status: 'ASSIGNED' as any,
+        driverStatus: 'ASSIGNED' as any,
+        orderTotal: 120.0,
+        pickupDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        arrivalDateTime: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        pickupAddressId: pickupAddress.id,
+        deliveryAddressId: deliveryAddress.id,
+        specialNotes: 'Seeded delivery for driver e2e tests',
+      },
+    });
+    orderId = order.id;
+    orderUserId = client.id;
+    console.log(`Created driver delivery order ${DRIVER_ORDER_NUMBER}`);
+  }
+
+  const dispatch = await prisma.dispatch.findFirst({
+    where: { cateringRequestId: orderId, driverId: driverProfile.id },
+  });
+  if (!dispatch) {
+    await prisma.dispatch.create({
+      data: {
+        cateringRequestId: orderId,
+        driverId: driverProfile.id,
+        userId: orderUserId,
+      },
+    });
+    console.log(`Dispatched ${DRIVER_ORDER_NUMBER} to ${TEST_DRIVER_EMAIL}`);
+  }
+}
+
 async function cleanupTestData() {
   console.log('Cleaning up test data...');
 
   try {
+    // Delete the seeded driver delivery (dispatch first, FK constraint)
+    const driverOrder = await prisma.cateringRequest.findUnique({
+      where: { orderNumber: DRIVER_ORDER_NUMBER },
+    });
+    if (driverOrder) {
+      await prisma.dispatch.deleteMany({
+        where: { cateringRequestId: driverOrder.id },
+      });
+      await prisma.cateringRequest.delete({ where: { id: driverOrder.id } });
+    }
+
     // Delete test orders first (due to foreign key constraints)
     for (const order of testOrders) {
       if (order.orderType === 'catering') {
@@ -300,6 +414,7 @@ async function main() {
 
   if (action === 'setup') {
     await createTestUsers();
+    await createDriverDeliveryData();
     console.log('Test data setup completed successfully!');
   } else if (action === 'cleanup') {
     await cleanupTestData();

@@ -23,13 +23,17 @@ import type { DeliveryStatusUpdatedPayload, DeliveryTrackingStatus } from '@/lib
 // Status display configuration
 const STATUS_DISPLAY: Record<DeliveryTrackingStatus, { emoji: string; label: string }> = {
   ASSIGNED: { emoji: '📋', label: 'Driver Assigned' },
-  EN_ROUTE_TO_VENDOR: { emoji: '🚗', label: 'Driver En Route to Resto' },
+  EN_ROUTE_TO_VENDOR: { emoji: '🚗', label: 'Driver En Route to Restaurant' },
   ARRIVED_AT_VENDOR: { emoji: '🏪', label: 'Driver Arrived at Pickup' },
   PICKED_UP: { emoji: '📦', label: 'Order Picked Up' },
   EN_ROUTE_TO_CLIENT: { emoji: '🚚', label: 'Driver En Route' },
   ARRIVED_TO_CLIENT: { emoji: '📍', label: 'Driver Arrived' },
   COMPLETED: { emoji: '✅', label: 'Delivery Completed' },
 };
+
+// If the channel neither connects nor errors within this window, stop showing
+// "Connecting…" and surface a resolved (error/fallback) state.
+const CONNECT_TIMEOUT_MS = 12_000;
 
 interface UseDeliveryStatusRealtimeOptions {
   /**
@@ -112,6 +116,7 @@ export function useDeliveryStatusRealtime({
   const [error, setError] = useState<string | null>(null);
 
   const channelRef = useRef<DriverStatusChannel | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Combine orderId and orderIds into a single set for filtering
   const orderIdsToTrack = useRef<Set<string>>(new Set());
@@ -190,12 +195,41 @@ export function useDeliveryStatusRealtime({
     setError(null);
 
     try {
+      // Pre-connection auth check: without an active browser session the
+      // Realtime WebSocket never opens and the channel hangs in "connecting"
+      // forever (REA-DRT-07). Resolve to a non-connecting state instead of
+      // leaving the UI stuck on "Connecting…".
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError || !session) {
+        setIsConnecting(false);
+        setIsConnected(false);
+        setError('Live updates unavailable — no active session');
+        onConnectionChange?.(false);
+        return;
+      }
+
+      // Safety net: if the channel neither connects nor errors within the
+      // window, stop showing "Connecting…".
+      if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = setTimeout(() => {
+        connectTimeoutRef.current = null;
+        setIsConnecting(false);
+        setError((prev) => prev ?? 'Live updates timed out');
+        onConnectionChange?.(false);
+      }, CONNECT_TIMEOUT_MS);
+
       const channel = createDriverStatusChannel();
       channelRef.current = channel;
 
       await channel.subscribe({
         onStatusUpdate: undefined, // We handle driver shift status separately
         onConnect: () => {
+          if (connectTimeoutRef.current) {
+            clearTimeout(connectTimeoutRef.current);
+            connectTimeoutRef.current = null;
+          }
           setIsConnected(true);
           setIsConnecting(false);
           setError(null);
@@ -206,6 +240,10 @@ export function useDeliveryStatusRealtime({
           onConnectionChange?.(false);
         },
         onError: (err) => {
+          if (connectTimeoutRef.current) {
+            clearTimeout(connectTimeoutRef.current);
+            connectTimeoutRef.current = null;
+          }
           setError(err.message);
           setIsConnected(false);
           setIsConnecting(false);
@@ -216,6 +254,10 @@ export function useDeliveryStatusRealtime({
       // Listen specifically for delivery status updates
       channel.on(REALTIME_EVENTS.DELIVERY_STATUS_UPDATED, handleStatusUpdate);
     } catch (err) {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       setError(err instanceof Error ? err.message : 'Failed to connect');
       setIsConnected(false);
       setIsConnecting(false);
@@ -246,6 +288,10 @@ export function useDeliveryStatusRealtime({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       if (channelRef.current) {
         void channelRef.current.unsubscribe().catch(() => {
           // Ignore cleanup errors

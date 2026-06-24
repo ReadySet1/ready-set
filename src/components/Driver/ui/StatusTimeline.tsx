@@ -84,7 +84,7 @@ export function StatusTimeline({
               </div>
               {active ? (
                 <div className="text-[11.5px] font-semibold text-driver-on-brand">
-                  In progress now
+                  {stage === DriverStatus.ASSIGNED ? "Awaiting start" : "In progress now"}
                 </div>
               ) : done && ts ? (
                 <div className="text-[11.5px] font-semibold text-driver-muted">

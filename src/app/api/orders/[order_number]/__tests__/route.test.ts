@@ -253,6 +253,90 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     });
   });
 
+  describe('Status-changing PATCH authorization (IDOR)', () => {
+    // Helper to mock the supabase auth client for a given caller. `userId` is the
+    // authenticated user; `type` is their profile.type (drives the privileged
+    // check); the profiles select/eq/single chain mirrors how the route resolves
+    // the caller's role (supabase.from('profiles').select('type').eq('id', user.id).single()).
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    it('returns 403 for a status-only PATCH from a non-assigned, non-privileged user (IDOR closed)', async () => {
+      // Order is assigned to driver 'driver-456' via dispatch; caller is a
+      // DIFFERENT driver. A bare { status: "COMPLETED" } previously skipped the
+      // ownership check entirely — now it must be rejected.
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT' });
+      mockCaller('attacker-user-id', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ status: 'COMPLETED' });
+      const params = Promise.resolve({ order_number: 'CAT-001' });
+
+      const response = await PATCH(request, { params });
+
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.message).toBe('You are not assigned to this delivery');
+      // The order must never be updated when authorization fails.
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('still allows the same status-only PATCH from a privileged (ADMIN) user', async () => {
+      // Same body, same order — but an admin manages all orders, so the legit
+      // completion path must keep working (proves the IDOR fix is not a blanket block).
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT' });
+      mockCaller('some-admin-id', 'ADMIN');
+
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ status: 'COMPLETED' });
+      const params = Promise.resolve({ order_number: 'CAT-001' });
+
+      const response = await PATCH(request, { params });
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.orderNumber).toBe('CAT-001');
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('still allows the same status-only PATCH from the assigned driver', async () => {
+      // The driver client sends { status: "COMPLETED" } on completion; the
+      // assigned driver (dispatch.driver.id === caller user id) must be allowed.
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT' });
+      mockCaller('driver-456', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ status: 'COMPLETED' });
+      const params = Promise.resolve({ order_number: 'CAT-001' });
+
+      const response = await PATCH(request, { params });
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.orderNumber).toBe('CAT-001');
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+  });
+
   describe('Edge cases', () => {
     it('should handle order without assigned driver', async () => {
       setupMocks({ dispatches: [] });
