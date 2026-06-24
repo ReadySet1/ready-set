@@ -263,7 +263,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (sessionError || !session) {
         console.error("Authentication error:", sessionError?.message);
         toast.error("Authentication error. Please try logging in again.");
-        router.push("/auth/login"); // Redirect to login if session is invalid
+        router.push("/sign-in"); // Redirect to login if session is invalid
         return;
       }
 
@@ -289,7 +289,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
           // If unauthorized, redirect to login
           if (orderResponse.status === 401) {
             toast.error("Session expired. Please log in again.");
-            router.push("/auth/login");
+            router.push("/sign-in");
             return;
           }
         } catch (parseError) {
@@ -429,7 +429,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         if (sessionError || !session) {
           console.error("Authentication error:", sessionError?.message);
           toast.error("Authentication error. Please try logging in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
 
@@ -446,7 +446,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         } else {
           if (response.status === 401) {
             toast.error("Session expired. Please log in again.");
-            router.push("/auth/login");
+            router.push("/sign-in");
             return;
           }
           if (response.status === 403) {
@@ -484,7 +484,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (sessionError || !session) {
         console.error("Authentication error:", sessionError?.message);
         toast.error("Authentication error. Please try logging in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
 
@@ -506,7 +506,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (!response.ok) {
         if (response.status === 401) {
           toast.error("Session expired. Please log in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
 
@@ -566,7 +566,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (sessionError || !session) {
         console.error("Authentication error:", sessionError?.message);
         toast.error("Authentication error. Please try logging in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
 
@@ -586,7 +586,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (!response.ok) {
         if (response.status === 401) {
           toast.error("Session expired. Please log in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
 
@@ -634,7 +634,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (sessionError || !session) {
         console.error("Authentication error:", sessionError?.message);
         toast.error("Authentication error. Please try logging in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
 
@@ -654,7 +654,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       if (!response.ok) {
         if (response.status === 401) {
           toast.error("Session expired. Please log in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
 

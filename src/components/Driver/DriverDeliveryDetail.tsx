@@ -172,7 +172,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       const session = await getValidSession();
       if (!session) {
         toast.error("Authentication error. Please log in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
       const res = await fetch(
@@ -187,7 +187,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       );
       if (res.status === 401) {
         toast.error("Session expired. Please log in again.");
-        router.push("/auth/login");
+        router.push("/sign-in");
         return;
       }
       if (res.status === 404) {
@@ -221,7 +221,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         const session = await getValidSession();
         if (!session) {
           toast.error("Authentication error. Please log in again.");
-          router.push("/auth/login");
+          router.push("/sign-in");
           return;
         }
         const res = await fetch(
