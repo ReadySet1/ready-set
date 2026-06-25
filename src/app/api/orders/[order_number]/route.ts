@@ -25,6 +25,10 @@ import {
   deriveOrderStatusFromDriver,
 } from '@/lib/state-machine/transition';
 import type { OrderStatus } from '@/lib/state-machine/transition';
+import {
+  recordAndDispatchLifecycleEvent,
+  DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
+} from '@/lib/services/partnerWebhookService';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -803,6 +807,37 @@ export async function PATCH(
         broadcastDeliveryStatus().catch((err) => {
           console.error('Failed to broadcast delivery status update:', err);
         });
+
+        // Registry-driven partner status webhook (e.g. CaterCow). The driver
+        // app advances order status through THIS route, so the outbound
+        // lifecycle callback (ASSIGNED → PICKED_UP → ON_THE_WAY → ARRIVED →
+        // DELIVERED) must be emitted here. recordAndDispatchLifecycleEvent
+        // records to order_status_history then POSTs an HMAC-signed webhook;
+        // it self-guards against legacy carriers (CaterValley/ezCater own their
+        // outbound path) and non-partner orders, never throws, and no-ops when
+        // the partner has no webhook URL/secret configured. Fire-and-forget so
+        // partner delivery (up to 3 retries) never blocks the driver's response.
+        const partnerLifecycle =
+          DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
+            driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
+          ];
+        if (partnerLifecycle) {
+          const driverProfile = (updatedOrder as any).dispatches?.[0]?.driver;
+          const driver =
+            driverProfile?.name && driverProfile?.contactNumber
+              ? { name: driverProfile.name, phone: driverProfile.contactNumber }
+              : undefined;
+          recordAndDispatchLifecycleEvent({
+            orderId: (updatedOrder as any).id,
+            orderNumber: (updatedOrder as any).orderNumber,
+            partnerStatus: partnerLifecycle,
+            driverStatus,
+            changedBy: user.id ?? driverProfile?.id ?? null,
+            driver,
+          }).catch((err) => {
+            console.error('Failed to dispatch partner lifecycle webhook:', err);
+          });
+        }
       }
 
       // Send customer notification for significant field changes (non-blocking)
