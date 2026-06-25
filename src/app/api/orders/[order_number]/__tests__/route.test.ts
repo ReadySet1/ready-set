@@ -14,6 +14,25 @@ jest.mock('@/utils/supabase/server');
 jest.mock('@/services/notifications/delivery-status', () => ({
   sendDispatchStatusNotification: jest.fn().mockResolvedValue(undefined),
 }));
+// Mock the partner webhook dispatcher so we can assert the orders PATCH wires
+// it on driver-status transitions (the bug this guards: the #447 unification
+// moved the driver flow onto this route and left the lifecycle emit orphaned
+// on /api/catering-requests/[id]/status). The status map is hardcoded here to
+// keep the route's `partnerLifecycle` lookup working without importing the real
+// module's DB deps; its values are independently locked by
+// src/__tests__/services/partnerWebhookService.test.ts.
+jest.mock('@/lib/services/partnerWebhookService', () => ({
+  recordAndDispatchLifecycleEvent: jest.fn().mockResolvedValue(undefined),
+  DRIVER_STATUS_TO_PARTNER_LIFECYCLE: {
+    ASSIGNED: 'ASSIGNED',
+    EN_ROUTE_TO_VENDOR: null,
+    ARRIVED_AT_VENDOR: null,
+    PICKED_UP: 'PICKED_UP',
+    EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',
+    ARRIVED_TO_CLIENT: 'ARRIVED',
+    COMPLETED: 'DELIVERED',
+  },
+}));
 
 import { NextRequest } from 'next/server';
 
@@ -21,12 +40,14 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/utils/prismaDB';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { sendDispatchStatusNotification } from '@/services/notifications/delivery-status';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 
 // Get mocked versions
 const mockedPrisma = jest.mocked(prisma);
 const mockedCreateClient = jest.mocked(createClient);
 const mockedCreateAdminClient = jest.mocked(createAdminClient);
 const mockedSendDispatchStatusNotification = jest.mocked(sendDispatchStatusNotification);
+const mockedRecordLifecycle = jest.mocked(recordAndDispatchLifecycleEvent);
 
 // Track calls to channel methods
 let channelSendCalls: any[] = [];
@@ -213,6 +234,81 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(response.status).toBe(200);
       const data = await response.json();
       expect(data.orderNumber).toBe('CAT-001');
+    });
+  });
+
+  describe('Partner lifecycle webhook (registry partners, e.g. CaterCow)', () => {
+    it('dispatches the partner lifecycle event on a client-leg driver transition', async () => {
+      // CC- order, ARRIVED_AT_VENDOR → EN_ROUTE_TO_CLIENT (maps to ON_THE_WAY).
+      setupMocks({
+        orderNumber: 'CC-12345',
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+      });
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ driverStatus: 'EN_ROUTE_TO_CLIENT' }, 'CC-12345');
+      const params = Promise.resolve({ order_number: 'CC-12345' });
+
+      const response = await PATCH(request, { params });
+      expect(response.status).toBe(200);
+
+      expect(mockedRecordLifecycle).toHaveBeenCalledTimes(1);
+      expect(mockedRecordLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderNumber: 'CC-12345',
+          partnerStatus: 'ON_THE_WAY',
+          driverStatus: 'EN_ROUTE_TO_CLIENT',
+          driver: { name: 'John Driver', phone: '555-1234' },
+        }),
+      );
+    });
+
+    it('does NOT dispatch on a vendor-leg transition (no partner-facing event)', async () => {
+      // ASSIGNED → EN_ROUTE_TO_VENDOR maps to null — vendor-leg detail isn't
+      // surfaced to partners, so no webhook should fire.
+      setupMocks({ orderNumber: 'CC-12345', status: 'ACTIVE', driverStatus: 'ASSIGNED' });
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }, 'CC-12345');
+      const params = Promise.resolve({ order_number: 'CC-12345' });
+
+      await PATCH(request, { params });
+
+      expect(mockedRecordLifecycle).not.toHaveBeenCalled();
+    });
+
+    it('does NOT dispatch on a status-only PATCH (no driverStatus)', async () => {
+      setupMocks({ orderNumber: 'CC-12345', status: 'ACTIVE', driverStatus: 'ASSIGNED' });
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ status: 'IN_PROGRESS' }, 'CC-12345');
+      const params = Promise.resolve({ order_number: 'CC-12345' });
+
+      await PATCH(request, { params });
+
+      expect(mockedRecordLifecycle).not.toHaveBeenCalled();
+    });
+
+    it('does not fail the driver request if the partner dispatch rejects', async () => {
+      // Fire-and-forget: even a thrown dispatch must not break the PATCH.
+      setupMocks({
+        orderNumber: 'CC-12345',
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+      });
+      mockedRecordLifecycle.mockRejectedValueOnce(new Error('partner down'));
+      const { PATCH } = await importRoute();
+
+      const request = createPatchRequest({ driverStatus: 'COMPLETED' }, 'CC-12345');
+      const params = Promise.resolve({ order_number: 'CC-12345' });
+
+      const response = await PATCH(request, { params });
+
+      expect(response.status).toBe(200);
+      expect(mockedRecordLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({ partnerStatus: 'DELIVERED' }),
+      );
     });
   });
 
