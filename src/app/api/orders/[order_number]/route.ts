@@ -319,6 +319,29 @@ function isStatusOnlyUpdate(body: Record<string, unknown>): boolean {
   return providedFields.every(field => statusFields.includes(field));
 }
 
+/**
+ * Run best-effort work *after* the response is sent — reliably.
+ *
+ * On Vercel the serverless function is frozen once the response returns, so a
+ * bare `fn().catch()` started during the request is dropped intermittently
+ * (observed live: ~half of partner-webhook emits, and by the same mechanism the
+ * realtime broadcast + status notifications below, were silently lost). `after()`
+ * keeps the function alive until the work finishes, without blocking the
+ * response. `after()` throws outside a request scope (e.g. a unit test calling
+ * the handler directly), so fall back to running inline there.
+ */
+function runAfterResponse(label: string, work: () => Promise<unknown>): void {
+  const safe = () =>
+    Promise.resolve()
+      .then(work)
+      .catch((err) => console.error(label, err));
+  try {
+    after(safe);
+  } catch {
+    void safe();
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ order_number: string }> }
@@ -721,26 +744,26 @@ export async function PATCH(
 
           // Send customer notification for relevant statuses
           if (CUSTOMER_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
-            sendDispatchStatusNotification({
-              status: dispatchStatus,
-              dispatchId,
-              orderId,
-              recipientType: 'CUSTOMER',
-            }).catch((err) => {
-              console.error('Failed to send customer notification:', err);
-            });
+            runAfterResponse('Failed to send customer notification:', () =>
+              sendDispatchStatusNotification({
+                status: dispatchStatus,
+                dispatchId,
+                orderId,
+                recipientType: 'CUSTOMER',
+              }),
+            );
           }
 
           // Send admin notification for relevant statuses
           if (ADMIN_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
-            sendDispatchStatusNotification({
-              status: dispatchStatus,
-              dispatchId,
-              orderId,
-              recipientType: 'ADMIN',
-            }).catch((err) => {
-              console.error('Failed to send admin notification:', err);
-            });
+            runAfterResponse('Failed to send admin notification:', () =>
+              sendDispatchStatusNotification({
+                status: dispatchStatus,
+                dispatchId,
+                orderId,
+                recipientType: 'ADMIN',
+              }),
+            );
           }
         }
 
@@ -800,13 +823,10 @@ export async function PATCH(
           }
         };
 
-        // Fire and forget - don't block the response. Attach .catch so any rejection
-        // from the broadcast (subscribe timeout, send failure) is surfaced rather than
-        // becoming an unhandled promise rejection that may crash the worker under
-        // --unhandled-rejections=strict.
-        broadcastDeliveryStatus().catch((err) => {
-          console.error('Failed to broadcast delivery status update:', err);
-        });
+        // Deferred past the response with after() (via runAfterResponse) so the
+        // broadcast isn't dropped when Vercel freezes the function — previously a
+        // bare dangling promise, so live-tracking updates were lost ~half the time.
+        runAfterResponse('Failed to broadcast delivery status update:', broadcastDeliveryStatus);
 
         // Registry-driven partner status webhook (e.g. CaterCow). The driver
         // app advances order status through THIS route, so the outbound
@@ -815,14 +835,8 @@ export async function PATCH(
         // records to order_status_history then POSTs an HMAC-signed webhook;
         // it self-guards against legacy carriers (CaterValley/ezCater own their
         // outbound path) and non-partner orders, never throws, and no-ops when
-        // the partner has no webhook URL/secret configured.
-        //
-        // Deferred with after() (NOT a bare dangling promise): on Vercel the
-        // function is frozen once the response is sent, so post-response work
-        // started with `fn().catch()` is dropped ~half the time — observed live
-        // as the order txn committing but order_status_history staying empty and
-        // no partner callback firing. after() keeps the function alive until the
-        // history write + webhook finish, without blocking the driver's response.
+        // the partner has no webhook URL/secret configured. Deferred via
+        // runAfterResponse so the post-response work survives the Vercel freeze.
         const partnerLifecycle =
           DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
             driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
@@ -833,7 +847,7 @@ export async function PATCH(
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          const emitLifecycle = () =>
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', () =>
             recordAndDispatchLifecycleEvent({
               orderId: (updatedOrder as any).id,
               orderNumber: (updatedOrder as any).orderNumber,
@@ -841,16 +855,8 @@ export async function PATCH(
               driverStatus,
               changedBy: user.id ?? driverProfile?.id ?? null,
               driver,
-            }).catch((err) => {
-              console.error('Failed to dispatch partner lifecycle webhook:', err);
-            });
-          // after() throws outside a request scope (e.g. unit tests); fall back
-          // to running inline there so the call still happens.
-          try {
-            after(emitLifecycle);
-          } catch {
-            void emitLifecycle();
-          }
+            }),
+          );
         }
       }
 
@@ -860,18 +866,17 @@ export async function PATCH(
         const customerName = (updatedOrder as any).user?.name || 'Customer';
 
         if (customerEmail) {
-          // Import dynamically to avoid circular dependencies
-          import('@/services/notifications/order-update').then(({ sendOrderUpdateNotification }) => {
-            sendOrderUpdateNotification({
+          runAfterResponse('Failed to send order update notification:', async () => {
+            // Import dynamically to avoid circular dependencies.
+            const { sendOrderUpdateNotification } = await import(
+              '@/services/notifications/order-update'
+            );
+            await sendOrderUpdateNotification({
               order: updatedOrder as any,
               changes,
               customerEmail,
               customerName,
-            }).catch((err) => {
-              console.error('Failed to send order update notification:', err);
             });
-          }).catch((err) => {
-            console.error('Failed to import order update notification service:', err);
           });
         }
       }
