@@ -1,5 +1,5 @@
 // src/app/api/orders/[order_number]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
@@ -815,8 +815,14 @@ export async function PATCH(
         // records to order_status_history then POSTs an HMAC-signed webhook;
         // it self-guards against legacy carriers (CaterValley/ezCater own their
         // outbound path) and non-partner orders, never throws, and no-ops when
-        // the partner has no webhook URL/secret configured. Fire-and-forget so
-        // partner delivery (up to 3 retries) never blocks the driver's response.
+        // the partner has no webhook URL/secret configured.
+        //
+        // Deferred with after() (NOT a bare dangling promise): on Vercel the
+        // function is frozen once the response is sent, so post-response work
+        // started with `fn().catch()` is dropped ~half the time — observed live
+        // as the order txn committing but order_status_history staying empty and
+        // no partner callback firing. after() keeps the function alive until the
+        // history write + webhook finish, without blocking the driver's response.
         const partnerLifecycle =
           DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
             driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
@@ -827,16 +833,24 @@ export async function PATCH(
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          recordAndDispatchLifecycleEvent({
-            orderId: (updatedOrder as any).id,
-            orderNumber: (updatedOrder as any).orderNumber,
-            partnerStatus: partnerLifecycle,
-            driverStatus,
-            changedBy: user.id ?? driverProfile?.id ?? null,
-            driver,
-          }).catch((err) => {
-            console.error('Failed to dispatch partner lifecycle webhook:', err);
-          });
+          const emitLifecycle = () =>
+            recordAndDispatchLifecycleEvent({
+              orderId: (updatedOrder as any).id,
+              orderNumber: (updatedOrder as any).orderNumber,
+              partnerStatus: partnerLifecycle,
+              driverStatus,
+              changedBy: user.id ?? driverProfile?.id ?? null,
+              driver,
+            }).catch((err) => {
+              console.error('Failed to dispatch partner lifecycle webhook:', err);
+            });
+          // after() throws outside a request scope (e.g. unit tests); fall back
+          // to running inline there so the call still happens.
+          try {
+            after(emitLifecycle);
+          } catch {
+            void emitLifecycle();
+          }
         }
       }
 
