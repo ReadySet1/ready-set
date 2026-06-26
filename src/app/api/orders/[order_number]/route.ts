@@ -1,5 +1,5 @@
 // src/app/api/orders/[order_number]/route.ts
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
@@ -29,6 +29,7 @@ import {
   recordAndDispatchLifecycleEvent,
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
+import { runAfterResponse } from '@/lib/api/after-response';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -317,29 +318,6 @@ function isStatusOnlyUpdate(body: Record<string, unknown>): boolean {
   const statusFields = ['status', 'driverStatus'];
   const providedFields = Object.keys(body).filter(key => body[key] !== undefined);
   return providedFields.every(field => statusFields.includes(field));
-}
-
-/**
- * Run best-effort work *after* the response is sent — reliably.
- *
- * On Vercel the serverless function is frozen once the response returns, so a
- * bare `fn().catch()` started during the request is dropped intermittently
- * (observed live: ~half of partner-webhook emits, and by the same mechanism the
- * realtime broadcast + status notifications below, were silently lost). `after()`
- * keeps the function alive until the work finishes, without blocking the
- * response. `after()` throws outside a request scope (e.g. a unit test calling
- * the handler directly), so fall back to running inline there.
- */
-function runAfterResponse(label: string, work: () => Promise<unknown>): void {
-  const safe = () =>
-    Promise.resolve()
-      .then(work)
-      .catch((err) => console.error(label, err));
-  try {
-    after(safe);
-  } catch {
-    void safe();
-  }
 }
 
 export async function PATCH(
