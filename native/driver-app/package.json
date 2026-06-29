@@ -11,13 +11,13 @@
     "open:android": "cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2",
-    "@capacitor-community/background-geolocation": "^1.2.20"
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
+    "@capacitor/cli": "^8.4.1",
     "typescript": "^5.4.5"
   }
 }
