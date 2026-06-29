@@ -1,0 +1,11 @@
+# Capacitor-generated native projects (regenerated via `npx cap add ios/android`)
+/ios/
+/android/
+
+# Dependencies
+/node_modules/
+package-lock.json
+
+# Build / tooling
+.DS_Store
+*.log

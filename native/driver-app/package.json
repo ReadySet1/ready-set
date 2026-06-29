@@ -1,0 +1,23 @@
+{
+  "name": "readyset-driver-native",
+  "version": "0.0.1-poc",
+  "private": true,
+  "description": "Thin Capacitor shell around the Ready Set /driver web app for true background GPS tracking (POC — gated, not for release).",
+  "scripts": {
+    "sync": "cap sync",
+    "ios": "cap run ios",
+    "android": "cap run android",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "typescript": "^5.4.5"
+  }
+}

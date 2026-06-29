@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Ready Set Driver</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #15202e;
+        color: #f4f7fb;
+      }
+      .wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 24px;
+        text-align: center;
+      }
+      .brand {
+        font-weight: 800;
+        font-size: 20px;
+        color: #fbd113;
+      }
+      .muted {
+        color: #94a3b8;
+        font-size: 14px;
+        max-width: 22rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Fallback page. The app normally loads the live /driver web UI via
+      capacitor.config.ts `server.url`; this is only shown if that URL is
+      unreachable (e.g. offline at launch).
+    -->
+    <div class="wrap">
+      <div class="brand">Ready Set Driver</div>
+      <div class="muted">
+        Can't reach the driver app right now. Check your connection and reopen.
+      </div>
+    </div>
+  </body>
+</html>
