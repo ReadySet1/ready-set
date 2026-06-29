@@ -1262,31 +1262,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               </div>
             </div>
 
-            {/* Order Timeline — hidden on mobile, visible on desktop sidebar */}
-            <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
-              <div className="border-b border-slate-100 p-6">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  Timeline
-                </h2>
-              </div>
-              <div className="p-6">
-                <DeliveryTimeline
-                  createdAt={order.createdAt}
-                  enRouteToVendorAt={(order as any).deliveryTimestamps?.enRouteToVendorAt}
-                  arrivedAtVendorAt={(order as any).deliveryTimestamps?.arrivedAtVendorAt}
-                  pickedUpAt={(order as any).deliveryTimestamps?.pickedUpAt}
-                  enRouteAt={(order as any).deliveryTimestamps?.enRouteAt}
-                  arrivedAtClientAt={(order as any).deliveryTimestamps?.arrivedAtClientAt}
-                  deliveredAt={(order as any).deliveryTimestamps?.deliveredAt}
-                  estimatedPickupTime={order.pickupDateTime}
-                  estimatedDeliveryTime={order.arrivalDateTime ?? order.completeDateTime}
-                  currentStatus={order.driverStatus}
-                  canUpdateStatus={canUserUpdateTimeline}
-                  onStatusUpdate={updateDriverStatus}
-                  compact
-                />
-              </div>
-            </div>
+            {/* Timeline intentionally rendered once, in the main column above
+                (see "Delivery Timeline"). A second sidebar copy duplicated the
+                pickup/delivery times on desktop. */}
           </div>
         </div>
       </motion.div>

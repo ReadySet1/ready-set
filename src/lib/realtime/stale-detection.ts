@@ -28,6 +28,18 @@ export const STALE_LOCATION_THRESHOLD_MS = 5 * 60 * 1000;
  */
 export const STALE_CHECK_INTERVAL_MS = 60 * 1000;
 
+/**
+ * Lightweight helper for UI components: is a driver's last GPS fix older than the
+ * stale threshold (or missing entirely)? Lets the admin map / driver list render an
+ * "offline" state — distinct from "stopped" — without instantiating the full detector.
+ */
+export function isLocationStale(lastLocationUpdate?: Date | string | null): boolean {
+  if (!lastLocationUpdate) return true;
+  const last = new Date(lastLocationUpdate).getTime();
+  if (Number.isNaN(last)) return true;
+  return Date.now() - last > STALE_LOCATION_THRESHOLD_MS;
+}
+
 // ============================================================================
 // Types
 // ============================================================================
