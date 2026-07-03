@@ -45,7 +45,7 @@ export function Segmented<T extends string>({
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "flex-1 whitespace-nowrap rounded-[9px] font-bold transition-all",
+              "flex-1 whitespace-nowrap rounded-[9px] font-semibold transition-all",
               small ? "min-h-driver-seg px-1.5 text-[12.5px]" : "min-h-driver-glyph-lg px-2 text-[13.5px]",
               active
                 ? "bg-driver-surface text-driver-text shadow-driver-sm"

@@ -19,7 +19,7 @@ export function StatusPill({ status, size = "md", className }: StatusPillProps) 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-extrabold",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold",
         sm ? "px-2.5 py-0.5 text-[11.5px]" : "px-3 py-1 text-[12.5px]",
         classes.bg,
         classes.ink,

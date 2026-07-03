@@ -31,7 +31,7 @@ export function StateBlock({
       <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-[20px] border border-driver-border bg-driver-surface-alt text-driver-subtle">
         <Icon className="h-driver-glyph w-driver-glyph" strokeWidth={1.8} />
       </div>
-      <div className="text-[16.5px] font-extrabold text-driver-text">{title}</div>
+      <div className="text-[16.5px] font-semibold text-driver-text">{title}</div>
       {body ? (
         <div className="max-w-driver-prose text-[13.5px] font-medium leading-relaxed text-driver-muted">
           {body}

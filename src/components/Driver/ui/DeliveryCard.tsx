@@ -56,7 +56,7 @@ export function DeliveryCard({
     >
       <div className="flex items-center gap-2">
         <TypeBadge type={type} />
-        <span className="font-mono text-[12.5px] font-bold text-driver-muted">
+        <span className="font-mono text-[12.5px] font-semibold text-driver-muted">
           {orderNumber}
         </span>
         <div className="flex-1" />
@@ -76,7 +76,7 @@ export function DeliveryCard({
         </span>
         <div className="flex items-center gap-1">
           {total ? (
-            <span className="text-[14px] font-extrabold text-driver-text">
+            <span className="text-[14px] font-semibold text-driver-text">
               {total}
             </span>
           ) : null}
@@ -98,7 +98,7 @@ function Stop({ tone, name }: { tone: "info" | "brand"; name: string }) {
           tone === "info" ? "bg-driver-info" : "bg-driver-brand",
         )}
       />
-      <span className="truncate text-[13.5px] font-bold text-driver-text">
+      <span className="truncate text-[13.5px] font-semibold text-driver-text">
         {name || "—"}
       </span>
     </div>

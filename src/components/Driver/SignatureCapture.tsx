@@ -174,7 +174,7 @@ export function SignatureCapture({
         type="button"
         onClick={onCancel}
         disabled={uploading}
-        className="text-[12.5px] font-bold text-driver-muted disabled:opacity-50"
+        className="text-[12.5px] font-semibold text-driver-muted disabled:opacity-50"
       >
         Cancel
       </button>

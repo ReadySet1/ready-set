@@ -75,7 +75,7 @@ export function BottomNav() {
               </span>
               <span
                 className={cn(
-                  "text-[10.5px] font-extrabold",
+                  "text-[10.5px] font-semibold",
                   active ? "text-driver-on-brand" : "text-driver-subtle",
                 )}
               >
