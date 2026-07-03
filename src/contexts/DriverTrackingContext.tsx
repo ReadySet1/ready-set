@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
 import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
@@ -91,7 +91,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   const {
     currentShift,
     isShiftActive,
-    startShift: startShiftBase,
+    startShift,
     endShift: endShiftBase,
     loading: shiftLoading,
     error: shiftError,
@@ -99,16 +99,15 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
 
   // Supplement the foreground web tracker with native background GPS while the
   // /driver app runs inside the Capacitor shell — so the trail survives a locked
-  // screen or a switch to Waze. Both calls no-op in a normal browser (the native
-  // plugin is only dynamically imported inside the native shell).
-  const startShift = useCallback(
-    async (location: LocationUpdate): Promise<boolean> => {
-      const started = await startShiftBase(location);
-      if (started) void startNativeShiftTrackingForDriver();
-      return started;
-    },
-    [startShiftBase],
-  );
+  // screen or a switch to Waze. Keyed on shift state (not the startShift call)
+  // so the watcher also re-arms when the app is relaunched mid-shift and when
+  // arming failed at shift start. Both helpers no-op in a normal browser (the
+  // native plugin is only dynamically imported inside the native shell) and are
+  // idempotent inside it.
+  useEffect(() => {
+    if (isShiftActive) void startNativeShiftTrackingForDriver();
+    else void stopNativeShiftTrackingForDriver();
+  }, [isShiftActive]);
 
   // Flush any queued GPS points before ending the shift, so the server-side
   // shift mileage (summed from driver_locations) reflects the full trail rather
