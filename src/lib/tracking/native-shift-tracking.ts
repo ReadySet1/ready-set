@@ -52,12 +52,14 @@ async function resolveDriverId(): Promise<string | null> {
 export async function startNativeShiftTrackingForDriver(): Promise<void> {
   if (!isCapacitorNative()) return;
   try {
-    const driverId = await resolveDriverId();
-    if (!driverId) return;
     const supabase = createClient();
     const { startNativeShiftTracking } = await import('./capacitor-tracking');
+    // The watcher always arms; the driver id resolves lazily per fix (and is
+    // then cached by the bridge). A 401 from /api/auth/session at shift start
+    // must not permanently disable background tracking — it retries on the
+    // next fix once the session heals.
     await startNativeShiftTracking({
-      driverId,
+      getDriverId: resolveDriverId,
       getAccessToken: async () =>
         (await supabase.auth.getSession()).data.session?.access_token ?? null,
     });

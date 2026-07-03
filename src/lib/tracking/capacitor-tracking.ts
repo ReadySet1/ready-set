@@ -32,7 +32,13 @@ const BackgroundGeolocation =
   registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 export interface NativeTrackingSession {
-  driverId: string;
+  /**
+   * Resolves the driver id. Called lazily on each fix until it succeeds (then
+   * cached), so a failed lookup at shift start — e.g. an expired server session
+   * returning 401 — heals on its own once auth recovers, instead of silently
+   * disabling background tracking for the whole shift.
+   */
+  getDriverId: () => Promise<string | null>;
   /** Returns a fresh Supabase access token (refresh-aware); null if signed out. */
   getAccessToken: () => Promise<string | null>;
 }
@@ -42,6 +48,7 @@ const POST_THROTTLE_MS = 5000;
 
 let watcherId: string | null = null;
 let lastPostAt = 0;
+let cachedDriverId: string | null = null;
 
 /** True only inside the Capacitor native shell — false in any web browser. */
 export function isNativeTrackingAvailable(): boolean {
@@ -87,7 +94,12 @@ export async function startNativeShiftTracking(
 
       const token = await session.getAccessToken();
       if (!token) return; // signed out / token unavailable — skip this fix
-      await postLocation(location, session.driverId, token);
+
+      if (!cachedDriverId) {
+        cachedDriverId = await session.getDriverId();
+        if (!cachedDriverId) return; // auth not healed yet — next fix retries
+      }
+      await postLocation(location, cachedDriverId, token);
     },
   );
 }
@@ -100,6 +112,7 @@ export async function stopNativeShiftTracking(): Promise<void> {
   } finally {
     watcherId = null;
     lastPostAt = 0;
+    cachedDriverId = null;
   }
 }
 
