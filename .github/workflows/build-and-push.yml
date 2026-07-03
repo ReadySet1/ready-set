@@ -26,11 +26,12 @@ name: Build & Push Image
 #     NEXT_PUBLIC_SENTRY_DSN
 #     BUILD_DATABASE_URL              (optional: only if pages hit the DB at build)
 #     BUILD_DIRECT_URL                (optional)
-#     COOLIFY_DEPLOY_WEBHOOK          (optional: Coolify app's deploy webhook URL)
-#     COOLIFY_API_TOKEN               (optional: bearer token for the webhook)
+#     DOKPLOY_DEV_DEPLOY_WEBHOOK      (optional: dev app's deploy webhook —
+#                                      https://dokploy.readysetllc.com/api/deploy/<refreshToken>)
+#     DOKPLOY_PROD_DEPLOY_WEBHOOK     (optional: prod app's deploy webhook, same shape)
 #
 # NOTE: runtime server secrets (real DATABASE_URL, Supabase service key, Stripe,
-# SendGrid/Resend, Cloudinary, etc.) are set in COOLIFY's env, NOT here — they
+# SendGrid/Resend, Cloudinary, etc.) are set in DOKPLOY's env, NOT here — they
 # are not needed to build the image.
 
 on:
@@ -114,19 +115,25 @@ jobs:
             DATABASE_URL=${{ secrets.BUILD_DATABASE_URL }}
             DIRECT_URL=${{ secrets.BUILD_DIRECT_URL }}
 
-      # Optional: tell Coolify to pull + redeploy the new image (closes the loop,
-      # giving you the Vercel-like "push -> live" flow). Safe to omit if you'd
-      # rather click Deploy in Coolify. No-op unless the webhook secret is set.
-      - name: Trigger Coolify redeploy
-        if: github.ref == 'refs/heads/main'
+      # Tell Dokploy to pull + redeploy the new image (closes the loop — the
+      # Vercel-like "push -> live" flow). Each branch maps to its own Dokploy
+      # application; the webhook URL embeds that app's refresh token, so no
+      # auth header is needed. No-op if the branch's secret isn't set (then
+      # deploy manually from the Dokploy panel).
+      - name: Trigger Dokploy redeploy
         env:
-          WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
-          TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          DEV_WEBHOOK: ${{ secrets.DOKPLOY_DEV_DEPLOY_WEBHOOK }}
+          PROD_WEBHOOK: ${{ secrets.DOKPLOY_PROD_DEPLOY_WEBHOOK }}
+          BRANCH: ${{ github.ref_name }}
         run: |
+          case "$BRANCH" in
+            development) WEBHOOK="$DEV_WEBHOOK" ;;
+            main)        WEBHOOK="$PROD_WEBHOOK" ;;
+            *)           WEBHOOK="" ;;
+          esac
           if [ -z "$WEBHOOK" ]; then
-            echo "COOLIFY_DEPLOY_WEBHOOK not set — skipping auto-redeploy (deploy manually in Coolify)."
+            echo "No Dokploy deploy webhook configured for branch '$BRANCH' — skipping auto-redeploy."
             exit 0
           fi
-          curl --fail --silent --show-error -X GET \
-            -H "Authorization: Bearer ${TOKEN}" \
-            "$WEBHOOK"
+          curl --fail --silent --show-error "$WEBHOOK"
+          echo "Dokploy redeploy triggered for branch '$BRANCH'."
