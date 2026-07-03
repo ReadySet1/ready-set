@@ -50,7 +50,7 @@ export function StatTile({
         {delta ? (
           <span
             className={cn(
-              "text-[11px] font-extrabold",
+              "text-[11px] font-semibold",
               down ? "text-driver-error" : "text-driver-success",
             )}
           >
@@ -58,7 +58,7 @@ export function StatTile({
           </span>
         ) : null}
       </div>
-      <div className="text-[20px] font-extrabold leading-[1.05] tracking-[-0.02em] text-driver-text">
+      <div className="text-[20px] font-semibold leading-[1.05] tracking-[-0.02em] text-driver-text">
         {value === null ||
         value === undefined ||
         value === "" ||
@@ -66,7 +66,7 @@ export function StatTile({
           ? "—"
           : value}
       </div>
-      <div className="text-[11px] font-bold leading-tight text-driver-muted">
+      <div className="text-[11px] font-semibold leading-tight text-driver-muted">
         {label}
       </div>
       {sub ? (

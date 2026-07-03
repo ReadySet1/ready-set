@@ -48,15 +48,15 @@ export function ShiftPill() {
           <span className="absolute inline-flex h-full w-full animate-driver-ping rounded-full bg-driver-success opacity-70" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-driver-success" />
         </span>
-        <span className="text-[13px] font-extrabold">On shift</span>
+        <span className="text-[13px] font-semibold">On shift</span>
         {startedAt ? (
-          <span className="font-mono text-[13px] font-bold tabular-nums">
+          <span className="font-mono text-[13px] font-semibold tabular-nums">
             {formatDuration(elapsed)}
           </span>
         ) : null}
         <div className="flex-1" />
         {activeCount > 0 ? (
-          <span className="text-[12.5px] font-bold opacity-80">
+          <span className="text-[12.5px] font-semibold opacity-80">
             {activeCount} active
           </span>
         ) : null}

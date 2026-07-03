@@ -44,7 +44,7 @@ export function DriverPodSheet({
       >
         <div className="mx-auto w-full max-w-2xl">
           <SheetHeader className="items-start">
-            <SheetTitle className="text-[18px] font-extrabold text-driver-text">
+            <SheetTitle className="text-[18px] font-semibold text-driver-text">
               Proof of delivery
             </SheetTitle>
           </SheetHeader>

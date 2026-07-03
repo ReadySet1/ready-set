@@ -363,7 +363,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       <DriverCard className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <StatusPill status={order.driverStatus} />
-          <span className="font-mono text-[12px] font-bold text-driver-subtle">
+          <span className="font-mono text-[12px] font-semibold text-driver-subtle">
             #{order.orderNumber}
           </span>
         </div>
@@ -382,7 +382,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
 
       {/* Timeline */}
       <DriverCard>
-        <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
           Progress
         </div>
         <StatusTimeline status={order.driverStatus} timestamps={timestamps} />
@@ -392,11 +392,11 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       <DriverCard className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
           <Store className="h-4 w-4 text-driver-info" strokeWidth={2.4} />
-          <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
             Pickup
           </span>
         </div>
-        <div className="text-driver-pip font-extrabold text-driver-text">{vendorName}</div>
+        <div className="text-driver-pip font-semibold text-driver-text">{vendorName}</div>
         {pickupLines.map((line) => (
           <div key={line} className="text-[13.5px] font-medium text-driver-muted">
             {line}
@@ -437,11 +437,11 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       <DriverCard className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
           <UserIcon className="h-4 w-4 text-driver-brand" strokeWidth={2.4} />
-          <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
             Drop-off
           </span>
         </div>
-        <div className="text-driver-pip font-extrabold text-driver-text">{clientName}</div>
+        <div className="text-driver-pip font-semibold text-driver-text">{clientName}</div>
         {deliveryLines.map((line) => (
           <div key={line} className="text-[13.5px] font-medium text-driver-muted">
             {line}
@@ -481,7 +481,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       <DriverCard className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
-          <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
             Order
           </span>
         </div>
@@ -509,7 +509,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       >
         <div className="mx-auto w-full max-w-2xl lg:max-w-5xl">
           {isDone ? (
-            <div className="flex min-h-driver-action items-center justify-center gap-2 rounded-2xl bg-driver-success-bg text-driver-pip font-extrabold text-driver-success-ink">
+            <div className="flex min-h-driver-action items-center justify-center gap-2 rounded-2xl bg-driver-success-bg text-driver-pip font-semibold text-driver-success-ink">
               <CheckCircle2 className="h-5 w-5" strokeWidth={2.6} />
               {resolved.status === "CANCELLED" ? "Delivery cancelled" : "Delivery complete"}
             </div>

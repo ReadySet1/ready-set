@@ -7,7 +7,7 @@ interface HealthBarProps {
   online?: boolean;
   /** true = real-time channel connected; false = REST/standard fallback. */
   realtime?: boolean;
-  /** GPS accuracy in meters (null when unknown). */
+  /** GPS accuracy in meters (null when unknown); displayed in feet — US-only app. */
   gps?: number | null;
   /** Battery level 0–100 (null when unsupported). */
   battery?: number | null;
@@ -77,12 +77,12 @@ export function HealthBar({
                 : "bg-driver-error ring-driver-error-bg",
             )}
           />
-          <span className="text-[13px] font-extrabold text-driver-text">
+          <span className="text-[13px] font-semibold text-driver-text">
             {online ? "Online" : "Offline"}
           </span>
         </div>
 
-        <span className="rounded-full border border-driver-border bg-driver-surface-alt px-2 py-driver-hair text-[11px] font-bold text-driver-muted">
+        <span className="rounded-full border border-driver-border bg-driver-surface-alt px-2 py-driver-hair text-[11px] font-semibold text-driver-muted">
           {online ? (realtime ? "Real-time" : "Standard") : `${queued} queued`}
         </span>
 
@@ -90,14 +90,14 @@ export function HealthBar({
 
         <div className="flex items-center gap-1.5">
           <Satellite className={cn("h-driver-pip w-driver-pip", TONE_COLOR[gTone])} strokeWidth={2.2} />
-          <span className="text-[12.5px] font-extrabold text-driver-text">
-            {gps == null ? "—" : `${Math.round(gps)}m`}
+          <span className="text-[12.5px] font-semibold text-driver-text">
+            {gps == null ? "—" : `${Math.round(gps * 3.28084)} ft`}
           </span>
         </div>
 
         <div className="flex items-center gap-1.5">
           <BatteryIcon className={cn("h-driver-pip w-driver-pip", TONE_COLOR[bTone])} strokeWidth={2.2} />
-          <span className="text-[12.5px] font-extrabold text-driver-text">
+          <span className="text-[12.5px] font-semibold text-driver-text">
             {battery == null ? "—" : `${Math.round(battery)}%`}
           </span>
         </div>

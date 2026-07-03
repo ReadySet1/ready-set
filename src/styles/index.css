@@ -56,6 +56,12 @@
   --rs-driver-brand-ink: #1a1a1a;
   --rs-driver-on-brand-subtle: #854d0e;
 
+  /* ink action fill (v2 handoff: primary actions are ink/dark, amber is
+   * only the trailing icon chip; inverts to near-white on dark) */
+  --rs-driver-ink: #15202e;
+  --rs-driver-ink-hover: #243347;
+  --rs-driver-on-ink: #ffffff;
+
   /* semantic status — light ({color} / {bg} / {ink}) */
   --rs-driver-success: #16a34a;
   --rs-driver-success-bg: #dcfce7;
@@ -95,6 +101,11 @@
 
   /* brand (amber accent text reads brighter on dark) */
   --rs-driver-on-brand-subtle: #fbd113;
+
+  /* ink action fill — inverted on dark */
+  --rs-driver-ink: #f4f7fb;
+  --rs-driver-ink-hover: #ffffff;
+  --rs-driver-on-ink: #15202e;
 
   /* semantic status — dark */
   --rs-driver-success: #34d399;

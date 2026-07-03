@@ -74,9 +74,9 @@ export function StatusTimeline({
                 className={cn(
                   "text-[13.5px]",
                   active
-                    ? "font-extrabold text-driver-text"
+                    ? "font-semibold text-driver-text"
                     : done
-                      ? "font-bold text-driver-text"
+                      ? "font-semibold text-driver-text"
                       : "font-semibold text-driver-subtle",
                 )}
               >

@@ -195,7 +195,7 @@ export default function DriverTrackingPortal() {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-driver-success-bg px-3 py-1.5">
         <span className="h-2 w-2 animate-driver-pulse rounded-full bg-driver-success" />
-        <span className="font-mono text-[13px] font-extrabold tabular-nums text-driver-success-ink">
+        <span className="font-mono text-[13px] font-semibold tabular-nums text-driver-success-ink">
           {formatDuration(elapsed)}
         </span>
       </span>
@@ -244,7 +244,7 @@ export default function DriverTrackingPortal() {
         {!isOnline ? (
           <div className="flex items-center gap-2 rounded-2xl border border-driver-warning/30 bg-driver-warning-bg px-4 py-3 text-driver-warning-ink">
             <CloudOff className="h-4 w-4 shrink-0" />
-            <span className="text-[13px] font-bold">
+            <span className="text-[13px] font-semibold">
               You&apos;re offline{queuedItems > 0 ? ` — ${queuedItems} updates queued` : ""}
             </span>
           </div>
@@ -286,7 +286,7 @@ export default function DriverTrackingPortal() {
             {/* Shift control bar */}
             <DriverCard className="flex items-center justify-between">
               <div>
-                <div className="text-[13px] font-extrabold text-driver-text">
+                <div className="text-[13px] font-semibold text-driver-text">
                   On shift
                 </div>
                 <div className="text-[11.5px] font-semibold text-driver-muted">
@@ -312,7 +312,7 @@ export default function DriverTrackingPortal() {
 
             {/* Active deliveries */}
             <section className="space-y-3">
-              <h2 className="text-[14px] font-extrabold uppercase tracking-[0.04em] text-driver-muted">
+              <h2 className="text-[14px] font-semibold uppercase tracking-[0.04em] text-driver-muted">
                 Active deliveries
                 {activeDeliveries.length > 0 ? ` — ${activeDeliveries.length} in progress` : ""}
               </h2>
@@ -351,7 +351,7 @@ export default function DriverTrackingPortal() {
                     >
                       <div className="flex items-center gap-2">
                         <TypeBadge type={orderType} />
-                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-bold text-driver-muted">
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold text-driver-muted">
                           #{orderNumber}
                         </span>
                         <div className="shrink-0">
@@ -391,7 +391,7 @@ export default function DriverTrackingPortal() {
                       ) : (
                         <div className="flex items-center gap-2 rounded-2xl bg-driver-success-bg px-4 py-3 text-driver-success-ink">
                           <CheckCircle2 className="h-4 w-4" />
-                          <span className="text-[13px] font-extrabold">
+                          <span className="text-[13px] font-semibold">
                             Delivered
                           </span>
                         </div>
@@ -411,7 +411,7 @@ export default function DriverTrackingPortal() {
           <DriverCard className="space-y-4">
             <div className="flex flex-col items-center py-4 text-center">
               <Truck className="mb-2 h-12 w-12 text-driver-subtle" />
-              <p className="text-[17px] font-extrabold text-driver-text">
+              <p className="text-[17px] font-semibold text-driver-text">
                 {permissionState === "denied"
                   ? "Location is turned off"
                   : currentLocation

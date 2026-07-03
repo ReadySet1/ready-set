@@ -41,7 +41,7 @@ export function DriverStatsPanel({ driverId }: DriverStatsPanelProps) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-[14px] font-extrabold uppercase tracking-[0.04em] text-driver-muted">
+      <h2 className="text-[14px] font-semibold uppercase tracking-[0.04em] text-driver-muted">
         Performance
       </h2>
 

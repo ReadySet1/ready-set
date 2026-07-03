@@ -45,10 +45,10 @@ export default function DriverOrderPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
               Delivery
             </div>
-            <div className="truncate font-mono text-[16px] font-bold text-driver-text">
+            <div className="truncate font-mono text-[16px] font-semibold text-driver-text">
               {orderNumber ? `#${orderNumber}` : "…"}
             </div>
           </div>
