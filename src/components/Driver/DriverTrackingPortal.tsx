@@ -32,6 +32,7 @@ import {
   getStatusProgress,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 
 interface PodTarget {
@@ -45,6 +46,7 @@ export default function DriverTrackingPortal() {
   const [elapsed, setElapsed] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
+  const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
   // confusing — filter by scheduled pickup date. `null` = no explicit choice,
   // in which case we default to Today whenever today has at least one.
@@ -178,6 +180,13 @@ export default function DriverTrackingPortal() {
     if (!next) return;
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
+    // The pickup step routes through vendor-signature capture (mandatory per
+    // the 2026-06-22 decision — mirrors the gate in DriverDeliveryDetail; the
+    // server also rejects an unsigned PICKED_UP).
+    if (next === DriverStatus.PICKED_UP) {
+      setSigTarget({ deliveryId: delivery.id, orderNumber });
+      return;
+    }
     // The final step routes through proof-of-delivery capture.
     if (next === DriverStatus.COMPLETED) {
       setPodTarget({ deliveryId: delivery.id, orderNumber });
@@ -192,6 +201,13 @@ export default function DriverTrackingPortal() {
     // having to re-capture the proof after only seeing the error toast.
     const ok = await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
     if (ok) setPodTarget(null);
+  };
+
+  const onSignatureComplete = async () => {
+    if (!sigTarget) return;
+    // Same retry semantics as POD: keep the sheet open if the advance fails.
+    const ok = await advanceStatus(sigTarget.deliveryId, DriverStatus.PICKED_UP);
+    if (ok) setSigTarget(null);
   };
 
   const isPickupToday = (d?: Date) =>
@@ -529,6 +545,15 @@ export default function DriverTrackingPortal() {
           </DriverCard>
         )}
       </div>
+
+      {sigTarget ? (
+        <DriverSignatureSheet
+          open={!!sigTarget}
+          onOpenChange={(o) => !o && setSigTarget(null)}
+          orderNumber={sigTarget.orderNumber}
+          onComplete={() => void onSignatureComplete()}
+        />
+      ) : null}
 
       {podTarget ? (
         <DriverPodSheet
