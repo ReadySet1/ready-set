@@ -1,5 +1,8 @@
+"use client";
+
 // src/components/Orders/DriverStatus.tsx
 
+import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +92,17 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   onAssignDriver,
   showAssignDriverButton = true,
 }) => {
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+
+  const handleStatusSelect = async (statusOption: DriverStatus) => {
+    setIsUpdatingStatus(true);
+    try {
+      await updateDriverStatus(statusOption);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const getProgressValue = (status: DriverStatus | null | undefined) => {
     return status ? driverStatusProgress[status] : 0;
   };
@@ -229,6 +243,40 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                       <Clock className="h-3.5 w-3.5" />
                       {getEstimatedTimeRemaining(order.driver_status)}
                     </span>
+                  )}
+
+                  {/* Staff correction: set any driver status (incl. backwards —
+                      "Assigned" undoes an accidentally started delivery). */}
+                  {canUpdateDriverStatus && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isUpdatingStatus}
+                        >
+                          {isUpdatingStatus ? "Updating…" : "Change status"}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {(Object.keys(driverStatusMap) as DriverStatus[]).map(
+                          (statusOption) => (
+                            <DropdownMenuItem
+                              key={statusOption}
+                              disabled={statusOption === order.driver_status}
+                              onClick={() => handleStatusSelect(statusOption)}
+                            >
+                              {driverStatusMap[statusOption]}
+                              {statusOption === DriverStatus.ASSIGNED &&
+                              order.driver_status &&
+                              order.driver_status !== DriverStatus.ASSIGNED
+                                ? " (reset progress)"
+                                : ""}
+                            </DropdownMenuItem>
+                          ),
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               </div>

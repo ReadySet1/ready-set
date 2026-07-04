@@ -514,9 +514,13 @@ export async function PATCH(
       }
     }
 
+    // The forward-only driver graph binds DRIVERS; admin/helpdesk may move
+    // driverStatus freely — the repair path for an accidentally-started
+    // delivery (Jul-3 walk) is resetting it back to ASSIGNED.
     if (
       driverStatus &&
       driverStatus !== currentDriverStatus &&
+      !callerIsPrivileged &&
       !canTransitionDriver(currentDriverStatus, driverStatus as DriverStatus)
     ) {
       return NextResponse.json(
@@ -559,6 +563,7 @@ export async function PATCH(
     if (
       status &&
       status !== currentStatus &&
+      !callerIsPrivileged &&
       !canTransitionOrder(currentStatus, status as OrderStatus)
     ) {
       return NextResponse.json(

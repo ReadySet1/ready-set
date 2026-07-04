@@ -469,6 +469,64 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     });
   });
 
+  describe('Privileged driver-status repair (undo accidental start)', () => {
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    it('lets HELPDESK move driverStatus backwards (PICKED_UP -> ASSIGNED) with the order status', async () => {
+      // The Jul-3 walk: a driver accidentally started a delivery and nothing
+      // could undo it — the forward-only graph 422'd even privileged callers.
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' });
+      mockCaller('helpdesk-user', 'HELPDESK');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(
+        createPatchRequest({ driverStatus: 'ASSIGNED', status: 'ASSIGNED' }),
+        { params: Promise.resolve({ order_number: 'CAT-001' }) },
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            driverStatus: 'ASSIGNED',
+            status: 'ASSIGNED',
+          }),
+        }),
+      );
+    });
+
+    it('still rejects a backward driverStatus move from the assigned driver (graph binds drivers)', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' });
+      mockCaller('driver-456', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(
+        createPatchRequest({ driverStatus: 'ASSIGNED' }),
+        { params: Promise.resolve({ order_number: 'CAT-001' }) },
+      );
+
+      expect(response.status).toBe(422);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Pickup-signature enforcement on PICKED_UP', () => {
     // Same caller-mock shape as the IDOR block above: `userId` is the
     // authenticated user, `type` drives the privileged check.

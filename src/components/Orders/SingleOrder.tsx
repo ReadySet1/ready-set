@@ -674,7 +674,14 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             "Content-Type": "application/json",
           },
           credentials: "include",
-          body: JSON.stringify({ driverStatus: newStatus }),
+          // Resetting to ASSIGNED is the staff "undo an accidental start"
+          // path — roll the order status back with it so the whole order
+          // returns to its pre-start state.
+          body: JSON.stringify(
+            newStatus === DriverStatus.ASSIGNED
+              ? { driverStatus: newStatus, status: "ASSIGNED" }
+              : { driverStatus: newStatus },
+          ),
         },
       );
 
