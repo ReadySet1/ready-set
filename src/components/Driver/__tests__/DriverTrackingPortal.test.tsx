@@ -39,6 +39,16 @@ jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
   ),
 }));
 
+jest.mock("@/components/Driver/SignatureCapture", () => ({
+  SignatureCapture: ({ onUploadComplete }: any) => (
+    <div data-testid="signature-capture">
+      <button onClick={() => onUploadComplete("https://pod.example/signature.png")}>
+        finish signature upload
+      </button>
+    </div>
+  ),
+}));
+
 const mockUseDriverTracking = useDriverTracking as jest.MockedFunction<
   typeof useDriverTracking
 >;
@@ -281,6 +291,47 @@ describe("DriverTrackingPortal (redesigned)", () => {
     // podTarget is only cleared on success — the sheet must stay open so the
     // driver can retry without re-capturing the proof.
     expect(screen.getByTestId("pod-capture")).toBeInTheDocument();
+  });
+
+  it("routes the pickup step through the signature sheet instead of advancing directly", async () => {
+    // Jul-3 walk-test regression: this surface advanced ARRIVED_AT_VENDOR ->
+    // PICKED_UP with no vendor signature (the gate only existed in
+    // DriverDeliveryDetail). The pickup mandate applies on every surface.
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_AT_VENDOR,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/picked up the order/i));
+
+    // The signature sheet opens and NO status update happens yet.
+    expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+    expect(updateDeliveryStatus).not.toHaveBeenCalled();
+
+    // Completing the signature advances to PICKED_UP.
+    fireEvent.click(
+      screen.getByRole("button", { name: /finish signature upload/i }),
+    );
+    await waitFor(() =>
+      expect(updateDeliveryStatus).toHaveBeenCalledWith(
+        "del-1",
+        DriverStatus.PICKED_UP,
+        sampleLocation,
+      ),
+    );
   });
 
   it("shows an offline banner when offline", () => {
