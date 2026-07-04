@@ -65,7 +65,9 @@ export function getCloudinaryUrl(
   // Ensure publicId doesn't have leading slash
   const cleanPublicId = publicId.startsWith('/') ? publicId.slice(1) : publicId;
 
-  return `${CLOUDINARY_BASE_URL}/${transforms}/${folder}/${cleanPublicId}`;
+  const versionSegment = options?.version ? `v${options.version}/` : '';
+
+  return `${CLOUDINARY_BASE_URL}/${transforms}/${versionSegment}${folder}/${cleanPublicId}`;
 }
 
 /**

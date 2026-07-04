@@ -33,13 +33,13 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
     },
     {
       name: "Grace Deli & Cafe",
-      image: getCloudinaryUrl("food/partners/grace"),
+      image: getCloudinaryUrl("food/partners/grace", { version: 1751551200 }),
       alt: "Grace Deli & Cafe logo",
       url: "https://www.grace303.com/",
     },
     {
       name: "Kasa Indian Eatery",
-      image: getCloudinaryUrl("food/partners/kasa"),
+      image: getCloudinaryUrl("food/partners/kasa", { version: 1751551200 }),
       alt: "Kasa Indian Eatery logo",
       url: "https://kasaindian.com/",
     },
@@ -57,7 +57,7 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
     },
     {
       name: "Conviva",
-      image: getCloudinaryUrl("food/partners/conviva"),
+      image: getCloudinaryUrl("food/partners/conviva", { version: 1751551200 }),
       alt: "Conviva logo",
       url: "https://www.conviva.com/",
     },

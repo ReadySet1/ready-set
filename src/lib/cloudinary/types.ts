@@ -55,6 +55,13 @@ export interface CloudinaryTransformOptions {
    * - 3: High DPI (3x)
    */
   dpr?: 1 | 2 | 3 | 'auto';
+
+  /**
+   * Version number for CDN cache busting.
+   * Use a timestamp (e.g. Date.now()) to force the CDN to serve a fresh copy
+   * after re-uploading an image to the same public ID.
+   */
+  version?: number;
 }
 
 /**
