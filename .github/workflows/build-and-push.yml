@@ -29,6 +29,11 @@ name: Build & Push Image
 #     DOKPLOY_DEV_DEPLOY_WEBHOOK      (optional: dev app's deploy webhook —
 #                                      https://dokploy.readysetllc.com/api/deploy/<refreshToken>)
 #     DOKPLOY_PROD_DEPLOY_WEBHOOK     (optional: prod app's deploy webhook, same shape)
+#     DEV_NEXT_PUBLIC_SUPABASE_ANON_KEY / DEV_BUILD_DATABASE_URL / DEV_BUILD_DIRECT_URL
+#       — rs-dev counterparts used for non-main builds (see the DEV_ vars too:
+#       DEV_NEXT_PUBLIC_SUPABASE_URL, DEV_NEXT_PUBLIC_SENTRY_ENVIRONMENT).
+#       main builds a production-flavored client bundle; development builds a
+#       dev-flavored one (rs-dev Supabase + Sentry env=development).
 #
 # NOTE: runtime server secrets (real DATABASE_URL, Supabase service key, Stripe,
 # SendGrid/Resend, Cloudinary, etc.) are set in DOKPLOY's env, NOT here — they
@@ -95,14 +100,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Branch-flavored client bundle: main bakes the production Supabase
+          # project + Sentry env; every other ref (i.e. development) bakes the
+          # rs-dev ones from the DEV_-prefixed repo vars/secrets. Only the values
+          # that actually differ between the two Vercel env targets are switched;
+          # everything else is shared. This is what lets the :development image
+          # run against the dev database with matching client-side auth.
           build-args: |
-            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ github.ref == 'refs/heads/main' && vars.NEXT_PUBLIC_SUPABASE_URL || vars.DEV_NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ github.ref == 'refs/heads/main' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.DEV_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=${{ vars.NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES }}
             NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=${{ vars.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD }}
             NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
             NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
-            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ github.ref == 'refs/heads/main' && vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT || vars.DEV_NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ vars.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${{ vars.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
@@ -112,8 +123,8 @@ jobs:
             NEXT_PUBLIC_SANITY_PROJECT_ID=${{ vars.NEXT_PUBLIC_SANITY_PROJECT_ID }}
             NEXT_PUBLIC_SANITY_DATASET=${{ vars.NEXT_PUBLIC_SANITY_DATASET }}
             NEXT_PUBLIC_SANITY_API_VERSION=${{ vars.NEXT_PUBLIC_SANITY_API_VERSION }}
-            DATABASE_URL=${{ secrets.BUILD_DATABASE_URL }}
-            DIRECT_URL=${{ secrets.BUILD_DIRECT_URL }}
+            DATABASE_URL=${{ github.ref == 'refs/heads/main' && secrets.BUILD_DATABASE_URL || secrets.DEV_BUILD_DATABASE_URL }}
+            DIRECT_URL=${{ github.ref == 'refs/heads/main' && secrets.BUILD_DIRECT_URL || secrets.DEV_BUILD_DIRECT_URL }}
 
       # Tell Dokploy to pull + redeploy the new image (closes the loop — the
       # Vercel-like "push -> live" flow). Each branch maps to its own Dokploy
