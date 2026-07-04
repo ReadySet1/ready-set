@@ -58,6 +58,7 @@ export function ProofOfDeliveryCapture({
   onError,
   className,
   uploadEndpoint,
+  hideTitle = false,
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { permission, requestPermission, error: permissionError, isCameraSupported } = useCameraPermission();
@@ -510,7 +511,7 @@ export function ProofOfDeliveryCapture({
     <Card className={cn('w-full max-w-md', className)}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-lg">Proof of Delivery</CardTitle>
+          {!hideTitle && <CardTitle className="text-lg">Proof of Delivery</CardTitle>}
           {!offlineStatus.isOnline && (
             <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-700">
               <WifiOff className="h-3 w-3" />

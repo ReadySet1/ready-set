@@ -53,6 +53,7 @@ export function DriverPodSheet({
               deliveryId={deliveryId}
               orderNumber={orderNumber}
               isRequired
+              hideTitle
               uploadEndpoint={uploadEndpoint}
               onUploadComplete={(url) => onComplete(url)}
               onCancel={() => onOpenChange(false)}
