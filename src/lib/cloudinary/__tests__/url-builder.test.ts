@@ -92,6 +92,18 @@ describe('cloudinary url-builder', () => {
       expect(url).toContain('f_webp');
       expect(url).toContain('dpr_2');
     });
+
+    it('should include version segment before folder when version is provided', () => {
+      const url = getCloudinaryUrl('food/partners/kasa', { version: 1751551200 });
+
+      expect(url).toMatch(/f_auto,q_auto\/v1751551200\/ready-set\/food\/partners\/kasa/);
+    });
+
+    it('should not include version segment when version is omitted', () => {
+      const url = getCloudinaryUrl('food/partners/kasa');
+
+      expect(url).not.toMatch(/\/v\d+\//);
+    });
   });
 
   describe('getResponsiveCloudinaryUrl', () => {
