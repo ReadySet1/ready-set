@@ -89,6 +89,9 @@ export interface ProofOfDeliveryCaptureProps {
   className?: string;
   /** Custom upload endpoint - defaults to tracking API if not provided */
   uploadEndpoint?: string;
+  /** Hide the card's own "Proof of Delivery" title — for hosts (sheets/dialogs)
+   *  that already render a title above this component. */
+  hideTitle?: boolean;
 }
 
 /**

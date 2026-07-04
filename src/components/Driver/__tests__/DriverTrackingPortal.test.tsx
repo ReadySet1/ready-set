@@ -293,6 +293,46 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getByTestId("pod-capture")).toBeInTheDocument();
   });
 
+  it("filters Active deliveries by scheduled pickup date via the Today/All chips", () => {
+    const today = new Date();
+    const nextWeek = new Date(Date.now() + 7 * 24 * 3600_000);
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-today",
+            cateringRequestId: "CR-TODAY",
+            driverId: "driver-1",
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: today,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+          {
+            id: "del-later",
+            cateringRequestId: "CR-LATER",
+            driverId: "driver-1",
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: nextWeek,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    // Today has an entry, so the filter defaults to Today: only CR-TODAY shows.
+    expect(screen.getByText(/#CR-TODAY/)).toBeInTheDocument();
+    expect(screen.queryByText(/#CR-LATER/)).not.toBeInTheDocument();
+
+    // Switching to All reveals both.
+    fireEvent.click(screen.getByRole("button", { name: /all \(2\)/i }));
+    expect(screen.getByText(/#CR-TODAY/)).toBeInTheDocument();
+    expect(screen.getByText(/#CR-LATER/)).toBeInTheDocument();
+  });
+
   it("routes the pickup step through the signature sheet instead of advancing directly", async () => {
     // Jul-3 walk-test regression: this surface advanced ARRIVED_AT_VENDOR ->
     // PICKED_UP with no vendor signature (the gate only existed in

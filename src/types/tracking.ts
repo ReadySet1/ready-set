@@ -65,6 +65,8 @@ export interface DeliveryTracking {
   };
   estimatedArrival?: Date;
   actualArrival?: Date;
+  /** Scheduled pickup time from the order (drives the Today/All filter + card label). */
+  scheduledPickupAt?: Date;
   route: LocationUpdate[];
   proofOfDelivery?: string;
   actualDistanceMiles?: number;

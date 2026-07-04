@@ -47,6 +47,10 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
+  // confusing — filter by scheduled pickup date. `null` = no explicit choice,
+  // in which case we default to Today whenever today has at least one.
+  const [dayFilter, setDayFilter] = useState<"today" | "all" | null>(null);
 
   const {
     currentLocation,
@@ -206,6 +210,29 @@ export default function DriverTrackingPortal() {
     if (ok) setSigTarget(null);
   };
 
+  const isPickupToday = (d?: Date) =>
+    !!d && new Date(d).toDateString() === new Date().toDateString();
+  const todayCount = activeDeliveries.filter((d) =>
+    isPickupToday(d.scheduledPickupAt),
+  ).length;
+  const effectiveDayFilter =
+    dayFilter ?? (todayCount > 0 ? "today" : "all");
+  const visibleDeliveries =
+    effectiveDayFilter === "all"
+      ? activeDeliveries
+      : activeDeliveries.filter((d) => isPickupToday(d.scheduledPickupAt));
+
+  const formatPickup = (d: Date) =>
+    isPickupToday(d)
+      ? `today ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+      : d.toLocaleDateString([], {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }) +
+        " " +
+        d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
   const headerRight = useMemo(() => {
     if (!isShiftActive || !currentShift?.startTime) return null;
     return (
@@ -275,6 +302,8 @@ export default function DriverTrackingPortal() {
                   <DriverLiveMap
                     currentLocation={currentLocation}
                     activeDeliveries={activeDeliveries}
+                    driverId={currentShift?.driverId}
+                    shiftStartedAt={currentShift?.startTime}
                   />
                 </div>
               ) : (
@@ -333,14 +362,46 @@ export default function DriverTrackingPortal() {
                 {activeDeliveries.length > 0 ? ` — ${activeDeliveries.length} in progress` : ""}
               </h2>
 
+              {activeDeliveries.length > 0 ? (
+                <div className="flex gap-2" role="group" aria-label="Filter deliveries by date">
+                  {(
+                    [
+                      { key: "today", label: `Today (${todayCount})` },
+                      { key: "all", label: `All (${activeDeliveries.length})` },
+                    ] as const
+                  ).map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setDayFilter(chip.key)}
+                      aria-pressed={effectiveDayFilter === chip.key}
+                      className={cn(
+                        "rounded-full border px-4 py-1.5 text-[12.5px] font-semibold transition-colors",
+                        effectiveDayFilter === chip.key
+                          ? "border-transparent bg-driver-brand/15 text-driver-on-brand"
+                          : "border-driver-border bg-transparent text-driver-subtle",
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               {activeDeliveries.length === 0 ? (
                 <StateBlock
                   icon={CheckCircle2}
                   title="No active deliveries"
                   body="New assignments will appear here while you're on shift."
                 />
+              ) : visibleDeliveries.length === 0 ? (
+                <StateBlock
+                  icon={CheckCircle2}
+                  title="Nothing scheduled for today"
+                  body='Switch to "All" to see your other assignments.'
+                />
               ) : (
-                activeDeliveries.map((delivery, idx) => {
+                visibleDeliveries.map((delivery, idx) => {
                   const orderNumber =
                     delivery.cateringRequestId ||
                     delivery.onDemandId ||
@@ -374,6 +435,12 @@ export default function DriverTrackingPortal() {
                           <StatusPill status={delivery.status} size="sm" />
                         </div>
                       </div>
+
+                      {delivery.scheduledPickupAt ? (
+                        <div className="text-[12px] font-semibold text-driver-muted">
+                          Pickup {formatPickup(delivery.scheduledPickupAt)}
+                        </div>
+                      ) : null}
 
                       {delivery.estimatedArrival ? (
                         <div className="text-[12px] font-semibold text-driver-muted">
