@@ -468,4 +468,82 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(response.status).toBe(400);
     });
   });
+
+  describe('Pickup-signature enforcement on PICKED_UP', () => {
+    // Same caller-mock shape as the IDOR block above: `userId` is the
+    // authenticated user, `type` drives the privileged check.
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    it('rejects a driver PICKED_UP with 422 when no pickup_signature upload exists', async () => {
+      // The Jul-3 walk-test bug: the Live-Tracking tab advanced
+      // ARRIVED_AT_VENDOR -> PICKED_UP without the signature sheet. The server
+      // must be the backstop regardless of which client surface forgot the gate.
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(422);
+      const data = await response.json();
+      expect(data.code).toBe('PICKUP_SIGNATURE_REQUIRED');
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('allows a driver PICKED_UP once the pickup_signature upload exists', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue({ id: 'sig-1' });
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.fileUpload.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            category: 'pickup_signature',
+            cateringRequestId: 'order-123',
+          }),
+        }),
+      );
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('lets a privileged (HELPDESK) caller set PICKED_UP without a signature (data repair)', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      mockCaller('helpdesk-user', 'HELPDESK');
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+  });
 });

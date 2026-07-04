@@ -423,6 +423,7 @@ export async function PATCH(
     // status-only PATCH (`{ status }`) — the driver client sends the latter on
     // completion, and without this any authenticated user could drive any order's
     // status by order number (the role check below only runs for field updates).
+    let callerIsPrivileged = false;
     if (driverStatus || status) {
       const { data: callerProfile } = await supabase
         .from('profiles')
@@ -434,6 +435,7 @@ export async function PATCH(
         callerType === 'ADMIN' ||
         callerType === 'SUPER_ADMIN' ||
         callerType === 'HELPDESK';
+      callerIsPrivileged = privileged;
 
       if (!privileged) {
         const dispatches = (existingOrder as any).dispatches;
@@ -524,6 +526,36 @@ export async function PATCH(
         { status: 422 },
       );
     }
+    // The vendor-pickup signature is mandatory (2026-06-22 decision), and the
+    // sheet is client-side — so back it up here: a driver cannot mark PICKED_UP
+    // until a pickup_signature upload exists for the order. Admin/helpdesk are
+    // exempt so they can repair stuck orders.
+    if (
+      driverStatus === DriverStatus.PICKED_UP &&
+      currentDriverStatus !== DriverStatus.PICKED_UP &&
+      !callerIsPrivileged
+    ) {
+      const pickupSignature = await prisma.fileUpload.findFirst({
+        where: {
+          category: 'pickup_signature',
+          ...(orderType === 'catering'
+            ? { cateringRequestId: (existingOrder as any).id }
+            : { onDemandId: (existingOrder as any).id }),
+        },
+        select: { id: true },
+      });
+      if (!pickupSignature) {
+        return NextResponse.json(
+          {
+            message:
+              'A vendor pickup signature is required before marking this order as picked up',
+            code: 'PICKUP_SIGNATURE_REQUIRED',
+          },
+          { status: 422 },
+        );
+      }
+    }
+
     if (
       status &&
       status !== currentStatus &&
