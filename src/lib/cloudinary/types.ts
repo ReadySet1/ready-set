@@ -55,6 +55,18 @@ export interface CloudinaryTransformOptions {
    * - 3: High DPI (3x)
    */
   dpr?: 1 | 2 | 3 | 'auto';
+
+  /**
+   * Version number for CDN cache busting. Must be a positive integer;
+   * any other value is ignored and the segment is omitted.
+   *
+   * Use a FIXED constant (see `ASSET_CACHE_VERSION` in config.ts), bumped only
+   * when an image is re-uploaded under the same public ID. Never compute this
+   * at render time (e.g. `Date.now()`) — that mints a unique URL per render,
+   * defeating CDN/browser caching and bloating the Next.js image optimizer
+   * cache, and causes hydration mismatches in client components.
+   */
+  version?: number;
 }
 
 /**

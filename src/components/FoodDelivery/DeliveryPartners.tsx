@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 
 const LOGISTICS_CALENDAR_URL =
@@ -33,13 +33,13 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
     },
     {
       name: "Grace Deli & Cafe",
-      image: getCloudinaryUrl("food/partners/grace"),
+      image: getCloudinaryUrl("food/partners/grace", { version: ASSET_CACHE_VERSION }),
       alt: "Grace Deli & Cafe logo",
       url: "https://www.grace303.com/",
     },
     {
       name: "Kasa Indian Eatery",
-      image: getCloudinaryUrl("food/partners/kasa"),
+      image: getCloudinaryUrl("food/partners/kasa", { version: ASSET_CACHE_VERSION }),
       alt: "Kasa Indian Eatery logo",
       url: "https://kasaindian.com/",
     },
@@ -57,7 +57,7 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
     },
     {
       name: "Conviva",
-      image: getCloudinaryUrl("food/partners/conviva"),
+      image: getCloudinaryUrl("food/partners/conviva", { version: ASSET_CACHE_VERSION }),
       alt: "Conviva logo",
       url: "https://www.conviva.com/",
     },

@@ -17,6 +17,16 @@ export const cloudinaryConfig: CloudinaryConfig = {
 export const CLOUDINARY_BASE_URL = `https://res.cloudinary.com/${cloudinaryConfig.cloudName}/image/upload`;
 
 /**
+ * Cache-bust version for re-uploaded static assets (partner logos, hero images).
+ *
+ * Cloudinary treats the URL's `v<number>` segment as an opaque cache key — any
+ * previously unseen value forces the CDN to fetch the current asset. Bump this
+ * to the current unix timestamp (seconds) whenever an existing image is
+ * re-uploaded under the same public ID, so every reference busts in lockstep.
+ */
+export const ASSET_CACHE_VERSION = 1751551200;
+
+/**
  * Server-side only: Cloudinary API configuration
  * Used by migration scripts and server actions
  */
