@@ -220,6 +220,7 @@ Convert a local image path to a Cloudinary public ID.
 | `crop` | `'fill' \| 'fit' \| 'scale' \| 'crop' \| 'thumb'` | Crop mode |
 | `gravity` | `'auto' \| 'face' \| 'center'` | Focus point for cropping |
 | `dpr` | `1 \| 2 \| 3 \| 'auto'` | Device pixel ratio |
+| `version` | `number` | CDN cache-bust segment (`/v{n}/`). Must be a positive integer; invalid values are omitted. Use the shared `ASSET_CACHE_VERSION` constant from `config.ts` — never a render-time value like `Date.now()` |
 
 **Crop Modes:**
 - `fill` - Resize and crop to exact dimensions (may crop edges)

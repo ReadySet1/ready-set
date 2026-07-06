@@ -65,7 +65,14 @@ export function getCloudinaryUrl(
   // Ensure publicId doesn't have leading slash
   const cleanPublicId = publicId.startsWith('/') ? publicId.slice(1) : publicId;
 
-  const versionSegment = options?.version ? `v${options.version}/` : '';
+  // Only positive integers form a valid Cloudinary version segment; anything
+  // else (0, NaN, floats, negatives) would be parsed as part of the public ID
+  // path and 404, so omit the segment instead.
+  const version = options?.version;
+  const versionSegment =
+    version !== undefined && Number.isInteger(version) && version > 0
+      ? `v${version}/`
+      : '';
 
   return `${CLOUDINARY_BASE_URL}/${transforms}/${versionSegment}${folder}/${cleanPublicId}`;
 }

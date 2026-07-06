@@ -4,7 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 
 const FoodHeader: React.FC = () => {
   const { openForm, DialogForm } = FormManager();
@@ -64,7 +64,7 @@ const FoodHeader: React.FC = () => {
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="relative h-full w-full scale-100 md:scale-[1.28] lg:scale-[1.35]">
           <Image
-            src={getCloudinaryUrl("food/food-containers-v2", { version: 1751551200 })}
+            src={getCloudinaryUrl("food/food-containers-v2", { version: ASSET_CACHE_VERSION })}
             alt="Food containers with various prepared meals"
             fill
             className="object-cover object-center md:object-[85%_50%] lg:object-[85%_50%]"

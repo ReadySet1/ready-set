@@ -104,6 +104,30 @@ describe('cloudinary url-builder', () => {
 
       expect(url).not.toMatch(/\/v\d+\//);
     });
+
+    it('should place version between transforms and folder when other transforms are set', () => {
+      const url = getCloudinaryUrl('food/partners/kasa', {
+        version: 1751551200,
+        width: 640,
+        crop: 'fill',
+      });
+
+      expect(url).toMatch(
+        /f_auto,q_auto,w_640,c_fill\/v1751551200\/ready-set\/food\/partners\/kasa/
+      );
+    });
+
+    it.each([
+      ['zero', 0],
+      ['negative', -3],
+      ['non-integer', 1.5],
+      ['NaN', NaN],
+    ])('should omit version segment for invalid version (%s)', (_label, version) => {
+      const url = getCloudinaryUrl('food/partners/kasa', { version });
+
+      expect(url).not.toContain('/v');
+      expect(url).toContain('ready-set/food/partners/kasa');
+    });
   });
 
   describe('getResponsiveCloudinaryUrl', () => {
@@ -119,6 +143,17 @@ describe('cloudinary url-builder', () => {
 
       expect(result.srcSet).toContain('640w');
       expect(result.srcSet).toContain('1024w');
+    });
+
+    it('should propagate version into src and every srcSet URL', () => {
+      const { src, srcSet } = getResponsiveCloudinaryUrl('hero/hero-bg', [640, 1024], {
+        version: 1751551200,
+      });
+
+      expect(src).toContain('/v1751551200/ready-set/');
+      const entries = srcSet.split(', ');
+      expect(entries).toHaveLength(2);
+      entries.forEach((entry) => expect(entry).toContain('/v1751551200/ready-set/'));
     });
 
     it('should include width in each srcSet URL', () => {

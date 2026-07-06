@@ -8,7 +8,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 
 interface Partner {
   name: string;
@@ -22,8 +22,8 @@ const SpecialtyPartners: React.FC = () => {
       { name: "Bobcha", logo: getCloudinaryUrl("food/partners/bobcha") },
       { name: "Foodee", logo: getCloudinaryUrl("food/partners/foodee") },
       { name: "Destino", logo: getCloudinaryUrl("food/partners/destino") },
-      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva", { version: 1751551200 }) },
-      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa", { version: 1751551200 }) },
+      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva", { version: ASSET_CACHE_VERSION }) },
+      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa", { version: ASSET_CACHE_VERSION }) },
       { name: "CaterValley", logo: getCloudinaryUrl("food/partners/catervalley") },
       { name: "Quivx", logo: getCloudinaryUrl("food/partners/quivx") },
     ],
