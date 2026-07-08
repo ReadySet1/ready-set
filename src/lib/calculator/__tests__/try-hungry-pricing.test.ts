@@ -540,4 +540,148 @@ describe('Try Hungry Pricing', () => {
       expect(result.totalMileagePay).toBe(7.07);
     });
   });
+
+  // ============================================================================
+  // 9% FOOD COST BAND (> $1,200)
+  // ============================================================================
+
+  describe('9% Food Cost Band (> $1,200)', () => {
+    it('should charge 9% of food cost when headcount = 0 and foodCost > $1,200', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 1300,
+        totalMileage: 5,
+        clientConfigId: 'try-hungry',
+      });
+
+      // 1300 × 0.09 = $117.00
+      expect(result.deliveryCost).toBe(117);
+      expect(result.deliveryFee).toBe(117);
+    });
+
+    it('should charge 9% for foodCost = $2,000 (headcount = 0)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 2000,
+        totalMileage: 8,
+        clientConfigId: 'try-hungry',
+      });
+
+      // 2000 × 0.09 = $180.00
+      expect(result.deliveryCost).toBe(180);
+    });
+
+    it('should use lesser fee when both headcount and food cost are supplied', () => {
+      // headcount 10 → tier < 25 → $40
+      // foodCost 1300 → tier > 1200 → 1300 × 0.09 = $117
+      // Lesser fee = $40 (headcount wins)
+      const result = calculateDeliveryCost({
+        headcount: 10,
+        foodCost: 1300,
+        totalMileage: 5,
+        clientConfigId: 'try-hungry',
+      });
+
+      expect(result.deliveryCost).toBe(40);
+    });
+
+    it('should add customer mileage surcharge on top of 9% band', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 1300,
+        totalMileage: 15, // 5 miles over threshold
+        clientConfigId: 'try-hungry',
+      });
+
+      // 9% of $1,300 = $117, plus (15-10) × $2.50 = $12.50
+      expect(result.deliveryCost).toBe(117);
+      expect(result.totalMileagePay).toBe(12.5);
+      expect(result.deliveryFee).toBe(129.5);
+    });
+  });
+
+  // ============================================================================
+  // HEADCOUNT BOUNDARY TESTS
+  // ============================================================================
+
+  describe('Headcount Tier Boundaries', () => {
+    it('headcount 24 → tier < 25 → $40', () => {
+      const result = calculateDeliveryCost({
+        headcount: 24, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(40);
+    });
+
+    it('headcount 25 → tier 25-49 → $50', () => {
+      const result = calculateDeliveryCost({
+        headcount: 25, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(50);
+    });
+
+    it('headcount 49 → tier 25-49 → $50', () => {
+      const result = calculateDeliveryCost({
+        headcount: 49, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(50);
+    });
+
+    it('headcount 50 → tier 50-74 → $60', () => {
+      const result = calculateDeliveryCost({
+        headcount: 50, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(60);
+    });
+
+    it('headcount 74 → tier 50-74 → $60', () => {
+      const result = calculateDeliveryCost({
+        headcount: 74, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(60);
+    });
+
+    it('headcount 75 → tier 75-99 → $70', () => {
+      const result = calculateDeliveryCost({
+        headcount: 75, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(70);
+    });
+
+    it('headcount 99 → tier 75-99 → $70', () => {
+      const result = calculateDeliveryCost({
+        headcount: 99, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+      });
+      expect(result.deliveryCost).toBe(70);
+    });
+  });
+
+  // ============================================================================
+  // MANUAL REVIEW (100+ HEADCOUNT)
+  // ============================================================================
+
+  describe('Manual Review (100+ Headcount)', () => {
+    it('headcount >= 100 → checkManualReviewRequired throws', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 100, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).toThrow('manual review');
+    });
+
+    it('headcount 110 → throws for manual review', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 110, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).toThrow('manual review');
+    });
+
+    it('headcount 99 → does NOT throw (last non-review tier)', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 99, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).not.toThrow();
+    });
+  });
 });

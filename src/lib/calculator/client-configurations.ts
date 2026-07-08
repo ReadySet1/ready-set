@@ -380,8 +380,8 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 50, within10Miles: 50 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 60, within10Miles: 60 },
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 70, within10Miles: 70 },
-    // 100+ headcount requires manual review
-    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0 }
+    // 100+ headcount requires manual review; food cost > $1,200 → 9% of food cost
+    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.09, within10MilesPercent: 0.09 }
   ],
 
   mileageRate: 2.5, // Custom rate: $2.50 per mile (lower than standard $3.00)
@@ -428,7 +428,7 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
 
   createdAt: new Date('2025-11-12'),
   updatedAt: new Date('2026-02-11'),
-  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70), driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case).'
+  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70). Food cost > $1,200 → 9% of food cost. Driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case). Customer mileage: $0 within 10mi, $2.50/mi beyond.'
 };
 
 /**

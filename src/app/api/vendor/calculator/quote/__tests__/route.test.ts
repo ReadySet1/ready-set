@@ -412,6 +412,78 @@ describe('POST /api/vendor/calculator/quote', () => {
     });
   });
 
+  // ── Try Hungry profile ─────────────────────────────────────────────────
+
+  describe('Try Hungry vendor resolution', () => {
+    it('resolves Try Hungry profile → pricingProfileLabel "Try Hungry", isFallbackPricing false', async () => {
+      authAsVendor();
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: 'Try Hungry',
+        email: 'user@tryhungry.com',
+      });
+
+      const res = await POST(
+        makePostRequest({ ...VALID_BODY, headcount: 30, foodCost: 0 }),
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.pricingProfileLabel).toBe('Try Hungry');
+      expect(body.isFallbackPricing).toBe(false);
+    });
+
+    it('headcount >= 100 → requiresCustomQuote: true (HTTP 200, NOT 500)', async () => {
+      authAsVendor();
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: 'Try Hungry',
+        email: 'user@tryhungry.com',
+      });
+
+      const res = await POST(
+        makePostRequest({ ...VALID_BODY, headcount: 110, foodCost: 0, totalMileage: 5 }),
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.requiresCustomQuote).toBe(true);
+    });
+  });
+
+  // ── Email fallback ────────────────────────────────────────────────────
+
+  describe('email-domain fallback', () => {
+    it('resolves to try-hungry when companyName is empty but email is @tryhungry.com', async () => {
+      authAsVendor();
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: null,
+        email: 'ops@tryhungry.com',
+      });
+
+      const res = await POST(
+        makePostRequest({ ...VALID_BODY, headcount: 10, foodCost: 0 }),
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.pricingProfileLabel).toBe('Try Hungry');
+      expect(body.isFallbackPricing).toBe(false);
+    });
+
+    it('falls back to standard config when both companyName and email are unmapped', async () => {
+      authAsVendor();
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: null,
+        email: 'user@gmail.com',
+      });
+
+      const res = await POST(makePostRequest(VALID_BODY));
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.isFallbackPricing).toBe(true);
+    });
+  });
+
   // ── Input validation ────────────────────────────────────────────────────
 
   describe('input validation', () => {

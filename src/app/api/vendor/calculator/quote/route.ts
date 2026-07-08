@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/prisma';
-import { resolveConfigId } from '@/lib/calculator/vendor-config-mapping';
+import { resolveConfigId, resolveConfigIdByEmail } from '@/lib/calculator/vendor-config-mapping';
 import {
   calculateDeliveryCost,
   validateDeliveryCostInput,
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     const userId = auth.context.user.id;
     const profile = await prisma.profile.findFirst({
       where: { id: userId, deletedAt: null },
-      select: { companyName: true },
+      select: { companyName: true, email: true },
     });
 
     // 5. Resolve config from company name
@@ -226,6 +226,11 @@ export async function POST(request: NextRequest) {
 
     if (profile?.companyName) {
       configId = resolveConfigId(profile.companyName);
+    }
+
+    if (!configId) {
+      // Email-domain fallback (e.g., @tryhungry.com → try-hungry)
+      configId = resolveConfigIdByEmail(profile?.email);
     }
 
     if (!configId) {
@@ -238,6 +243,7 @@ export async function POST(request: NextRequest) {
         {
           userId,
           companyName: profile?.companyName ?? '(none)',
+          email: profile?.email ?? '(none)',
           resolvedConfigId: configId,
         },
         'warning',
