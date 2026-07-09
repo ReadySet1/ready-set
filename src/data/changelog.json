@@ -3,6 +3,46 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.4.0",
+      "date": "2026-07-09",
+      "title": "A smoother, safer driver experience",
+      "summary": "Drivers get a calmer app with a full route map and faster feedback, pickup signatures are now required everywhere, and staff can undo an accidental delivery start.",
+      "changes": [
+        {
+          "text": "Updated partner logos for Kasa, Conviva, and Grace Deli, plus a refreshed catering hero image with improved text readability.",
+          "type": "improved"
+        },
+        {
+          "text": "Helpdesk and admins can now fix a delivery that was started by mistake, resetting it back to Assigned.",
+          "type": "new"
+        },
+        {
+          "text": "The driver map now shows your full route for the shift, the delivery list can be filtered by day, and buttons respond instantly.",
+          "type": "improved"
+        },
+        {
+          "text": "Drivers are now always asked for the vendor signature when picking up an order, no matter which screen they use.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver app got a calmer look — clearer dark action buttons and GPS accuracy shown in feet.",
+          "type": "improved"
+        },
+        {
+          "text": "Fixed the delivery time appearing twice on the catering order page.",
+          "type": "fixed"
+        },
+        {
+          "text": "The live tracking map now shows each order's restaurant pickup point, the driver's name and mileage, and clearly marks a driver as offline when their app loses GPS.",
+          "type": "improved"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.4.0"
+      }
+    },
+    {
       "version": "2.3.0",
       "date": "2026-06-24",
       "title": "Release 2.3.0",
