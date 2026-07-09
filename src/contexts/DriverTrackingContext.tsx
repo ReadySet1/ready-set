@@ -1,12 +1,16 @@
 'use client';
 
-import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
 import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { DriverStatus } from '@/types/user';
 import type { LocationUpdate, DriverShift, DeliveryTracking } from '@/types/tracking';
+import {
+  startNativeShiftTrackingForDriver,
+  stopNativeShiftTrackingForDriver,
+} from '@/lib/tracking/native-shift-tracking';
 
 interface DriverTrackingContextValue {
   // Location tracking
@@ -93,11 +97,25 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     error: shiftError,
   } = useDriverShift();
 
+  // Supplement the foreground web tracker with native background GPS while the
+  // /driver app runs inside the Capacitor shell — so the trail survives a locked
+  // screen or a switch to Waze. Keyed on shift state (not the startShift call)
+  // so the watcher also re-arms when the app is relaunched mid-shift and when
+  // arming failed at shift start. Both helpers no-op in a normal browser (the
+  // native plugin is only dynamically imported inside the native shell) and are
+  // idempotent inside it.
+  useEffect(() => {
+    if (isShiftActive) void startNativeShiftTrackingForDriver();
+    else void stopNativeShiftTrackingForDriver();
+  }, [isShiftActive]);
+
   // Flush any queued GPS points before ending the shift, so the server-side
   // shift mileage (summed from driver_locations) reflects the full trail rather
   // than dropping breadcrumbs that were only sitting in the offline queue.
+  // Also stop the native background watcher (no-op on web).
   const endShift = useCallback(
     async (shiftId: string, location: LocationUpdate) => {
+      void stopNativeShiftTrackingForDriver();
       try {
         await syncOfflineLocations();
       } catch {

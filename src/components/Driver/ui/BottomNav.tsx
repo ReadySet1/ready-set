@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { GraduationCap, History, Home, Navigation, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,15 @@ const ITEMS: NavItem[] = [
  *  Detail view (which has its own back button). */
 export function BottomNav() {
   const pathname = usePathname() ?? "/driver";
+  // Route transitions can take seconds on a phone, and the active highlight
+  // only moves once the new route commits — so give the tapped tab immediate
+  // pending feedback (Jul-3 walk feedback: "bottom buttons take long to
+  // respond"). Cleared as soon as the pathname changes.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
   // Detail is a pushed view — no bottom nav there.
   if (pathname.startsWith("/driver/deliveries/")) return null;
 
@@ -51,31 +61,37 @@ export function BottomNav() {
       <div className="mx-auto flex max-w-2xl items-stretch justify-around px-2 py-1.5">
         {ITEMS.map((item) => {
           const active = item.match(pathname);
+          const pending = !active && pendingHref === item.href;
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              onClick={() => {
+                if (!active) setPendingHref(item.href);
+              }}
               className="flex min-h-driver-control flex-1 flex-col items-center justify-center gap-1 rounded-xl"
             >
               <span
                 className={cn(
                   "flex h-8 w-12 items-center justify-center rounded-full transition-colors",
                   active ? "bg-driver-brand/15" : "bg-transparent",
+                  pending && "animate-driver-pulse bg-driver-brand/10",
                 )}
               >
                 <Icon
                   className={cn(
                     "h-driver-node w-driver-node",
                     active ? "text-driver-on-brand" : "text-driver-subtle",
+                    pending && "text-driver-on-brand",
                   )}
-                  strokeWidth={active ? 2.4 : 2}
+                  strokeWidth={active || pending ? 2.4 : 2}
                 />
               </span>
               <span
                 className={cn(
-                  "text-[10.5px] font-extrabold",
+                  "text-[10.5px] font-semibold",
                   active ? "text-driver-on-brand" : "text-driver-subtle",
                 )}
               >

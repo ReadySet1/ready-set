@@ -32,6 +32,7 @@ import {
   getStatusProgress,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 
 interface PodTarget {
@@ -45,6 +46,11 @@ export default function DriverTrackingPortal() {
   const [elapsed, setElapsed] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
+  const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
+  // confusing — filter by scheduled pickup date. `null` = no explicit choice,
+  // in which case we default to Today whenever today has at least one.
+  const [dayFilter, setDayFilter] = useState<"today" | "all" | null>(null);
 
   const {
     currentLocation,
@@ -174,6 +180,13 @@ export default function DriverTrackingPortal() {
     if (!next) return;
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
+    // The pickup step routes through vendor-signature capture (mandatory per
+    // the 2026-06-22 decision — mirrors the gate in DriverDeliveryDetail; the
+    // server also rejects an unsigned PICKED_UP).
+    if (next === DriverStatus.PICKED_UP) {
+      setSigTarget({ deliveryId: delivery.id, orderNumber });
+      return;
+    }
     // The final step routes through proof-of-delivery capture.
     if (next === DriverStatus.COMPLETED) {
       setPodTarget({ deliveryId: delivery.id, orderNumber });
@@ -190,12 +203,42 @@ export default function DriverTrackingPortal() {
     if (ok) setPodTarget(null);
   };
 
+  const onSignatureComplete = async () => {
+    if (!sigTarget) return;
+    // Same retry semantics as POD: keep the sheet open if the advance fails.
+    const ok = await advanceStatus(sigTarget.deliveryId, DriverStatus.PICKED_UP);
+    if (ok) setSigTarget(null);
+  };
+
+  const isPickupToday = (d?: Date) =>
+    !!d && new Date(d).toDateString() === new Date().toDateString();
+  const todayCount = activeDeliveries.filter((d) =>
+    isPickupToday(d.scheduledPickupAt),
+  ).length;
+  const effectiveDayFilter =
+    dayFilter ?? (todayCount > 0 ? "today" : "all");
+  const visibleDeliveries =
+    effectiveDayFilter === "all"
+      ? activeDeliveries
+      : activeDeliveries.filter((d) => isPickupToday(d.scheduledPickupAt));
+
+  const formatPickup = (d: Date) =>
+    isPickupToday(d)
+      ? `today ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+      : d.toLocaleDateString([], {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }) +
+        " " +
+        d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
   const headerRight = useMemo(() => {
     if (!isShiftActive || !currentShift?.startTime) return null;
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-driver-success-bg px-3 py-1.5">
         <span className="h-2 w-2 animate-driver-pulse rounded-full bg-driver-success" />
-        <span className="font-mono text-[13px] font-extrabold tabular-nums text-driver-success-ink">
+        <span className="font-mono text-[13px] font-semibold tabular-nums text-driver-success-ink">
           {formatDuration(elapsed)}
         </span>
       </span>
@@ -244,7 +287,7 @@ export default function DriverTrackingPortal() {
         {!isOnline ? (
           <div className="flex items-center gap-2 rounded-2xl border border-driver-warning/30 bg-driver-warning-bg px-4 py-3 text-driver-warning-ink">
             <CloudOff className="h-4 w-4 shrink-0" />
-            <span className="text-[13px] font-bold">
+            <span className="text-[13px] font-semibold">
               You&apos;re offline{queuedItems > 0 ? ` — ${queuedItems} updates queued` : ""}
             </span>
           </div>
@@ -259,6 +302,8 @@ export default function DriverTrackingPortal() {
                   <DriverLiveMap
                     currentLocation={currentLocation}
                     activeDeliveries={activeDeliveries}
+                    driverId={currentShift?.driverId}
+                    shiftStartedAt={currentShift?.startTime}
                   />
                 </div>
               ) : (
@@ -286,7 +331,7 @@ export default function DriverTrackingPortal() {
             {/* Shift control bar */}
             <DriverCard className="flex items-center justify-between">
               <div>
-                <div className="text-[13px] font-extrabold text-driver-text">
+                <div className="text-[13px] font-semibold text-driver-text">
                   On shift
                 </div>
                 <div className="text-[11.5px] font-semibold text-driver-muted">
@@ -312,10 +357,36 @@ export default function DriverTrackingPortal() {
 
             {/* Active deliveries */}
             <section className="space-y-3">
-              <h2 className="text-[14px] font-extrabold uppercase tracking-[0.04em] text-driver-muted">
+              <h2 className="text-[14px] font-semibold uppercase tracking-[0.04em] text-driver-muted">
                 Active deliveries
                 {activeDeliveries.length > 0 ? ` — ${activeDeliveries.length} in progress` : ""}
               </h2>
+
+              {activeDeliveries.length > 0 ? (
+                <div className="flex gap-2" role="group" aria-label="Filter deliveries by date">
+                  {(
+                    [
+                      { key: "today", label: `Today (${todayCount})` },
+                      { key: "all", label: `All (${activeDeliveries.length})` },
+                    ] as const
+                  ).map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setDayFilter(chip.key)}
+                      aria-pressed={effectiveDayFilter === chip.key}
+                      className={cn(
+                        "rounded-full border px-4 py-1.5 text-[12.5px] font-semibold transition-colors",
+                        effectiveDayFilter === chip.key
+                          ? "border-transparent bg-driver-brand/15 text-driver-on-brand"
+                          : "border-driver-border bg-transparent text-driver-subtle",
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               {activeDeliveries.length === 0 ? (
                 <StateBlock
@@ -323,8 +394,14 @@ export default function DriverTrackingPortal() {
                   title="No active deliveries"
                   body="New assignments will appear here while you're on shift."
                 />
+              ) : visibleDeliveries.length === 0 ? (
+                <StateBlock
+                  icon={CheckCircle2}
+                  title="Nothing scheduled for today"
+                  body='Switch to "All" to see your other assignments.'
+                />
               ) : (
-                activeDeliveries.map((delivery, idx) => {
+                visibleDeliveries.map((delivery, idx) => {
                   const orderNumber =
                     delivery.cateringRequestId ||
                     delivery.onDemandId ||
@@ -351,13 +428,19 @@ export default function DriverTrackingPortal() {
                     >
                       <div className="flex items-center gap-2">
                         <TypeBadge type={orderType} />
-                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-bold text-driver-muted">
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold text-driver-muted">
                           #{orderNumber}
                         </span>
                         <div className="shrink-0">
                           <StatusPill status={delivery.status} size="sm" />
                         </div>
                       </div>
+
+                      {delivery.scheduledPickupAt ? (
+                        <div className="text-[12px] font-semibold text-driver-muted">
+                          Pickup {formatPickup(delivery.scheduledPickupAt)}
+                        </div>
+                      ) : null}
 
                       {delivery.estimatedArrival ? (
                         <div className="text-[12px] font-semibold text-driver-muted">
@@ -391,7 +474,7 @@ export default function DriverTrackingPortal() {
                       ) : (
                         <div className="flex items-center gap-2 rounded-2xl bg-driver-success-bg px-4 py-3 text-driver-success-ink">
                           <CheckCircle2 className="h-4 w-4" />
-                          <span className="text-[13px] font-extrabold">
+                          <span className="text-[13px] font-semibold">
                             Delivered
                           </span>
                         </div>
@@ -411,7 +494,7 @@ export default function DriverTrackingPortal() {
           <DriverCard className="space-y-4">
             <div className="flex flex-col items-center py-4 text-center">
               <Truck className="mb-2 h-12 w-12 text-driver-subtle" />
-              <p className="text-[17px] font-extrabold text-driver-text">
+              <p className="text-[17px] font-semibold text-driver-text">
                 {permissionState === "denied"
                   ? "Location is turned off"
                   : currentLocation
@@ -462,6 +545,15 @@ export default function DriverTrackingPortal() {
           </DriverCard>
         )}
       </div>
+
+      {sigTarget ? (
+        <DriverSignatureSheet
+          open={!!sigTarget}
+          onOpenChange={(o) => !o && setSigTarget(null)}
+          orderNumber={sigTarget.orderNumber}
+          onComplete={() => void onSignatureComplete()}
+        />
+      ) : null}
 
       {podTarget ? (
         <DriverPodSheet

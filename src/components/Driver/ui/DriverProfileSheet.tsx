@@ -49,7 +49,7 @@ export function DriverProfileSheet({
         <button
           type="button"
           aria-label="Open profile menu"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-driver-brand text-[15px] font-extrabold text-driver-brand-ink"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-driver-brand text-[15px] font-semibold text-driver-brand-ink"
         >
           {fallbackInitials || <CircleUser className="h-6 w-6" />}
         </button>
@@ -63,14 +63,14 @@ export function DriverProfileSheet({
       >
         <div className="mx-auto w-full max-w-2xl px-5 pb-8 pt-2">
           <SheetHeader className="items-start">
-            <SheetTitle className="text-[18px] font-extrabold text-driver-text">
+            <SheetTitle className="text-[18px] font-semibold text-driver-text">
               {driverName}
             </SheetTitle>
           </SheetHeader>
 
           <div className="mt-5 space-y-5">
             <div>
-              <div className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.06em] text-driver-subtle">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
                 Appearance
               </div>
               <Segmented

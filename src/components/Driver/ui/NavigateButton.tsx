@@ -21,11 +21,12 @@ interface NavigateButtonProps {
 }
 
 /**
- * Prominent, brand-colored "Navigate" button for the driver app.
- *
- * Replaces the old low-contrast `<a>` links (a tester couldn't find them). The
- * primary tap opens the driver's remembered maps app; the adjacent chevron opens
- * a chooser (Google / Apple / Waze), persisting the choice for next time.
+ * Full-width "Navigate" button for the driver app. Neutral outline per the v2
+ * handoff (quick actions are calm; amber is reserved for the Next-Action chip),
+ * but still a ≥48px real button rather than the old low-contrast `<a>` links
+ * (a tester couldn't find those). The primary tap opens the driver's remembered
+ * maps app; the adjacent chevron opens a chooser (Google / Apple / Waze),
+ * persisting the choice for next time.
  */
 export function NavigateButton({ target, label = "Navigate", className }: NavigateButtonProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -58,7 +59,7 @@ export function NavigateButton({ target, label = "Navigate", className }: Naviga
   return (
     <div className={cn("flex items-stretch gap-1.5", className)}>
       <DriverButton
-        variant="brand"
+        variant="outline"
         onClick={() => openWith(pref)}
         aria-label={label}
         className="flex-1"

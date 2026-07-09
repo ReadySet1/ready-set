@@ -17,15 +17,15 @@ interface DriverButtonProps
 
 const VARIANT: Record<Variant, string> = {
   brand:
-    "bg-driver-brand text-driver-brand-ink font-extrabold hover:bg-driver-brand-hover shadow-driver-sm",
-  dark: "bg-slate-900 text-white font-bold hover:bg-slate-800 dark:bg-driver-surface-alt dark:hover:bg-driver-border",
+    "bg-driver-brand text-driver-brand-ink font-semibold hover:bg-driver-brand-hover shadow-driver-sm",
+  dark: "bg-slate-900 text-white font-semibold hover:bg-slate-800 dark:bg-driver-surface-alt dark:hover:bg-driver-border",
   outline:
-    "border-[1.5px] border-driver-border bg-transparent text-driver-text font-bold hover:bg-driver-surface-alt",
-  ghost: "bg-transparent text-driver-muted font-bold hover:bg-driver-surface-alt",
+    "border-[1.5px] border-driver-border bg-transparent text-driver-text font-semibold hover:bg-driver-surface-alt",
+  ghost: "bg-transparent text-driver-muted font-semibold hover:bg-driver-surface-alt",
   danger:
-    "border-[1.5px] border-driver-error bg-driver-error-bg text-driver-error-ink font-bold hover:bg-driver-error hover:text-white",
+    "border-[1.5px] border-driver-error bg-driver-error-bg text-driver-error-ink font-semibold hover:bg-driver-error hover:text-white",
   success:
-    "border-[1.5px] border-driver-success bg-driver-success-bg text-driver-success-ink font-bold hover:bg-driver-success hover:text-white",
+    "border-[1.5px] border-driver-success bg-driver-success-bg text-driver-success-ink font-semibold hover:bg-driver-success hover:text-white",
 };
 
 const SIZE: Record<Size, string> = {

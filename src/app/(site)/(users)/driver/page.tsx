@@ -108,10 +108,10 @@ export default function DriverHomePage() {
   const header = (
     <div className="flex items-start gap-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[12.5px] font-bold text-driver-muted" suppressHydrationWarning>
+        <div className="text-[12.5px] font-semibold text-driver-muted" suppressHydrationWarning>
           {mounted ? `${dateLabel} · ${timeLabel}` : ""}
         </div>
-        <h1 className="mt-0.5 text-driver-node font-extrabold leading-tight text-driver-text">
+        <h1 className="mt-0.5 text-driver-node font-semibold leading-tight text-driver-text">
           {greeting},{" "}
           <span className="text-driver-on-brand">{driverName}</span>
         </h1>
@@ -124,7 +124,7 @@ export default function DriverHomePage() {
                 : "bg-driver-subtle",
             )}
           />
-          <span className="text-[11.5px] font-extrabold text-driver-muted">
+          <span className="text-[11.5px] font-semibold text-driver-muted">
             {isShiftActive ? "On shift" : "Off shift"}
           </span>
         </div>
@@ -150,7 +150,7 @@ export default function DriverHomePage() {
                 <Navigation className="h-6 w-6" strokeWidth={2.2} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[15.5px] font-extrabold text-driver-text">
+                <div className="text-[15.5px] font-semibold text-driver-text">
                   {isShiftActive ? "Active shift" : "Start shift"}
                 </div>
                 <div className="text-[12.5px] font-semibold text-driver-muted">
@@ -159,7 +159,7 @@ export default function DriverHomePage() {
                     : "Begin tracking your shift & location"}
                 </div>
                 {isShiftActive && currentShift?.startTime ? (
-                  <div className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-bold text-driver-on-brand">
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-semibold text-driver-on-brand">
                     <Clock className="h-3.5 w-3.5" />
                     Active for {formatDurationShort(shiftSeconds)}
                   </div>
@@ -173,7 +173,7 @@ export default function DriverHomePage() {
             <Link href="/driver/tracking" className="block">
               <DriverCard interactive className="flex h-full flex-col gap-2">
                 <Package className="h-6 w-6 text-driver-on-brand" strokeWidth={2.2} />
-                <div className="text-[13.5px] font-extrabold text-driver-text">
+                <div className="text-[13.5px] font-semibold text-driver-text">
                   My deliveries
                 </div>
                 <div className="mt-auto text-[11.5px] font-semibold text-driver-muted">
@@ -185,7 +185,7 @@ export default function DriverHomePage() {
             <Link href="/driver/history" className="block">
               <DriverCard interactive className="flex h-full flex-col gap-2">
                 <History className="h-6 w-6 text-driver-on-brand" strokeWidth={2.2} />
-                <div className="text-[13.5px] font-extrabold text-driver-text">
+                <div className="text-[13.5px] font-semibold text-driver-text">
                   View history
                 </div>
                 <div className="mt-auto text-[11.5px] font-semibold text-driver-muted">

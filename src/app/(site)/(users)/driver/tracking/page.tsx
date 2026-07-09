@@ -18,6 +18,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover', // resolve env(safe-area-inset-*) so the native WebView clears the status bar
   themeColor: '#1f2937',
 };
 

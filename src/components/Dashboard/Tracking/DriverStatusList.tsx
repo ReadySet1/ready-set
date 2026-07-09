@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TrackedDriver } from '@/types/tracking';
+import { isLocationStale } from '@/lib/realtime/stale-detection';
 
 interface LocationData {
   driverId: string;
@@ -133,6 +134,8 @@ export default function DriverStatusList({
     const locationData = getLocationData(driver.id);
     const timeSinceUpdate = getTimeSinceUpdate(driver);
     const signalStrength = getSignalStrength(locationData?.accuracy);
+    // On duty but no recent GPS fix (app closed / lost signal) → offline, not "stopped".
+    const isStale = driver.isOnDuty && isLocationStale(driver.lastLocationUpdate);
 
     return (
       <Card className={cn('transition-all duration-200 hover:shadow-md', {
@@ -145,8 +148,9 @@ export default function DriverStatusList({
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
                 <div className={cn('w-3 h-3 rounded-full', {
-                  'bg-green-500 animate-pulse': driver.isOnDuty && locationData?.isMoving,
-                  'bg-yellow-500': driver.isOnDuty && !locationData?.isMoving,
+                  'bg-green-500 animate-pulse': driver.isOnDuty && !isStale && locationData?.isMoving,
+                  'bg-yellow-500': driver.isOnDuty && !isStale && !locationData?.isMoving,
+                  'bg-slate-400': isStale,
                   'bg-gray-400': !driver.isOnDuty
                 })} />
                 
@@ -168,12 +172,15 @@ export default function DriverStatusList({
                   {driver.isOnDuty ? 'On Duty' : 'Off Duty'}
                 </Badge>
                 
-                {locationData && (
+                {locationData && !isStale && (
                   <Badge variant="outline" className="text-xs">
                     {locationData.activityType === 'driving' && '🚗 Driving'}
                     {locationData.activityType === 'walking' && '🚶 Walking'}
                     {locationData.activityType === 'stationary' && '⏸️ Stopped'}
                   </Badge>
+                )}
+                {isStale && (
+                  <Badge variant="outline" className="text-xs">📴 Offline</Badge>
                 )}
               </div>
 

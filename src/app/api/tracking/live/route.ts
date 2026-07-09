@@ -33,6 +33,8 @@ interface ActiveDriverRow {
   shift_status: string | null;
   shift_start: Date | null;
   total_distance: number | null;
+  total_distance_miles: number | null;
+  delivery_count: number | null;
   active_deliveries: number | string;
 }
 
@@ -194,6 +196,8 @@ export async function GET(request: NextRequest) {
                 ds.status as shift_status,
                 ds.shift_start,
                 ds.total_distance,
+                ds.total_distance_miles,
+                ds.delivery_count,
                 COUNT(CASE WHEN del.status NOT IN ('delivered', 'cancelled') THEN 1 END) as active_deliveries
               FROM drivers d
               LEFT JOIN profiles p ON d.profile_id = p.id
@@ -356,6 +360,12 @@ export async function GET(request: NextRequest) {
                   shiftStatus: driver.shift_status,
                   shiftStart: driver.shift_start,
                   totalDistance: driver.total_distance || 0,
+                  // Primary miles column written by the mileage service at shift end
+                  // (services/tracking/mileage.ts). Consumed by the Drivers tab + map popup.
+                  totalDistanceMiles: driver.total_distance_miles || 0,
+                  // Per-shift completed-delivery counter, incremented on delivery completion
+                  // (api/tracking/deliveries/[id]/route.ts).
+                  deliveryCount: driver.delivery_count || 0,
                   activeDeliveries: (() => {
                     const raw = driver.active_deliveries;
                     const count =

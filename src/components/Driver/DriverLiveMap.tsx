@@ -17,7 +17,27 @@ if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 interface DriverLiveMapProps {
   currentLocation: LocationUpdate | null;
   activeDeliveries: DeliveryTracking[];
+  /** When set (together with shiftStartedAt), the trail is seeded from the
+   *  server so it shows the full shift route — including stretches recorded
+   *  while the page was locked/backgrounded or before a reload — instead of
+   *  only the points this browser session happened to observe. */
+  driverId?: string | null;
+  shiftStartedAt?: string | Date | null;
   className?: string;
+}
+
+/** Hard cap on trail vertices kept in memory / handed to Mapbox. */
+const MAX_TRAIL_POINTS = 1000;
+
+/** Cap the trail without ever losing the route start: thin the OLDER half
+ *  (drop every other point) instead of shifting points off the head — the old
+ *  `length > 200 → shift()` behavior made the beginning of the route visibly
+ *  disappear ~20 min into a shift. */
+function capTrail(trail: [number, number][]): [number, number][] {
+  if (trail.length <= MAX_TRAIL_POINTS) return trail;
+  const half = Math.floor(trail.length / 2);
+  const olderThinned = trail.slice(0, half).filter((_, i) => i % 2 === 0);
+  return [...olderThinned, ...trail.slice(half)];
 }
 
 /**
@@ -34,6 +54,8 @@ interface DriverLiveMapProps {
 export default function DriverLiveMap({
   currentLocation,
   activeDeliveries,
+  driverId,
+  shiftStartedAt,
   className,
 }: DriverLiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -46,6 +68,65 @@ export default function DriverLiveMap({
   const trailRef = useRef<[number, number][]>([]);
   // Track last centered position to detect large jumps
   const lastCenteredRef = useRef<{ lng: number; lat: number } | null>(null);
+  // Which shift the trail was last seeded from (guards against re-fetching).
+  const seededShiftKeyRef = useRef<string | null>(null);
+
+  // Seed the trail from the server once per shift: the DB holds the full
+  // recorded route (offline queue + native watcher keep posting while the
+  // page is locked), while this component previously only accumulated points
+  // it saw live — producing straight-line shortcuts across locked periods
+  // and losing everything on reload.
+  useEffect(() => {
+    if (!mapLoaded || !driverId || !shiftStartedAt) return;
+    const shiftKey = `${driverId}:${new Date(shiftStartedAt).getTime()}`;
+    if (seededShiftKeyRef.current === shiftKey) return;
+    seededShiftKeyRef.current = shiftKey;
+
+    const startMs = new Date(shiftStartedAt).getTime();
+    const hours = Math.min(
+      Math.max(Math.ceil((Date.now() - startMs) / 3_600_000), 1),
+      24,
+    );
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/tracking/locations?driver_id=${encodeURIComponent(driverId)}&hours=${hours}&limit=1000`,
+          { credentials: 'include', signal: controller.signal },
+        );
+        if (!res.ok) return; // best-effort: live accumulation still works
+        const data = await res.json();
+        const history: [number, number][] = (data?.data ?? [])
+          .filter((l: any) => new Date(l.recorded_at).getTime() >= startMs)
+          .reverse() // API returns DESC; the trail wants oldest -> newest
+          .map((l: any) => l?.location?.coordinates)
+          .filter(
+            (c: unknown): c is [number, number] =>
+              Array.isArray(c) && c.length === 2,
+          );
+        if (history.length === 0) return;
+        // History first, then whatever live points arrived while fetching.
+        trailRef.current = capTrail([...history, ...trailRef.current]);
+        const source = mapRef.current?.getSource('driver-trail') as
+          | mapboxgl.GeoJSONSource
+          | undefined;
+        source?.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: trailRef.current },
+        });
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') {
+          captureException(error, {
+            action: 'trail-seed',
+            feature: 'driver-live-map',
+            component: 'DriverLiveMap',
+          });
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [mapLoaded, driverId, shiftStartedAt]);
 
   // Initialize the map
   useEffect(() => {
@@ -170,11 +251,9 @@ export default function DriverLiveMap({
           .addTo(mapRef.current);
       }
 
-      // Update the in-memory trail (cap length for performance)
+      // Update the in-memory trail (thinned, never truncated from the head)
       trailRef.current.push([lng, lat]);
-      if (trailRef.current.length > 200) {
-        trailRef.current.shift();
-      }
+      trailRef.current = capTrail(trailRef.current);
 
       const source = mapRef.current.getSource('driver-trail') as mapboxgl.GeoJSONSource | undefined;
       if (source) {

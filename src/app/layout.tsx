@@ -15,7 +15,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { CONSTANTS } from "@/constants";
 import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
 import QueryProvider from "@/providers/QueryProvider";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import JsonLd from "@/components/SEO/JsonLd";
 
@@ -65,6 +65,21 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+};
+
+// `viewport-fit=cover` lets the page extend into the iOS safe-area regions
+// (status bar / notch / home indicator) and, crucially, makes the
+// `env(safe-area-inset-*)` CSS variables resolve to real values instead of 0.
+// The driver UI already pads its sticky header + bottom nav with those insets
+// (see DriverScreen / BottomNav); without cover mode they collapsed to 0, so in
+// the native Capacitor WebView (no browser chrome) the header rendered under the
+// status bar. This only has a visible effect in standalone/native contexts
+// (the PWA `start_url` and the native shell are driver-only) — normal browser
+// tabs are unaffected. Kept zoom enabled site-wide for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const montserrat = Montserrat({

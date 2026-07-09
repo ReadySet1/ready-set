@@ -25,6 +25,11 @@ import {
   deriveOrderStatusFromDriver,
 } from '@/lib/state-machine/transition';
 import type { OrderStatus } from '@/lib/state-machine/transition';
+import {
+  recordAndDispatchLifecycleEvent,
+  DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
+} from '@/lib/services/partnerWebhookService';
+import { runAfterResponse } from '@/lib/api/after-response';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -418,6 +423,7 @@ export async function PATCH(
     // status-only PATCH (`{ status }`) — the driver client sends the latter on
     // completion, and without this any authenticated user could drive any order's
     // status by order number (the role check below only runs for field updates).
+    let callerIsPrivileged = false;
     if (driverStatus || status) {
       const { data: callerProfile } = await supabase
         .from('profiles')
@@ -429,6 +435,7 @@ export async function PATCH(
         callerType === 'ADMIN' ||
         callerType === 'SUPER_ADMIN' ||
         callerType === 'HELPDESK';
+      callerIsPrivileged = privileged;
 
       if (!privileged) {
         const dispatches = (existingOrder as any).dispatches;
@@ -507,9 +514,13 @@ export async function PATCH(
       }
     }
 
+    // The forward-only driver graph binds DRIVERS; admin/helpdesk may move
+    // driverStatus freely — the repair path for an accidentally-started
+    // delivery (Jul-3 walk) is resetting it back to ASSIGNED.
     if (
       driverStatus &&
       driverStatus !== currentDriverStatus &&
+      !callerIsPrivileged &&
       !canTransitionDriver(currentDriverStatus, driverStatus as DriverStatus)
     ) {
       return NextResponse.json(
@@ -519,9 +530,40 @@ export async function PATCH(
         { status: 422 },
       );
     }
+    // The vendor-pickup signature is mandatory (2026-06-22 decision), and the
+    // sheet is client-side — so back it up here: a driver cannot mark PICKED_UP
+    // until a pickup_signature upload exists for the order. Admin/helpdesk are
+    // exempt so they can repair stuck orders.
+    if (
+      driverStatus === DriverStatus.PICKED_UP &&
+      currentDriverStatus !== DriverStatus.PICKED_UP &&
+      !callerIsPrivileged
+    ) {
+      const pickupSignature = await prisma.fileUpload.findFirst({
+        where: {
+          category: 'pickup_signature',
+          ...(orderType === 'catering'
+            ? { cateringRequestId: (existingOrder as any).id }
+            : { onDemandId: (existingOrder as any).id }),
+        },
+        select: { id: true },
+      });
+      if (!pickupSignature) {
+        return NextResponse.json(
+          {
+            message:
+              'A vendor pickup signature is required before marking this order as picked up',
+            code: 'PICKUP_SIGNATURE_REQUIRED',
+          },
+          { status: 422 },
+        );
+      }
+    }
+
     if (
       status &&
       status !== currentStatus &&
+      !callerIsPrivileged &&
       !canTransitionOrder(currentStatus, status as OrderStatus)
     ) {
       return NextResponse.json(
@@ -717,26 +759,26 @@ export async function PATCH(
 
           // Send customer notification for relevant statuses
           if (CUSTOMER_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
-            sendDispatchStatusNotification({
-              status: dispatchStatus,
-              dispatchId,
-              orderId,
-              recipientType: 'CUSTOMER',
-            }).catch((err) => {
-              console.error('Failed to send customer notification:', err);
-            });
+            runAfterResponse('Failed to send customer notification:', () =>
+              sendDispatchStatusNotification({
+                status: dispatchStatus,
+                dispatchId,
+                orderId,
+                recipientType: 'CUSTOMER',
+              }),
+            );
           }
 
           // Send admin notification for relevant statuses
           if (ADMIN_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
-            sendDispatchStatusNotification({
-              status: dispatchStatus,
-              dispatchId,
-              orderId,
-              recipientType: 'ADMIN',
-            }).catch((err) => {
-              console.error('Failed to send admin notification:', err);
-            });
+            runAfterResponse('Failed to send admin notification:', () =>
+              sendDispatchStatusNotification({
+                status: dispatchStatus,
+                dispatchId,
+                orderId,
+                recipientType: 'ADMIN',
+              }),
+            );
           }
         }
 
@@ -796,13 +838,41 @@ export async function PATCH(
           }
         };
 
-        // Fire and forget - don't block the response. Attach .catch so any rejection
-        // from the broadcast (subscribe timeout, send failure) is surfaced rather than
-        // becoming an unhandled promise rejection that may crash the worker under
-        // --unhandled-rejections=strict.
-        broadcastDeliveryStatus().catch((err) => {
-          console.error('Failed to broadcast delivery status update:', err);
-        });
+        // Deferred past the response with after() (via runAfterResponse) so the
+        // broadcast isn't dropped when Vercel freezes the function — previously a
+        // bare dangling promise, so live-tracking updates were lost ~half the time.
+        runAfterResponse('Failed to broadcast delivery status update:', broadcastDeliveryStatus);
+
+        // Registry-driven partner status webhook (e.g. CaterCow). The driver
+        // app advances order status through THIS route, so the outbound
+        // lifecycle callback (ASSIGNED → PICKED_UP → ON_THE_WAY → ARRIVED →
+        // DELIVERED) must be emitted here. recordAndDispatchLifecycleEvent
+        // records to order_status_history then POSTs an HMAC-signed webhook;
+        // it self-guards against legacy carriers (CaterValley/ezCater own their
+        // outbound path) and non-partner orders, never throws, and no-ops when
+        // the partner has no webhook URL/secret configured. Deferred via
+        // runAfterResponse so the post-response work survives the Vercel freeze.
+        const partnerLifecycle =
+          DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
+            driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
+          ];
+        if (partnerLifecycle) {
+          const driverProfile = (updatedOrder as any).dispatches?.[0]?.driver;
+          const driver =
+            driverProfile?.name && driverProfile?.contactNumber
+              ? { name: driverProfile.name, phone: driverProfile.contactNumber }
+              : undefined;
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', () =>
+            recordAndDispatchLifecycleEvent({
+              orderId: (updatedOrder as any).id,
+              orderNumber: (updatedOrder as any).orderNumber,
+              partnerStatus: partnerLifecycle,
+              driverStatus,
+              changedBy: user.id ?? driverProfile?.id ?? null,
+              driver,
+            }),
+          );
+        }
       }
 
       // Send customer notification for significant field changes (non-blocking)
@@ -811,18 +881,17 @@ export async function PATCH(
         const customerName = (updatedOrder as any).user?.name || 'Customer';
 
         if (customerEmail) {
-          // Import dynamically to avoid circular dependencies
-          import('@/services/notifications/order-update').then(({ sendOrderUpdateNotification }) => {
-            sendOrderUpdateNotification({
+          runAfterResponse('Failed to send order update notification:', async () => {
+            // Import dynamically to avoid circular dependencies.
+            const { sendOrderUpdateNotification } = await import(
+              '@/services/notifications/order-update'
+            );
+            await sendOrderUpdateNotification({
               order: updatedOrder as any,
               changes,
               customerEmail,
               customerName,
-            }).catch((err) => {
-              console.error('Failed to send order update notification:', err);
             });
-          }).catch((err) => {
-            console.error('Failed to import order update notification service:', err);
           });
         }
       }

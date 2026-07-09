@@ -82,6 +82,8 @@
     "unrs-resolver"
   ],
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/core": "^6.2.1",
     "@faker-js/faker": "^10.3.0",
     "@hookform/resolvers": "^5.2.2",
     "@next/mdx": "^15.5.12",

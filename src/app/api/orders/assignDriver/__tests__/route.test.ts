@@ -18,6 +18,7 @@ import { POST } from "../route";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
+import { recordAndDispatchLifecycleEvent } from "@/lib/services/partnerWebhookService";
 import {
   createPostRequest,
   expectSuccessResponse,
@@ -43,10 +44,17 @@ jest.mock("@/lib/soft-delete-handlers", () => ({
   getActiveDriversForDispatch: jest.fn(),
 }));
 
+jest.mock("@/lib/services/partnerWebhookService", () => ({
+  recordAndDispatchLifecycleEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
 const mockPrisma = prisma as any;
 const mockValidateUserNotSoftDeleted = validateUserNotSoftDeleted as jest.MockedFunction<
   typeof validateUserNotSoftDeleted
+>;
+const mockRecordLifecycle = recordAndDispatchLifecycleEvent as jest.MockedFunction<
+  typeof recordAndDispatchLifecycleEvent
 >;
 
 describe("/api/orders/assignDriver", () => {
@@ -411,6 +419,73 @@ describe("/api/orders/assignDriver", () => {
             data: expect.objectContaining({ status: "ASSIGNED" }),
           })
         );
+      });
+    });
+
+    describe("Partner ASSIGNED webhook", () => {
+      it("emits the ASSIGNED lifecycle event for a catering assignment", async () => {
+        mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+          return callback({
+            cateringRequest: {
+              findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
+              update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest
+                .fn()
+                .mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+            },
+            dispatch: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockDispatch),
+            },
+          });
+        });
+
+        const request = createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+          orderId: mockCateringOrder.id,
+          driverId: mockDriver.id,
+          orderType: "catering",
+        });
+
+        await POST(request);
+
+        expect(mockRecordLifecycle).toHaveBeenCalledTimes(1);
+        expect(mockRecordLifecycle).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderId: mockCateringOrder.id,
+            orderNumber: mockCateringOrder.orderNumber,
+            partnerStatus: "ASSIGNED",
+            driverStatus: "ASSIGNED",
+            driver: { name: mockDriver.name, phone: mockDriver.contactNumber },
+          })
+        );
+      });
+
+      it("does NOT emit for an on_demand assignment (partner orders are catering)", async () => {
+        mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+          return callback({
+            onDemand: {
+              findUnique: jest.fn().mockResolvedValue(mockOnDemandOrder),
+              update: jest.fn().mockResolvedValue({ ...mockOnDemandOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest
+                .fn()
+                .mockResolvedValue({ ...mockOnDemandOrder, status: "ASSIGNED" }),
+            },
+            dispatch: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockDispatch),
+            },
+          });
+        });
+
+        const request = createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+          orderId: mockOnDemandOrder.id,
+          driverId: mockDriver.id,
+          orderType: "on_demand",
+        });
+
+        await POST(request);
+
+        expect(mockRecordLifecycle).not.toHaveBeenCalled();
       });
     });
 

@@ -99,6 +99,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             pickupLocation: { coordinates: toCoords(pickup) },
             deliveryLocation: { coordinates: toCoords(dropoff) },
             estimatedArrival: o.arrivalDateTime ? new Date(o.arrivalDateTime) : undefined,
+            scheduledPickupAt: o.pickupDateTime ? new Date(o.pickupDateTime) : undefined,
             route: [],
             proofOfDelivery: pod,
             metadata: {},
@@ -106,7 +107,13 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             createdAt: o.createdAt ? new Date(o.createdAt) : new Date(0),
             updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date(0),
           } as DeliveryTracking;
-        });
+        })
+        // Soonest scheduled pickup first so tonight's delivery leads the list.
+        .sort(
+          (a, b) =>
+            (a.scheduledPickupAt ?? a.estimatedArrival ?? a.createdAt).getTime() -
+            (b.scheduledPickupAt ?? b.estimatedArrival ?? b.createdAt).getTime(),
+        );
 
       setActiveDeliveries(mapped);
     } catch (err) {

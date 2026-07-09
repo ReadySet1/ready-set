@@ -48,7 +48,7 @@ export function DriverScreen({
                 {left}
                 <div className="min-w-0 flex-1">
                   {title ? (
-                    <h1 className="truncate text-[21px] font-extrabold leading-tight text-driver-text">
+                    <h1 className="truncate text-[21px] font-semibold leading-tight text-driver-text">
                       {title}
                     </h1>
                   ) : null}

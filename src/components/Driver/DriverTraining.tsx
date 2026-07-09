@@ -73,7 +73,7 @@ function ProgressRing({ value }: { value: number }) {
         y="32"
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-driver-text text-[14px] font-extrabold"
+        className="fill-driver-text text-[14px] font-semibold"
       >
         {value}%
       </text>
@@ -117,7 +117,7 @@ export function DeliveryDriverTraining() {
         <DriverCard className="flex items-center gap-4">
           <ProgressRing value={mounted ? progress : 0} />
           <div className="min-w-0">
-            <div className="text-[15px] font-extrabold text-driver-text">
+            <div className="text-[15px] font-semibold text-driver-text">
               {progress === 100 ? "All caught up!" : "Keep your training current"}
             </div>
             <div className="text-[12.5px] font-semibold text-driver-muted">
@@ -137,19 +137,19 @@ export function DeliveryDriverTraining() {
                 <div className="relative overflow-hidden rounded-t-2xl">
                   <VideoPlayer videoUrl={video.videoUrl} title={video.title} />
                   {isDone ? (
-                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-driver-success px-2 py-1 text-[11px] font-extrabold text-white shadow">
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-driver-success px-2 py-1 text-[11px] font-semibold text-white shadow">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Done
                     </span>
                   ) : null}
                 </div>
                 <div className="space-y-3 p-4 pt-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-driver-on-brand">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-driver-on-brand">
                     <GraduationCap className="h-3.5 w-3.5" />
                     Module
                   </div>
                   <div>
-                    <h2 className="text-[14.5px] font-extrabold text-driver-text">
+                    <h2 className="text-[14.5px] font-semibold text-driver-text">
                       {video.title}
                     </h2>
                     <p className="mt-1 text-[12px] font-medium leading-relaxed text-driver-muted">

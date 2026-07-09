@@ -41,7 +41,7 @@ export function NavigationAppSheet({
       >
         <div className="mx-auto w-full max-w-md">
           <SheetHeader className="items-start">
-            <SheetTitle className="text-[18px] font-extrabold text-driver-text">
+            <SheetTitle className="text-[18px] font-semibold text-driver-text">
               Navigate with
             </SheetTitle>
           </SheetHeader>
@@ -55,7 +55,7 @@ export function NavigationAppSheet({
                   onClick={() => onSelect(app.id)}
                   aria-pressed={active}
                   className={cn(
-                    "flex min-h-driver-control items-center justify-between rounded-2xl border-[1.5px] px-4 text-[15px] font-extrabold text-driver-text transition-all active:translate-y-px",
+                    "flex min-h-driver-control items-center justify-between rounded-2xl border-[1.5px] px-4 text-[15px] font-semibold text-driver-text transition-all active:translate-y-px",
                     active
                       ? "border-driver-brand bg-driver-surface-alt"
                       : "border-driver-border bg-driver-surface-alt",

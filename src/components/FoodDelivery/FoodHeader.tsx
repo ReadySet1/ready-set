@@ -4,7 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 
 const FoodHeader: React.FC = () => {
   const { openForm, DialogForm } = FormManager();
@@ -64,13 +64,15 @@ const FoodHeader: React.FC = () => {
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="relative h-full w-full scale-100 md:scale-[1.28] lg:scale-[1.35]">
           <Image
-            src={getCloudinaryUrl("food/food-containers-v2")}
+            src={getCloudinaryUrl("food/food-containers-v2", { version: ASSET_CACHE_VERSION })}
             alt="Food containers with various prepared meals"
             fill
             className="object-cover object-center md:object-[85%_50%] lg:object-[85%_50%]"
             priority
           />
         </div>
+        {/* Dark gradient overlay for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
       </div>
 
       {/* Text content overlay */}
@@ -81,12 +83,12 @@ const FoodHeader: React.FC = () => {
         variants={containerVariants}
       >
         <motion.div
-          className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 rounded-lg bg-white/80 p-4 backdrop-blur-sm sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md md:bg-transparent md:p-0 md:backdrop-blur-none lg:ml-32 lg:mt-28"
+          className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md md:bg-transparent md:p-0 md:backdrop-blur-none lg:ml-32 lg:mt-28"
           initial={false}
           variants={containerVariants}
         >
           <motion.h1
-            className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-gray-800 md:text-2xl lg:text-3xl"
+            className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-white md:text-2xl lg:text-3xl"
             initial={false}
             variants={itemVariants}
           >
@@ -94,7 +96,7 @@ const FoodHeader: React.FC = () => {
           </motion.h1>
 
           <motion.p
-            className="font-[Montserrat] text-xs font-medium leading-relaxed text-gray-700 md:text-sm lg:text-base"
+            className="font-[Montserrat] text-xs font-medium leading-relaxed text-white/90 md:text-sm lg:text-base"
             initial={false}
             variants={itemVariants}
           >

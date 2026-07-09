@@ -20,8 +20,9 @@ interface NextActionProps {
   className?: string;
 }
 
-/** The single dominant action on a screen. 56px min, amber (or green at the
- *  delivery step), with an optional hint chip + pulsing ring to signal tappability. */
+/** The single dominant action on a screen. 56px min, ink fill (green at the
+ *  delivery step) — the trailing amber icon chip is the only amber element —
+ *  with an optional hint chip + pulsing ring to signal tappability. */
 export function NextAction({
   label,
   sub,
@@ -42,7 +43,7 @@ export function NextAction({
           className={cn(
             "inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1",
             brand
-              ? "border border-driver-brand/45 bg-driver-brand/15 text-driver-on-brand"
+              ? "border border-driver-border bg-driver-surface-alt text-driver-muted"
               : "bg-driver-success-bg text-driver-success-ink",
           )}
         >
@@ -50,7 +51,7 @@ export function NextAction({
             className="h-3.5 w-3.5 animate-driver-tap"
             strokeWidth={2.4}
           />
-          <span className="text-[11.5px] font-extrabold">{hint}</span>
+          <span className="text-[11.5px] font-semibold">{hint}</span>
         </div>
       ) : null}
 
@@ -62,23 +63,23 @@ export function NextAction({
         className={cn(
           "flex min-h-driver-action w-full items-center gap-3 rounded-2xl px-4 text-left shadow-driver transition-transform active:translate-y-px disabled:opacity-60",
           brand
-            ? "bg-driver-brand text-driver-brand-ink hover:bg-driver-brand-hover"
+            ? "bg-driver-ink text-driver-on-ink hover:bg-driver-ink-hover"
             : "bg-driver-success text-white",
         )}
       >
         <span className="flex-1">
           {loading ? (
-            <span className="block text-driver-rail font-extrabold tracking-[-0.01em]">
+            <span className="block text-driver-rail font-semibold tracking-[-0.01em]">
               {loadingLabel}
             </span>
           ) : (
             <>
               {sub ? (
-                <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.06em] opacity-70">
+                <span className="block text-[10.5px] font-semibold uppercase tracking-[0.06em] opacity-70">
                   {sub}
                 </span>
               ) : null}
-              <span className="block text-driver-rail font-extrabold tracking-[-0.01em]">
+              <span className="block text-driver-rail font-semibold tracking-[-0.01em]">
                 {label}
               </span>
             </>
@@ -90,11 +91,18 @@ export function NextAction({
             <span
               className={cn(
                 "absolute inset-0 rounded-xl border-2 animate-driver-ping",
-                brand ? "border-driver-brand-ink/50" : "border-white/70",
+                brand ? "border-[rgba(251,209,19,0.55)]" : "border-white/70",
               )}
             />
           ) : null}
-          <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/10">
+          <span
+            className={cn(
+              "absolute inset-0 flex items-center justify-center rounded-xl",
+              brand
+                ? "bg-driver-brand text-driver-brand-ink"
+                : "bg-white/[0.14] text-white",
+            )}
+          >
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.6} />
             ) : (

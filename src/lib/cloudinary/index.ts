@@ -42,7 +42,7 @@ export {
 } from './url-builder';
 
 // Configuration
-export { cloudinaryConfig, CLOUDINARY_BASE_URL } from './config';
+export { cloudinaryConfig, CLOUDINARY_BASE_URL, ASSET_CACHE_VERSION } from './config';
 
 // Types
 export type {

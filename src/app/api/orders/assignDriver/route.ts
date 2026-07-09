@@ -10,6 +10,8 @@ import {
   StateTransitionError,
 } from "@/lib/state-machine/transition";
 import type { OrderStatus, OrderType } from "@/lib/state-machine/transition";
+import { recordAndDispatchLifecycleEvent } from "@/lib/services/partnerWebhookService";
+import { runAfterResponse } from "@/lib/api/after-response";
 
 function serializeData(obj: unknown): number | string | Date | Record<string, unknown> | unknown {
   if (typeof obj === "bigint") {
@@ -198,6 +200,32 @@ export async function POST(request: Request) {
         });
       } catch (deliveryErr) {
         console.error('Failed to upsert delivery assignedAt:', deliveryErr);
+      }
+
+      // Registry-driven partner ASSIGNED webhook (e.g. CaterCow). Driver
+      // assignment happens here, NOT via the driver order PATCH, so the ASSIGNED
+      // lifecycle event has to be emitted from this route — otherwise partners
+      // never see it. Catering-only: partner orders are catering_requests, and
+      // order_status_history.cateringRequestId FKs to that table. The helper
+      // additionally no-ops for non-partner orders and legacy carriers, never
+      // throws, and skips when no webhook is configured. Deferred via
+      // runAfterResponse so it survives the Vercel post-response freeze.
+      if (orderType === "catering") {
+        const driverProfile = (result.dispatch as any)?.driver;
+        const driver =
+          driverProfile?.name && driverProfile?.contactNumber
+            ? { name: driverProfile.name, phone: driverProfile.contactNumber }
+            : undefined;
+        runAfterResponse('Failed to dispatch partner ASSIGNED webhook:', () =>
+          recordAndDispatchLifecycleEvent({
+            orderId: (result.updatedOrder as any).id,
+            orderNumber: (result.updatedOrder as any).orderNumber,
+            partnerStatus: 'ASSIGNED',
+            driverStatus: 'ASSIGNED',
+            changedBy: user.id ?? null,
+            driver,
+          }),
+        );
       }
 
       // Serialize the result before sending the response

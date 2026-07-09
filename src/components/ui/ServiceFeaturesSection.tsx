@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef, ErrorInfo } from "react";
 import Image from "next/image";
 import { Clock, Truck, Shield } from "lucide-react";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 
 // Carousel imports
 import {
@@ -222,8 +222,8 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
       { name: "Bobcha", logo: getCloudinaryUrl("food/partners/bobcha") },
       { name: "Foodee", logo: getCloudinaryUrl("food/partners/foodee") },
       { name: "Destino", logo: getCloudinaryUrl("food/partners/destino") },
-      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva") },
-      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa") },
+      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva", { version: ASSET_CACHE_VERSION }) },
+      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa", { version: ASSET_CACHE_VERSION }) },
       { name: "CaterValley", logo: getCloudinaryUrl("food/partners/catervalley") },
     ],
     [],
