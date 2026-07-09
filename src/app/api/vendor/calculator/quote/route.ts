@@ -226,11 +226,21 @@ export async function POST(request: NextRequest) {
 
     if (profile?.companyName) {
       configId = resolveConfigId(profile.companyName);
+      if (configId) {
+        console.info(
+          `[vendor-quote] Config resolved via companyName: "${profile.companyName}" → ${configId}`,
+        );
+      }
     }
 
     if (!configId) {
       // Email-domain fallback (e.g., @tryhungry.com → try-hungry)
       configId = resolveConfigIdByEmail(profile?.email);
+      if (configId) {
+        console.info(
+          `[vendor-quote] Config resolved via email domain: @${profile?.email?.split('@')[1]} → ${configId}`,
+        );
+      }
     }
 
     if (!configId) {
@@ -243,7 +253,7 @@ export async function POST(request: NextRequest) {
         {
           userId,
           companyName: profile?.companyName ?? '(none)',
-          email: profile?.email ?? '(none)',
+          emailDomain: profile?.email?.split('@')[1] ?? '(none)',
           resolvedConfigId: configId,
         },
         'warning',

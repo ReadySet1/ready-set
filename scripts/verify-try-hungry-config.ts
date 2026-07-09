@@ -28,7 +28,7 @@ interface PricingTier {
 
 async function verify() {
   const dbRow = await prisma.deliveryConfiguration.findFirst({
-    where: { configId: 'try-hungry' },
+    where: { configId: TRY_HUNGRY.id },
   });
 
   if (!dbRow) {

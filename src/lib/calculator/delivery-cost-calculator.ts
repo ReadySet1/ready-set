@@ -485,6 +485,22 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // 1. Determine if within 10 miles
   const isWithin10Miles = totalMileage <= config.distanceThreshold;
 
+  // 1.5. Early sentinel guard — if the headcount falls in a tier with
+  // regularRate===0 and NO percentage override, it is a manual-review
+  // sentinel.  Fire the check BEFORE tier selection so that a food-cost
+  // tier's non-zero fee cannot bypass the deliveryCost===0 guard below.
+  // Tiers that carry a regularRatePercent (e.g. CaterValley 10%) are
+  // intentionally percent-priced, not sentinels, so we skip them.
+  if (config.driverPaySettings.requiresManualReview) {
+    const hcSentinel = config.pricingTiers.find(t =>
+      headcount >= t.headcountMin && (t.headcountMax === null || headcount <= t.headcountMax)
+    );
+    if (hcSentinel && hcSentinel.regularRate === 0 && hcSentinel.within10Miles === 0
+        && !hcSentinel.regularRatePercent && !hcSentinel.within10MilesPercent) {
+      checkManualReviewRequired(headcount, config);
+    }
+  }
+
   // 2. Determine pricing tier (LESSER FEE of headcount or food cost)
   const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
 

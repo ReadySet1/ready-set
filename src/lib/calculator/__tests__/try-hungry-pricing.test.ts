@@ -585,6 +585,29 @@ describe('Try Hungry Pricing', () => {
       expect(result.deliveryCost).toBe(40);
     });
 
+    it('should charge 9% at exact $1,200 boundary (foodCostMin)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 1200,
+        totalMileage: 5,
+        clientConfigId: 'try-hungry',
+      });
+
+      // 1200 × 0.09 = $108.00
+      expect(result.deliveryCost).toBe(108);
+    });
+
+    it('foodCost $1,199.99 (just below boundary) → $70 flat rate tier', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 1199.99,
+        totalMileage: 5,
+        clientConfigId: 'try-hungry',
+      });
+
+      expect(result.deliveryCost).toBe(70);
+    });
+
     it('should add customer mileage surcharge on top of 9% band', () => {
       const result = calculateDeliveryCost({
         headcount: 0,
@@ -682,6 +705,24 @@ describe('Try Hungry Pricing', () => {
           headcount: 99, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
         }),
       ).not.toThrow();
+    });
+
+    it('headcount >= 100 with non-zero foodCost still triggers manual review', () => {
+      // Regression: the 9% regularRatePercent on the 100+ tier must NOT
+      // bypass the manual review guard when foodCost > 0
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 100, foodCost: 100, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).toThrow('manual review');
+    });
+
+    it('headcount 150 with foodCost $1,500 → manual review, not 9%', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 150, foodCost: 1500, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).toThrow('manual review');
     });
   });
 });

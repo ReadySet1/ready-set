@@ -380,8 +380,11 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 50, within10Miles: 50 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 60, within10Miles: 60 },
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 70, within10Miles: 70 },
-    // 100+ headcount requires manual review; food cost > $1,200 → 9% of food cost
-    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.09, within10MilesPercent: 0.09 }
+    // Food cost > $1,200 with headcount < 100 → 9% of food cost
+    // Headcount range 0-99 ensures the headcount lookup skips this tier for 100+
+    { headcountMin: 0, headcountMax: 99, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.09, within10MilesPercent: 0.09 },
+    // 100+ headcount requires manual review (no percent — sentinel tier)
+    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0 }
   ],
 
   mileageRate: 2.5, // Custom rate: $2.50 per mile (lower than standard $3.00)
