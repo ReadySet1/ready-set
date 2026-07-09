@@ -229,6 +229,15 @@ function isInTier(value: number, min: number, max: number | null): boolean {
 }
 
 /**
+ * Rounds a dollar amount to cents. Percentage-based fees (e.g. 9% of food
+ * cost) produce float artifacts ($1,333.33 × 0.09 = 119.99969999999999)
+ * that would otherwise reach API responses verbatim.
+ */
+function roundToCents(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/**
  * Calculates extra stops charge for multi-stop deliveries
  * First stop is included in base delivery cost, additional stops are charged extra
  *
@@ -493,7 +502,7 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // intentionally percent-priced, not sentinels, so we skip them.
   if (config.driverPaySettings.requiresManualReview) {
     const hcSentinel = config.pricingTiers.find(t =>
-      headcount >= t.headcountMin && (t.headcountMax === null || headcount <= t.headcountMax)
+      isInTier(headcount, t.headcountMin, t.headcountMax)
     );
     if (hcSentinel && hcSentinel.regularRate === 0 && hcSentinel.within10Miles === 0
         && !hcSentinel.regularRatePercent && !hcSentinel.within10MilesPercent) {
@@ -509,11 +518,11 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   let deliveryCost: number;
   if (isWithin10Miles) {
     deliveryCost = tier.within10MilesPercent
-      ? foodCost * tier.within10MilesPercent
+      ? roundToCents(foodCost * tier.within10MilesPercent)
       : tier.within10Miles;
   } else {
     deliveryCost = tier.regularRatePercent
-      ? foodCost * tier.regularRatePercent
+      ? roundToCents(foodCost * tier.regularRatePercent)
       : tier.regularRate;
   }
 
@@ -775,8 +784,8 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     const isWithin10Miles = totalMileage <= config.distanceThreshold;
     const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
     readySetFee = isWithin10Miles
-      ? (tier.within10MilesPercent ? foodCost * tier.within10MilesPercent : tier.within10Miles)
-      : (tier.regularRatePercent ? foodCost * tier.regularRatePercent : tier.regularRate);
+      ? (tier.within10MilesPercent ? roundToCents(foodCost * tier.within10MilesPercent) : tier.within10Miles)
+      : (tier.regularRatePercent ? roundToCents(foodCost * tier.regularRatePercent) : tier.regularRate);
   } else {
     // Default: use fixed Ready Set fee from config
     readySetFee = config.driverPaySettings.readySetFee;

@@ -608,6 +608,17 @@ describe('Try Hungry Pricing', () => {
       expect(result.deliveryCost).toBe(70);
     });
 
+    it('rounds the 9% fee to cents (no float artifacts in the API response)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 0,
+        foodCost: 1333.33, // × 0.09 = 119.99969999999999 unrounded
+        totalMileage: 5,
+        clientConfigId: 'try-hungry',
+      });
+
+      expect(result.deliveryCost).toBe(120);
+    });
+
     it('should add customer mileage surcharge on top of 9% band', () => {
       const result = calculateDeliveryCost({
         headcount: 0,

@@ -51,11 +51,11 @@ const mockPrisma = prisma as unknown as {
 // ---------------------------------------------------------------------------
 
 /** Simulate authenticated VENDOR user */
-function authAsVendor(userId = 'vendor-user-id') {
+function authAsVendor(userId = 'vendor-user-id', email = 'vendor@example.com') {
   mockWithAuth.mockResolvedValueOnce({
     success: true,
     context: {
-      user: { id: userId, email: 'vendor@example.com', type: 'VENDOR' },
+      user: { id: userId, email, type: 'VENDOR' },
     },
   } as unknown as AuthResult);
 }
@@ -452,11 +452,10 @@ describe('POST /api/vendor/calculator/quote', () => {
   // ── Email fallback ────────────────────────────────────────────────────
 
   describe('email-domain fallback', () => {
-    it('resolves to try-hungry when companyName is empty but email is @tryhungry.com', async () => {
-      authAsVendor();
+    it('resolves to try-hungry when companyName is empty but the AUTH email is @tryhungry.com', async () => {
+      authAsVendor('vendor-user-id', 'ops@tryhungry.com');
       mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: null,
-        email: 'ops@tryhungry.com',
       });
 
       const res = await POST(
@@ -469,11 +468,56 @@ describe('POST /api/vendor/calculator/quote', () => {
       expect(body.isFallbackPricing).toBe(false);
     });
 
-    it('falls back to standard config when both companyName and email are unmapped', async () => {
-      authAsVendor();
+    it('engages when companyName is present but unmapped', async () => {
+      authAsVendor('vendor-user-id', 'ops@tryhungry.com');
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: 'Unknown Corp',
+      });
+
+      const res = await POST(
+        makePostRequest({ ...VALID_BODY, headcount: 10, foodCost: 0 }),
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.pricingProfileLabel).toBe('Try Hungry');
+      expect(body.isFallbackPricing).toBe(false);
+    });
+
+    it('does NOT override a companyName that resolves to a config', async () => {
+      authAsVendor('vendor-user-id', 'ops@tryhungry.com');
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: 'Destino',
+      });
+
+      const res = await POST(makePostRequest(VALID_BODY));
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.pricingProfileLabel).not.toBe('Try Hungry');
+      expect(body.isFallbackPricing).toBe(false);
+    });
+
+    it('ignores the user-editable profiles.email column (auth email is the trust anchor)', async () => {
+      // A self-set profile email must not grant another vendor's pricing.
+      authAsVendor('vendor-user-id', 'user@gmail.com');
       mockPrisma.profile.findFirst.mockResolvedValue({
         companyName: null,
-        email: 'user@gmail.com',
+        email: 'spoof@tryhungry.com',
+      });
+
+      const res = await POST(makePostRequest(VALID_BODY));
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.pricingProfileLabel).not.toBe('Try Hungry');
+      expect(body.isFallbackPricing).toBe(true);
+    });
+
+    it('falls back to standard config when both companyName and auth email are unmapped', async () => {
+      authAsVendor('vendor-user-id', 'user@gmail.com');
+      mockPrisma.profile.findFirst.mockResolvedValue({
+        companyName: null,
       });
 
       const res = await POST(makePostRequest(VALID_BODY));

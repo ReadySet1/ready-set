@@ -62,4 +62,19 @@ describe('resolveConfigIdByEmail', () => {
   it('returns null for a string without @', () => {
     expect(resolveConfigIdByEmail('no-at-sign')).toBeNull();
   });
+
+  // Spoof-resistance: these pin the exact-label matching so a future
+  // regression to a naive endsWith() cannot grant attacker-registered
+  // lookalike domains another vendor's pricing.
+  it('rejects a lookalike suffix domain (nottryhungry.com)', () => {
+    expect(resolveConfigIdByEmail('user@nottryhungry.com')).toBeNull();
+  });
+
+  it('rejects a domain where tryhungry.com is a non-terminal label', () => {
+    expect(resolveConfigIdByEmail('user@tryhungry.com.evil.io')).toBeNull();
+  });
+
+  it('does not resolve on a second @ segment', () => {
+    expect(resolveConfigIdByEmail('a@b@tryhungry.com')).toBeNull();
+  });
 });

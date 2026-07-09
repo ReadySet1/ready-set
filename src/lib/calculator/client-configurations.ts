@@ -380,8 +380,11 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 50, within10Miles: 50 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 60, within10Miles: 60 },
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 70, within10Miles: 70 },
-    // Food cost > $1,200 with headcount < 100 → 9% of food cost
-    // Headcount range 0-99 ensures the headcount lookup skips this tier for 100+
+    // Food cost ≥ $1,200 → 9% of food cost. NOTE: the LESSER-FEE rule still
+    // applies — when a real headcount (1-99) is also supplied, the flat
+    // headcount tier ($40-$70) always undercuts 9% of ≥$1,200 (≥$108) and
+    // wins, so this band effectively prices orders where only food cost is
+    // known (headcount 0). Headcount range 0-99 keeps 100+ on the sentinel.
     { headcountMin: 0, headcountMax: 99, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.09, within10MilesPercent: 0.09 },
     // 100+ headcount requires manual review (no percent — sentinel tier)
     { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0 }
@@ -431,7 +434,7 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
 
   createdAt: new Date('2025-11-12'),
   updatedAt: new Date('2026-02-11'),
-  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70). Food cost > $1,200 → 9% of food cost. Driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case). Customer mileage: $0 within 10mi, $2.50/mi beyond.'
+  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70). Food cost ≥ $1,200 with no headcount → 9% of food cost (lesser fee wins when both are supplied, so a known headcount ≤99 prices by its flat tier). Driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case). Customer mileage: $0 within 10mi, $2.50/mi beyond.'
 };
 
 /**

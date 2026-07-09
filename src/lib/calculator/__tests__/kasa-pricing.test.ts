@@ -1090,4 +1090,31 @@ describe('Kasa Pricing', () => {
       expect(result.driverBasePayPerDrop).toBe(18);
     });
   });
+
+  // ==========================================================================
+  // 300+ SENTINEL TIER — EARLY MANUAL-REVIEW GUARD
+  // ==========================================================================
+  // The early sentinel guard in calculateDeliveryCost fires for ANY config
+  // with requiresManualReview whose headcount-matched tier is all-zero with
+  // no percent override. For Kasa that is the 300+ TBD tier. Previously a
+  // 300+ headcount with a non-zero foodCost priced from the food-cost tier
+  // via the "prefer non-zero fee" rule; it now (deliberately) requires
+  // manual review on every engine surface.
+  describe('300+ headcount sentinel (manual review)', () => {
+    it('headcount 350 with non-zero foodCost throws manual review (was: priced by food-cost tier)', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 350, foodCost: 1000, totalMileage: 8, clientConfigId: 'kasa',
+        }),
+      ).toThrow('manual review');
+    });
+
+    it('headcount 299 with non-zero foodCost still prices normally', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 299, foodCost: 1000, totalMileage: 8, clientConfigId: 'kasa',
+        }),
+      ).not.toThrow();
+    });
+  });
 });

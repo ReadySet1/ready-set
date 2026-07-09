@@ -4,8 +4,10 @@
  * Vendor-facing delivery cost estimator. A logged-in VENDOR can estimate
  * their own delivery cost against their own pricing configuration.
  *
- * The config ID is resolved server-side from the caller's profile
- * (company_name → resolveConfigId → DB-first config chain).
+ * The config ID is resolved server-side: profile company_name →
+ * resolveConfigId, then the caller's auth email domain →
+ * resolveConfigIdByEmail, then READY_SET_FOOD_STANDARD. The resolved
+ * ID is loaded through the DB-first config chain.
  *
  * Returns customer-facing fields ONLY — never exposes driver pay, margin,
  * RS fee, or any internal breakdown.
@@ -217,8 +219,14 @@ export async function POST(request: NextRequest) {
     const userId = auth.context.user.id;
     const profile = await prisma.profile.findFirst({
       where: { id: userId, deletedAt: null },
-      select: { companyName: true, email: true },
+      select: { companyName: true },
     });
+
+    // The auth-layer email (Supabase-verified) — NOT profiles.email, which a
+    // vendor can edit without re-verification and use to self-select another
+    // vendor's pricing profile.
+    const authEmail = auth.context.user.email;
+    const authEmailDomain = authEmail?.toLowerCase().split('@')[1] ?? '(none)';
 
     // 5. Resolve config from company name
     let configId: string | null = null;
@@ -228,17 +236,17 @@ export async function POST(request: NextRequest) {
       configId = resolveConfigId(profile.companyName);
       if (configId) {
         console.info(
-          `[vendor-quote] Config resolved via companyName: "${profile.companyName}" → ${configId}`,
+          `[vendor-quote] Config resolved via companyName → ${configId}`,
         );
       }
     }
 
     if (!configId) {
       // Email-domain fallback (e.g., @tryhungry.com → try-hungry)
-      configId = resolveConfigIdByEmail(profile?.email);
+      configId = resolveConfigIdByEmail(authEmail);
       if (configId) {
         console.info(
-          `[vendor-quote] Config resolved via email domain: @${profile?.email?.split('@')[1]} → ${configId}`,
+          `[vendor-quote] Config resolved via auth email domain: @${authEmailDomain} → ${configId}`,
         );
       }
     }
@@ -253,7 +261,7 @@ export async function POST(request: NextRequest) {
         {
           userId,
           companyName: profile?.companyName ?? '(none)',
-          emailDomain: profile?.email?.split('@')[1] ?? '(none)',
+          emailDomain: authEmailDomain,
           resolvedConfigId: configId,
         },
         'warning',

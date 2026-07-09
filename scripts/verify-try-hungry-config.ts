@@ -8,23 +8,13 @@
 import { config } from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { TRY_HUNGRY } from '../src/lib/calculator/client-configurations';
+import type { PricingTier } from '../src/lib/calculator/delivery-cost-calculator';
 
 config({ path: '.env.local' });
 config({ path: '.env.development.local' });
 config({ path: '.env' });
 
 const prisma = new PrismaClient();
-
-interface PricingTier {
-  headcountMin: number;
-  headcountMax: number | null;
-  foodCostMin: number;
-  foodCostMax: number | null;
-  regularRate: number;
-  within10Miles: number;
-  regularRatePercent?: number;
-  within10MilesPercent?: number;
-}
 
 async function verify() {
   const dbRow = await prisma.deliveryConfiguration.findFirst({
