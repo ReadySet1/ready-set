@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0](https://github.com/ReadySet1/ready-set/compare/v2.3.0...v2.4.0) (2026-07-09)
+
+
+### Added
+
+* **admin:** staff can correct driver status (undo an accidental start) ([5d1440f](https://github.com/ReadySet1/ready-set/commit/5d1440f0a4238ac7d83b7fb4d2b12d1699909745))
+* **admin:** staff can correct driver status, including undoing an accidental start ([c791a74](https://github.com/ReadySet1/ready-set/commit/c791a74ec1369db8fa48b9e02c7a948bf49bad3b))
+* **driver:** native background-GPS bridge (shift lifecycle) ([d427685](https://github.com/ReadySet1/ready-set/commit/d427685f42b2cd1b1c5084a7941565adfffca84f))
+* **driver:** wire native background-GPS bridge into shift lifecycle ([b0e1b02](https://github.com/ReadySet1/ready-set/commit/b0e1b02d889e5ede6467db2175fb35cc2ec363fa))
+* **partners:** emit ASSIGNED lifecycle webhook on driver assignment ([933e79f](https://github.com/ReadySet1/ready-set/commit/933e79fcac220d6e256e5ad85fbeef27b6c73ffa))
+* **partners:** emit ASSIGNED lifecycle webhook on driver assignment ([efe27cf](https://github.com/ReadySet1/ready-set/commit/efe27cf6dcbb8f07c29e3fa02782ed8a87262394))
+* refresh Cloudinary partner logos and catering hero image ([715447b](https://github.com/ReadySet1/ready-set/commit/715447b1a22b4a40b9b31200814aa967f3b64d67))
+* refresh Cloudinary partner logos and catering hero image ([8ee4f7b](https://github.com/ReadySet1/ready-set/commit/8ee4f7b033dcc9516cb27b3b6a9cee76f97efaa7))
+
+
+### Fixed
+
+* **driver:** enforce the pickup signature on every surface ([2de30da](https://github.com/ReadySet1/ready-set/commit/2de30dac8a5a6876f381487a5ec9162cbdf3995d))
+* **driver:** enforce the pickup signature on every surface ([958882e](https://github.com/ReadySet1/ready-set/commit/958882eafa7c1709541437048641e58186f80c5e))
+* **driver:** re-arm native background GPS when arming fails or the app relaunches mid-shift ([10ecab9](https://github.com/ReadySet1/ready-set/commit/10ecab9f390c56554551d9b63584cba014f340d5))
+* **driver:** re-arm native background GPS when arming fails or the app relaunches mid-shift ([e684673](https://github.com/ReadySet1/ready-set/commit/e684673009beac6c3a723345a1e7fb5f3a7ee239))
+* **driver:** reserve the iOS safe-area top inset in the native WebView ([ef857aa](https://github.com/ReadySet1/ready-set/commit/ef857aaea6aaa71a83f92451bbd3a005f77f4086))
+* **driver:** reserve the iOS safe-area top inset in the native WebView ([1ddf372](https://github.com/ReadySet1/ready-set/commit/1ddf3724454f2673e8c8efda3a8d66860e784472))
+* **driver:** walk-test UX batch — real route trail, POD title, nav feedback, delivery date filter ([246838a](https://github.com/ReadySet1/ready-set/commit/246838aca6f3a8ce061ba680daf03fb164a2cc76))
+* **driver:** walk-test UX batch — route trail, POD title, nav feedback, date filter ([1eafe3e](https://github.com/ReadySet1/ready-set/commit/1eafe3e99a39f4135a8ae7cf5c34831cd9b24096))
+* **orders:** defer all post-response work in the driver PATCH with after() ([9cdb1f1](https://github.com/ReadySet1/ready-set/commit/9cdb1f17687b2ffc3483d8d98eb7218f12a45e13))
+* **orders:** defer broadcast + notifications with after() too (same Vercel drop) ([5134c1e](https://github.com/ReadySet1/ready-set/commit/5134c1ee674c5021fa85c4f3a3c4446eddd81db2))
+* **partners:** defer CaterCow webhook emit with after() so Vercel keeps it alive ([08b47b5](https://github.com/ReadySet1/ready-set/commit/08b47b5af35b2775704927c26c4416ac6f069fb9))
+* **partners:** emit CaterCow lifecycle webhooks from the driver order PATCH ([825cae3](https://github.com/ReadySet1/ready-set/commit/825cae348e8530253cf2cde783d1cca103e09509))
+* **partners:** emit CaterCow lifecycle webhooks from the driver order PATCH ([3475031](https://github.com/ReadySet1/ready-set/commit/347503138fd4ce31a1e9ecf8be190286283c7a94))
+* **tracking:** live-map pickup pin, driver name, mileage, offline state + dedupe catering timeline ([d8c2bd0](https://github.com/ReadySet1/ready-set/commit/d8c2bd0bb52d0c3d596a7bb703a059602667fd28))
+
+
+### Changed
+
+* centralize Cloudinary cache-bust version and validate version option ([110929c](https://github.com/ReadySet1/ready-set/commit/110929c0a951424a50de76160ce86fb4930aeba9))
+* driver app v2 restyle — ink primary actions, calmer amber ([0fcc616](https://github.com/ReadySet1/ready-set/commit/0fcc616c9862ae89193a64623eca63ba0c6d5450))
+
 ## [2.3.0](https://github.com/ReadySet1/ready-set/compare/v2.2.1...v2.3.0) (2026-06-24)
 
 
