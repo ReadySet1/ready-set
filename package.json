@@ -8,7 +8,7 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096 --max-http-header-size=32768' next dev",
     "build": "cross-env NODE_OPTIONS='--max-old-space-size=6144' prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=6144' next build",
     "build:no-typecheck": "cross-env NODE_OPTIONS='--max-old-space-size=6144' SKIP_TYPECHECK=true prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=6144' next build",
     "build:custom": "node scripts/build-without-prisma-collect.js",
