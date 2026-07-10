@@ -149,6 +149,7 @@ This is the busiest domain and the one most actively under refactor. **If you ar
 | `DriverShift`         | A driver's shift (start/end odometer, GPS-derived distance, reported distance).                                                |
 | `Delivery`            | A delivery within a shift. Records timestamps for `assignedAt`, `pickedUpAt`, `enRouteAt`, `arrivedAtClientAt`, `deliveredAt`. |
 | `DriverWeeklySummary` | Pre-computed aggregates (miles, deliveries, location-point count) used to generate weekly PDFs without re-aggregating raw points. |
+| `TrackingSettings`    | Singleton row (`id = 1`, CHECK-enforced) of admin-editable tracking knobs — see "Admin-configurable tracking settings" below.  |
 
 **Location ingestion path:**
 
@@ -201,7 +202,16 @@ Connection state is a small FSM: `IDLE → CONNECTING → CONNECTED → DISCONNE
 
 **Retention:** `DriverLocation` rows accumulate indefinitely. Manual archival via `/api/admin/data-archiving` writes an `ArchiveBatch` and tags rows with `archiveBatchId`. There is **no automatic TTL or partitioning** today — see §10.
 
-API surface: 11 routes under `/api/tracking/*` plus `/api/driver-deliveries`, `/api/dispatch/*`.
+**Admin-configurable tracking settings:** the tracking knobs that used to be hardcoded — arrival-geofence radius, stale-GPS threshold, end-shift pickup guard, GPS update interval, and the three mileage-validation thresholds — live in the `tracking_settings` singleton row (`id = 1`, CHECK-enforced; RLS enabled with no policies so PostgREST clients can't touch it; migration `20260710000000_add_tracking_settings`). Admins edit them on the **Settings** tab of `/admin/tracking` (ADMIN / SUPER_ADMIN only). API: `GET/PUT /api/tracking/settings` — GET returns drivers only the client-relevant subset (not the anti-gaming mileage thresholds); PUT is admin-only, Zod-validated (`src/types/tracking-settings.ts`), and audited via `updated_by`.
+
+Resolution is **fail-open on both sides** — tracking must never stop because settings are unreachable:
+
+- Server: `getTrackingSettings()` in `src/services/tracking/tracking-settings.ts` — 60s per-instance TTL cache, falls back to `TRACKING_SETTINGS_DEFAULTS` on a missing row/table or any DB error, never throws. Rows are re-validated on read so out-of-bounds values written outside the API also fall back.
+- Client: the `useTrackingSettings()` hook — always returns a fully-populated settings object, and exposes `isServerData` so writer surfaces (the admin Settings form) never seed themselves from fallback defaults (saving those would silently reset customized settings fleet-wide).
+
+Enforcement points wired to these settings: the driver arrival-geofence hint, the `POST /api/tracking/locations` per-interval rate limit (with 80% jitter grace), the native Capacitor post throttle, the end-shift imminent-pickup guard, admin-dashboard staleness detection, and the mileage pipeline (which snapshots the thresholds per calculation). The `MILEAGE_GPS_ACCURACY_M`, `MILEAGE_MAX_SPEED_MPH`, and `MILEAGE_MAX_SHIFT_MILES` env overrides are **superseded** by the DB values when the row exists (`src/config/mileage-config.ts`). Product rule: every **user-facing** distance renders imperial (feet/miles); storage and math stay metric — convert at the display boundary with `src/lib/units.ts`.
+
+API surface: 15 routes under `/api/tracking/*` plus `/api/driver-deliveries`, `/api/dispatch/*`.
 
 ### 4.4 Delivery Calculator
 
@@ -333,7 +343,7 @@ Every user-owned or business-record model carries `deletedAt`, `deletedBy`, `del
 
 | Surface                    | Implementation                                                          | Distributed? |
 | -------------------------- | ----------------------------------------------------------------------- | ------------ |
-| `POST /api/tracking/locations` | `src/lib/rate-limiting/location-rate-limiter.ts` — in-memory `Map`  | **No**       |
+| `POST /api/tracking/locations` | `src/lib/rate-limiting/location-rate-limiter.ts` — in-memory `Map`, min interval admin-configurable via tracking settings; outer abuse cap via Upstash (`src/lib/security/rate-limit.ts`) | Interval: **No**; abuse cap: yes |
 | Email sending              | Circuit breaker in `src/services/email-notification.ts` (in-memory)     | **No**       |
 | Application sessions       | `TODO` in `src/app/api/application-sessions/route.ts` ("implement DB function for atomic rate limiting") | n/a |
 | Partner APIs               | `ApiPartner.rateLimitPerMin` column exists; enforcement varies          | Per-row config |
@@ -356,7 +366,7 @@ See §10 — multi-instance correctness for these is a known gap.
 | Domain                | Models                                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Users & Auth          | `Profile`, `Account`, `Session`, `EmailPreferences`, `VerificationToken`, `UserAudit`                                                                                    |
-| Driver Tracking       | `Driver`, `DriverLocation`, `DriverShift`, `Delivery`, `DriverWeeklySummary`                                                                                             |
+| Driver Tracking       | `Driver`, `DriverLocation`, `DriverShift`, `Delivery`, `DriverWeeklySummary`, `TrackingSettings`                                                                         |
 | Orders & Dispatch     | `CateringRequest`, `OnDemand`, `Dispatch`, `Address`, `UserAddress`, `PricingTier`                                                                                       |
 | Calculator            | `DeliveryConfiguration`, `CalculatorTemplate`, `PricingRule`, `ClientConfiguration`, `CalculationHistory`                                                                |
 | Files & Archival      | `FileUpload`, `UploadError`, `ArchiveBatch`                                                                                                                              |
@@ -444,7 +454,7 @@ Zustand is intentionally minimal. Anything that's server state goes through TanS
 | Services           | Moderate — `userAudit`, `userBulkOperations`, `email-notification`, `ezcater`   |
 | Auth               | Moderate — hydration tests, token refresh (mocked)                              |
 | Realtime           | Minimal — `channels.test.ts`, `client.test.ts`, schema tests                    |
-| Tracking services  | Minimal — no dedicated tracking-service tests                                   |
+| Tracking services  | Moderate — tracking-settings resolver, mileage filtering + settings snapshot (`src/services/tracking/__tests__/`) |
 | Components         | Inconsistent — several skipped due to mocking complexity (REA-266, 269, 281)    |
 | Webhooks (non-EZCater) | None                                                                        |
 | Mapbox / Stripe    | None                                                                            |

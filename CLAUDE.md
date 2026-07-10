@@ -260,6 +260,18 @@ node scripts/build-changelog.mjs
 - Admin dashboard: `/admin/tracking`
 - Test driver simulator: `/admin/tracking/test-driver`
 
+### Tracking Settings (admin-configurable)
+
+Tracking knobs (geofence radius, GPS interval, stale threshold, end-shift guard, mileage thresholds) live in the `tracking_settings` singleton table, edited on the Settings tab of `/admin/tracking` (ADMIN/SUPER_ADMIN only).
+
+- API: `GET/PUT /api/tracking/settings` (GET gives drivers a client-safe subset; PUT is admin-only, Zod-validated, audited)
+- Server reads: `getTrackingSettings()` from `src/services/tracking/tracking-settings.ts` — 60s TTL cache, **fail-open** to `TRACKING_SETTINGS_DEFAULTS` (`src/types/tracking-settings.ts`), never throws
+- Client reads: `useTrackingSettings()` hook — also fail-open; check `isServerData` before seeding any editor form from it
+- Supersedes the `MILEAGE_GPS_ACCURACY_M`, `MILEAGE_MAX_SPEED_MPH`, `MILEAGE_MAX_SHIFT_MILES` env vars when the DB row exists
+- **Product rule:** user-facing distances are always imperial (feet/miles); storage stays metric — convert at display with `src/lib/units.ts`
+
+Full detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4.3 "Admin-configurable tracking settings".
+
 ### Cloudinary Image CDN
 
 See [docs/cloudinary-integration.md](docs/cloudinary-integration.md) for complete documentation.
