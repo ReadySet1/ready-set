@@ -82,8 +82,21 @@ describe('checkArrivalGeofence', () => {
 });
 
 describe('geofenceHint', () => {
-  it('formats meters and kilometers', () => {
-    expect(geofenceHint(480)).toBe('~480 m away — move closer to enable');
-    expect(geofenceHint(1850)).toBe('~1.9 km away — move closer to enable');
+  it('formats short distances in feet, rounded to the nearest 10', () => {
+    expect(geofenceHint(60)).toBe('~200 ft away — move closer to enable');
+    expect(geofenceHint(ARRIVAL_GEOFENCE_RADIUS_M)).toBe(
+      '~490 ft away — move closer to enable',
+    );
+  });
+
+  it('switches to miles at 1000 ft', () => {
+    expect(geofenceHint(480)).toBe('~0.3 mi away — move closer to enable');
+    expect(geofenceHint(1850)).toBe('~1.1 mi away — move closer to enable');
+  });
+
+  it('never shows metric units', () => {
+    for (const meters of [5, 150, 480, 999, 1850, 25000]) {
+      expect(geofenceHint(meters)).not.toMatch(/\d\s?(m|km)\b/);
+    }
   });
 });

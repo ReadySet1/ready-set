@@ -76,11 +76,19 @@ export function checkArrivalGeofence(
   return { allowed: distance <= radiusM, distanceM: rounded };
 }
 
-/** Human hint for a blocked advance, e.g. "~480 m away — move closer to enable". */
+const METERS_TO_FEET = 3.28084;
+const FEET_PER_MILE = 5280;
+
+/**
+ * Human hint for a blocked advance, e.g. "~490 ft away — move closer to
+ * enable". Distances are computed in meters internally but always shown in
+ * imperial units — drivers are US-based and think in feet/miles.
+ */
 export function geofenceHint(distanceM: number): string {
+  const feet = distanceM * METERS_TO_FEET;
   const shown =
-    distanceM >= 1000
-      ? `${(distanceM / 1000).toFixed(1)} km`
-      : `${distanceM} m`;
+    feet >= 1000
+      ? `${(feet / FEET_PER_MILE).toFixed(1)} mi`
+      : `${Math.round(feet / 10) * 10} ft`;
   return `~${shown} away — move closer to enable`;
 }
