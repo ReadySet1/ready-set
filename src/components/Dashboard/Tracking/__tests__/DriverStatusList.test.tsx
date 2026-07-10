@@ -474,7 +474,7 @@ describe('DriverStatusList', () => {
   });
 
   describe('Signal Strength', () => {
-    it('should show excellent signal for accuracy <= 10m', () => {
+    it('shows excellent-signal accuracy in feet (10 m → 33 ft)', () => {
       render(
         <DriverStatusList
           drivers={[mockDriver1]}
@@ -482,10 +482,10 @@ describe('DriverStatusList', () => {
         />
       );
 
-      expect(screen.getByText('10m')).toBeInTheDocument();
+      expect(screen.getByText('33 ft')).toBeInTheDocument();
     });
 
-    it('should show accuracy in meters', () => {
+    it('shows accuracy in imperial units, never meters (25 m → 82 ft)', () => {
       render(
         <DriverStatusList
           drivers={[mockDriver2]}
@@ -493,7 +493,8 @@ describe('DriverStatusList', () => {
         />
       );
 
-      expect(screen.getByText('25m')).toBeInTheDocument();
+      expect(screen.getByText('82 ft')).toBeInTheDocument();
+      expect(screen.queryByText(/\d+\s?m\b/)).not.toBeInTheDocument();
     });
   });
 

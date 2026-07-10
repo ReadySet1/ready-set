@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LocationUpdate } from '@/types/tracking';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
+import { setNativePostThrottleMs } from '@/lib/tracking/capacitor-tracking';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
@@ -106,8 +107,10 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     const intervalMs = settings.locationUpdateIntervalSeconds * 1000;
     minSyncIntervalMsRef.current = intervalMs;
     // Keep the browser-side realtime rate limiter (src/lib/realtime/client.ts
-    // uses the same module singleton) in step with the server.
+    // uses the same module singleton) and the native background-GPS post
+    // throttle (Capacitor shell shares this JS context) in step with the server.
     locationRateLimiter.configure(intervalMs);
+    setNativePostThrottleMs(intervalMs);
   }, [settings.locationUpdateIntervalSeconds]);
   // Mirror isTracking into a ref so the long-lived watchPosition callback always
   // reads the live value. The callback registered in startTracking() captures the

@@ -83,6 +83,16 @@ export class StaleLocationDetector {
   }
 
   /**
+   * Override the stale threshold (admin-configurable via tracking settings).
+   * Ignores invalid values — keeps the previous threshold.
+   */
+  setStaleThreshold(thresholdMs: number): void {
+    if (Number.isFinite(thresholdMs) && thresholdMs > 0) {
+      this.staleThresholdMs = thresholdMs;
+    }
+  }
+
+  /**
    * Record a location update from a driver
    */
   recordLocation(

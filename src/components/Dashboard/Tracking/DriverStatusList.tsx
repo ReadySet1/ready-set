@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import type { TrackedDriver } from '@/types/tracking';
 import { isLocationStale } from '@/lib/realtime/stale-detection';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
+import { metersToFeet } from '@/lib/units';
 
 interface LocationData {
   driverId: string;
@@ -154,7 +155,7 @@ export default function DriverStatusList({
                 <div className={cn('w-3 h-3 rounded-full', {
                   'bg-green-500 animate-pulse': driver.isOnDuty && !isStale && locationData?.isMoving,
                   'bg-yellow-500': driver.isOnDuty && !isStale && !locationData?.isMoving,
-                  'bg-slate-400': isStale,
+                  'bg-slate-500': isStale,
                   'bg-gray-400': !driver.isOnDuty
                 })} />
                 
@@ -215,7 +216,7 @@ export default function DriverStatusList({
                 })} />
                 {locationData?.accuracy && (
                   <span className="text-xs text-muted-foreground">
-                    {Math.round(locationData.accuracy)}m
+                    {metersToFeet(locationData.accuracy)} ft
                   </span>
                 )}
               </div>

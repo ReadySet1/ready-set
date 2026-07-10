@@ -320,7 +320,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 ) : (
                   <>
                     <p className="text-2xl font-bold">{Math.round(stats.totalDistance)}</p>
-                    <p className="text-sm text-muted-foreground">Total KM</p>
+                    <p className="text-sm text-muted-foreground">Total Miles</p>
                     <p className="text-xs text-muted-foreground">today</p>
                   </>
                 )}

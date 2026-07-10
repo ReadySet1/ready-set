@@ -161,17 +161,16 @@ export async function endDriverShift(
     if (!force) {
       const settings = await getTrackingSettings();
       const guardMinutes = settings.endShiftPickupGuardMinutes;
-      // The pickup window is bound as a parameter (never interpolated).
-      const imminentPickupCr = guardMinutes > 0
-        ? `OR (cr."driverStatus" = 'ASSIGNED'
-                      AND cr."pickupDateTime" IS NOT NULL
-                      AND cr."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
-        : '';
-      const imminentPickupOd = guardMinutes > 0
-        ? `OR (od."driverStatus" = 'ASSIGNED'
-                      AND od."pickupDateTime" IS NOT NULL
-                      AND od."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
-        : '';
+      // The pickup window is bound as a parameter (never interpolated); the
+      // alias is a compile-time constant, one fragment builder for both tables.
+      const imminentPickup = (alias: 'cr' | 'od') =>
+        guardMinutes > 0
+          ? `OR (${alias}."driverStatus" = 'ASSIGNED'
+                      AND ${alias}."pickupDateTime" IS NOT NULL
+                      AND ${alias}."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
+          : '';
+      const imminentPickupCr = imminentPickup('cr');
+      const imminentPickupOd = imminentPickup('od');
       const guardParams: unknown[] = guardMinutes > 0
         ? [shift?.driver_id, guardMinutes]
         : [shift?.driver_id];
@@ -552,11 +551,17 @@ export async function updateDriverLocation(
     }
 
     // Check rate limit atomically (1 update per admin-configured interval per
-    // driver; cache-backed settings read, defaults on any failure).
+    // driver; cache-backed settings read, defaults on any failure). The same
+    // settings read keeps the server-side stale detector's threshold in step
+    // with what admins configured on the dashboard.
     // SECURITY FIX: Using checkAndRecordLimit() to prevent race conditions
     // This atomically checks AND records, preventing concurrent requests from bypassing the limit
+    const trackingSettings = await getTrackingSettings();
     locationRateLimiter.configure(
-      (await getTrackingSettings()).locationUpdateIntervalSeconds * 1000,
+      trackingSettings.locationUpdateIntervalSeconds * 1000,
+    );
+    staleLocationDetector.setStaleThreshold(
+      trackingSettings.staleGpsThresholdSeconds * 1000,
     );
     const rateLimit = locationRateLimiter.checkAndRecordLimit(driverId);
     if (!rateLimit.allowed) {

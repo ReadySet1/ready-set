@@ -2,6 +2,9 @@ jest.mock('@/utils/prismaDB', () => ({
   prisma: {
     trackingSettings: {
       upsert: jest.fn(),
+      // PUT reads the previous row directly (audit accuracy) — null means
+      // "no row yet", which falls back to the mocked resolver.
+      findUnique: jest.fn().mockResolvedValue(null),
     },
   },
 }));
@@ -67,12 +70,29 @@ describe('GET /api/tracking/settings', () => {
     mockGetSettings.mockResolvedValue(TRACKING_SETTINGS_DEFAULTS);
   });
 
-  it('returns the settings for a DRIVER', async () => {
+  it('returns the client-relevant subset for a DRIVER (no mileage thresholds)', async () => {
     authAs('DRIVER');
     const response = await GET(new NextRequest(URL));
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json.success).toBe(true);
+    // Mileage anti-gaming thresholds are withheld from drivers.
+    expect(json.data).toEqual({
+      arrivalGeofenceRadiusM: TRACKING_SETTINGS_DEFAULTS.arrivalGeofenceRadiusM,
+      locationUpdateIntervalSeconds:
+        TRACKING_SETTINGS_DEFAULTS.locationUpdateIntervalSeconds,
+      staleGpsThresholdSeconds:
+        TRACKING_SETTINGS_DEFAULTS.staleGpsThresholdSeconds,
+      endShiftPickupGuardMinutes:
+        TRACKING_SETTINGS_DEFAULTS.endShiftPickupGuardMinutes,
+    });
+  });
+
+  it('returns the full settings for an ADMIN', async () => {
+    authAs('ADMIN');
+    const response = await GET(new NextRequest(URL));
+    expect(response.status).toBe(200);
+    const json = await response.json();
     expect(json.data).toEqual(TRACKING_SETTINGS_DEFAULTS);
   });
 
@@ -125,6 +145,22 @@ describe('PUT /api/tracking/settings', () => {
       new NextRequest(URL, { method: 'PUT', body: 'not json' }),
     );
     expect(response.status).toBe(400);
+  });
+
+  it('returns 500 (without leaking details) when the DB write fails', async () => {
+    authAs('ADMIN');
+    mockUpsert.mockRejectedValue(new Error('db down'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await PUT(putRequest(newSettings));
+    expect(response.status).toBe(500);
+    const json = await response.json();
+    expect(json).toEqual({
+      success: false,
+      error: 'Failed to update tracking settings',
+    });
+
+    errorSpy.mockRestore();
   });
 
   it('upserts the singleton row with updatedBy, audits, and invalidates the cache', async () => {

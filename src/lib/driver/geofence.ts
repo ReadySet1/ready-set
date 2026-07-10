@@ -11,6 +11,7 @@
  */
 
 import { calculateDistance } from '@/utils/distance';
+import { METERS_TO_FEET, FEET_PER_MILE } from '@/lib/units';
 
 /** How close (meters) the driver must be for the "Arrived" advance to enable. */
 export const ARRIVAL_GEOFENCE_RADIUS_M = 150;
@@ -75,9 +76,6 @@ export function checkArrivalGeofence(
   const rounded = Math.round(distance);
   return { allowed: distance <= radiusM, distanceM: rounded };
 }
-
-const METERS_TO_FEET = 3.28084;
-const FEET_PER_MILE = 5280;
 
 /**
  * Human hint for a blocked advance, e.g. "~490 ft away — move closer to

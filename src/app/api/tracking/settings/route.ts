@@ -30,9 +30,22 @@ export async function GET(request: NextRequest) {
   }
 
   const settings = await getTrackingSettings();
+  // Drivers get only the client-relevant subset. The mileage-validation
+  // thresholds describe the anti-gaming envelope (accuracy filter, max speed,
+  // review-warning distance) — don't hand them to the population being
+  // checked. The client hook merges partial payloads over its defaults.
+  const data =
+    authResult.context.user.type === 'DRIVER'
+      ? {
+          arrivalGeofenceRadiusM: settings.arrivalGeofenceRadiusM,
+          locationUpdateIntervalSeconds: settings.locationUpdateIntervalSeconds,
+          staleGpsThresholdSeconds: settings.staleGpsThresholdSeconds,
+          endShiftPickupGuardMinutes: settings.endShiftPickupGuardMinutes,
+        }
+      : settings;
   return NextResponse.json({
     success: true,
-    data: settings,
+    data,
     timestamp: new Date().toISOString(),
   });
 }
@@ -77,7 +90,22 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const previous = await getTrackingSettings();
+    // Audit "previous" must reflect the actual stored row, not the 60s cache
+    // (another instance may have written since) — read the DB directly.
+    const previousRow = await prisma.trackingSettings.findUnique({
+      where: { id: 1 },
+    });
+    const previous: TrackingSettings = previousRow
+      ? {
+          arrivalGeofenceRadiusM: previousRow.arrivalGeofenceRadiusM,
+          staleGpsThresholdSeconds: previousRow.staleGpsThresholdSeconds,
+          endShiftPickupGuardMinutes: previousRow.endShiftPickupGuardMinutes,
+          locationUpdateIntervalSeconds: previousRow.locationUpdateIntervalSeconds,
+          mileageGpsAccuracyThresholdM: previousRow.mileageGpsAccuracyThresholdM,
+          mileageMaxSpeedMph: previousRow.mileageMaxSpeedMph,
+          maxReasonableShiftMiles: previousRow.maxReasonableShiftMiles,
+        }
+      : await getTrackingSettings();
 
     const saved = await prisma.trackingSettings.upsert({
       where: { id: 1 },
@@ -104,10 +132,12 @@ export async function PUT(request: NextRequest) {
       data: auditEntry,
     });
 
+    // Same envelope as GET ({success, data, timestamp}) — keep the route's
+    // two methods symmetrical for clients.
     return NextResponse.json({
       success: true,
       data: parsed.data,
-      updatedAt: saved.updatedAt.toISOString(),
+      timestamp: saved.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error('Error updating tracking settings:', error);

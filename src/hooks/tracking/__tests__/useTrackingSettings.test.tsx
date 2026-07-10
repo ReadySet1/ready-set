@@ -43,6 +43,29 @@ describe('useTrackingSettings', () => {
 
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
     expect(result.current.settings).toEqual(serverSettings);
+    expect(result.current.isServerData).toBe(true);
+  });
+
+  it('merges a driver-scoped partial payload over the defaults', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { arrivalGeofenceRadiusM: 91, locationUpdateIntervalSeconds: 10 },
+      }),
+    });
+
+    const { result } = renderHook(() => useTrackingSettings(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isLoaded).toBe(true));
+    expect(result.current.settings).toEqual({
+      ...TRACKING_SETTINGS_DEFAULTS,
+      arrivalGeofenceRadiusM: 91,
+      locationUpdateIntervalSeconds: 10,
+    });
+    expect(result.current.isServerData).toBe(true);
   });
 
   it('falls back to defaults on a non-OK response', async () => {
@@ -54,6 +77,7 @@ describe('useTrackingSettings', () => {
 
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
     expect(result.current.settings).toEqual(TRACKING_SETTINGS_DEFAULTS);
+    expect(result.current.isServerData).toBe(false);
   });
 
   it('falls back to defaults on a network error', async () => {
@@ -65,6 +89,7 @@ describe('useTrackingSettings', () => {
 
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
     expect(result.current.settings).toEqual(TRACKING_SETTINGS_DEFAULTS);
+    expect(result.current.isServerData).toBe(false);
   });
 
   it('falls back to defaults when the payload fails schema validation', async () => {
@@ -82,5 +107,6 @@ describe('useTrackingSettings', () => {
 
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
     expect(result.current.settings).toEqual(TRACKING_SETTINGS_DEFAULTS);
+    expect(result.current.isServerData).toBe(false);
   });
 });

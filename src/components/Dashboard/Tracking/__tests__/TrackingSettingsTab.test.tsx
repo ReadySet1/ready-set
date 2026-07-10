@@ -43,6 +43,7 @@ describe('TrackingSettingsTab', () => {
     mockUseTrackingSettings.mockReturnValue({
       settings: TRACKING_SETTINGS_DEFAULTS,
       isLoaded: true,
+      isServerData: true,
     });
   });
 
@@ -84,7 +85,7 @@ describe('TrackingSettingsTab', () => {
     renderTab();
 
     fireEvent.change(screen.getByLabelText(/arrival geofence radius/i), {
-      target: { value: '10' }, // 10 ft ≈ 3 m — below the 15 m minimum
+      target: { value: '10' }, // below the 50 ft display minimum
     });
     fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
 
@@ -92,6 +93,23 @@ describe('TrackingSettingsTab', () => {
       expect((toast as unknown as { error: jest.Mock }).error).toHaveBeenCalled(),
     );
     expect(mockFetch).not.toHaveBeenCalled();
+    // Error messages speak the form's display units, never metric bounds.
+    expect(screen.getByText(/between 50 and 5280 ft/i)).toBeInTheDocument();
+  });
+
+  it('blocks saving when a field is blanked (never coerces empty to 0)', async () => {
+    renderTab();
+
+    fireEvent.change(screen.getByLabelText(/end-shift pickup guard/i), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+
+    await waitFor(() =>
+      expect((toast as unknown as { error: jest.Mock }).error).toHaveBeenCalled(),
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByText(/enter a value/i)).toBeInTheDocument();
   });
 
   it('shows an error toast when the server rejects the save', async () => {
@@ -110,10 +128,24 @@ describe('TrackingSettingsTab', () => {
     );
   });
 
+  it('fails closed when settings did not come from the server (no editable form)', () => {
+    mockUseTrackingSettings.mockReturnValue({
+      settings: TRACKING_SETTINGS_DEFAULTS,
+      isLoaded: true,
+      isServerData: false,
+    });
+    renderTab();
+    // No inputs seeded from fail-open defaults — a retry state instead.
+    expect(screen.queryByLabelText(/arrival geofence radius/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /save settings/i })).not.toBeInTheDocument();
+  });
+
   it('reset fills the form with defaults without saving', () => {
     mockUseTrackingSettings.mockReturnValue({
       settings: { ...TRACKING_SETTINGS_DEFAULTS, arrivalGeofenceRadiusM: 91 },
       isLoaded: true,
+      isServerData: true,
     });
     renderTab();
     expect(screen.getByLabelText(/arrival geofence radius/i)).toHaveValue(299);

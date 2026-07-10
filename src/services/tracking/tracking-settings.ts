@@ -15,23 +15,27 @@ import { prisma } from '@/utils/prismaDB';
 import * as Sentry from '@sentry/nextjs';
 import {
   TRACKING_SETTINGS_DEFAULTS,
+  TrackingSettingsSchema,
   type TrackingSettings,
 } from '@/types/tracking-settings';
 
 const CACHE_TTL_MS = 60 * 1000;
 
 let cached: { value: TrackingSettings; fetchedAt: number } | null = null;
+// Dedupe concurrent cache-miss callers (GPS posts arrive in bursts) so a TTL
+// expiry issues one DB query per instance, not one per in-flight request.
+let inflight: Promise<TrackingSettings> | null = null;
 
-export async function getTrackingSettings(): Promise<TrackingSettings> {
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.value;
-  }
-
+async function fetchSettings(): Promise<TrackingSettings> {
   let value = TRACKING_SETTINGS_DEFAULTS;
   try {
     const row = await prisma.trackingSettings.findUnique({ where: { id: 1 } });
     if (row) {
-      value = {
+      // Re-validate on read: the Zod bounds stay authoritative even for rows
+      // written outside the API (direct SQL, console). Out-of-bounds rows
+      // fall back to defaults rather than flowing into the rate limiter /
+      // geofence / shift guard silently.
+      const parsed = TrackingSettingsSchema.safeParse({
         arrivalGeofenceRadiusM: row.arrivalGeofenceRadiusM,
         staleGpsThresholdSeconds: row.staleGpsThresholdSeconds,
         endShiftPickupGuardMinutes: row.endShiftPickupGuardMinutes,
@@ -39,7 +43,15 @@ export async function getTrackingSettings(): Promise<TrackingSettings> {
         mileageGpsAccuracyThresholdM: row.mileageGpsAccuracyThresholdM,
         mileageMaxSpeedMph: row.mileageMaxSpeedMph,
         maxReasonableShiftMiles: row.maxReasonableShiftMiles,
-      };
+      });
+      if (parsed.success) {
+        value = parsed.data;
+      } else {
+        Sentry.captureMessage('tracking_settings row failed schema validation — using defaults', {
+          level: 'warning',
+          extra: { issues: parsed.error.issues },
+        });
+      }
     }
   } catch (error) {
     // Cache the defaults for the TTL too — don't hammer a down DB.
@@ -50,6 +62,18 @@ export async function getTrackingSettings(): Promise<TrackingSettings> {
 
   cached = { value, fetchedAt: Date.now() };
   return value;
+}
+
+export async function getTrackingSettings(): Promise<TrackingSettings> {
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.value;
+  }
+  if (!inflight) {
+    inflight = fetchSettings().finally(() => {
+      inflight = null;
+    });
+  }
+  return inflight;
 }
 
 export function invalidateTrackingSettingsCache(): void {
