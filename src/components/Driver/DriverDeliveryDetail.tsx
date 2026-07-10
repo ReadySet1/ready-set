@@ -32,6 +32,8 @@ import {
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
 
 /**
  * Driver-specific Delivery Detail.
@@ -61,6 +63,21 @@ interface AddressLike {
   locationNumber?: string | null;
   parkingLoading?: string | null;
   isRestaurant?: boolean | null;
+  /** Present when the address was geocoded — used by the arrival geofence. */
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/** [lng, lat] tuple for the geofence check, or null when ungeocoded (fail-open). */
+function addressTarget(addr?: AddressLike | null): [number, number] | null {
+  if (
+    !addr ||
+    typeof addr.latitude !== "number" ||
+    typeof addr.longitude !== "number"
+  ) {
+    return null;
+  }
+  return [addr.longitude, addr.latitude];
 }
 
 interface DeliveryTimestampMap {
@@ -134,6 +151,9 @@ interface DriverDeliveryDetailProps {
 
 export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps) {
   const router = useRouter();
+  // Live GPS from the shared tracking provider (wraps all /driver/* routes).
+  // May be null outside an active shift — the geofence fails open in that case.
+  const { currentLocation } = useDriverTracking();
   const supabase = useMemo(() => createClient(), []);
 
   const [order, setOrder] = useState<DriverOrder | null>(null);
@@ -288,6 +308,24 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     const current = order.driverStatus as DriverStatus | undefined;
     const next = current ? getNextStatus(current) : DriverStatus.ASSIGNED;
     if (!next) return;
+    // Arrival geofence backstop (fail-open on unknown GPS/coords): never mark
+    // "arrived" while demonstrably far from the stop.
+    const arrivalTarget =
+      next === DriverStatus.ARRIVED_AT_VENDOR
+        ? addressTarget(order.pickupAddress)
+        : next === DriverStatus.ARRIVED_TO_CLIENT
+          ? addressTarget(order.deliveryAddress)
+          : null;
+    if (arrivalTarget) {
+      const check = checkArrivalGeofence(
+        currentLocation?.coordinates ?? null,
+        arrivalTarget,
+      );
+      if (!check.allowed && check.distanceM !== null) {
+        toast.error(geofenceHint(check.distanceM));
+        return;
+      }
+    }
     // Require a vendor-staff signature before marking the pickup done.
     if (current === DriverStatus.ARRIVED_AT_VENDOR && next === DriverStatus.PICKED_UP) {
       setSignatureOpen(true);
@@ -299,7 +337,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       return;
     }
     void advanceStatus(next);
-  }, [order, advanceStatus]);
+  }, [order, advanceStatus, currentLocation]);
 
   const onSignatureComplete = useCallback(async () => {
     setSignatureOpen(false);
@@ -356,6 +394,26 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const deliveryLines = formatAddressLines(order.deliveryAddress);
   const pickupQuery = addressQuery(order.pickupAddress);
   const deliveryQuery = addressQuery(order.deliveryAddress);
+
+  // Arrival geofence for the sticky Next-Action: engaged only on the two
+  // "arrived" steps, and only when GPS + target coords are both known.
+  const nextDriverStatus = order.driverStatus
+    ? getNextStatus(order.driverStatus as DriverStatus)
+    : null;
+  const arrivalCheck =
+    nextDriverStatus === DriverStatus.ARRIVED_AT_VENDOR
+      ? checkArrivalGeofence(
+          currentLocation?.coordinates ?? null,
+          addressTarget(order.pickupAddress),
+        )
+      : nextDriverStatus === DriverStatus.ARRIVED_TO_CLIENT
+        ? checkArrivalGeofence(
+            currentLocation?.coordinates ?? null,
+            addressTarget(order.deliveryAddress),
+          )
+        : null;
+  const geofenceBlocked =
+    !!arrivalCheck && !arrivalCheck.allowed && arrivalCheck.distanceM !== null;
 
   return (
     <div className="flex flex-col gap-3 px-2 pb-32">
@@ -518,8 +576,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
               label={getDriverNextActionLabel(order.driverStatus)}
               sub="Next step"
               tone={completing ? "success" : "brand"}
-              hint={completing ? "Photo required to complete" : "Tap to update your status"}
+              hint={
+                geofenceBlocked
+                  ? geofenceHint(arrivalCheck!.distanceM!)
+                  : completing
+                    ? "Photo required to complete"
+                    : "Tap to update your status"
+              }
               loading={isAdvancing}
+              disabled={geofenceBlocked}
               onClick={handleNextAction}
             />
           )}

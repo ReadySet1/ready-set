@@ -382,4 +382,67 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
     expect(screen.getByText(/3 updates queued/i)).toBeInTheDocument();
   });
+
+  describe("arrival geofence", () => {
+    const shiftCtx = (delivery: Record<string, unknown>) =>
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation, // lat 37.77, lng -122.41
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.EN_ROUTE_TO_VENDOR, // next = ARRIVED_AT_VENDOR
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+            ...delivery,
+          },
+        ],
+      });
+
+    it("disables the arrived advance and shows a distance hint when far from the pickup", () => {
+      mockUseDriverTracking.mockReturnValue(
+        shiftCtx({ pickupLocation: { coordinates: [-122.5, 37.9] } }), // ~16 km away
+      );
+      renderPortal();
+      const button = screen
+        .getByText(/i've arrived at vendor/i)
+        .closest("button");
+      expect(button).toBeDisabled();
+      expect(
+        screen.getByText(/away — move closer to enable/i),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the arrived advance enabled when near the pickup", async () => {
+      mockUseDriverTracking.mockReturnValue(
+        shiftCtx({ pickupLocation: { coordinates: [-122.41, 37.7702] } }), // ~25 m
+      );
+      renderPortal();
+      fireEvent.click(screen.getByText(/i've arrived at vendor/i));
+      await waitFor(() =>
+        expect(updateDeliveryStatus).toHaveBeenCalledWith(
+          "del-1",
+          DriverStatus.ARRIVED_AT_VENDOR,
+          sampleLocation,
+        ),
+      );
+    });
+
+    it("fails open when the pickup address is ungeocoded ([0,0] fallback)", async () => {
+      mockUseDriverTracking.mockReturnValue(
+        shiftCtx({ pickupLocation: { coordinates: [0, 0] } }),
+      );
+      renderPortal();
+      fireEvent.click(screen.getByText(/i've arrived at vendor/i));
+      await waitFor(() =>
+        expect(updateDeliveryStatus).toHaveBeenCalledWith(
+          "del-1",
+          DriverStatus.ARRIVED_AT_VENDOR,
+          sampleLocation,
+        ),
+      );
+    });
+  });
 });

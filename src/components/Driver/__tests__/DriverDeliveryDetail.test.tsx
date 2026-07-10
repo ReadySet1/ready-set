@@ -15,6 +15,12 @@ jest.mock("react-hot-toast", () => ({
   default: { success: jest.fn(), error: jest.fn() },
 }));
 
+// The detail page reads live GPS for the arrival geofence; no provider in
+// these tests → null location = geofence fails open (advance stays enabled).
+jest.mock("@/contexts/DriverTrackingContext", () => ({
+  useDriverTracking: () => ({ currentLocation: null }),
+}));
+
 jest.mock("@/utils/supabase/client", () => ({
   createClient: () => ({
     auth: {

@@ -7,6 +7,7 @@ import { AlertTriangleIcon } from 'lucide-react';
 import type { DeliveryTracking, LocationUpdate } from '@/types/tracking';
 import { cn } from '@/lib/utils';
 import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
+import { DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 // Ensure Mapbox token is available on the client
@@ -28,6 +29,73 @@ interface DriverLiveMapProps {
 
 /** Hard cap on trail vertices kept in memory / handed to Mapbox. */
 const MAX_TRAIL_POINTS = 1000;
+
+/** Ungeocoded addresses come through as the [0, 0] fallback from
+ *  useDriverDeliveries.toCoords — never plot those (Gulf of Guinea). */
+function isValidCoords(c: unknown): c is [number, number] {
+  return (
+    Array.isArray(c) &&
+    c.length === 2 &&
+    Number.isFinite(c[0]) &&
+    Number.isFinite(c[1]) &&
+    !(c[0] === 0 && c[1] === 0)
+  );
+}
+
+/** Orange drop-off pin — same visual as the admin LiveDriverMap. */
+function createDeliveryMarkerElement(): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'delivery-marker';
+  el.style.width = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+  el.style.height = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+  el.innerHTML = `
+    <div style="
+      width: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+      height: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+      background-color: ${DELIVERY_MARKER_COLOR};
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+        <circle cx="12" cy="10" r="3" fill="${DELIVERY_MARKER_COLOR}"/>
+      </svg>
+    </div>
+  `;
+  return el;
+}
+
+/** Violet pickup (restaurant) marker — same visual as the admin LiveDriverMap. */
+function createPickupMarkerElement(): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'pickup-marker';
+  el.style.width = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+  el.style.height = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+  el.innerHTML = `
+    <div style="
+      width: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+      height: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+      background-color: ${PICKUP_MARKER_COLOR};
+      border-radius: 6px;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
+        <path d="M3 6h18"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+    </div>
+  `;
+  return el;
+}
 
 /** Cap the trail without ever losing the route start: thin the OLDER half
  *  (drop every other point) instead of shifting points off the head — the old
@@ -70,6 +138,12 @@ export default function DriverLiveMap({
   const lastCenteredRef = useRef<{ lng: number; lat: number } | null>(null);
   // Which shift the trail was last seeded from (guards against re-fetching).
   const seededShiftKeyRef = useRef<string | null>(null);
+  // Pickup / drop-off markers keyed by delivery id.
+  const pickupMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
+  const dropoffMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
+  // Signature of the last delivery set we fit the viewport to — fit once per
+  // set change, not on every GPS tick (respect the driver's manual pan/zoom).
+  const lastBoundsKeyRef = useRef<string | null>(null);
 
   // Seed the trail from the server once per shift: the DB holds the full
   // recorded route (offline queue + native watcher keep posting while the
@@ -207,6 +281,9 @@ export default function DriverLiveMap({
         mapRef.current = null;
         driverMarkerRef.current = null;
         trailRef.current = [];
+        pickupMarkersRef.current.clear();
+        dropoffMarkersRef.current.clear();
+        lastBoundsKeyRef.current = null;
       };
     } catch (error) {
       captureException(error, {
@@ -315,61 +392,97 @@ export default function DriverLiveMap({
     }
   }, [currentLocation, mapLoaded]);
 
-  // Optional: show delivery markers for active deliveries
+  // Pickup + drop-off markers for active deliveries (2026-07-09 drive-test
+  // feedback: neither location was visible on the driver's map). HTML markers
+  // with popups, mirroring the admin LiveDriverMap; the old dropoff-only
+  // circle layer is replaced by these.
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded) {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) {
       return;
     }
 
-    // Remove any existing delivery layer/source and recreate from scratch
     try {
-      if (mapRef.current.getLayer('driver-deliveries')) {
-        mapRef.current.removeLayer('driver-deliveries');
+      const seen = new Set<string>();
+      const boundsCoords: [number, number][] = [];
+
+      for (const delivery of activeDeliveries) {
+        seen.add(delivery.id);
+
+        const pickup = delivery.pickupLocation?.coordinates;
+        if (isValidCoords(pickup)) {
+          boundsCoords.push(pickup);
+          const existing = pickupMarkersRef.current.get(delivery.id);
+          if (existing) {
+            existing.setLngLat(pickup);
+          } else {
+            const marker = new mapboxgl.Marker({
+              element: createPickupMarkerElement(),
+              anchor: 'center',
+            })
+              .setLngLat(pickup)
+              .setPopup(
+                new mapboxgl.Popup({ offset: 18 }).setHTML(
+                  `<div style="font-size:12px;font-weight:600;">Pickup location</div>`,
+                ),
+              )
+              .addTo(map);
+            pickupMarkersRef.current.set(delivery.id, marker);
+          }
+        }
+
+        const dropoff = delivery.deliveryLocation?.coordinates;
+        if (isValidCoords(dropoff)) {
+          boundsCoords.push(dropoff);
+          const existing = dropoffMarkersRef.current.get(delivery.id);
+          if (existing) {
+            existing.setLngLat(dropoff);
+          } else {
+            const marker = new mapboxgl.Marker({
+              element: createDeliveryMarkerElement(),
+              anchor: 'bottom',
+            })
+              .setLngLat(dropoff)
+              .setPopup(
+                new mapboxgl.Popup({ offset: 18 }).setHTML(
+                  `<div style="font-size:12px;font-weight:600;">Drop-off location</div>`,
+                ),
+              )
+              .addTo(map);
+            dropoffMarkersRef.current.set(delivery.id, marker);
+          }
+        }
       }
-      if (mapRef.current.getSource('driver-deliveries')) {
-        mapRef.current.removeSource('driver-deliveries');
+
+      // Remove markers for deliveries no longer active
+      for (const markers of [pickupMarkersRef.current, dropoffMarkersRef.current]) {
+        for (const [id, marker] of markers) {
+          if (!seen.has(id)) {
+            marker.remove();
+            markers.delete(id);
+          }
+        }
       }
 
-      if (activeDeliveries.length === 0) {
-        return;
+      // Fit the viewport to driver + stops once per delivery-set change so the
+      // route context is visible without fighting the driver's manual pan.
+      if (boundsCoords.length > 0) {
+        const boundsKey = activeDeliveries
+          .map((d) => `${d.id}:${d.pickupLocation?.coordinates}:${d.deliveryLocation?.coordinates}`)
+          .join('|');
+        if (lastBoundsKeyRef.current !== boundsKey) {
+          lastBoundsKeyRef.current = boundsKey;
+          const bounds = new mapboxgl.LngLatBounds();
+          for (const c of boundsCoords) bounds.extend(c);
+          const driverPos = driverMarkerRef.current?.getLngLat();
+          if (driverPos) bounds.extend(driverPos);
+          map.fitBounds(bounds, {
+            padding: MAP_CONFIG.BOUNDS_PADDING,
+            maxZoom: MAP_CONFIG.MAX_AUTO_ZOOM,
+            duration: MAP_CONFIG.FIT_BOUNDS_DURATION,
+          });
+        }
       }
-
-      const features = activeDeliveries
-        .filter((delivery) => delivery.deliveryLocation?.coordinates)
-        .map((delivery) => ({
-          type: 'Feature' as const,
-          properties: {
-            id: delivery.id,
-          },
-          geometry: {
-            type: 'Point' as const,
-            coordinates: delivery.deliveryLocation.coordinates,
-          },
-        }));
-
-      if (features.length === 0) {
-        return;
-      }
-
-      mapRef.current.addSource('driver-deliveries', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features,
-        },
-      });
-
-      mapRef.current.addLayer({
-        id: 'driver-deliveries',
-        type: 'circle',
-        source: 'driver-deliveries',
-        paint: {
-          'circle-radius': 6,
-          'circle-color': '#f97316', // orange
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 2,
-        },
-      });
     } catch (error) {
       captureException(error, {
         action: 'update-delivery-markers',

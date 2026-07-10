@@ -34,6 +34,28 @@ import {
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import {
+  checkArrivalGeofence,
+  geofenceHint,
+  type GeofenceCheck,
+} from "@/lib/driver/geofence";
+import type { DeliveryTracking } from "@/types/tracking";
+
+/** Geofence only the "arrived" steps: block advancing when the driver is
+ *  demonstrably far from the relevant stop (fail-open on unknown GPS/coords). */
+function arrivalGeofence(
+  delivery: DeliveryTracking,
+  current: { lat: number; lng: number } | null,
+): GeofenceCheck | null {
+  const next = getNextStatus(delivery.status);
+  if (next === DriverStatus.ARRIVED_AT_VENDOR) {
+    return checkArrivalGeofence(current, delivery.pickupLocation?.coordinates);
+  }
+  if (next === DriverStatus.ARRIVED_TO_CLIENT) {
+    return checkArrivalGeofence(current, delivery.deliveryLocation?.coordinates);
+  }
+  return null;
+}
 
 interface PodTarget {
   deliveryId: string;
@@ -178,6 +200,16 @@ export default function DriverTrackingPortal() {
   const handleAdvance = (delivery: (typeof activeDeliveries)[number]) => {
     const next = getNextStatus(delivery.status);
     if (!next) return;
+    // Backstop for the disabled button: never advance an "arrived" step while
+    // the driver is demonstrably far from the stop.
+    const geofence = arrivalGeofence(
+      delivery,
+      currentLocation?.coordinates ?? null,
+    );
+    if (geofence && !geofence.allowed && geofence.distanceM !== null) {
+      toast.error(geofenceHint(geofence.distanceM));
+      return;
+    }
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
     // The pickup step routes through vendor-signature capture (mandatory per
@@ -417,6 +449,12 @@ export default function DriverTrackingPortal() {
                   const lead = idx === 0;
                   const atClient =
                     delivery.status === DriverStatus.ARRIVED_TO_CLIENT;
+                  const geofence = arrivalGeofence(
+                    delivery,
+                    currentLocation?.coordinates ?? null,
+                  );
+                  const geofenceBlocked =
+                    !!geofence && !geofence.allowed && geofence.distanceM !== null;
 
                   return (
                     <DriverCard
@@ -466,9 +504,15 @@ export default function DriverTrackingPortal() {
                           sub={atClient ? "Final step" : "Next step"}
                           tone={atClient ? "success" : "brand"}
                           icon={atClient ? CheckCircle2 : Navigation2}
-                          hint={lead ? "Tap to update your status" : undefined}
+                          hint={
+                            geofenceBlocked
+                              ? geofenceHint(geofence!.distanceM!)
+                              : lead
+                                ? "Tap to update your status"
+                                : undefined
+                          }
                           loading={updatingId === delivery.id}
-                          disabled={deliveriesLoading}
+                          disabled={deliveriesLoading || geofenceBlocked}
                           onClick={() => handleAdvance(delivery)}
                         />
                       ) : (
