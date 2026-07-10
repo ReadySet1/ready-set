@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import SignaturePad from "signature_pad";
-import { AlertCircle, Check, Eraser } from "lucide-react";
+import { AlertCircle, Check, Eraser, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { DriverButton } from "./ui/DriverButton";
@@ -47,8 +47,19 @@ export function SignatureCapture({
   const [receivedBy, setReceivedBy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Full-screen signing mode (field feedback: the inline pad is too small).
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Initialise the pad and keep the canvas crisp on high-DPI screens.
+  //
+  // Sizing is driven by a ResizeObserver (not a mount-time read + window
+  // resize listener) because BOTH of those bit us in the field:
+  //  - at mount the bottom sheet is still animating in, so offsetWidth can be
+  //    0 (especially in the native WebView) → a 0×0 canvas that ignores touch;
+  //  - the iOS keyboard (opened by the receiver-name input) fires window
+  //    resize, and the old handler cleared the pad — wiping the signature.
+  // The observer resizes only on real dimension changes and PRESERVES the ink
+  // by replaying the stroke data after rescaling.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -61,23 +72,35 @@ export function SignatureCapture({
     });
     padRef.current = pad;
 
-    const resize = () => {
+    let lastW = 0;
+    let lastH = 0;
+    const applySize = () => {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (w === 0 || h === 0) return; // not laid out yet — wait for the observer
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      canvas.width = canvas.offsetWidth * ratio;
-      canvas.height = canvas.offsetHeight * ratio;
+      const strokes = pad.toData(); // preserve ink across the resize
+      canvas.width = w * ratio; // resets the 2d transform
+      canvas.height = h * ratio;
       canvas.getContext("2d")?.scale(ratio, ratio);
-      pad.clear(); // resizing wipes the canvas — reset pad state too
-      setHasInk(false);
+      pad.clear();
+      if (strokes.length > 0) pad.fromData(strokes);
+      setHasInk(!pad.isEmpty());
     };
-    resize();
+    applySize();
+
+    const observer = new ResizeObserver(() => applySize());
+    observer.observe(canvas);
 
     const onEnd = () => setHasInk(!pad.isEmpty());
     pad.addEventListener("endStroke", onEnd);
-    window.addEventListener("resize", resize);
 
     return () => {
+      observer.disconnect();
       pad.removeEventListener("endStroke", onEnd);
-      window.removeEventListener("resize", resize);
       pad.off();
       padRef.current = null;
     };
@@ -158,16 +181,65 @@ export function SignatureCapture({
         />
       </label>
 
-      <div className="relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt">
-        <canvas
-          ref={canvasRef}
-          className="h-48 w-full touch-none"
-          aria-label="Signature pad (optional)"
-        />
-        {!hasInk ? (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
-            Sign here (optional)
-          </span>
+      <div
+        className={cn(
+          fullscreen
+            ? "driver-theme fixed inset-0 z-[100] flex flex-col gap-3 bg-driver-surface p-4 pt-[max(env(safe-area-inset-top),1rem)]"
+            : "contents",
+        )}
+      >
+        {fullscreen ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[15px] font-semibold text-driver-text">
+              Sign here
+            </span>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="flex items-center gap-1.5 rounded-xl border-[1.5px] border-driver-border px-3 py-1.5 text-[12.5px] font-semibold text-driver-muted"
+              aria-label="Exit full screen"
+            >
+              <Minimize2 className="h-4 w-4" />
+              Done
+            </button>
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt",
+            fullscreen && "flex-1",
+          )}
+        >
+          <canvas
+            ref={canvasRef}
+            className={cn("w-full touch-none", fullscreen ? "h-full" : "h-48")}
+            aria-label="Signature pad (optional)"
+          />
+          {!hasInk ? (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
+              Sign here (optional)
+            </span>
+          ) : null}
+          {!fullscreen ? (
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              className="absolute right-2 top-2 rounded-xl border-[1.5px] border-driver-border bg-driver-surface p-2 text-driver-muted"
+              aria-label="Sign in full screen"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        {fullscreen ? (
+          <DriverButton
+            variant="outline"
+            onClick={handleClear}
+            disabled={uploading || !hasInk}
+          >
+            <Eraser className="h-4 w-4" strokeWidth={2.4} />
+            Clear
+          </DriverButton>
         ) : null}
       </div>
 

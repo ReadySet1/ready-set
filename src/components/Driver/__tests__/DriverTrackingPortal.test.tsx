@@ -383,6 +383,63 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getByText(/3 updates queued/i)).toBeInTheDocument();
   });
 
+  describe("end-shift guard", () => {
+    const withDelivery = (delivery: Record<string, unknown>) =>
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+            ...delivery,
+          },
+        ],
+      });
+
+    it("disables End shift while a delivery is mid-flight", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+      expect(
+        screen.getByRole("button", { name: /end shift/i }),
+      ).toBeDisabled();
+      expect(screen.getByText(/1 delivery to finish first/i)).toBeInTheDocument();
+      expect(endShift).not.toHaveBeenCalled();
+    });
+
+    it("disables End shift for an ASSIGNED delivery whose pickup is overdue", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.ASSIGNED,
+          scheduledPickupAt: new Date(Date.now() - 60 * 60 * 1000), // 1h ago
+        }),
+      );
+      renderPortal();
+      expect(
+        screen.getByRole("button", { name: /end shift/i }),
+      ).toBeDisabled();
+    });
+
+    it("allows End shift when the only assignment is well in the future", async () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.ASSIGNED,
+          scheduledPickupAt: new Date(Date.now() + 26 * 60 * 60 * 1000), // tomorrow
+        }),
+      );
+      renderPortal();
+      const button = screen.getByRole("button", { name: /end shift/i });
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+      await waitFor(() => expect(endShift).toHaveBeenCalled());
+    });
+  });
+
   describe("arrival geofence", () => {
     const shiftCtx = (delivery: Record<string, unknown>) =>
       baseCtx({

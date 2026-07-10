@@ -41,6 +41,28 @@ import {
 } from "@/lib/driver/geofence";
 import type { DeliveryTracking } from "@/types/tracking";
 
+/** Movement stages: the delivery has been started and MUST block ending the
+ *  shift. Mirrors the server-side guard in endDriverShift. */
+const IN_FLIGHT_STATUSES: DriverStatus[] = [
+  DriverStatus.EN_ROUTE_TO_VENDOR,
+  DriverStatus.ARRIVED_AT_VENDOR,
+  DriverStatus.PICKED_UP,
+  DriverStatus.EN_ROUTE_TO_CLIENT,
+  DriverStatus.ARRIVED_TO_CLIENT,
+];
+
+/** True when this delivery should block ending the shift: it's mid-flight, or
+ *  it's ASSIGNED with a pickup that is imminent (≤2h) or overdue. Mirrors the
+ *  server guard so the button state matches what the API will say. */
+function blocksEndShift(delivery: DeliveryTracking): boolean {
+  if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
+  if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
+    const pickup = new Date(delivery.scheduledPickupAt).getTime();
+    return pickup <= Date.now() + 2 * 60 * 60 * 1000;
+  }
+  return false;
+}
+
 /** Geofence only the "arrived" steps: block advancing when the driver is
  *  demonstrably far from the relevant stop (fail-open on unknown GPS/coords). */
 function arrivalGeofence(
@@ -159,8 +181,17 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
+  const endShiftBlockers = activeDeliveries.filter(blocksEndShift).length;
+
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
+    // Backstop for the disabled button (mirrors the server guard).
+    if (endShiftBlockers > 0) {
+      toast.error(
+        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} before ending your shift.`,
+      );
+      return;
+    }
     let location = currentLocation;
     if (!location) {
       location = {
@@ -177,6 +208,13 @@ export default function DriverTrackingPortal() {
     const ok = await endShift(currentShift.id, location);
     if (ok) stopTracking();
   };
+
+  // Surface shift failures (e.g. the server's active-delivery guard) instead
+  // of a button that silently does nothing. Effect-based so it reads the
+  // freshly-set error, not the render-time closure value.
+  useEffect(() => {
+    if (shiftError) toast.error(shiftError);
+  }, [shiftError]);
 
   const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
     setUpdatingId(deliveryId);
@@ -375,12 +413,20 @@ export default function DriverTrackingPortal() {
                       })
                     : ""}
                 </div>
+                {endShiftBlockers > 0 ? (
+                  <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                    {endShiftBlockers === 1
+                      ? "1 delivery to finish first"
+                      : `${endShiftBlockers} deliveries to finish first`}
+                  </div>
+                ) : null}
               </div>
               <DriverButton
                 variant="danger"
                 size="md"
                 onClick={handleEndShift}
                 loading={shiftLoading}
+                disabled={endShiftBlockers > 0}
               >
                 <Square className="h-4 w-4" />
                 End shift
