@@ -148,8 +148,10 @@ export async function endDriverShift(
     // Guard: a driver may not end a shift while they still have active
     // deliveries — doing so would strand an in-progress order. Admins may
     // override by passing metadata.force. "Active" = a non-terminal row in the
-    // `deliveries` table (what the live portal shows), or a catering/on-demand
-    // order the driver has actually started (driverStatus in a movement stage).
+    // `deliveries` table (what the live portal shows), a catering/on-demand
+    // order the driver has actually started (driverStatus in a movement stage),
+    // or — 2026-07-09 drive-test feedback — an ASSIGNED order whose pickup is
+    // imminent (≤2h) or overdue. Future-dated assignments don't trap the driver.
     const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
     if (!force) {
@@ -170,9 +172,19 @@ export async function endDriverShift(
             WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
               AND (
                 (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
-                  AND cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+                  AND (
+                    cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                    OR (cr."driverStatus" = 'ASSIGNED'
+                      AND cr."pickupDateTime" IS NOT NULL
+                      AND cr."pickupDateTime" <= NOW() + interval '2 hours')
+                  ))
                 OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
-                  AND od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+                  AND (
+                    od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                    OR (od."driverStatus" = 'ASSIGNED'
+                      AND od."pickupDateTime" IS NOT NULL
+                      AND od."pickupDateTime" <= NOW() + interval '2 hours')
+                  ))
               )
           ) AS n
       `, shift?.driver_id);
@@ -181,7 +193,7 @@ export async function endDriverShift(
       if (activeCount > 0) {
         return {
           success: false,
-          error: `You still have ${activeCount} active ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete or cancel ${activeCount === 1 ? 'it' : 'them'} before ending your shift.`,
+          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} (or ask dispatch to reassign) before ending your shift.`,
           activeDeliveries: activeCount,
         };
       }
