@@ -11,6 +11,7 @@
  */
 
 import { calculateDistance } from '@/utils/distance';
+import { METERS_TO_FEET, FEET_PER_MILE } from '@/lib/units';
 
 /** How close (meters) the driver must be for the "Arrived" advance to enable. */
 export const ARRIVAL_GEOFENCE_RADIUS_M = 150;
@@ -76,11 +77,16 @@ export function checkArrivalGeofence(
   return { allowed: distance <= radiusM, distanceM: rounded };
 }
 
-/** Human hint for a blocked advance, e.g. "~480 m away — move closer to enable". */
+/**
+ * Human hint for a blocked advance, e.g. "~490 ft away — move closer to
+ * enable". Distances are computed in meters internally but always shown in
+ * imperial units — drivers are US-based and think in feet/miles.
+ */
 export function geofenceHint(distanceM: number): string {
+  const feet = distanceM * METERS_TO_FEET;
   const shown =
-    distanceM >= 1000
-      ? `${(distanceM / 1000).toFixed(1)} km`
-      : `${distanceM} m`;
+    feet >= 1000
+      ? `${(feet / FEET_PER_MILE).toFixed(1)} mi`
+      : `${Math.round(feet / 10) * 10} ft`;
   return `~${shown} away — move closer to enable`;
 }

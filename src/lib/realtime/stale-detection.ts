@@ -33,11 +33,14 @@ export const STALE_CHECK_INTERVAL_MS = 60 * 1000;
  * stale threshold (or missing entirely)? Lets the admin map / driver list render an
  * "offline" state — distinct from "stopped" — without instantiating the full detector.
  */
-export function isLocationStale(lastLocationUpdate?: Date | string | null): boolean {
+export function isLocationStale(
+  lastLocationUpdate?: Date | string | null,
+  thresholdMs: number = STALE_LOCATION_THRESHOLD_MS,
+): boolean {
   if (!lastLocationUpdate) return true;
   const last = new Date(lastLocationUpdate).getTime();
   if (Number.isNaN(last)) return true;
-  return Date.now() - last > STALE_LOCATION_THRESHOLD_MS;
+  return Date.now() - last > thresholdMs;
 }
 
 // ============================================================================
@@ -77,6 +80,16 @@ export class StaleLocationDetector {
   ) {
     this.staleThresholdMs = staleThresholdMs;
     this.onStaleCallback = onStaleCallback;
+  }
+
+  /**
+   * Override the stale threshold (admin-configurable via tracking settings).
+   * Ignores invalid values — keeps the previous threshold.
+   */
+  setStaleThreshold(thresholdMs: number): void {
+    if (Number.isFinite(thresholdMs) && thresholdMs > 0) {
+      this.staleThresholdMs = thresholdMs;
+    }
   }
 
   /**

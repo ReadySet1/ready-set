@@ -39,6 +39,7 @@ import {
   geofenceHint,
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
+import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import type { DeliveryTracking } from "@/types/tracking";
 
 /** Movement stages: the delivery has been started and MUST block ending the
@@ -52,13 +53,15 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 ];
 
 /** True when this delivery should block ending the shift: it's mid-flight, or
- *  it's ASSIGNED with a pickup that is imminent (≤2h) or overdue. Mirrors the
- *  server guard so the button state matches what the API will say. */
-function blocksEndShift(delivery: DeliveryTracking): boolean {
+ *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
+ *  Mirrors the server guard so the button state matches what the API will say.
+ *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks). */
+function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
   if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
+  if (guardMs <= 0) return false;
   if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
     const pickup = new Date(delivery.scheduledPickupAt).getTime();
-    return pickup <= Date.now() + 2 * 60 * 60 * 1000;
+    return pickup <= Date.now() + guardMs;
   }
   return false;
 }
@@ -68,13 +71,14 @@ function blocksEndShift(delivery: DeliveryTracking): boolean {
 function arrivalGeofence(
   delivery: DeliveryTracking,
   current: { lat: number; lng: number } | null,
+  radiusM: number,
 ): GeofenceCheck | null {
   const next = getNextStatus(delivery.status);
   if (next === DriverStatus.ARRIVED_AT_VENDOR) {
-    return checkArrivalGeofence(current, delivery.pickupLocation?.coordinates);
+    return checkArrivalGeofence(current, delivery.pickupLocation?.coordinates, radiusM);
   }
   if (next === DriverStatus.ARRIVED_TO_CLIENT) {
-    return checkArrivalGeofence(current, delivery.deliveryLocation?.coordinates);
+    return checkArrivalGeofence(current, delivery.deliveryLocation?.coordinates, radiusM);
   }
   return null;
 }
@@ -121,6 +125,9 @@ export default function DriverTrackingPortal() {
     isOnline,
     queuedItems,
   } = useDriverTracking();
+
+  const { settings } = useTrackingSettings();
+  const endShiftGuardMs = settings.endShiftPickupGuardMinutes * 60_000;
 
   // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
@@ -181,7 +188,9 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
-  const endShiftBlockers = activeDeliveries.filter(blocksEndShift).length;
+  const endShiftBlockers = activeDeliveries.filter((d) =>
+    blocksEndShift(d, endShiftGuardMs),
+  ).length;
 
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
@@ -243,6 +252,7 @@ export default function DriverTrackingPortal() {
     const geofence = arrivalGeofence(
       delivery,
       currentLocation?.coordinates ?? null,
+      settings.arrivalGeofenceRadiusM,
     );
     if (geofence && !geofence.allowed && geofence.distanceM !== null) {
       toast.error(geofenceHint(geofence.distanceM));
@@ -498,6 +508,7 @@ export default function DriverTrackingPortal() {
                   const geofence = arrivalGeofence(
                     delivery,
                     currentLocation?.coordinates ?? null,
+                    settings.arrivalGeofenceRadiusM,
                   );
                   const geofenceBlocked =
                     !!geofence && !geofence.allowed && geofence.distanceM !== null;

@@ -5,6 +5,17 @@ import { DriverDeliveryDetail } from "../DriverDeliveryDetail";
 import { DriverThemeProvider } from "@/components/Driver/ui/DriverThemeProvider";
 import { DriverStatus } from "@/types/user";
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),

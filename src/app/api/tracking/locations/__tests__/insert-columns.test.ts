@@ -29,6 +29,23 @@ jest.mock('@/lib/db/raw', () => {
 jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
 jest.mock('@/lib/security/rate-limit', () => ({ enforceRateLimit: jest.fn() }));
 
+// The route also enforces the admin-configured per-interval GPS cadence via
+// the module-singleton limiter — neutralize both so repeated test posts from
+// one user aren't 429'd.
+jest.mock('@/services/tracking/tracking-settings', () => ({
+  getTrackingSettings: () =>
+    Promise.resolve(
+      jest.requireActual('@/types/tracking-settings').TRACKING_SETTINGS_DEFAULTS,
+    ),
+  invalidateTrackingSettingsCache: () => {},
+}));
+jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
+  locationRateLimiter: {
+    configure: jest.fn(),
+    checkAndRecordLimit: jest.fn().mockReturnValue({ allowed: true, retryAfter: null, message: 'Request allowed' }),
+  },
+}));
+
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
 import { withAuth } from '@/lib/auth-middleware';
 import { withRawTx } from '@/lib/db/raw';

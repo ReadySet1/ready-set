@@ -34,6 +34,21 @@ class LocationRateLimiter {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private isInitialized: boolean = false;
   private violationCounts: Map<string, number> = new Map();
+  // Admin-configurable via tracking settings; the constant is the fallback.
+  // The class is isomorphic (browser + Node), so callers on each side push
+  // the resolved setting in via configure() rather than this module reading
+  // a server-only settings source.
+  private minIntervalMs: number = RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS;
+
+  /**
+   * Override the minimum interval between updates per driver.
+   * Ignores invalid values (NaN / <= 0) — keeps the previous interval.
+   */
+  configure(minIntervalMs: number): void {
+    if (Number.isFinite(minIntervalMs) && minIntervalMs > 0) {
+      this.minIntervalMs = minIntervalMs;
+    }
+  }
 
   /**
    * Initialize the rate limiter and start automatic cleanup
@@ -77,7 +92,7 @@ class LocationRateLimiter {
     }
 
     const timeSinceLastUpdate = now - lastUpdate;
-    const isAllowed = timeSinceLastUpdate >= RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS;
+    const isAllowed = timeSinceLastUpdate >= this.minIntervalMs;
 
     if (isAllowed) {
       return {
@@ -88,7 +103,7 @@ class LocationRateLimiter {
     }
 
     // Rate limit exceeded
-    const retryAfter = RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS - timeSinceLastUpdate;
+    const retryAfter = this.minIntervalMs - timeSinceLastUpdate;
 
     // Track violation for monitoring
     const currentCount = this.violationCounts.get(driverId) || 0;
@@ -129,7 +144,7 @@ class LocationRateLimiter {
     }
 
     const timeSinceLastUpdate = now - lastUpdate;
-    const isAllowed = timeSinceLastUpdate >= RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS;
+    const isAllowed = timeSinceLastUpdate >= this.minIntervalMs;
 
     if (isAllowed) {
       // ATOMICALLY record before returning (prevents race condition)
@@ -152,7 +167,7 @@ class LocationRateLimiter {
     }
 
     // Rate limit exceeded - track violation
-    const retryAfter = RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS - timeSinceLastUpdate;
+    const retryAfter = this.minIntervalMs - timeSinceLastUpdate;
     const currentCount = this.violationCounts.get(driverId) || 0;
     this.violationCounts.set(driverId, currentCount + 1);
 

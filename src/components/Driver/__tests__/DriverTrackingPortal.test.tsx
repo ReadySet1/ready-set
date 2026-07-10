@@ -19,6 +19,22 @@ jest.mock("react-hot-toast", () => ({
 
 import toast from "react-hot-toast";
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+// Individual tests may override via mockTrackingSettingsOverride.
+const mockTrackingSettingsOverride: { current: Record<string, number> | null } =
+  { current: null };
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings:
+      mockTrackingSettingsOverride.current ??
+      jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 // Light map mock (real one needs Mapbox + a token).
 jest.mock("@/components/Driver/DriverLiveMap", () => ({
   __esModule: true,
@@ -437,6 +453,78 @@ describe("DriverTrackingPortal (redesigned)", () => {
       expect(button).toBeEnabled();
       fireEvent.click(button);
       await waitFor(() => expect(endShift).toHaveBeenCalled());
+    });
+
+    describe("admin-configured guard window", () => {
+      const { TRACKING_SETTINGS_DEFAULTS } = jest.requireActual(
+        "@/types/tracking-settings",
+      );
+
+      afterEach(() => {
+        mockTrackingSettingsOverride.current = null;
+      });
+
+      it("does not block for an overdue ASSIGNED pickup when the guard is disabled (0)", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 0,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 60 * 60 * 1000), // 1h overdue
+          }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toBeEnabled();
+      });
+
+      it("still blocks a mid-flight delivery when the guard is disabled (0)", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 0,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({ status: DriverStatus.PICKED_UP }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toBeDisabled();
+      });
+
+      it("honors a shortened guard window from settings", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 30,
+        };
+        // Pickup in 1h: inside the 120-min default but outside the 30-min window.
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() + 60 * 60 * 1000),
+          }),
+        );
+        const { unmount } = renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toBeEnabled();
+        unmount();
+
+        // Pickup in 10 min: inside the 30-min window → blocked.
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() + 10 * 60 * 1000),
+          }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toBeDisabled();
+      });
     });
   });
 

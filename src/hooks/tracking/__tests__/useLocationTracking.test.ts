@@ -24,6 +24,24 @@ jest.mock('@/utils/indexedDB/locationStore', () => ({
 // Import mocked modules
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+// Individual tests may override via mockTrackingSettingsOverride.
+const mockTrackingSettingsOverride: { current: Record<string, number> | null } =
+  { current: null };
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings:
+      mockTrackingSettingsOverride.current ??
+      jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
+
+
 // Helper to mock navigator properties
 const mockNavigatorProperty = (property: string, value: unknown) => {
   Object.defineProperty(navigator, property, {
@@ -170,6 +188,32 @@ describe('useLocationTracking', () => {
       jest.runOnlyPendingTimers();
     });
     jest.useRealTimers();
+  });
+
+  describe('admin-configured sync interval', () => {
+    afterEach(() => {
+      mockTrackingSettingsOverride.current = null;
+      // The hook configures the module singleton — restore the default so
+      // later tests in this file aren't order-dependent on a 12s interval.
+      const { RATE_LIMIT_CONFIG } = jest.requireActual('@/constants/realtime-config');
+      locationRateLimiter.configure(RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS);
+    });
+
+    it('pushes the settings interval into the shared client rate limiter on mount', async () => {
+      const { TRACKING_SETTINGS_DEFAULTS } = jest.requireActual(
+        '@/types/tracking-settings',
+      );
+      mockTrackingSettingsOverride.current = {
+        ...TRACKING_SETTINGS_DEFAULTS,
+        locationUpdateIntervalSeconds: 12,
+      };
+      const configureSpy = jest.spyOn(locationRateLimiter, 'configure');
+
+      renderHook(() => useLocationTracking());
+
+      expect(configureSpy).toHaveBeenCalledWith(12_000);
+      configureSpy.mockRestore();
+    });
   });
 
   describe('initialization', () => {

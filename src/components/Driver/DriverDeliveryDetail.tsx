@@ -34,6 +34,7 @@ import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureShee
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
+import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 
 /**
  * Driver-specific Delivery Detail.
@@ -154,6 +155,8 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   // Live GPS from the shared tracking provider (wraps all /driver/* routes).
   // May be null outside an active shift — the geofence fails open in that case.
   const { currentLocation } = useDriverTracking();
+  const { settings } = useTrackingSettings();
+  const geofenceRadiusM = settings.arrivalGeofenceRadiusM;
   const supabase = useMemo(() => createClient(), []);
 
   const [order, setOrder] = useState<DriverOrder | null>(null);
@@ -320,6 +323,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       const check = checkArrivalGeofence(
         currentLocation?.coordinates ?? null,
         arrivalTarget,
+        geofenceRadiusM,
       );
       if (!check.allowed && check.distanceM !== null) {
         toast.error(geofenceHint(check.distanceM));
@@ -337,7 +341,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       return;
     }
     void advanceStatus(next);
-  }, [order, advanceStatus, currentLocation]);
+  }, [order, advanceStatus, currentLocation, geofenceRadiusM]);
 
   const onSignatureComplete = useCallback(async () => {
     setSignatureOpen(false);
@@ -405,11 +409,13 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       ? checkArrivalGeofence(
           currentLocation?.coordinates ?? null,
           addressTarget(order.pickupAddress),
+          geofenceRadiusM,
         )
       : nextDriverStatus === DriverStatus.ARRIVED_TO_CLIENT
         ? checkArrivalGeofence(
             currentLocation?.coordinates ?? null,
             addressTarget(order.deliveryAddress),
+            geofenceRadiusM,
           )
         : null;
   const geofenceBlocked =

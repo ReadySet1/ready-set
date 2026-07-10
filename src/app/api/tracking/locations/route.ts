@@ -3,6 +3,8 @@ import { withAuth } from '@/lib/auth-middleware';
 import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { rawQuery, withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
+import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 
 interface LocationUpdate {
   driver_id: string;
@@ -27,10 +29,26 @@ export async function POST(request: NextRequest) {
 
   // Abuse protection: cap location writes per authenticated user (keyed by the
   // auth id, not the body driver_id, so it can't be bypassed). Multi-instance
-  // safe via Upstash; falls open if the limiter backend is unavailable. Normal
-  // drivers write ~12/min (client throttled to 1/5s) — well under the cap.
+  // safe via Upstash; falls open if the limiter backend is unavailable. The
+  // client throttles itself to the admin-configured interval — this cap is the
+  // outer abuse bound.
   const limited = await enforceRateLimit(auth.context.user.id, 'tracking-location-write');
   if (limited) return limited;
+
+  // Per-interval enforcement of the admin-configured GPS cadence (this route
+  // is the production write path for web and native drivers). Keyed by auth
+  // id; fail-open settings read. 429 lets the client back off silently.
+  // 80% grace: clients post at exactly the interval, so network jitter must
+  // not reject a legitimate cadence.
+  const settings = await getTrackingSettings();
+  locationRateLimiter.configure(settings.locationUpdateIntervalSeconds * 800);
+  const intervalLimit = locationRateLimiter.checkAndRecordLimit(auth.context.user.id);
+  if (!intervalLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: intervalLimit.message },
+      { status: 429 },
+    );
+  }
 
   try {
     const body = await request.json();
