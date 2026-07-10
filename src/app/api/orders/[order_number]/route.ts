@@ -530,30 +530,39 @@ export async function PATCH(
         { status: 422 },
       );
     }
-    // The vendor-pickup signature is mandatory (2026-06-22 decision), and the
-    // sheet is client-side — so back it up here: a driver cannot mark PICKED_UP
-    // until a pickup_signature upload exists for the order. Admin/helpdesk are
-    // exempt so they can repair stuck orders.
+    // Pickup confirmation is mandatory (2026-07-09 policy: receiver NAME is the
+    // required artifact, signature optional — supersedes the 2026-06-22
+    // signature-only mandate), and the sheet is client-side — so back it up
+    // here: a driver cannot mark PICKED_UP until a receiver name is recorded on
+    // the deliveries row OR a pickup_signature upload exists. Admin/helpdesk
+    // are exempt so they can repair stuck orders.
     if (
       driverStatus === DriverStatus.PICKED_UP &&
       currentDriverStatus !== DriverStatus.PICKED_UP &&
       !callerIsPrivileged
     ) {
-      const pickupSignature = await prisma.fileUpload.findFirst({
-        where: {
-          category: 'pickup_signature',
-          ...(orderType === 'catering'
-            ? { cateringRequestId: (existingOrder as any).id }
-            : { onDemandId: (existingOrder as any).id }),
-        },
-        select: { id: true },
-      });
-      if (!pickupSignature) {
+      const [pickupSignature, deliveryRow] = await Promise.all([
+        prisma.fileUpload.findFirst({
+          where: {
+            category: 'pickup_signature',
+            ...(orderType === 'catering'
+              ? { cateringRequestId: (existingOrder as any).id }
+              : { onDemandId: (existingOrder as any).id }),
+          },
+          select: { id: true },
+        }),
+        prisma.delivery.findUnique({
+          where: { orderNumber: (existingOrder as any).orderNumber },
+          select: { pickupReceivedBy: true },
+        }),
+      ]);
+      const hasReceiverName = !!deliveryRow?.pickupReceivedBy?.trim();
+      if (!pickupSignature && !hasReceiverName) {
         return NextResponse.json(
           {
             message:
-              'A vendor pickup signature is required before marking this order as picked up',
-            code: 'PICKUP_SIGNATURE_REQUIRED',
+              'Record who handed over the order (name) or capture a signature before marking picked up',
+            code: 'PICKUP_CONFIRMATION_REQUIRED',
           },
           { status: 422 },
         );
