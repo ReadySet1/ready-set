@@ -21,4 +21,14 @@ describe('isLocationStale', () => {
     expect(isLocationStale(old)).toBe(true);
     expect(isLocationStale(old.toISOString())).toBe(true);
   });
+
+  it('honors an explicit threshold (admin-configured) over the default', () => {
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    // Fresh under the 5-minute default…
+    expect(isLocationStale(twoMinutesAgo)).toBe(false);
+    // …but stale under a 1-minute admin setting.
+    expect(isLocationStale(twoMinutesAgo, 60_000)).toBe(true);
+    // And fresh again under a larger custom threshold.
+    expect(isLocationStale(twoMinutesAgo, 10 * 60 * 1000)).toBe(false);
+  });
 });

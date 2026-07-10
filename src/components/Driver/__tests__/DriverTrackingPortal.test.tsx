@@ -19,6 +19,17 @@ jest.mock("react-hot-toast", () => ({
 
 import toast from "react-hot-toast";
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 // Light map mock (real one needs Mapbox + a token).
 jest.mock("@/components/Driver/DriverLiveMap", () => ({
   __esModule: true,

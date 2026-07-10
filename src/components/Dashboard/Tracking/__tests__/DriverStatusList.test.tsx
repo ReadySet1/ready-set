@@ -4,6 +4,17 @@ import '@testing-library/jest-dom';
 import DriverStatusList from '../DriverStatusList';
 import type { TrackedDriver } from '@/types/tracking';
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 // Mock data
 const mockDriver1: TrackedDriver = {
   id: 'driver-1',

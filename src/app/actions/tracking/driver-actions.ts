@@ -21,6 +21,7 @@ import {
   calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 
 /**
  * Start a new driver shift
@@ -151,10 +152,29 @@ export async function endDriverShift(
     // `deliveries` table (what the live portal shows), a catering/on-demand
     // order the driver has actually started (driverStatus in a movement stage),
     // or — 2026-07-09 drive-test feedback — an ASSIGNED order whose pickup is
-    // imminent (≤2h) or overdue. Future-dated assignments don't trap the driver.
+    // imminent (within the admin-configured window) or overdue. Future-dated
+    // assignments don't trap the driver. A window of 0 disables the
+    // imminent-pickup branch entirely (in-flight orders always block).
+    // Mirrored client-side by blocksEndShift in DriverTrackingPortal.
     const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
     if (!force) {
+      const settings = await getTrackingSettings();
+      const guardMinutes = settings.endShiftPickupGuardMinutes;
+      // The pickup window is bound as a parameter (never interpolated).
+      const imminentPickupCr = guardMinutes > 0
+        ? `OR (cr."driverStatus" = 'ASSIGNED'
+                      AND cr."pickupDateTime" IS NOT NULL
+                      AND cr."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
+        : '';
+      const imminentPickupOd = guardMinutes > 0
+        ? `OR (od."driverStatus" = 'ASSIGNED'
+                      AND od."pickupDateTime" IS NOT NULL
+                      AND od."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
+        : '';
+      const guardParams: unknown[] = guardMinutes > 0
+        ? [shift?.driver_id, guardMinutes]
+        : [shift?.driver_id];
       const blocking = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`
         SELECT
           (
@@ -174,20 +194,16 @@ export async function endDriverShift(
                 (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
                   AND (
                     cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    OR (cr."driverStatus" = 'ASSIGNED'
-                      AND cr."pickupDateTime" IS NOT NULL
-                      AND cr."pickupDateTime" <= NOW() + interval '2 hours')
+                    ${imminentPickupCr}
                   ))
                 OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
                   AND (
                     od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    OR (od."driverStatus" = 'ASSIGNED'
-                      AND od."pickupDateTime" IS NOT NULL
-                      AND od."pickupDateTime" <= NOW() + interval '2 hours')
+                    ${imminentPickupOd}
                   ))
               )
           ) AS n
-      `, shift?.driver_id);
+      `, ...guardParams);
 
       const activeCount = Number(blocking[0]?.n ?? 0);
       if (activeCount > 0) {
@@ -535,9 +551,13 @@ export async function updateDriverLocation(
       return { success: false, error: 'Access denied' };
     }
 
-    // Check rate limit atomically (1 update per 5 seconds per driver)
+    // Check rate limit atomically (1 update per admin-configured interval per
+    // driver; cache-backed settings read, defaults on any failure).
     // SECURITY FIX: Using checkAndRecordLimit() to prevent race conditions
     // This atomically checks AND records, preventing concurrent requests from bypassing the limit
+    locationRateLimiter.configure(
+      (await getTrackingSettings()).locationUpdateIntervalSeconds * 1000,
+    );
     const rateLimit = locationRateLimiter.checkAndRecordLimit(driverId);
     if (!rateLimit.allowed) {
       realtimeLogger.rateLimit(driverId, rateLimit.retryAfter!);

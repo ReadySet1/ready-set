@@ -22,7 +22,10 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
+import TrackingSettingsTab from './TrackingSettingsTab';
 import { useAdminRealtimeTracking } from '@/hooks/tracking/useAdminRealtimeTracking';
+import { useUser } from '@/contexts/UserContext';
+import { UserType } from '@/types/user';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 
 // Dynamically import LiveDriverMap to code-split Mapbox bundle (~750KB)
@@ -47,6 +50,12 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
   const [activeTab, setActiveTab] = useState('overview');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Settings are editable by admins only (the API enforces this server-side;
+  // hiding the tab keeps HELPDESK's dashboard uncluttered).
+  const { userRole } = useUser();
+  const canEditSettings =
+    userRole === UserType.ADMIN || userRole === UserType.SUPER_ADMIN;
 
   const {
     activeDrivers,
@@ -348,11 +357,16 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
 
       {/* Main Dashboard Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList
+          className={cn('grid w-full', canEditSettings ? 'grid-cols-5' : 'grid-cols-4')}
+        >
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="map">Live Map</TabsTrigger>
           <TabsTrigger value="drivers">Drivers</TabsTrigger>
           <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
+          {canEditSettings ? (
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -449,6 +463,12 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canEditSettings ? (
+          <TabsContent value="settings" className="space-y-6">
+            <TrackingSettingsTab />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   );

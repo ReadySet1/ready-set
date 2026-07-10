@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LocationUpdate } from '@/types/tracking';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
+import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
+import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
   currentLocation: LocationUpdate | null;
@@ -95,6 +97,18 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
+  // Admin-configurable sync throttle (matches the server rate limit). Kept in
+  // a ref so a settings refetch doesn't re-create the callback chain and tear
+  // down the geolocation watcher.
+  const { settings } = useTrackingSettings();
+  const minSyncIntervalMsRef = useRef(5000);
+  useEffect(() => {
+    const intervalMs = settings.locationUpdateIntervalSeconds * 1000;
+    minSyncIntervalMsRef.current = intervalMs;
+    // Keep the browser-side realtime rate limiter (src/lib/realtime/client.ts
+    // uses the same module singleton) in step with the server.
+    locationRateLimiter.configure(intervalMs);
+  }, [settings.locationUpdateIntervalSeconds]);
   // Mirror isTracking into a ref so the long-lived watchPosition callback always
   // reads the live value. The callback registered in startTracking() captures the
   // isTracking *state* from the same render that calls setIsTracking(true) — i.e.
@@ -330,11 +344,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   }, [isOnline, postLocation]);
 
   // Update location to server with client-side throttling
-  // Skips server sync if less than 5s since last successful sync (matches server rate limit)
+  // Skips server sync if the admin-configured interval hasn't elapsed since
+  // the last successful sync (matches the server rate limit).
   const syncLocationToServer = useCallback(async (location: LocationUpdate) => {
     const now = Date.now();
     const timeSinceLastSync = now - lastSyncTimeRef.current;
-    if (timeSinceLastSync < 5000) {
+    if (timeSinceLastSync < minSyncIntervalMsRef.current) {
       // Too soon since last sync - skip to avoid rate limit spam
       return;
     }

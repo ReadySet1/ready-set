@@ -6,6 +6,10 @@ import {
   METERS_TO_MILES,
   milesToMeters,
 } from '@/config/mileage-config';
+// Admin-editable settings (cache-backed, fail-open to defaults). These
+// supersede the MILEAGE_* env-var overrides for the accuracy / max-speed /
+// max-shift-miles knobs; the remaining MILEAGE_CONFIG keys are unchanged.
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 
 /**
  * Internal type representing the minimal shift window needed for mileage calculation.
@@ -63,6 +67,7 @@ async function calculateWindowDistanceMiles(
 ): Promise<{ miles: number; warnings: string[] }> {
   assertUuid(driverId, 'driverId');
   const warnings: string[] = [];
+  const settings = await getTrackingSettings();
 
   // Run diagnostic query to check GPS data quality
   const diagnosticRows = await prisma.$queryRawUnsafe<{
@@ -76,7 +81,7 @@ async function calculateWindowDistanceMiles(
     WHERE driver_id = $1::uuid
       AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
       AND deleted_at IS NULL
-  `, driverId, startTime, endTime, MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M);
+  `, driverId, startTime, endTime, settings.mileageGpsAccuracyThresholdM);
 
   const totalPoints = Number(diagnosticRows[0]?.total_points ?? 0);
   const filteredPoints = Number(diagnosticRows[0]?.filtered_points ?? 0);
@@ -111,7 +116,7 @@ async function calculateWindowDistanceMiles(
   }
 
   // Convert config values for SQL query
-  const maxSpeedMsForQuery = MILEAGE_CONFIG.MAX_SPEED_MPH / 2.23694; // mph to m/s
+  const maxSpeedMsForQuery = settings.mileageMaxSpeedMph / 2.23694; // mph to m/s
   const maxSegmentMeters = milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES);
 
   const rows = await prisma.$queryRawUnsafe<{ total_miles: number | null }[]>(`
@@ -165,7 +170,7 @@ async function calculateWindowDistanceMiles(
     driverId,
     startTime,
     endTime,
-    MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M,
+    settings.mileageGpsAccuracyThresholdM,
     MILEAGE_CONFIG.MIN_MOVING_SPEED_MS,
     maxSegmentMeters,
     MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS,
@@ -229,15 +234,16 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
   );
 
   // Warn if mileage seems unrealistically high
-  if (totalMiles > MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES) {
-    const warningMsg = `Unusually high mileage: ${totalMiles.toFixed(2)} miles exceeds ${MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES} mile threshold`;
+  const maxReasonableMiles = (await getTrackingSettings()).maxReasonableShiftMiles;
+  if (totalMiles > maxReasonableMiles) {
+    const warningMsg = `Unusually high mileage: ${totalMiles.toFixed(2)} miles exceeds ${maxReasonableMiles} mile threshold`;
     warnings.push(warningMsg);
     Sentry.captureMessage('Unusually high mileage for shift', {
       level: 'warning',
       extra: {
         shiftId,
         totalMiles: totalMiles.toFixed(2),
-        threshold: MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES,
+        threshold: maxReasonableMiles,
       },
     });
   }

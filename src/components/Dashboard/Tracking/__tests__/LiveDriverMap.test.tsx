@@ -5,6 +5,17 @@ import LiveDriverMap from '../LiveDriverMap';
 import mapboxgl from 'mapbox-gl';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 // Enable automocking for mapbox-gl
 jest.mock('mapbox-gl');
 

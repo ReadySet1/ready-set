@@ -24,6 +24,17 @@ jest.mock('@/utils/indexedDB/locationStore', () => ({
 // Import mocked modules
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 // Helper to mock navigator properties
 const mockNavigatorProperty = (property: string, value: unknown) => {
   Object.defineProperty(navigator, property, {

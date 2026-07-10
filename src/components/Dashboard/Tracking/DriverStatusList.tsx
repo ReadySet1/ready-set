@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { TrackedDriver } from '@/types/tracking';
 import { isLocationStale } from '@/lib/realtime/stale-detection';
+import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface LocationData {
   driverId: string;
@@ -50,6 +51,8 @@ export default function DriverStatusList({
   className 
 }: DriverStatusListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { settings } = useTrackingSettings();
+  const staleThresholdMs = settings.staleGpsThresholdSeconds * 1000;
   const [statusFilter, setStatusFilter] = useState<'all' | 'on_duty' | 'off_duty' | 'moving'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'distance' | 'deliveries'>('status');
 
@@ -135,7 +138,8 @@ export default function DriverStatusList({
     const timeSinceUpdate = getTimeSinceUpdate(driver);
     const signalStrength = getSignalStrength(locationData?.accuracy);
     // On duty but no recent GPS fix (app closed / lost signal) → offline, not "stopped".
-    const isStale = driver.isOnDuty && isLocationStale(driver.lastLocationUpdate);
+    const isStale =
+      driver.isOnDuty && isLocationStale(driver.lastLocationUpdate, staleThresholdMs);
 
     return (
       <Card className={cn('transition-all duration-200 hover:shadow-md', {

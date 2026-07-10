@@ -211,6 +211,19 @@ jest.mock('@/lib/utils', () => ({
   cn: (...args: any[]) => args.filter(Boolean).join(' '),
 }));
 
+// Role gate for the Settings tab. Falls back to no-role when a test doesn't
+// set an explicit return value (clearAllMocks resets it).
+const mockUseUser = jest.fn();
+jest.mock('@/contexts/UserContext', () => ({
+  useUser: () => mockUseUser() ?? { userRole: null },
+}));
+
+jest.mock('../TrackingSettingsTab', () => {
+  return function MockTrackingSettingsTab() {
+    return <div data-testid="tracking-settings-tab" />;
+  };
+});
+
 describe('AdminTrackingDashboard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -253,6 +266,26 @@ describe('AdminTrackingDashboard', () => {
       expect(screen.getByTestId('tab-map')).toBeInTheDocument();
       expect(screen.getByTestId('tab-drivers')).toBeInTheDocument();
       expect(screen.getByTestId('tab-deliveries')).toBeInTheDocument();
+    });
+
+    it('shows the Settings tab for ADMIN and SUPER_ADMIN', () => {
+      const { UserType } = require('@/types/user');
+      for (const role of [UserType.ADMIN, UserType.SUPER_ADMIN]) {
+        mockUseUser.mockReturnValue({ userRole: role });
+        const { unmount } = render(<AdminTrackingDashboard />);
+        expect(screen.getByTestId('tab-settings')).toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('hides the Settings tab for HELPDESK and unknown roles', () => {
+      const { UserType } = require('@/types/user');
+      for (const role of [UserType.HELPDESK, null]) {
+        mockUseUser.mockReturnValue({ userRole: role });
+        const { unmount } = render(<AdminTrackingDashboard />);
+        expect(screen.queryByTestId('tab-settings')).not.toBeInTheDocument();
+        unmount();
+      }
     });
   });
 

@@ -21,6 +21,7 @@ import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
 import { MAP_CONFIG, MARKER_CONFIG, BATTERY_THRESHOLDS } from '@/constants/tracking-config';
 import { isLocationStale } from '@/lib/realtime/stale-detection';
+import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 // Ensure Mapbox token is available
@@ -68,6 +69,8 @@ export default function LiveDriverMap({
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>('streets');
   const [mapLoaded, setMapLoaded] = useState(false);
+  const { settings } = useTrackingSettings();
+  const staleThresholdMs = settings.staleGpsThresholdSeconds * 1000;
   const [mapError, setMapError] = useState<string | null>(null);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [shouldAutoFit, setShouldAutoFit] = useState(true);
@@ -178,7 +181,8 @@ export default function LiveDriverMap({
     if (!driver.isOnDuty) return DRIVER_STATUS_COLORS.offDuty;
 
     // On duty but no recent GPS fix (app closed / lost signal) → offline, not "stopped".
-    if (isLocationStale(driver.lastLocationUpdate)) return DRIVER_STATUS_COLORS.stale;
+    if (isLocationStale(driver.lastLocationUpdate, staleThresholdMs))
+      return DRIVER_STATUS_COLORS.stale;
 
     const recentLocation = recentLocations.find(loc => loc.driverId === driver.id);
     if (recentLocation) {
@@ -187,7 +191,7 @@ export default function LiveDriverMap({
     }
 
     return DRIVER_STATUS_COLORS.onDuty;
-  }, [recentLocations]);
+  }, [recentLocations, staleThresholdMs]);
 
   // Get battery status
   const getBatteryStatus = useCallback((driverId: string): { level?: number; status: 'good' | 'low' | 'critical' } => {

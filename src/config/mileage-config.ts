@@ -3,6 +3,11 @@
  *
  * All distance values are in MILES (not kilometers).
  * These can be overridden via environment variables for operational flexibility.
+ *
+ * NOTE: GPS_ACCURACY_THRESHOLD_M, MAX_SPEED_MPH and MAX_REASONABLE_SHIFT_MILES
+ * are now admin-editable via the tracking settings (/admin/tracking → Settings,
+ * `tracking_settings` table). When that row exists, the DB value wins over the
+ * env override for those three keys — see src/services/tracking/mileage.ts.
  */
 
 /**

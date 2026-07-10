@@ -793,6 +793,26 @@ model DeliveryConfiguration {
   @@map("delivery_configurations")
 }
 
+// Singleton (id = 1, enforced by a CHECK constraint) row of admin-editable
+// driver-tracking settings. Defaults mirror TRACKING_SETTINGS_DEFAULTS in
+// src/types/tracking-settings.ts — code falls back to those when the row
+// (or table) is missing, so this table is never load-bearing.
+model TrackingSettings {
+  id                            Int      @id @default(1)
+  arrivalGeofenceRadiusM        Int      @default(150) @map("arrival_geofence_radius_m")
+  staleGpsThresholdSeconds      Int      @default(300) @map("stale_gps_threshold_seconds")
+  endShiftPickupGuardMinutes    Int      @default(120) @map("end_shift_pickup_guard_minutes")
+  locationUpdateIntervalSeconds Int      @default(5) @map("location_update_interval_seconds")
+  mileageGpsAccuracyThresholdM  Int      @default(100) @map("mileage_gps_accuracy_threshold_m")
+  mileageMaxSpeedMph            Int      @default(95) @map("mileage_max_speed_mph")
+  maxReasonableShiftMiles       Int      @default(310) @map("max_reasonable_shift_miles")
+  updatedAt                     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  updatedBy                     String?  @db.Uuid @map("updated_by")
+
+  @@schema("public")
+  @@map("tracking_settings")
+}
+
 // ============================================================================
 // Driver Tracking Models (REA-122)
 // ============================================================================
