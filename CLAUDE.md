@@ -267,7 +267,7 @@ Tracking knobs (geofence radius, GPS interval, stale threshold, end-shift guard,
 - API: `GET/PUT /api/tracking/settings` (GET gives drivers a client-safe subset; PUT is admin-only, Zod-validated, audited)
 - Server reads: `getTrackingSettings()` from `src/services/tracking/tracking-settings.ts` — 60s TTL cache, **fail-open** to `TRACKING_SETTINGS_DEFAULTS` (`src/types/tracking-settings.ts`), never throws
 - Client reads: `useTrackingSettings()` hook — also fail-open; check `isServerData` before seeding any editor form from it
-- Supersedes the `MILEAGE_GPS_ACCURACY_M`, `MILEAGE_MAX_SPEED_MPH`, `MILEAGE_MAX_SHIFT_MILES` env vars when the DB row exists
+- Supersedes the `MILEAGE_GPS_ACCURACY_M`, `MILEAGE_MAX_SPEED_MPH`, `MILEAGE_MAX_SHIFT_MILES` env vars entirely — mileage reads only the resolved settings (DB row or hardcoded defaults); those three env overrides no longer take effect
 - **Product rule:** user-facing distances are always imperial (feet/miles); storage stays metric — convert at display with `src/lib/units.ts`
 
 Full detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4.3 "Admin-configurable tracking settings".
