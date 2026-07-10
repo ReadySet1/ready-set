@@ -549,13 +549,15 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       } as any);
     };
 
-    it('rejects a driver PICKED_UP with 422 when no pickup_signature upload exists', async () => {
+    it('rejects a driver PICKED_UP with 422 when neither a signature nor a receiver name exists', async () => {
       // The Jul-3 walk-test bug: the Live-Tracking tab advanced
       // ARRIVED_AT_VENDOR -> PICKED_UP without the signature sheet. The server
       // must be the backstop regardless of which client surface forgot the gate.
+      // Since 2026-07-09 the gate accepts a receiver NAME or a signature.
       setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(null);
 
       const { PATCH } = await importRoute();
       const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
@@ -564,14 +566,55 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
 
       expect(response.status).toBe(422);
       const data = await response.json();
-      expect(data.code).toBe('PICKUP_SIGNATURE_REQUIRED');
+      expect(data.code).toBe('PICKUP_CONFIRMATION_REQUIRED');
       expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a driver PICKED_UP when the recorded receiver name is whitespace-only', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
+        pickupReceivedBy: '   ',
+      });
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).code).toBe('PICKUP_CONFIRMATION_REQUIRED');
+    });
+
+    it('allows a driver PICKED_UP with a receiver name only (no signature upload)', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
+        pickupReceivedBy: 'Maria Lopez',
+      });
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.delivery.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { orderNumber: 'CAT-001' },
+          select: { pickupReceivedBy: true },
+        }),
+      );
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
     });
 
     it('allows a driver PICKED_UP once the pickup_signature upload exists', async () => {
       setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue({ id: 'sig-1' });
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(null);
 
       const { PATCH } = await importRoute();
       const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {

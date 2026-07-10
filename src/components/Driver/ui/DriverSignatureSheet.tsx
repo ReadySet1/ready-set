@@ -16,8 +16,9 @@ interface DriverSignatureSheetProps {
   orderNumber: string;
   /** Endpoint override (defaults to /api/orders/[order_number]/signature). */
   uploadEndpoint?: string;
-  /** Called with the stored signature URL once capture + upload succeeds. */
-  onComplete: (url: string) => void;
+  /** Called once the confirmation is stored. `url` is the signature image URL
+   *  when one was drawn, or null for a name-only confirmation. */
+  onComplete: (url: string | null) => void;
 }
 
 /** Bottom-sheet wrapper around the pickup SignatureCapture flow. Mirrors
@@ -43,7 +44,7 @@ export function DriverSignatureSheet({
         <div className="mx-auto w-full max-w-2xl">
           <SheetHeader className="items-start">
             <SheetTitle className="text-[18px] font-semibold text-driver-text">
-              Vendor pickup signature
+              Confirm pickup
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">

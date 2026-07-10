@@ -931,6 +931,7 @@ model Delivery {
   photoRequired          Boolean?  @default(false) @map("photo_required")
   deliverySignatureUrl   String?   @map("delivery_signature_url")
   pickupSignatureUrl     String?   @map("pickup_signature_url")
+  pickupReceivedBy       String?   @map("pickup_received_by") @db.VarChar(255)
   deliveryPhotoUrl       String?   @map("delivery_photo_url")
   deliveryNotes          String?   @map("delivery_notes")
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)

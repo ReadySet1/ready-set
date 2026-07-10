@@ -125,8 +125,11 @@ export async function uploadPODImage(
 /**
  * Upload a pickup-stage signature image (a PNG from the in-app signature pad).
  *
- * Reuses the delivery-proofs bucket but a distinct `signatures/` path prefix so
- * pickup signatures are easy to tell apart from POD photos in storage.
+ * Reuses the delivery-proofs bucket under the `deliveries/` path prefix — the
+ * bucket's INSERT policy only allows that first folder segment
+ * (supabase/migrations/20251127000000_create_delivery_proofs_bucket.sql), so any
+ * other prefix is rejected with an RLS violation. The `pickup-signature-` filename
+ * keeps signatures distinguishable from POD photos.
  *
  * @param file - The signature image (File or Blob)
  * @param orderId - The order UUID (catering or on-demand)
@@ -153,7 +156,7 @@ export async function uploadPickupSignatureImage(
     }
 
     const timestamp = Date.now();
-    const filename = `signatures/${orderId}/pickup-signature-${orderId}-${timestamp}.png`;
+    const filename = `deliveries/${orderId}/pickup-signature-${timestamp}.png`;
 
     const { data, error } = await supabase.storage
       .from(POD_BUCKET_NAME)

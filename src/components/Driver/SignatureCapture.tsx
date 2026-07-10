@@ -11,8 +11,9 @@ interface SignatureCaptureProps {
   orderNumber: string;
   /** Endpoint override (defaults to /api/orders/[order_number]/signature). */
   uploadEndpoint?: string;
-  /** Called with the stored signature URL once capture + upload succeeds. */
-  onUploadComplete: (url: string) => void;
+  /** Called once the confirmation is stored. `url` is the signature image URL
+   *  when one was drawn, or null for a name-only confirmation. */
+  onUploadComplete: (url: string | null) => void;
   onCancel: () => void;
   className?: string;
 }
@@ -28,9 +29,10 @@ function dataURLToBlob(dataURL: string): Blob {
 }
 
 /**
- * In-app signature pad for the vendor pickup step. Captures a manual signature
- * from the restaurant staff (not DocuSign), exports a PNG, and uploads it to the
- * orders signature endpoint. Mandatory before a driver can mark a pickup done.
+ * In-app pickup confirmation for the vendor pickup step. The NAME of the person
+ * who handed over the order is required (2026-07-09 policy); the signature pad
+ * is optional. Posts both to the orders signature endpoint, which records the
+ * confirmation the PICKED_UP gate checks.
  */
 export function SignatureCapture({
   orderNumber,
@@ -42,6 +44,7 @@ export function SignatureCapture({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const [hasInk, setHasInk] = useState(false);
+  const [receivedBy, setReceivedBy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,20 +90,26 @@ export function SignatureCapture({
   }, []);
 
   const handleConfirm = useCallback(async () => {
-    const pad = padRef.current;
-    if (!pad || pad.isEmpty()) {
-      setError("Please capture a signature first.");
+    const name = receivedBy.trim();
+    if (!name) {
+      setError("Please enter who handed over the order.");
       return;
     }
     setUploading(true);
     setError(null);
     try {
-      const blob = dataURLToBlob(pad.toDataURL("image/png"));
-      const file = new File([blob], "pickup-signature.png", {
-        type: "image/png",
-      });
       const formData = new FormData();
-      formData.append("file", file, file.name);
+      formData.append("receivedBy", name);
+
+      // The signature is optional — attach it only when the pad has ink.
+      const pad = padRef.current;
+      if (pad && !pad.isEmpty()) {
+        const blob = dataURLToBlob(pad.toDataURL("image/png"));
+        const file = new File([blob], "pickup-signature.png", {
+          type: "image/png",
+        });
+        formData.append("file", file, file.name);
+      }
 
       const endpoint =
         uploadEndpoint ??
@@ -111,8 +120,8 @@ export function SignatureCapture({
         throw new Error(body.error || "Upload failed");
       }
       const result = await res.json();
-      toast.success("Signature captured");
-      onUploadComplete(result.url);
+      toast.success("Pickup confirmed");
+      onUploadComplete(result.url ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
@@ -120,23 +129,44 @@ export function SignatureCapture({
     } finally {
       setUploading(false);
     }
-  }, [orderNumber, uploadEndpoint, onUploadComplete]);
+  }, [orderNumber, uploadEndpoint, onUploadComplete, receivedBy]);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <p className="text-[13.5px] font-semibold text-driver-muted">
-        Ask the restaurant staff to sign below to confirm pickup.
+        Enter the name of the person who handed over the order. Signature is
+        optional.
       </p>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[12.5px] font-semibold text-driver-muted">
+          Received / confirmed by
+        </span>
+        <input
+          type="text"
+          value={receivedBy}
+          onChange={(e) => {
+            setReceivedBy(e.target.value);
+            if (error) setError(null);
+          }}
+          placeholder="Name of restaurant staff"
+          maxLength={255}
+          autoComplete="off"
+          disabled={uploading}
+          className="w-full rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt px-4 py-3 text-[15px] font-semibold text-driver-text placeholder:text-driver-subtle focus:outline-none focus:ring-2 focus:ring-driver-brand disabled:opacity-50"
+          aria-label="Received / confirmed by"
+        />
+      </label>
 
       <div className="relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt">
         <canvas
           ref={canvasRef}
           className="h-48 w-full touch-none"
-          aria-label="Signature pad"
+          aria-label="Signature pad (optional)"
         />
         {!hasInk ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
-            Sign here
+            Sign here (optional)
           </span>
         ) : null}
       </div>
@@ -161,12 +191,12 @@ export function SignatureCapture({
           variant="brand"
           full
           loading={uploading}
-          disabled={uploading || !hasInk}
+          disabled={uploading || !receivedBy.trim()}
           onClick={handleConfirm}
           className="flex-1"
         >
           {!uploading ? <Check className="h-4 w-4" strokeWidth={2.6} /> : null}
-          Confirm signature
+          Confirm pickup
         </DriverButton>
       </div>
 
