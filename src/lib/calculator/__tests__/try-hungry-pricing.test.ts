@@ -36,7 +36,7 @@
  * - $2.50/mile after 10 miles
  */
 
-import { calculateDeliveryCost, calculateDriverPay } from '../delivery-cost-calculator';
+import { calculateDeliveryCost, calculateDriverPay, ManualReviewRequiredError } from '../delivery-cost-calculator';
 import { TRY_HUNGRY } from '../client-configurations';
 
 describe('Try Hungry Pricing', () => {
@@ -734,6 +734,60 @@ describe('Try Hungry Pricing', () => {
           headcount: 150, foodCost: 1500, totalMileage: 5, clientConfigId: 'try-hungry',
         }),
       ).toThrow('manual review');
+    });
+
+    it('throws ManualReviewRequiredError (instanceof, not just message)', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 100, foodCost: 0, totalMileage: 5, clientConfigId: 'try-hungry',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+  });
+
+  // ============================================================================
+  // SENTINEL GUARD — DRIVER-PAY PATH
+  // ============================================================================
+
+  describe('Sentinel Guard — calculateDriverPay path', () => {
+    it('headcount 100 → throws manual review via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 100, foodCost: 0, totalMileage: 5,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'try-hungry',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+
+    it('headcount 110 → throws via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 110, foodCost: 0, totalMileage: 5,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'try-hungry',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+
+    it('headcount 100 with non-zero foodCost → still throws via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 100, foodCost: 1500, totalMileage: 5,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'try-hungry',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+
+    it('headcount 99 → does NOT throw via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 99, foodCost: 0, totalMileage: 5,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'try-hungry',
+        }),
+      ).not.toThrow();
     });
   });
 });

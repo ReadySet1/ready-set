@@ -43,7 +43,7 @@
  * - 4+ drives/day: -$15/drive
  */
 
-import { calculateDeliveryCost, calculateDriverPay } from '../delivery-cost-calculator';
+import { calculateDeliveryCost, calculateDriverPay, ManualReviewRequiredError } from '../delivery-cost-calculator';
 import { KASA } from '../client-configurations';
 
 describe('Kasa Pricing', () => {
@@ -1115,6 +1115,47 @@ describe('Kasa Pricing', () => {
           headcount: 299, foodCost: 1000, totalMileage: 8, clientConfigId: 'kasa',
         }),
       ).not.toThrow();
+    });
+
+    it('throws ManualReviewRequiredError (instanceof, not just message)', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 350, foodCost: 1000, totalMileage: 8, clientConfigId: 'kasa',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+  });
+
+  // ==========================================================================
+  // SENTINEL GUARD — DRIVER-PAY PATH
+  // ==========================================================================
+
+  describe('Sentinel guard — calculateDriverPay path', () => {
+    it('headcount 350 with non-zero foodCost throws via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 350, foodCost: 1000, totalMileage: 8,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'kasa',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+
+    it('headcount 124 does NOT throw via calculateDriverPay (last supported tier)', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 124, foodCost: 1000, totalMileage: 8,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'kasa',
+        }),
+      ).not.toThrow();
+    });
+
+    it('CaterValley 100+ percent tier is NOT a sentinel via calculateDeliveryCost (10%)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 150, foodCost: 1300, totalMileage: 5, clientConfigId: 'cater-valley',
+      });
+      expect(result.deliveryCost).toBe(130); // 10% of $1,300
     });
   });
 });

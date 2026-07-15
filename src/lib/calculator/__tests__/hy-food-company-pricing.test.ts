@@ -21,7 +21,7 @@
  * Mileage: $3.00/mile ONLY for miles beyond 10 (HY Food Company rate)
  */
 
-import { calculateDeliveryCost, calculateDriverPay } from '../delivery-cost-calculator';
+import { calculateDeliveryCost, calculateDriverPay, ManualReviewRequiredError } from '../delivery-cost-calculator';
 import {
   READY_SET_FOOD_STANDARD,
   HY_FOOD_COMPANY_DIRECT,
@@ -922,6 +922,47 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
     });
 
     it('CaterValley 100+ percent tier is NOT treated as a sentinel (still prices at 10%)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 150, foodCost: 1300, totalMileage: 5, clientConfigId: 'cater-valley',
+      });
+      expect(result.deliveryCost).toBe(130); // 10% of $1,300
+    });
+
+    it('throws ManualReviewRequiredError (instanceof, not just message)', () => {
+      expect(() =>
+        calculateDeliveryCost({
+          headcount: 320, foodCost: 1000, totalMileage: 8, clientConfigId: 'hy-food-company-direct',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+  });
+
+  // ==========================================================================
+  // SENTINEL GUARD — DRIVER-PAY PATH
+  // ==========================================================================
+
+  describe('Sentinel guard — calculateDriverPay path', () => {
+    it('headcount 320 with non-zero foodCost throws via calculateDriverPay', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 320, foodCost: 1000, totalMileage: 8,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'hy-food-company-direct',
+        }),
+      ).toThrow(ManualReviewRequiredError);
+    });
+
+    it('headcount 199 does NOT throw via calculateDriverPay (last supported tier)', () => {
+      expect(() =>
+        calculateDriverPay({
+          headcount: 199, foodCost: 1000, totalMileage: 8,
+          bonusQualified: true, bonusQualifiedPercent: 100,
+          clientConfigId: 'hy-food-company-direct',
+        }),
+      ).not.toThrow();
+    });
+
+    it('CaterValley 100+ percent tier is NOT a sentinel via calculateDeliveryCost (10%)', () => {
       const result = calculateDeliveryCost({
         headcount: 150, foodCost: 1300, totalMileage: 5, clientConfigId: 'cater-valley',
       });

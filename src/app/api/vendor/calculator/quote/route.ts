@@ -21,6 +21,7 @@ import { resolveConfigId, resolveConfigIdByEmail } from '@/lib/calculator/vendor
 import {
   calculateDeliveryCost,
   validateDeliveryCostInput,
+  ManualReviewRequiredError,
 } from '@/lib/calculator/delivery-cost-calculator';
 import {
   getConfiguration,
@@ -320,9 +321,9 @@ export async function POST(request: NextRequest) {
       userId: auth.context.user.id,
     });
 
-    // If the engine throws due to a config issue (e.g., manual review required),
+    // If the engine throws due to a manual-review business rule,
     // surface it as a custom-quote scenario rather than a 500
-    if (error instanceof Error && error.message.includes('manual review')) {
+    if (error instanceof ManualReviewRequiredError) {
       return NextResponse.json<VendorQuoteResponse>(CUSTOM_QUOTE_RESPONSE);
     }
 

@@ -13,6 +13,25 @@ import { ClientDeliveryConfiguration, getConfiguration, getActiveConfigurations,
 import { captureMessage } from '@/lib/monitoring/sentry';
 
 // ============================================================================
+// ERRORS
+// ============================================================================
+
+/**
+ * Thrown when an order requires manual review (e.g. headcount >= threshold
+ * for a client with `requiresManualReview: true`).
+ *
+ * Exported so both engine consumers and API routes can detect this
+ * business condition via `instanceof` instead of string-matching on
+ * `error.message`.
+ */
+export class ManualReviewRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManualReviewRequiredError';
+  }
+}
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -238,6 +257,23 @@ function roundToCents(amount: number): number {
 }
 
 /**
+ * Returns true when a pricing tier is a manual-review sentinel: a
+ * placeholder row with rate 0 and no percentage override.
+ *
+ * Tiers that carry `regularRatePercent` / `within10MilesPercent`
+ * (e.g. CaterValley's 10 %) are intentionally percent-priced, NOT
+ * sentinels, so this returns false for them.
+ */
+function isSentinelTier(tier: PricingTier): boolean {
+  return (
+    tier.regularRate === 0 &&
+    tier.within10Miles === 0 &&
+    !tier.regularRatePercent &&
+    !tier.within10MilesPercent
+  );
+}
+
+/**
  * Calculates extra stops charge for multi-stop deliveries
  * First stop is included in base delivery cost, additional stops are charged extra
  *
@@ -296,7 +332,7 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
     });
 
     // Return sanitized message to client without exposing exact thresholds
-    throw new Error(
+    throw new ManualReviewRequiredError(
       `This order requires manual review. Please contact support for a custom quote.`
     );
   }
@@ -494,18 +530,15 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // 1. Determine if within 10 miles
   const isWithin10Miles = totalMileage <= config.distanceThreshold;
 
-  // 1.5. Early sentinel guard — if the headcount falls in a tier with
-  // regularRate===0 and NO percentage override, it is a manual-review
-  // sentinel.  Fire the check BEFORE tier selection so that a food-cost
-  // tier's non-zero fee cannot bypass the deliveryCost===0 guard below.
-  // Tiers that carry a regularRatePercent (e.g. CaterValley 10%) are
-  // intentionally percent-priced, not sentinels, so we skip them.
+  // 1.5. Early sentinel guard — if the headcount falls in a sentinel
+  // tier (rate 0, no percent override), fire the manual-review check
+  // BEFORE tier selection so that a food-cost tier's non-zero fee
+  // cannot bypass the deliveryCost===0 guard below.
   if (config.driverPaySettings.requiresManualReview) {
     const hcSentinel = config.pricingTiers.find(t =>
       isInTier(headcount, t.headcountMin, t.headcountMax)
     );
-    if (hcSentinel && hcSentinel.regularRate === 0 && hcSentinel.within10Miles === 0
-        && !hcSentinel.regularRatePercent && !hcSentinel.within10MilesPercent) {
+    if (hcSentinel && isSentinelTier(hcSentinel)) {
       checkManualReviewRequired(headcount, config);
     }
   }
@@ -707,6 +740,18 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
       bonusQualifiedPercent,
       bonusQualified
     };
+  }
+
+  // Early sentinel guard — mirror of calculateDeliveryCost's guard.
+  // If the headcount falls in a sentinel pricing tier, fire the
+  // manual-review check before any fee resolution can proceed.
+  if (config.driverPaySettings.requiresManualReview) {
+    const hcSentinel = config.pricingTiers.find(t =>
+      isInTier(headcount, t.headcountMin, t.headcountMax)
+    );
+    if (hcSentinel && isSentinelTier(hcSentinel)) {
+      checkManualReviewRequired(headcount, config);
+    }
   }
 
   // CRITICAL RULE: Direct tip = NO base pay, NO bonus
