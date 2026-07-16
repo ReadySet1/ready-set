@@ -46,11 +46,9 @@ describe("ServedPartners", () => {
     it("renders the main title with correct styling", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We've Proudly Served Top Marketplaces and Companies",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass(
-        "mb-3",
+        "mb-6",
         "text-3xl",
         "font-black",
         "text-gray-800",
@@ -85,9 +83,7 @@ describe("ServedPartners", () => {
     it("uses Montserrat font for title and subtitle", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We've Proudly Served Top Marketplaces and Companies",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       const subtitle = screen.getByText(
         /zerocater, ezcater, google, netflix, apple/i,
       );
@@ -302,7 +298,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const titleSection = screen
-        .getByText("We've Proudly Served Top Marketplaces and Companies")
+        .getByRole("heading", { level: 2 })
         .closest("div");
       expect(titleSection).toHaveClass("mb-4", "text-center");
     });
@@ -322,8 +318,9 @@ describe("ServedPartners", () => {
       const heading = screen.getByRole("heading", { level: 2 });
       expect(heading).toBeInTheDocument();
       expect(heading).toHaveTextContent(
-        "We've Proudly Served Top Marketplaces and Companies",
+        /we've proudly served top marketplaces and/i,
       );
+      expect(heading).toHaveTextContent(/companies/i);
     });
 
     it("all images have descriptive alt text", () => {
@@ -397,9 +394,7 @@ describe("ServedPartners", () => {
     it("applies responsive title sizing", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We've Proudly Served Top Marketplaces and Companies",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass("text-3xl", "md:text-4xl", "lg:text-5xl");
     });
 
@@ -466,7 +461,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const titleSection = screen
-        .getByText("We've Proudly Served Top Marketplaces and Companies")
+        .getByRole("heading", { level: 2 })
         .closest("div");
       expect(titleSection).toHaveClass("mb-4");
 
@@ -522,9 +517,7 @@ describe("ServedPartners", () => {
     it("uses correct font weights for title", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We've Proudly Served Top Marketplaces and Companies",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass("font-black");
     });
 
@@ -540,9 +533,7 @@ describe("ServedPartners", () => {
     it("applies correct text colors", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We've Proudly Served Top Marketplaces and Companies",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       const subtitle = screen.getByText(
         /zerocater, ezcater, google, netflix, apple/i,
       );

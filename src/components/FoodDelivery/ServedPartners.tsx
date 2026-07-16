@@ -72,8 +72,9 @@ const ServedPartners: React.FC = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="mb-3 font-[Montserrat] text-3xl font-black text-gray-800 md:text-4xl lg:text-5xl">
-            We've Proudly Served Top Marketplaces and Companies
+          <h2 className="mb-6 font-[Montserrat] text-3xl leading-[1.8] font-black text-gray-800 md:mb-8 md:text-4xl md:leading-normal lg:text-5xl">
+            We've Proudly Served Top Marketplaces and
+            <span className="mt-1 block md:mt-4">Companies</span>
           </h2>
           <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
             ZeroCater, EzCater, Google, Netflix, Apple
