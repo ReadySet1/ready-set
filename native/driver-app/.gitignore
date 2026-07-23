@@ -1,6 +1,6 @@
-# Capacitor-generated native projects (regenerated via `npx cap add ios/android`)
-/ios/
-/android/
+# Native projects are COMMITTED (hand-applied permissions live in them — a
+# `npx cap add` regen silently wipes those; don't regenerate, sync instead).
+# Build artifacts are excluded by ios/.gitignore and android/.gitignore.
 
 # Dependencies
 /node_modules/

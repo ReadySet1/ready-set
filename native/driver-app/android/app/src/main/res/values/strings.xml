@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ready Set Driver</string>
+    <string name="title_activity_main">Ready Set Driver</string>
+    <string name="package_name">co.readyset.driver</string>
+    <string name="custom_url_scheme">co.readyset.driver</string>
+</resources>
