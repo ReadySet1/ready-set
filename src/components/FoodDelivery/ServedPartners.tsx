@@ -22,22 +22,28 @@ interface PartnerLogo {
 const ServedPartners: React.FC = () => {
   const partners: PartnerLogo[] = [
     {
-      name: "Zerocater",
+      name: "ZeroCater",
       // Use fit to scale up logo while adding white background to remove borders
+      // Horizontal wordmark scaled up to match visual weight of square icon logos
       image: `${getCloudinaryUrl("food/served/zerocater").replace("/f_auto,q_auto/", "/f_auto,q_auto,b_white,w_600,h_600,c_fit/")}`,
-      alt: "Zerocater logo",
+      alt: "ZeroCater logo",
+      containerClassName: "scale-150",
     },
     {
       name: "EzCater",
       // Use fit to scale up logo while adding white background to remove borders
+      // Horizontal wordmark scaled up to match visual weight of square icon logos
       image: `${getCloudinaryUrl("food/served/ezcater").replace("/f_auto,q_auto/", "/f_auto,q_auto,b_white,w_600,h_600,c_fit/")}`,
       alt: "EzCater logo",
+      containerClassName: "scale-150",
     },
     {
       name: "Google",
       // Use fit with consistent dimensions for uniform sizing
+      // Horizontal wordmark scaled up to match visual weight of square icon logos
       image: `${getCloudinaryUrl("food/served/google").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Google logo",
+      containerClassName: "scale-150",
     },
     {
       name: "Netflix",
@@ -45,7 +51,7 @@ const ServedPartners: React.FC = () => {
       // Square icon needs constrained height to match horizontal wordmarks
       image: `${getCloudinaryUrl("food/served/netflix").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Netflix logo",
-      containerClassName: "max-h-16 sm:max-h-20 md:max-h-24 lg:max-h-28",
+      containerClassName: "max-h-20 sm:max-h-24 md:max-h-32 lg:max-h-36",
     },
     {
       name: "Apple",
@@ -66,11 +72,12 @@ const ServedPartners: React.FC = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="mb-3 font-[Montserrat] text-3xl font-black text-gray-800 md:text-4xl lg:text-5xl">
-            We Served the Top Marketplace and Company
+          <h2 className="mb-6 font-[Montserrat] text-3xl leading-[1.8] font-black text-gray-800 md:mb-8 md:text-4xl md:leading-normal lg:text-5xl">
+            We've Proudly Served Top Marketplaces and
+            <span className="mt-1 block md:mt-4">Companies</span>
           </h2>
           <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
-            Zerocater, EzCater, Google, Netflix, Apple
+            ZeroCater, EzCater, Google, Netflix, Apple
           </p>
         </motion.div>
 
@@ -80,7 +87,7 @@ const ServedPartners: React.FC = () => {
             {partners.map((partner, index) => (
               <motion.div
                 key={partner.name}
-                className="flex items-center justify-center px-2 py-4 sm:px-4"
+                className={`flex items-center justify-center px-2 py-4 sm:px-4 ${index === partners.length - 1 ? "col-span-2 md:col-span-1" : ""}`}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -90,7 +97,7 @@ const ServedPartners: React.FC = () => {
                 }}
               >
                 <div
-                  className={`relative h-28 w-full min-w-[160px] max-w-[240px] sm:h-32 md:h-40 lg:h-44 ${partner.containerClassName || ""}`}
+                  className={`relative h-36 w-full min-w-[180px] max-w-[280px] sm:h-40 md:h-48 lg:h-52 ${partner.containerClassName || ""}`}
                 >
                   <Image
                     src={partner.image}
