@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CalculationInputSchema, ConfigurationError, CalculatorError } from '@/types/calculator';
+import { ManualReviewRequiredError } from '@/lib/calculator/delivery-cost-calculator';
 import { createClient } from '@/utils/supabase/server';
 
 const AUTH_TIMEOUT_MS = 3000;
@@ -90,6 +91,15 @@ export async function POST(request: NextRequest) {
     Sentry.captureException(error, {
       tags: { operation: 'calculator-calculate-post' },
     });
+
+    if (error instanceof ManualReviewRequiredError) {
+      return NextResponse.json({
+        success: true,
+        requiresCustomQuote: true,
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     if (error instanceof ConfigurationError || error instanceof CalculatorError) {
       return NextResponse.json(
