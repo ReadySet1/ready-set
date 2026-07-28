@@ -4,8 +4,10 @@
  * Vendor-facing delivery cost estimator. A logged-in VENDOR can estimate
  * their own delivery cost against their own pricing configuration.
  *
- * The config ID is resolved server-side from the caller's profile
- * (company_name → resolveConfigId → DB-first config chain).
+ * The config ID is resolved server-side: profile company_name →
+ * resolveConfigId, then the caller's auth email domain →
+ * resolveConfigIdByEmail, then READY_SET_FOOD_STANDARD. The resolved
+ * ID is loaded through the DB-first config chain.
  *
  * Returns customer-facing fields ONLY — never exposes driver pay, margin,
  * RS fee, or any internal breakdown.
@@ -15,10 +17,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/prisma';
-import { resolveConfigId } from '@/lib/calculator/vendor-config-mapping';
+import { resolveConfigId, resolveConfigIdByEmail } from '@/lib/calculator/vendor-config-mapping';
 import {
   calculateDeliveryCost,
   validateDeliveryCostInput,
+  ManualReviewRequiredError,
 } from '@/lib/calculator/delivery-cost-calculator';
 import {
   getConfiguration,
@@ -220,12 +223,33 @@ export async function POST(request: NextRequest) {
       select: { companyName: true },
     });
 
+    // The auth-layer email (Supabase-verified) — NOT profiles.email, which a
+    // vendor can edit without re-verification and use to self-select another
+    // vendor's pricing profile.
+    const authEmail = auth.context.user.email;
+    const authEmailDomain = authEmail?.toLowerCase().split('@')[1] ?? '(none)';
+
     // 5. Resolve config from company name
     let configId: string | null = null;
     let isFallbackPricing = false;
 
     if (profile?.companyName) {
       configId = resolveConfigId(profile.companyName);
+      if (configId) {
+        console.info(
+          `[vendor-quote] Config resolved via companyName → ${configId}`,
+        );
+      }
+    }
+
+    if (!configId) {
+      // Email-domain fallback (e.g., @tryhungry.com → try-hungry)
+      configId = resolveConfigIdByEmail(authEmail);
+      if (configId) {
+        console.info(
+          `[vendor-quote] Config resolved via auth email domain: @${authEmailDomain} → ${configId}`,
+        );
+      }
     }
 
     if (!configId) {
@@ -238,6 +262,7 @@ export async function POST(request: NextRequest) {
         {
           userId,
           companyName: profile?.companyName ?? '(none)',
+          emailDomain: authEmailDomain,
           resolvedConfigId: configId,
         },
         'warning',
@@ -296,9 +321,9 @@ export async function POST(request: NextRequest) {
       userId: auth.context.user.id,
     });
 
-    // If the engine throws due to a config issue (e.g., manual review required),
+    // If the engine throws due to a manual-review business rule,
     // surface it as a custom-quote scenario rather than a 500
-    if (error instanceof Error && error.message.includes('manual review')) {
+    if (error instanceof ManualReviewRequiredError) {
       return NextResponse.json<VendorQuoteResponse>(CUSTOM_QUOTE_RESPONSE);
     }
 

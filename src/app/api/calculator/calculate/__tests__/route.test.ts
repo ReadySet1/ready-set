@@ -18,6 +18,7 @@ import { POST, GET } from "../route";
 import { createClient } from "@/utils/supabase/server";
 import { CalculatorService } from "@/lib/calculator/calculator-service";
 import { ConfigurationError, CalculatorError } from "@/types/calculator";
+import { ManualReviewRequiredError } from "@/lib/calculator/delivery-cost-calculator";
 import {
   createPostRequest,
   createRequestWithParams,
@@ -287,6 +288,28 @@ describe("/api/calculator/calculate", () => {
       const response = await POST(request);
       const data = await expectValidationError(response);
       expect(data.error).toContain("Calculation failed");
+    });
+
+    it("should return 200 with requiresCustomQuote for ManualReviewRequiredError", async () => {
+      mockCalculatorService.calculate.mockRejectedValue(
+        new ManualReviewRequiredError(
+          "This order requires manual review. Please contact support for a custom quote."
+        )
+      );
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/calculator/calculate",
+        validCalculationData
+      );
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.requiresCustomQuote).toBe(true);
+      expect(data.message).toContain("manual review");
+      expect(data).toHaveProperty("timestamp");
     });
 
     it("should handle generic errors with 500 status", async () => {

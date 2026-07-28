@@ -55,6 +55,25 @@ export function resolveConfigId(vendorName: string): string | null {
   return null;
 }
 
+/** Vendor email domain → config ID (fallback when companyName is missing/unresolvable). */
+const EMAIL_DOMAIN_TO_CONFIG: [string, string][] = [
+  ["tryhungry.com", "try-hungry"],
+];
+
+/**
+ * Resolves a vendor config ID by email domain.
+ * Returns null if no match found.
+ */
+export function resolveConfigIdByEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const domain = email.toLowerCase().trim().split("@")[1];
+  if (!domain) return null;
+  for (const [key, configId] of EMAIL_DOMAIN_TO_CONFIG) {
+    if (domain === key || domain.endsWith(`.${key}`)) return configId;
+  }
+  return null;
+}
+
 /**
  * Returns distinct vendor names from rows that cannot be resolved to a config.
  */
