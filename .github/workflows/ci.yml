@@ -94,7 +94,11 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 2026-07-29: runtime crept past the old 25-min cap after the 7/28 merge batch
+    # (was ~12 min on 7/10). The suite is healthy — 8346 tests pass locally in
+    # ~2.7 min on 10 cores (~27 core-min), which is ~14 min ideal on a 2-core
+    # runner before overhead. Raise the cap instead of masking a hang.
+    timeout-minutes: 40
     # REA-285: Threshold-based enforcement at 95%
 
     steps:
