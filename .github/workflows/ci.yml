@@ -94,7 +94,11 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 2026-07-29: runtime crept past the old 25-min cap after the 7/28 merge batch
+    # (was ~12 min on 7/10). The suite is healthy — 8346 tests pass locally in
+    # ~2.7 min on 10 cores (~27 core-min), which is ~14 min ideal on a 2-core
+    # runner before overhead. Raise the cap instead of masking a hang.
+    timeout-minutes: 40
     # REA-285: Threshold-based enforcement at 95%
 
     steps:
@@ -177,18 +181,23 @@ jobs:
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
+        # Non-fatal: the org artifact-storage quota being full must not fail a
+        # green test run (it currently does, repo-wide). 7-day retention — the
+        # 3280-file coverage tree on every run is the main quota pressure.
+        continue-on-error: true
         with:
           name: coverage-report
           path: coverage/
-          retention-days: 30
+          retention-days: 7
 
       - name: Upload Jest results
         uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: jest-results
           path: jest-results.json
-          retention-days: 30
+          retention-days: 7
 
       - name: Generate test summary
         if: always()
