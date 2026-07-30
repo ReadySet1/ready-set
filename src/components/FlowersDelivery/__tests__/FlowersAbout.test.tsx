@@ -121,7 +121,7 @@ describe("FlowersAbout", () => {
         name: /how our service works/i,
       });
       expect(link).toBeInTheDocument();
-      expect(link).toHaveAttribute("href", "/vendor-hero#vendor-hero");
+      expect(link).toHaveAttribute("href", "/vendor-hero");
     });
   });
 
