@@ -1,14 +1,18 @@
 {
   "title": "Ready Set — Tasks Board",
-  "subtitle": "Action items from the Dev Team Meetings on May 4 – June 1, 2026 — status as of June 1.",
-  "generated": "2026-06-01",
+  "subtitle": "Action items from the Dev Team Meetings (May 4 – Aug 3) + driver walk/drive-test fixes — status as of August 3, 2026 (code-verified cleanup).",
+  "generated": "2026-08-03",
   "sources": [
     "meetings/shared/2026-05-04-dev-team-meeting.md",
     "meetings/shared/2026-05-11-dev-team-meeting.md",
     "meetings/shared/2026-05-11-may4-action-item-review.md",
     "meetings/shared/2026-05-11-weekly-recap.md",
     "meetings/shared/2026-05-19-dev-team-meeting.md",
-    "meetings/shared/2026-06-01-dev-team-meeting.md"
+    "meetings/shared/2026-06-01-dev-team-meeting.md",
+    "meetings/shared/2026-06-08-dev-team-meeting.md",
+    "meetings/shared/2026-06-22-dev-team-meeting.md",
+    "meetings/shared/2026-06-29-dev-team-meeting.md",
+    "meetings/shared/2026-07-13-dev-team-meeting.md"
   ],
   "columns": [
     {
@@ -25,23 +29,60 @@
     },
     {
       "key": "new",
-      "title": "★ New — Jun 1"
+      "title": "★ New"
     }
   ],
   "owners": {
     "emmanuel": "Emmanuel",
     "gary": "Gary",
-    "fernando": "Fernando"
+    "fernando": "Fernando",
+    "mai": "Mai"
   },
   "sourceLabels": {
     "may4": "May 4",
     "may11": "May 11",
     "may19": "May 19",
     "jun1": "June 1",
+    "jun8": "June 8",
+    "jun22": "June 22",
+    "release": "Release",
     "qa": "QA",
-    "catercow": "CaterCow"
+    "catercow": "CaterCow",
+    "walktest": "Walk Test 6/16",
+    "jun29": "June 29",
+    "jul3walk": "Walk Test 7/3",
+    "jul9": "Jul 9 planning",
+    "jul9walk": "Drive Test 7/9",
+    "review": "Code Review",
+    "jul13": "July 13",
+    "jul21": "Jul 21 planning",
+    "aug3": "Aug 3 session"
   },
   "tasks": [
+    {
+      "id": "profile-update-route-unauthenticated",
+      "status": "open",
+      "title": "Secure unauthenticated PUT /api/profile/[id]/update",
+      "owner": "emmanuel",
+      "source": "review",
+      "sourceRef": "#479",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "description": "<code>PUT /api/profile/[id]/update</code> has no auth check (middleware does not run for <code>/api/*</code>) and accepts <code>companyName</code> for <strong>any</strong> profile id. Since companyName resolution outranks the email fallback in the vendor calculator, anyone can assign any pricing profile to any vendor without authentication. Pre-existing; surfaced during PR #479 review. Must gate with <code>withAuth</code> + owner-or-admin ownership check.<br><br><strong>Re-verified 2026-08-03: still unauthenticated</strong> (no <code>withAuth</code>/session read anywhere in the route).<br><br>Mitigating nuance found: the route's handlers are <em>mock stubs</em> (<code>setTimeout</code> + <code>Math.random</code>, no DB writes), so nothing persists today — but it's a live unauthenticated PUT that must be gated or deleted before anyone wires it to real data."
+    },
+    {
+      "id": "vercel-overdue-payment",
+      "status": "done",
+      "title": "Pay overdue Vercel invoice + fix failed payment method",
+      "owner": "mai",
+      "source": "jun29",
+      "tags": [
+        "critical"
+      ],
+      "description": "<strong>$28.38 overdue</strong> on the Vercel team (June 2026 invoice, Open, invoiced Jun 20) with a dashboard warning: <em>Payment failed — pay any open invoices before your account is shut down.</em><br><br><strong>Production (www.readysetllc.com) is still 100% on Vercel</strong> (DNS cutover not done) → a shutdown = production outage, same class as the 6/1 Hetzner billing null-route.<br><br>Root cause = a failed payment method (~$20/mo history, all paid before June). Steps: (1) pay the $28.38 open invoice now; (2) update/fix the payment method (Vercel → Settings → Billing).<br><br><strong>Mai manages the payment methods</strong> — confirm she can update it, else Emmanuel/Gary. Surfaced 6/29 via screenshot."
+    },
     {
       "id": "report-twilio-costs",
       "status": "done",
@@ -80,32 +121,32 @@
     },
     {
       "id": "coolfire-bridge-api",
-      "status": "progress",
+      "status": "open",
       "title": "Internal Website → Google Sheet → Coolfire bridge API",
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#8",
       "tags": [
-        "critical"
+        "moot"
       ],
-      "description": "Largest open item. Coolfire export still requires the Google Sheet hop until this lands. Blocks the July Coolfire sunset."
+      "description": "<strong>Superseded 2026-08-03:</strong> the Coolfire-sunset replacement path chosen at the 7/9–7/13 meetings is the <strong>sheet → orders import</strong> (<code>sheet-orders-sync</code> + <code>sheet-sync-decision-proof-prep</code>), pulling drives from the COOLFIRE MASTER UPLOAD sheet into our orders system — not a bridge API.<br><br>Keeping this card only until the import ships; if a direct Coolfire API integration ever revives, re-scope it then (see also <code>coolfire-api-docs</code>)."
     },
     {
       "id": "driver-tracking-sync",
-      "status": "progress",
+      "status": "done",
       "title": "Resolve driver tracking sync issues",
       "owner": "emmanuel",
       "source": "may11",
-      "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections. Prioritize distance calculations before map drawing. <strong>Jun 1 update:</strong> tracking-error code is fixed; verification testing scheduled across this week."
+      "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections.<br><br><strong>CLOSED 2026-08-03 as superseded:</strong> the May-era sync issues were absorbed and resolved by the subsequent tracking workstream — realtime channel fixes (#409/#410), the driver authz/tracking overhaul (#441), and the June–July walk/drive-test PR series (#446, #460, #475–#477, #483–#485).<br><br>Remaining known realtime gaps are tracked specifically: <code>rea-367b-realtime-strictmode-resubscribe</code> (dev-only) and <code>rea-344-assign-driver-broadcast</code>."
     },
     {
       "id": "driver-phone-storage",
-      "status": "progress",
+      "status": "done",
       "title": "Decide driver phone storage (Sheet vs DB profile)",
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#1",
-      "description": "Blocks the Google Sheet automation thread."
+      "description": "Blocks the Google Sheet automation thread.<br><br><strong>DECIDED 7/13 meeting: DB profile / web app.</strong> The Coolfire master uploader will NOT be modified (operational risk); driver phone + ID fields are added in the web app instead — tracked as <code>webapp-driver-client-id-phone-fields</code>. SMS send lists therefore come from DB profiles."
     },
     {
       "id": "coolfire-api-docs",
@@ -184,7 +225,7 @@
       "tags": [
         "bug"
       ],
-      "description": "DELETE /api/orders/delete performs hard delete instead of soft-delete. Schema gaps: <code>Dispatch.deletedAt</code> and <code>deletedBy</code> missing. Promoted from QA fail on test REA-OMG-06."
+      "description": "DELETE /api/orders/delete performs hard delete instead of soft-delete. Schema gaps: <code>Dispatch.deletedAt</code> and <code>deletedBy</code> missing. Promoted from QA fail on test REA-OMG-06.<br><br><strong>Re-verified 2026-08-03: still broken</strong> — <code>tx.dispatch.deleteMany</code>/<code>tx.cateringRequest.delete</code> hard-delete in the transaction; <code>Dispatch</code> model still has no <code>deletedAt</code>/<code>deletedBy</code>."
     },
     {
       "id": "rea-343-bulk-delete-defects",
@@ -197,7 +238,7 @@
       "tags": [
         "bug"
       ],
-      "description": "6 defects in <code>src/app/api/orders/bulk-delete/route.ts</code>: hard delete instead of soft, wrong S3 bucket name, BUCKET_NAME shadowed, path extraction fallback orphans files, storage errors swallowed, no orphan tracking. Promoted from QA fail on test REA-OMG-07."
+      "description": "6 defects in <code>src/app/api/orders/bulk-delete/route.ts</code>: hard delete instead of soft, wrong S3 bucket name, BUCKET_NAME shadowed, path extraction fallback orphans files, storage errors swallowed, no orphan tracking. Promoted from QA fail on test REA-OMG-07.<br><br><strong>Re-verified 2026-08-03: all 6 defects still present</strong> (rollback <code>throw</code>s still commented out; local <code>BUCKET_NAME = \"order-files\"</code> still targets a nonexistent bucket)."
     },
     {
       "id": "rea-344-assign-driver-broadcast",
@@ -210,7 +251,7 @@
       "tags": [
         "bug"
       ],
-      "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload. Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08."
+      "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload.<br><br>Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08.<br><br><strong>Re-verified 2026-08-03: still broken</strong> — <code>broadcastDeliveryAssigned</code>'s only references are its unit tests; the assignDriver route's only post-assign side effect is the partner webhook."
     },
     {
       "id": "rea-drt-07-supabase-browser-session-bridge",
@@ -223,39 +264,7 @@
         "bug",
         "critical"
       ],
-      "description": "<strong>DONE — shipped in PR #409 (merged 2026-05-22), live on apex via #412.</strong> Remaining: confirm Sentry READY-SET-NEXTJS-1S goes silent with an authenticated apex check. <strong>Root cause (investigated 2026-05-19):</strong> server-side cookie defaults force <code>httpOnly: true</code> on every cookie they write — including the <code>sb-&lt;ref&gt;-auth-token</code> chunks. <code>src/utils/supabase/server.ts:10-16</code> and <code>src/utils/supabase/middleware.ts:6-12</code> both define <code>{ httpOnly: true, ...options }</code> defaults, and <code>@supabase/ssr</code> doesn't override <code>httpOnly</code>, so the auth cookies land HttpOnly. The browser supabase-js client (<code>src/utils/supabase/client.ts:19-28</code>) reads cookies via <code>document.cookie</code>, which by spec cannot see HttpOnly cookies — so <code>getSession()</code> returns null, Realtime channels never authenticate, and <code>TokenRefreshService</code> throws <code>REFRESH_FAILED</code> (the symptom #404 patched as graceful failure). Regression introduced in commit <code>f49f6ec5</code> (2026-01-07 mobile-Safari ITP fix); the <code>sameSite: 'lax'</code> + request+response sync changes in that commit were correct, only <code>httpOnly: true</code> was wrong. <strong>Fix:</strong> drop <code>httpOnly: true</code> from <code>getDefaultCookieOptions</code> (server.ts) and <code>getCookieOptions</code> (middleware.ts); auth cookies must be JS-readable for the <code>@supabase/ssr</code> SSR↔browser bridge. ~2-line change in 2 files. Add a browser <code>getSession()</code> smoke test in <code>src/lib/auth/__tests__/token-refresh-and-session.test.ts</code> that fails if auth cookies are written HttpOnly. <strong>Tradeoff:</strong> XSS-exfiltrable auth tokens in principle; mitigated by existing CSP + dompurify + Supabase's short-lived JWT + refresh-token rotation. <strong>Keep #404 patch in place</strong> — graceful sign-in redirect on legitimate session expiry is still correct behavior. <strong>Out of scope:</strong> Realtime reconnect handler (see <code>docs/architecture/REMEDIATION_PLAN.md</code>). See <code>docs/JOURNAL.md</code> 2026-05-19 for full trace."
-    },
-    {
-      "id": "test-telnyx-integration",
-      "status": "new",
-      "title": "Test Telnyx Integration",
-      "owner": "emmanuel",
-      "source": "may11",
-      "description": "Verify the new vendor works correctly with the existing codebase."
-    },
-    {
-      "id": "email-telnyx-details",
-      "status": "new",
-      "title": "Email Telnyx provider details",
-      "owner": "emmanuel",
-      "source": "may11",
-      "description": "Send Gary the information regarding the alternative telecom vendor Telnyx."
-    },
-    {
-      "id": "calc-porting-costs",
-      "status": "new",
-      "title": "Calculate 5-line porting/migration costs",
-      "owner": "emmanuel",
-      "source": "may11",
-      "description": "Determine the total fee required for porting 5 lines to the new platform."
-    },
-    {
-      "id": "research-phone-segmentation",
-      "status": "new",
-      "title": "Research phone segmentation by marketplace",
-      "owner": "emmanuel",
-      "source": "may11",
-      "description": "Investigate groups/dividers to organize marketplaces inside the comms provider. Goal: consolidate 5 lines → 3."
+      "description": "<strong>DONE — shipped in PR #409 (merged 2026-05-22), live on apex via #412.</strong> Remaining: confirm Sentry READY-SET-NEXTJS-1S goes silent with an authenticated apex check.<br><br><strong>Root cause (investigated 2026-05-19):</strong> server-side cookie defaults force <code>httpOnly: true</code> on every cookie they write — including the <code>sb-&lt;ref&gt;-auth-token</code> chunks. <code>src/utils/supabase/server.ts:10-16</code> and <code>src/utils/supabase/middleware.ts:6-12</code> both define <code>{ httpOnly: true, ...options }</code> defaults, and <code>@supabase/ssr</code> doesn't override <code>httpOnly</code>, so the auth cookies land HttpOnly. The browser supabase-js client (<code>src/utils/supabase/client.ts:19-28</code>) reads cookies via <code>document.cookie</code>, which by spec cannot see HttpOnly cookies — so <code>getSession()</code> returns null, Realtime channels never authenticate, and <code>TokenRefreshService</code> throws <code>REFRESH_FAILED</code> (the symptom #404 patched as graceful failure). Regression introduced in commit <code>f49f6ec5</code> (2026-01-07 mobile-Safari ITP fix); the <code>sameSite: 'lax'</code> + request+response sync changes in that commit were correct, only <code>httpOnly: true</code> was wrong.<br><br><strong>Fix:</strong> drop <code>httpOnly: true</code> from <code>getDefaultCookieOptions</code> (server.ts) and <code>getCookieOptions</code> (middleware.ts); auth cookies must be JS-readable for the <code>@supabase/ssr</code> SSR↔browser bridge. ~2-line change in 2 files. Add a browser <code>getSession()</code> smoke test in <code>src/lib/auth/__tests__/token-refresh-and-session.test.ts</code> that fails if auth cookies are written HttpOnly.<br><br><strong>Tradeoff:</strong> XSS-exfiltrable auth tokens in principle; mitigated by existing CSP + dompurify + Supabase's short-lived JWT + refresh-token rotation. <strong>Keep #404 patch in place</strong> — graceful sign-in redirect on legitimate session expiry is still correct behavior.<br><br><strong>Out of scope:</strong> Realtime reconnect handler (see <code>docs/architecture/REMEDIATION_PLAN.md</code>). See <code>docs/JOURNAL.md</code> 2026-05-19 for full trace."
     },
     {
       "id": "update-hours-sheet",
@@ -291,11 +300,11 @@
     },
     {
       "id": "catercow-webhook-preconfigure",
-      "status": "progress",
+      "status": "done",
       "title": "Pre-configure CaterCow staging webhook URL",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "Dispatcher code is shipped (<code>catercow-dispatcher-refactor</code>); <code>scripts/set-partner-webhook.ts</code> is ready. Remaining (ops): run against staging to set CaterCow's <code>webhook_url</code> = <code>https://api.staging.steerdelivery.com/webhooks/ready_set</code> and a generated secret. CaterCow dev row exists (CC-, active, url/secret still null → dispatcher logs <code>[partner-webhook] skipped</code> until set)."
+      "description": "<strong>Done.</strong> Staging webhook configured on rs-dev via <code>scripts/set-partner-webhook.ts</code>: CaterCow <code>webhook_url</code> = <code>https://api.staging.steerdelivery.com/webhooks/ready_set</code> + a 256-bit secret. Dispatcher fires signed callbacks — verified live (2/2 advances persisted after the <code>after()</code> fix, PR #468)."
     },
     {
       "id": "catercow-dispatcher-refactor",
@@ -303,15 +312,15 @@
       "title": "Generalize outbound webhook dispatcher (partner-registry-driven)",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "<strong>Built</strong> on <code>feature/catercow-partner-webhooks</code> (commit <code>50d78873</code>, off <code>development</code>). New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the resolved <code>api_partners</code> row; builds the contract payload, HMAC-SHA256 signs it (<code>x-readyset-signature</code>), 3-attempt backoff (no retry on 4xx), skips with a logged notice when unconfigured. <code>recordAndDispatchLifecycleEvent</code> writes history + dispatches, self-guarding against <code>CARRIER_CONFIGS</code> and non-partner orders. Added <code>getPartnerByOrderNumber</code> (registry, prefix-match, cached). Wired into the driver status route (<code>driverStatus</code>→ASSIGNED/PICKED_UP/ON_THE_WAY/ARRIVED/DELIVERED) and the confirm cancel branch (CANCELLED). 7 unit tests green."
+      "description": "<strong>Built</strong> on <code>feature/catercow-partner-webhooks</code> (commit <code>50d78873</code>, off <code>development</code>). New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the resolved <code>api_partners</code> row; builds the contract payload, HMAC-SHA256 signs it (<code>x-readyset-signature</code>), 3-attempt backoff (no retry on 4xx), skips with a logged notice when unconfigured.<br><br><code>recordAndDispatchLifecycleEvent</code> writes history + dispatches, self-guarding against <code>CARRIER_CONFIGS</code> and non-partner orders. Added <code>getPartnerByOrderNumber</code> (registry, prefix-match, cached).<br><br>Wired into the driver status route (<code>driverStatus</code>→ASSIGNED/PICKED_UP/ON_THE_WAY/ARRIVED/DELIVERED) and the confirm cancel branch (CANCELLED). 7 unit tests green."
     },
     {
       "id": "catercow-hmac-secret",
-      "status": "progress",
+      "status": "done",
       "title": "Generate + deliver CaterCow webhook HMAC secret",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "Generation + delivery now handled by <code>scripts/set-partner-webhook.ts</code> (generates a 256-bit secret, prints once for 1Password). Run: <code>PARTNER_SLUG=catercow WEBHOOK_URL=https://api.staging.steerdelivery.com/webhooks/ready_set DATABASE_URL=$STAGING_DATABASE_URL pnpm tsx scripts/set-partner-webhook.ts</code>, capture secret → 1Password → share with Nate. Trigger: their staging endpoint reachable (Nate says it's ready)."
+      "description": "<strong>Done.</strong> 256-bit secret generated via <code>scripts/set-partner-webhook.ts</code> and <strong>delivered to Nate (CaterCow) on 2026-06-29</strong> with the corrected integration email. Now waiting on Nate's staging sign-off → then prod go-live."
     },
     {
       "id": "catercow-steerdelivery-domain-check",
@@ -327,7 +336,7 @@
       "title": "GET /orders/{id} for partner API",
       "owner": "emmanuel",
       "source": "catercow",
-      "description": "<strong>Built</strong> (commit <code>50d78873</code>). <code>GET /api/partners/orders/{id}</code> (+ cater-valley alias) returns current status + last 10 lifecycle events from the new <code>order_status_history</code> table, with the same partner-ownership check as the writes. Backed by migration <code>20260605000000_add_order_status_history</code> (applied to dev Supabase). 6 endpoint tests green."
+      "description": "<strong>Built</strong> (commit <code>50d78873</code>). <code>GET /api/partners/orders/{id}</code> (+ cater-valley alias) returns current status + last 10 lifecycle events from the new <code>order_status_history</code> table, with the same partner-ownership check as the writes.<br><br>Backed by migration <code>20260605000000_add_order_status_history</code> (applied to dev Supabase). 6 endpoint tests green."
     },
     {
       "id": "catercow-openapi-export",
@@ -351,7 +360,7 @@
       "title": "Redesign address manager",
       "owner": "fernando",
       "source": "may19",
-      "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders. <strong>DONE — shipped in PR #417 (merged 2026-05-25):</strong> AddressSelector redesigned with RouteBuilder, MiniMap & geocoding + mobile-responsive pass; CateringRequestForm unified to a single AddressSelector. Superseded the original 3-proposal-review-with-Iman approach by shipping the redesign directly."
+      "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders.<br><br><strong>DONE — shipped in PR #417 (merged 2026-05-25):</strong> AddressSelector redesigned with RouteBuilder, MiniMap & geocoding + mobile-responsive pass; CateringRequestForm unified to a single AddressSelector. Superseded the original 3-proposal-review-with-Iman approach by shipping the redesign directly."
     },
     {
       "id": "push-jitter-dev-code",
@@ -370,15 +379,15 @@
       "tags": [
         "critical"
       ],
-      "description": "Real-world test with Gary + Mark on Thursday 2026-05-21. Monitor logs, identify + resolve errors. Co-owners: Fernando (testing), Gary (field). First step of the 3-week phased rollout (2–3 drivers at a time) leading to the July Cool Fire sunset. <strong>Jun 1 update:</strong> device testing on Android + Apple ran (week of May 29); surfaced a refresh-rate issue. Continued testing tracked under <code>mobile-refresh-rate-testing</code>."
+      "description": "Real-world test with Gary + Mark on Thursday 2026-05-21. Monitor logs, identify + resolve errors. Co-owners: Fernando (testing), Gary (field). First step of the 3-week phased rollout (2–3 drivers at a time) leading to the July Cool Fire sunset.<br><br><strong>Jun 1 update:</strong> device testing on Android + Apple ran (week of May 29); surfaced a refresh-rate issue. Continued testing tracked under <code>mobile-refresh-rate-testing</code>."
     },
     {
       "id": "gary-review-hours-file",
-      "status": "new",
+      "status": "done",
       "title": "Review Google hours file tonight",
       "owner": "gary",
       "source": "may19",
-      "description": "Review the updated hours sheet tonight; contact Emmanuel with any questions before the next scheduled meeting."
+      "description": "Review the updated hours sheet tonight; contact Emmanuel with any questions before the next scheduled meeting. <strong>CLOSED 2026-08-03 as stale/overtaken:</strong> weekly invoicing has run continuously since (invoices through July settled) with no open questions on the hours file."
     },
     {
       "id": "vendor-multi-pickup-support",
@@ -416,7 +425,7 @@
         "bug",
         "critical"
       ],
-      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical). <strong>DONE (PR #410, merged 2026-05-22, live via #412):</strong> fixed in PR #410 (stable broadcast dispatcher; removed the phantom <code>channel.off()</code> + its <code>.d.ts</code> augmentation; 38 tests). The TypeError + cleanup WARN are verified gone. The remaining subscribe→close (StrictMode) is split to <code>rea-367b-realtime-strictmode-resubscribe</code>."
+      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later.<br><br><strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal).<br><br>Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical).<br><br><strong>DONE (PR #410, merged 2026-05-22, live via #412):</strong> fixed in PR #410 (stable broadcast dispatcher; removed the phantom <code>channel.off()</code> + its <code>.d.ts</code> augmentation; 38 tests). The TypeError + cleanup WARN are verified gone. The remaining subscribe→close (StrictMode) is split to <code>rea-367b-realtime-strictmode-resubscribe</code>."
     },
     {
       "id": "rea-367b-realtime-strictmode-resubscribe",
@@ -429,7 +438,7 @@
       "tags": [
         "bug"
       ],
-      "description": "Split from REA-367. After the <code>channel.off</code> fix (PR #410), the admin <code>driver-locations</code> channel still reaches <code>subscribed</code> then closes ~1ms later in dev and does not re-subscribe. Root cause is a React <strong>StrictMode</strong> double-invoke race in <code>useAdminRealtimeTracking</code> (<code>src/hooks/tracking/useAdminRealtimeTracking.ts:512-534</code>): mount 1's deferred <code>.then</code> cleanup (lines 518-523) calls <code>removeChannel('driver-locations')</code> on the channel mount 2 established (the RealtimeClient dedups by channel name), tearing it down with no re-subscribe. StrictMode double-invoke is <strong>dev-only</strong>, so production single-mount is unaffected — but it blocks dev/QA (DRT-06+). <strong>Fix direction:</strong> ref-count or guard the shared channel so a stale mount's cleanup can't remove a channel a live mount owns (or key channels per-subscriber). Verify on <code>development.readysetllc.com</code> (prod build, no StrictMode double-invoke) after #410 merges. Found during #410 verification on 2026-05-20."
+      "description": "Split from REA-367. After the <code>channel.off</code> fix (PR #410), the admin <code>driver-locations</code> channel still reaches <code>subscribed</code> then closes ~1ms later in dev and does not re-subscribe.<br><br>Root cause is a React <strong>StrictMode</strong> double-invoke race in <code>useAdminRealtimeTracking</code> (<code>src/hooks/tracking/useAdminRealtimeTracking.ts:512-534</code>): mount 1's deferred <code>.then</code> cleanup (lines 518-523) calls <code>removeChannel('driver-locations')</code> on the channel mount 2 established (the RealtimeClient dedups by channel name), tearing it down with no re-subscribe. StrictMode double-invoke is <strong>dev-only</strong>, so production single-mount is unaffected — but it blocks dev/QA (DRT-06+).<br><br><strong>Fix direction:</strong> ref-count or guard the shared channel so a stale mount's cleanup can't remove a channel a live mount owns (or key channels per-subscriber). Verify on <code>development.readysetllc.com</code> (prod build, no StrictMode double-invoke) after #410 merges. Found during #410 verification on 2026-05-20.<br><br><strong>Re-verified 2026-08-03: still broken</strong> — no generation/instance guard; <code>isMountedRef</code> is a one-way latch (never reset on remount), and the deferred <code>.then</code> cleanups still unsubscribe <code>channelRef.current</code> instead of the captured local channel."
     },
     {
       "id": "migrate-vercel-to-vps",
@@ -440,7 +449,7 @@
       "tags": [
         "critical"
       ],
-      "description": "<strong>Decision aligned Jun 1.</strong> Vercel now bills per-deployment (cost creep; $24 pending) and has had security issues; consolidate all live websites + tracking apps onto a single Hetzner VPS for cost control, performance, and direct management (~5 hrs/month maintenance). In progress on branch <code>chore/self-host-image-envs</code> (CI builds the prod image → GHCR). See <code>docs/STATUS.md</code> → infra."
+      "description": "<strong>Decision aligned Jun 1, reaffirmed Jun 8.</strong> Vercel bills per-deployment (cost creep ~$17–24/mo) and has had security issues; consolidate all live websites + tracking apps onto a single Hetzner VPS for cost control, performance, and direct management (~5 hrs/month maintenance).<br><br><strong>Jun 18 status: the build half is DONE</strong> — every push builds a multi-arch (amd64+arm64) image to GHCR via GitHub Actions (replaces Vercel's billed <code>next build</code>); control plane is Dokploy on the ARM box. <strong>Remaining = deploy side only:</strong> create the Dokploy app from the GHCR image → runtime env from Vercel → <code>/api/health</code> → DNS cutover (keep Vercel 24–48h rollback) → <strong>then cancel the Vercel subscription next billing cycle</strong> (the Jun 8 action item). DB stays on managed Supabase (no data migration).<br><br><strong>Jun 22 update:</strong> Emmanuel finalizing the migration — ~2–3 hrs of work left, will notify Gary when it's done. See <code>docs/STATUS.md</code> → infra.<br><br><strong>7/13 meeting: cutover CONFIRMED GO</strong> — dev mirror live at <code>preview.readysetllc.com</code> with push-to-live (#473/#474); plan is parallel run in both places, DNS/domain switch at the final stage (no downtime). Remaining: prod app on the box, DNS switch, off-host backups + uptime monitoring.<br><br><strong>2026-08-03: FULL migration plan + cutover runbook + comms drafts written</strong> — <code>docs/ready-set/specs/2026-08-03-vercel-dokploy-cutover-plan.md</code>. Phase 0 preconditions (uptime monitoring, off-host backups, billing alarms, TTL prep) gate the prod cutover; Hetzner billing fixed same day (autopay on card).<br><br>⚠️ Boxes reactivated by payment but services not yet reachable (443 resets, SSH times out) — check Hetzner console: servers may need manual Power-on after suspension."
     },
     {
       "id": "migrate-error-tracking-self-host",
@@ -456,18 +465,25 @@
       "title": "Mandatory driver photo + signature capture",
       "owner": "emmanuel",
       "source": "jun1",
-      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability."
+      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration."
+    },
+    {
+      "id": "driver-pickup-signature",
+      "status": "done",
+      "title": "Signature capture at vendor pickup (restaurant staff)",
+      "owner": "emmanuel",
+      "source": "jun22",
+      "sourceRef": "#459",
+      "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/459\">#459</a> MERGED to <code>development</code> 2026-06-24 (all CI green).</strong><br><br>In-app signature pad (<code>signature_pad</code> canvas) gating <code>ARRIVED_AT_VENDOR → PICKED_UP</code>, mirroring the POD gate at delivery. New <code>SignatureCapture</code> + <code>DriverSignatureSheet</code> + <code>POST /api/orders/[order_number]/signature</code> (FileUpload <code>category='pickup_signature'</code> + non-fatal mirror to <code>deliveries.pickup_signature_url</code>, new migration). Manual restaurant-staff signature, NOT DocuSign. Split out of <code>driver-photo-signature-required</code> (which keeps the photo requirements + completion-stage signature).<br><br><strong>Ops (DONE 2026-06-24):</strong> migration <code>20260623000000_add_pickup_signature</code> applied + recorded in <code>_prisma_migrations</code> on dev (earlier) and <strong>prod</strong> (via the Supabase MCP, sha256 <code>014f9173…</code>, during the #463 sync) — <code>deliveries.pickup_signature_url</code> now exists on both. Migrations here are <strong>manual</strong>, not auto-applied on deploy.<br><br><strong>Follow-up:</strong> offline queue for poor-signal vendors; Claude Design polish pass."
     },
     {
       "id": "mobile-refresh-rate-testing",
-      "status": "progress",
+      "status": "done",
       "title": "Fix mobile refresh-rate issue + continue device testing",
       "owner": "emmanuel",
       "source": "jun1",
-      "tags": [
-        "bug"
-      ],
-      "description": "Android + Apple device testing (week of May 29) surfaced a refresh-rate issue in the driver/tracking UI. Fix it and run further functional-error testing across this week. Co-owners: Fernando (testing), Gary (field screenshots)."
+      "tags": [],
+      "description": "Android + Apple device testing (week of May 29) surfaced a refresh-rate issue in the driver/tracking UI.<br><br><strong>CLOSED 2026-08-03 as superseded:</strong> the refresh fix landed with the polling-feed rework (#437) and device testing continued through the real-device walk/drive-test rounds (6/16 CDMX, 6/22, 7/3, 7/9). Ongoing device testing is now <code>web-mobile-test-round1</code> (Fernando, iPhone X)."
     },
     {
       "id": "dashboard-redesign-helpdesk",
@@ -479,19 +495,11 @@
     },
     {
       "id": "gary-email-cater-client",
-      "status": "new",
+      "status": "done",
       "title": "Email CaterCow re: API endpoint + timeline",
-      "owner": "gary",
-      "source": "jun1",
-      "description": "No recent updates from CaterCow on their webhook/API endpoint or testing. Gary to email (referencing the May 13 correspondence) requesting an update and pushing them to proceed to production. Unblocks the CaterCow webhook work (<code>catercow-webhook-preconfigure</code>, <code>catercow-hmac-secret</code>)."
-    },
-    {
-      "id": "emmanuel-forward-cater-email",
-      "status": "new",
-      "title": "Forward prior CaterCow correspondence to Gary",
       "owner": "emmanuel",
       "source": "jun1",
-      "description": "Forward the previous CaterCow email thread to Gary so he can follow up (see <code>gary-email-cater-client</code>)."
+      "description": "<strong>Done — Emmanuel sent it 2026-06-29.</strong> Rather than just chase them, Emmanuel completed the full staging integration (PRs #467/#468/#469, verified live) and sent Nate the corrected full-sequence email + the signing secret. Now waiting on Nate's sign-off → then prod go-live (prod key + prod webhook + sync dev→main)."
     },
     {
       "id": "gary-screenshot-layout-errors",
@@ -515,8 +523,481 @@
       "owner": "emmanuel",
       "source": "catercow",
       "title": "Durable webhook retry queue (fast-follow)",
-      "description": "v1 dispatcher does in-request retries (3 attempts, short backoff). The contract promises “5 attempts over ~30 min”, which needs a queue/cron, not in-request retries. Build a <code>partner_webhook_deliveries</code> table + cron worker on top of the existing <code>order_status_history</code> table. Not a go-live blocker — missed callbacks are recoverable via <code>GET /orders/{id}</code>.",
+      "description": "v1 dispatcher does in-request retries (3 attempts, short backoff). The contract promises “5 attempts over ~30 min”, which needs a queue/cron, not in-request retries. Build a <code>partner_webhook_deliveries</code> table + cron worker on top of the existing <code>order_status_history</code> table.<br><br>Not a go-live blocker — missed callbacks are recoverable via <code>GET /orders/{id}</code>.",
       "tags": []
+    },
+    {
+      "id": "walk-test-fixes-pr1",
+      "status": "done",
+      "title": "Driver walk-test PR1 — POD upload, end-shift guard, Connecting, labels, empty states",
+      "owner": "emmanuel",
+      "source": "walktest",
+      "sourceRef": "#446",
+      "tags": [
+        "bug"
+      ],
+      "description": "<strong>DONE — PR #446 merged 2026-06-16.</strong><br><br>Blocking-bug fixes from the first real-device GPS walk test (CDMX): POD photo upload was 500-ing on dead <code>proof_of_delivery</code>/<code>metadata</code> columns (now <code>delivery_photo_url</code>); a failed photo no longer traps the driver (\"Complete anyway — upload later\" via the offline queue); <code>endDriverShift</code> blocks while active deliveries remain (admin force); the admin order page is no longer stuck on \"Connecting…\" (pre-auth <code>getSession()</code> + 12s timeout, REA-DRT-07 class); \"Resto\"→\"Restaurant\" + \"Awaiting start\" labels; empty-state \"—\" fallbacks. Triage: <code>docs/issues-tracker/README.md</code>.<br><br><strong>Continue tomorrow:</strong> <code>walk-test-pr2</code> (perf + background-GPS + location persistence), <code>driver-photo-signature-required</code> (signature, awaiting design), the dead-column follow-up in the rest of <code>/api/tracking/deliveries/*</code>, and <code>npm-audit-ci-red</code>."
+    },
+    {
+      "id": "walk-test-pr2",
+      "status": "open",
+      "title": "Driver walk-test PR2 — remaining perf slice (60s poll + refetch consolidation)",
+      "owner": "emmanuel",
+      "source": "walktest",
+      "tags": [],
+      "description": "<strong>Rescoped 2026-08-03 — 2 of the 3 original items shipped since.</strong><br><br>(1) <strong>Location persistence: DONE</strong> — the driver GPS path now dual-writes (POST <code>/api/tracking/locations</code> → <code>driver_locations</code> AND realtime broadcast) and the offline queue flushes before shift-end (#460).<br><br>(2) <strong>Background/visibility: DONE</strong> — watchPosition re-arm + wake lock (#460), native re-arm recovery (#471).<br><br>(3) <strong>Perf: REMAINING</strong> — <code>useDriverDeliveriesFeed</code> still has the 60s <code>setInterval</code> poll + visibilitychange refetch (the spinner-replace half is fixed: refetches keep the list rendered, and an <code>inFlight</code> guard prevents overlap). Residual: consolidate driver-home mount fetches; a failed poll sets <code>error</code> over stale data; no request cancellation on unmount. Low urgency."
+    },
+    {
+      "id": "npm-audit-ci-red",
+      "status": "done",
+      "title": "NPM Security Audit CI failing (15 high > threshold 10)",
+      "owner": "emmanuel",
+      "source": "walktest",
+      "tags": [
+        "bug"
+      ],
+      "description": "<strong>DONE — PR #448 (merged 2026-06-17) cleared npm-audit HIGH 13 → 0 via pnpm overrides; CI Security gate green.</strong><br><br>Was: the <code>Security / NPM Security Audit</code> check failed on every PR (incl. #446) — <code>pnpm audit</code> reported high-severity transitive vulns and the job hard-fails when high > 10 (<code>.github/workflows/security.yml</code>); pre-existing & repo-wide, not introduced by any feature PR."
+    },
+    {
+      "id": "hire-robert-qa",
+      "status": "new",
+      "title": "Hire Robert for QA testing",
+      "owner": "gary",
+      "source": "jun8",
+      "description": "<strong>Decision aligned Jun 8.</strong> Robert approved for hire to handle QA testing (Emmanuel has worked with him before — more proactive than Fernando). Gary to contact Mark to authorize bringing him on. Pairs with the 35–40 hr/wk budget under Emmanuel's management (<code>manage-dev-budget</code>) and Fernando's transition out of the dev role."
+    },
+    {
+      "id": "manage-dev-budget",
+      "status": "progress",
+      "title": "Manage 35–40 hr/wk dev budget + delegate to Robert",
+      "owner": "emmanuel",
+      "source": "jun8",
+      "description": "<strong>Decision aligned Jun 8.</strong> Emmanuel steps into an IT-management role: total dev budget set to <strong>35–40 hrs/week</strong> (supersedes the Jun 1 \"25–30 hrs/wk\"), with autonomy to split hours between himself and Robert. Goal: build budgeting, time-management, and delegation skills."
+    },
+    {
+      "id": "cancel-cursor-subscription",
+      "status": "new",
+      "title": "Cancel corporate Cursor subscription",
+      "owner": "emmanuel",
+      "source": "jun8",
+      "description": "Deactivate the corporate Cursor service subscription (cost optimization). Standalone action item from Jun 8."
+    },
+    {
+      "id": "propose-ai-solutions",
+      "status": "new",
+      "title": "Research + propose AI integration opportunities",
+      "owner": "emmanuel",
+      "source": "jun8",
+      "description": "Identify areas where AI can improve company operations and present the suggestions to Gary. Part of the broader Jun 8 AI-integration push (see <code>ai-driver-location-matching</code>)."
+    },
+    {
+      "id": "ai-driver-location-matching",
+      "status": "open",
+      "title": "AI driver↔location matching + automated weekly reporting",
+      "owner": "emmanuel",
+      "source": "jun8",
+      "description": "Gary's AI-logistics initiative: use AI to correlate drive data, match drivers to locations, and automate weekly reporting. A Gemini \"Gem\" was started (by others) to correlate drive data + flag errors. Scope the Ready Set-side integration."
+    },
+    {
+      "id": "schedule-ai-consult-meetings",
+      "status": "new",
+      "title": "Schedule weekly 2-hr tech / AI consultation sessions",
+      "owner": "gary",
+      "source": "jun8",
+      "description": "Recurring 2-hr/week technology + AI consultation / knowledge-sharing sessions (Gary + Emmanuel). Co-owned with Emmanuel. Includes Emmanuel training Gary on Claude Code."
+    },
+    {
+      "id": "nonprofit-financial-ed-consulting",
+      "status": "new",
+      "title": "Consult on Gary's nonprofit (financial-education site)",
+      "owner": "emmanuel",
+      "source": "jun8",
+      "description": "<strong>Decision aligned Jun 8.</strong> ~2 hrs/week guiding Gary's one-off nonprofit financial-education website (built from scratch), reusing Ready Set's client / user-acquisition frameworks + AI."
+    },
+    {
+      "id": "gary-review-james-docs",
+      "status": "open",
+      "title": "Review James's documents + provide feedback",
+      "owner": "gary",
+      "source": "jun8",
+      "description": "Analyze the documents James provided and give feedback (Gary committed \"by tomorrow\" on Jun 8; was delayed by the Will lawsuit). Relates to the James order-processing pilot (<code>contact-james-trial</code>, <code>james-payment-plan</code>)."
+    },
+    {
+      "id": "gary-file-lawsuit-will",
+      "status": "open",
+      "title": "File lawsuit against Will (flower shop)",
+      "owner": "gary",
+      "source": "jun8",
+      "description": "Submit the lawsuit against Will from the flower shop (Gary committed to file by end of week on Jun 8). Business / legal action item — tracked for completeness."
+    },
+    {
+      "id": "persistent-gps-background",
+      "status": "progress",
+      "title": "Persistent background GPS (Waze/Maps-style, ~1–2 wk)",
+      "owner": "emmanuel",
+      "source": "jun22",
+      "sourceRef": "#460",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "description": "GPS is lost when the app is closed, the phone is locked, or the driver switches to another app (e.g. opens Waze/Maps).<br><br><strong>Web slice — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/460\">#460</a> MERGED to <code>development</code> 2026-06-24:</strong> hardened the <em>foreground</em> trail — re-arm <code>watchPosition</code> + immediate fix on return to foreground (the old visibility handler was dead code), a screen <strong>wake lock</strong> during a shift, and flushing the offline queue before shift-end so mileage reflects the full trail. <strong>Needs a real-device <code>WALK-TEST-SF</code> re-walk to verify.</strong><br><br><strong>True background still requires the native wrapper</strong> (Capacitor + background-geolocation reusing <code>/driver</code>, posting to the existing <code>/api/tracking/locations</code> — no backend change), full eval/runbook in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>.<br><br><strong>Native POC scaffolding drafted — DRAFT PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (2026-06-24):</strong> <code>repos/ready-set/native/driver-app/</code> (Capacitor config + shell + the WebView-side <code>capacitor-tracking.ts</code> bridge + runbook), ready to build. <strong>Still GATED</strong> on a go/no-go + Apple Developer account + Android keystore + real iPhone/Android devices before the POC can actually be built + walk-tested.<br><br><strong>Update 2026-06-24:</strong> POC built out — Android <code>app-debug.apk</code> + the iOS shell both build, and iOS is confirmed loading <code>/driver</code> on the Simulator; the web-side GPS bridge is MERGED to <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> — no-op in a browser, active only inside the native shell). Remaining gate is just the free-Apple-ID signing + a real iPhone/Android to run the on-device background walk.<br><br><strong>Update 2026-06-24 (later):</strong> brought the iOS shell up on Emmanuel's real iPhone (Developer Mode + free-Apple-ID signing done) but hit a <strong>Capacitor 6 vs iOS 26.5 WebView wall</strong> (WKWebView black-screens + bounces to Safari; <code>Frame load interrupted</code> + WebContent sandbox errors; Safari/Simulator load the same URL fine). <strong>Upgraded the shell to Capacitor 8</strong> (now SPM); <strong>pending the on-device re-test</strong>, then the WALK-TEST-SF background walk. Resume: memory <code>native-driver-app-poc-resume</code>.<br><br><strong>Update 2026-07-21 — Phase-1 (prove-it) prep done; the ONLY remaining gate is the locked-screen walk on each platform.</strong> All web-side code is merged (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> bridge, <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> arm-recovery, <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a> walk fixes); the diagnostic <code>server.url</code> override (<code>/sign-in?returnTo=</code> + <code>allowNavigation:['*']</code>) is <strong>reverted</strong> (safe now — #485's sign-in self-heal redirects authed users), both native projects re-synced, and a <strong>fresh Android APK is built with the clean <code>/driver</code> URL baked</strong> (re-sideload before the next walk). iOS needs the 7-day re-sign with the phone attached: <code>cap sync ios</code> → <code>xcodebuild -allowProvisioningUpdates</code> → <code>devicectl device install app</code>. <strong>Pass bar:</strong> no trail gap &gt;~30s during a 15–20 min locked-screen/Waze-in-front walk, both platforms; if Android still drops points, evaluate the paid transistorsoft plugin (OEM battery killers). Once both pass → un-draft + merge #461 and move to productionization (<code>native-wrapper-productionization</code>).<br><br><strong>HANDED OFF to Fernando 2026-07-23</strong> (Emmanuel unavailable for device testing): Phase-1 locked-screen walk runbook is self-contained in a <a href=\"https://github.com/ReadySet1/ready-set/pull/461#issuecomment-5060228104\">PR #461 comment</a> (test creds included; repo now private) + prebuilt APK on the <code>native-walk-test-apk-2026-07-21</code> release; <code>ios/</code>+<code>android/</code> projects committed to the branch. Waiting on Fernando: platform coverage (iOS needs a Mac+Xcode), city/route, walk date → then re-stage via <code>test_stage_walk()</code>. Email draft: <code>docs/ready-set/emails/2026-07-23-fernando-walk-test-handoff-draft.md</code>."
+    },
+    {
+      "id": "native-app-go-no-go",
+      "status": "done",
+      "title": "Decide go/no-go on the native driver app (background GPS)",
+      "owner": "gary",
+      "source": "jun22",
+      "description": "<strong>Decision teed up — 1-page brief ready for Gary:</strong> <code>docs/ready-set/reports/2026-06-24-native-driver-app-go-no-go-gary.md</code>.<br><br>Web GPS can't track in the background (drivers open Waze / lock the screen → tracking stops, mileage undercounted) — only a native app fixes it. Proposed: a thin Capacitor shell reusing the existing <code>/driver</code> UI (no rewrite, zero backend change); POC scaffolding already drafted in <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (gated draft).<br><br><strong>Decisions needed:</strong> (1) go/no-go; (2) iOS+Android or one first (rec: Android first); (3) approve $99/yr Apple Developer account + a test iPhone+Android; (4) who builds it; (5) internal-only distribution.<br><br><strong>Lowest-risk path:</strong> approve the <strong>$0</strong> proof-of-concept (~1–2 wk on real phones) before any production spend. Unblocks <code>persistent-gps-background</code> / #461.<br><br><strong>DECIDED 7/13 meeting: GO.</strong> Production store licenses approved for purchase — Google Play ($25 one-time) + Apple Developer ($99/yr, also ends the every-7-days free-Apple-ID re-sign). Purchase tracked as <code>buy-app-store-licenses</code>."
+    },
+    {
+      "id": "nav-button-visibility",
+      "status": "done",
+      "title": "Make the \"Navigate\" button more visible (bolder / brighter)",
+      "owner": "emmanuel",
+      "source": "jun22",
+      "sourceRef": "#458",
+      "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/458\">#458</a> MERGED to <code>development</code> 2026-06-24.</strong><br><br>Gary couldn't find the low-contrast \"Navigate\" link in the Jun 22 live test. Promoted to the prominent <code>DriverButton</code> brand variant (amber) in <code>DriverDeliveryDetail</code> (pickup + drop-off) and <code>DriverTrackingPortal</code>. Shipped together with <code>nav-app-choice</code>."
+    },
+    {
+      "id": "nav-app-choice",
+      "status": "done",
+      "title": "Let drivers choose navigation app (Waze vs Google Maps)",
+      "owner": "emmanuel",
+      "source": "jun22",
+      "sourceRef": "#458",
+      "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/458\">#458</a> MERGED to <code>development</code> 2026-06-24.</strong><br><br>New <code>src/lib/driver-navigation.ts</code> <code>buildNavigationUrl(app, target)</code> for Google / Apple / Waze (universal https deep links) + a <code>NavigationAppSheet</code> chooser remembering the pick in localStorage (default Google). Replaces the hardcoded Google Maps URLs. Shipped together with <code>nav-button-visibility</code>."
+    },
+    {
+      "id": "confirm-bridge-toll-pricing-prod",
+      "status": "done",
+      "title": "Confirm bridge-toll $8.00→$8.50 is cleared for production",
+      "owner": "fernando",
+      "source": "release",
+      "tags": [
+        "critical"
+      ],
+      "description": "<strong>DONE — cleared + shipped 2026-06-24.</strong><br><br>The $8.50 toll was signed off to go live, so Fernando's migration <code>20260619000000_update_bridge_toll_to_850</code> (#455) was applied + recorded in <code>_prisma_migrations</code> on <strong>both dev (no-op — data already $8.50 via the admin UI) and prod</strong> via the Supabase MCP, alongside <code>20260623000000_add_pickup_signature</code> (prod).<br><br>On prod it bumped 5 configs $8.00/$7.00 → $8.50 (<code>WHERE &lt;8.50</code>; left CaterValley $8.50 and the inactive $10 premium untouched). <a href=\"https://github.com/ReadySet1/ready-set/pull/463\">#463</a> then merged <code>--admin</code> (merge <code>0b9a25c</code>); release-please opened <a href=\"https://github.com/ReadySet1/ready-set/pull/464\">#464</a> <code>chore(main): release 2.3.0</code>."
+    },
+    {
+      "id": "driver-active-deliveries-date-filter",
+      "status": "done",
+      "title": "Driver: filter Active deliveries by date/time",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [],
+      "description": "Jul-3 night walk feedback: the Active-deliveries list is confusing when multiple test/real orders coexist. Add date/time filtering (or group by day, soonest first) so the driver can find tonight’s delivery at a glance.",
+      "sourceRef": "#476"
+    },
+    {
+      "id": "helpdesk-undo-accidental-drive-start",
+      "status": "done",
+      "title": "Undo an accidentally-started delivery (Helpdesk revert/cancel)",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Driver accidentally started a delivery and had no way back.<br><br>Verified in code: <code>PATCH /api/orders/[order_number]</code> already lets HELPDESK/ADMIN change status and CANCELLED is reachable from every non-terminal state — but <strong>driverStatus has no backward transitions</strong>, so an accidental start can only be resolved by cancelling the whole order.<br><br>Add a Helpdesk-facing revert (reset driverStatus to ASSIGNED) and/or surface the cancel affordance in the admin/helpdesk order view.",
+      "sourceRef": "#477"
+    },
+    {
+      "id": "driver-map-trail-straight-line",
+      "status": "done",
+      "title": "Driver map: trail draws straight lines after lock + drops route start after 200 points",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Jul-3 walk: map drew a straight line instead of the real route, and the line “broke” mid-walk.<br><br><strong>Data is NOT the problem</strong> — the DB captured 285 pts/28 min (only two ~90s lock gaps, 2.5 km coherent path).<br><br>Root cause in <code>DriverLiveMap.tsx</code>: the trail lives only in browser memory (<code>trailRef</code>) so locked-screen periods connect as a straight segment, and the 200-point cap <code>shift()</code>s the oldest points — at ~6 s/pt the route START disappears after ~20 min.<br><br>Fix: seed/refresh the trail from <code>GET /api/tracking/locations</code> (supports limit≤1000) and downsample instead of dropping the head.",
+      "sourceRef": "#476"
+    },
+    {
+      "id": "pod-sheet-duplicate-title",
+      "status": "done",
+      "title": "POD sheet shows the title twice",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "<code>DriverPodSheet.tsx:47</code> renders SheetTitle “Proof of delivery” and the wrapped <code>ProofOfDeliveryCapture.tsx:513</code> renders its own CardTitle “Proof of Delivery” — both visible in the popup. Hide the inner CardTitle when hosted in the sheet (prop) or remove it.",
+      "sourceRef": "#476"
+    },
+    {
+      "id": "driver-action-buttons-loading-state",
+      "status": "done",
+      "title": "Driver bottom action buttons: add pending/loading indicator",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [],
+      "description": "Status-advance buttons wait on a server round-trip with no visual feedback, so they feel unresponsive (and invite double-taps). Add a spinner/disabled pending state to <code>DriverButton</code> call sites in the delivery detail + tracking portal while the PATCH is in flight.",
+      "sourceRef": "#476"
+    },
+    {
+      "id": "pickup-signature-gate-bypassed-tracking-portal",
+      "status": "done",
+      "title": "Pickup signature NOT requested — Live-Tracking tab bypasses the gate",
+      "owner": "emmanuel",
+      "source": "jul3walk",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "description": "Jul-3 night walk: the app never asked for the vendor-staff signature at pickup and the order completed with <strong>0 signature uploads</strong> (verified in rs-dev).<br><br>Root cause: #459 added the signature gate only to <code>DriverDeliveryDetail.handleNextAction</code>; the Live-Tracking tab (<code>DriverTrackingPortal.handleAdvance</code>, ~line 172) gates POD (<code>next === COMPLETED</code>) but advances <code>ARRIVED_AT_VENDOR → PICKED_UP</code> with no signature sheet.<br><br>Fix: (1) add the same DriverSignatureSheet gate to the tracking portal; (2) <strong>enforce server-side</strong> — the orders PATCH should reject PICKED_UP for catering orders when no <code>pickup_signature</code> upload exists, so no client surface can skip the mandate (Gary/2026-06-22 decision: signature + photo at pickup are mandatory).",
+      "sourceRef": "#475"
+    },
+    {
+      "id": "sheet-orders-sync",
+      "status": "new",
+      "title": "Sheet → orders sync: import master-sheet drives into the orders system",
+      "owner": "emmanuel",
+      "source": "jul9",
+      "description": "The Coolfire-sunset replacement path: pull drives from the COOLFIRE MASTER UPLOAD sheet (itself auto-fed from the Coolfire API) into our orders system.<br><br>Plan + Phase-0 findings in <code>docs/ready-set/specs/2026-07-09-sheet-orders-sync.md</code> — ~1 wk build, preview-first (<code>/admin/sheet-import</code>) before any cron. Confirm at the 7/10 meeting, then start.<br><br>Blockers: share the sheet with the service account (30 s, Editor); decisions — exclude CaterCow/CaterValley rows (69/119 overlap with API orders), order-ID write-back column, backfill window, cutover.<br><br>Discovered prerequisite: <strong>driver onboarding — only 1 of 27 sheet drivers has an account</strong> (gates assignment + SMS); needs an owner. Also: Seoul Kitchen + Freshroll pricing configs unmapped."
+    },
+    {
+      "id": "sheet-sync-decision-proof-prep",
+      "status": "new",
+      "title": "Sheet sync prep: parser for real columns + master-sheet env var",
+      "owner": "emmanuel",
+      "source": "jul9",
+      "description": "Decision-proof first slice, start 7/10: extend <code>src/lib/google-sheets/parser.ts</code> for the ~15 real-sheet columns it doesn't map (<code>Coolfire Success ID</code>, Invoice #, Arrival/Complete, timestamp block, contact fields, Stop #) with fixtures from the 7/9 CSV export; plumb <code>GOOGLE_SHEETS_MASTER_SHEET_ID</code> (fallback to the legacy var, which points at the wrong \"Web Quotes\" sheet everywhere) so going live after the share is a one-value change."
+    },
+    {
+      "id": "pickup-signature-rls-blocked",
+      "status": "done",
+      "title": "Pickup signature upload fails with RLS violation — drivers hard-blocked at pickup",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#483",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "description": "7/9 drive test: confirming the vendor pickup signature failed with <code>new row violates row-level security policy</code> — the upload wrote to the <code>signatures/</code> prefix but the delivery-proofs bucket policy only allows <code>deliveries/</code>.<br><br>Combined with the #475 server gate, a driver cannot advance past pickup.<br><br><strong>Affects prod</strong> (shipped in v2.4.0). Fix + policy change in PR #483: receiver NAME required, signature optional; gate accepts either. Flag for expedited dev→main sync."
+    },
+    {
+      "id": "driver-map-missing-stop-markers",
+      "status": "done",
+      "title": "Driver map shows no pickup/drop-off locations",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#484",
+      "tags": [
+        "bug"
+      ],
+      "description": "7/9 drive test: the Live-Tracking map had no pickup marker at all and the drop-off circle sat off-viewport. PR #484 adds pickup (violet) + drop-off (orange) markers mirroring the admin map, with fit-bounds once per delivery-set change and a guard against ungeocoded <code>[0,0]</code> coords."
+    },
+    {
+      "id": "driver-arrival-geofence",
+      "status": "done",
+      "title": "Geofence the \"Arrived\" buttons (disable when far from the stop)",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#484",
+      "description": "7/9 drive test ask: disable \"Arrived at restaurant/client\" unless the driver is nearby. PR #484: 150 m fail-open geofence on both surfaces — blocks only when GPS and target coords are both known and clearly out of range; unknown GPS or ungeocoded address never strands a driver. Distance hint shown on the disabled button."
+    },
+    {
+      "id": "signature-pad-dead-touch-fullscreen",
+      "status": "done",
+      "title": "Signature pad ignores touch in the native shell + fullscreen signing mode",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#485",
+      "tags": [
+        "bug"
+      ],
+      "description": "<strong>DONE — PR #485 merged to <code>development</code> 2026-07-10.</strong><br><br>Round 2 of the 7/9 drive test: the pad was sized once at mount (0×0 inside the still-animating sheet in the WebView) and the iOS keyboard's window-resize event wiped the ink. Now ResizeObserver-sized with stroke preservation, plus a <strong>fullscreen signing mode</strong> (expand icon) per field request."
+    },
+    {
+      "id": "native-shell-signin-bounce",
+      "status": "done",
+      "title": "Native shell lands on marketing sign-in page despite live session",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#485",
+      "tags": [
+        "bug"
+      ],
+      "description": "<strong>DONE — PR #485 merged to <code>development</code> 2026-07-10.</strong><br><br>Returning to the iOS app showed the marketing Sign In page even though the session was alive (menu offered Dashboard). Web-side self-heal in #485: <code>/sign-in</code> now server-redirects authenticated users to their role dashboard.<br><br>The underlying WebView cookie divergence stays tracked as <code>webview-session-divergence</code>."
+    },
+    {
+      "id": "end-shift-blocked-by-due-deliveries",
+      "status": "done",
+      "title": "End shift must be blocked while a due delivery is still open",
+      "owner": "emmanuel",
+      "source": "jul9walk",
+      "sourceRef": "#485",
+      "description": "<strong>DONE — PR #485 merged to <code>development</code> 2026-07-10.</strong><br><br>7/9 test: the shift could end while WALK-TEST-AM sat Assigned with an overdue pickup (the guard only counted started deliveries).<br><br>#485: ASSIGNED orders with pickup ≤2h away or overdue now block server-side, and the End shift button disables with a \"N deliveries to finish first\" hint. Future-dated assignments don't trap the driver; admin force override kept."
+    },
+    {
+      "id": "buy-app-store-licenses",
+      "status": "new",
+      "title": "Purchase production app-store licenses (Google Play $25 + Apple $99/yr)",
+      "owner": "gary",
+      "source": "jul13",
+      "description": "Approved in the 7/13 meeting for the production mobile release. The Apple Developer account also ends the every-7-days free-Apple-ID re-sign ritual on the test iPhone. Closes the spend question behind <code>native-app-go-no-go</code>; unblocks store publication of the native driver app."
+    },
+    {
+      "id": "webapp-driver-client-id-phone-fields",
+      "status": "new",
+      "title": "Add driver + client ID and phone fields in the web app (not the uploader)",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "7/13 decision: do NOT modify the Coolfire master uploader (operational risk). Driver/client identification numbers + phone fields go directly in the web app during the migration; existing DB UUIDs confirmed as the canonical unique identifier for clients/vendors.<br><br>Supersedes the sheet side of <code>driver-phone-storage</code>; also feeds the SMS send list (driver phones from DB profiles) and the driver-onboarding gap (only 1 of 27 sheet drivers has an account)."
+    },
+    {
+      "id": "verify-seoul-freshroll-pricing",
+      "status": "new",
+      "title": "Verify pricing maps for Seoul Kitchen + Freshroll - SF (email, CC Gary)",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "The only non-partner sheet vendors without a calculator config mapping (7/9 export analysis). Email Fernando / helpdesk to verify the pricing amounts are correct.<br><br><strong>Gary must be CC'd on this and all future pricing correspondence</strong> (explicit 7/13 ask).<br><br><strong>Draft ready:</strong> <code>docs/ready-set/emails/2026-07-13-helpdesk-pricing-and-sheet-questions-draft.md</code> (also carries the Try Hungry $60-vs-$216 tie-break + the master-sheet workflow questions)."
+    },
+    {
+      "id": "demo-pricing-admin-gary",
+      "status": "new",
+      "title": "Demo the pricing admin panel to Gary",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "Show Gary how driver + client pricing is configured in the admin panel (Admin → Calculator → Adjust Vendor Pricing) so pricing changes don't depend on hardcoded values or a developer."
+    },
+    {
+      "id": "dynamic-pricing-per-client",
+      "status": "new",
+      "title": "Dynamic per-client pricing config — create new clients without hardcoded values",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors."
+    },
+    {
+      "id": "sms-provider-final-call",
+      "status": "new",
+      "title": "SMS provider — compare and make the final call (delegated to Emmanuel)",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "The May Telnyx-vs-Twilio decision came back to the 7/13 meeting and was <strong>delegated to Emmanuel</strong>: compare Twilio vs cheaper alternatives and decide.<br><br>The 5/7 analysis recommends Telnyx (~$55–75/mo vs ~$120–145/mo).<br><br>Then: open the account + 10DLC registration (weeks — the long pole), set creds, flip the two disabled schedules on.<br><br>Absorbs the four May-11 research cards (Telnyx integration test, Telnyx details email, 5-line porting-cost calc, phone segmentation by marketplace — removed from the board 2026-08-03); send list comes from DB profiles per <code>webapp-driver-client-id-phone-fields</code>."
+    },
+    {
+      "id": "drive-test-after-signature-fix",
+      "status": "new",
+      "title": "Fix signature save bug, then notify Gary to schedule the drive test",
+      "owner": "emmanuel",
+      "source": "jul13",
+      "description": "Signature capture is nearly complete but a save issue is still being troubleshot. Once resolved, notify Gary via email/Slack to schedule the verification drive test (covers the #475–#477 re-walk plus #483/#484/#485/#486: name-only pickup, map pins, check-in zone, Settings tab). Gary stressed the driver side must work correctly at CaterCow launch."
+    },
+    {
+      "id": "destino-payment-qa-unblock",
+      "status": "new",
+      "title": "Collect outstanding Destino payment (unblocks the QA hire)",
+      "owner": "gary",
+      "source": "jul13",
+      "description": "QA support (Mark / Robert) is contingent on collecting the outstanding funds from Destino; Gary requests payment this week. Gates <code>hire-robert-qa</code>."
+    },
+    {
+      "id": "webview-session-divergence",
+      "status": "open",
+      "title": "Native shell: WebView cookie/session divergence (client alive, server 401)",
+      "owner": "emmanuel",
+      "source": "jul21",
+      "tags": [
+        "bug"
+      ],
+      "description": "The pre-rollout blocker behind the #485 sign-in bounce: inside the native WKWebView the supabase-js client session stays alive while the <strong>server-side auth cookies</strong> go stale/401 — surfaced on the 7/2 Android walk (driver-id lookup silently bailed) and the 7/9 iOS walk (marketing sign-in page despite a live session).<br><br>#485 added a web-side self-heal (<code>/sign-in</code> server-redirects authed users) but the underlying WKWebView cookie persistence vs Supabase token refresh drift is unfixed and will strand drivers mid-shift.<br><br>Investigate via Safari Web Inspector / <code>chrome://inspect</code> against the shell; workaround today = sign out/in.<br><br><strong>Phase 2 of the background-GPS plan</strong> — must be fixed before real-driver rollout of the native app. Related: <code>persistent-gps-background</code>."
+    },
+    {
+      "id": "native-wrapper-productionization",
+      "status": "open",
+      "title": "Native wrapper productionization (iOS + Android hardening)",
+      "owner": "emmanuel",
+      "source": "jul21",
+      "description": "<strong>Phase 3 of the background-GPS plan — starts once the locked-screen walks pass (see <code>persistent-gps-background</code>). ~3–5 days once store accounts exist.</strong> From the 7/21 wrapper audit.<br><br><strong>Shared:</strong> (1) scope <code>allowNavigation</code> to the readysetllc.com domains (committed config is fine; never ship the <code>['*']</code> diagnostic); (2) commit the gitignored <code>ios/</code>+<code>android/</code> projects (or add a post-<code>cap add</code> patch step) — regeneration silently wipes hand-applied permissions, already bit twice (Cap-8 regen wiped Android; CAMERA re-add); (3) offline buffering/retry for location POSTs (fixes are dropped on network blips = dead zones); (4) branded icon + splash (both platforms are Capacitor placeholders); (5) versionName/versionCode bump strategy (both hardcoded 1/1.0).<br><br><strong>Android:</strong> release keystore + signing config (release builds unsigned — blocks any distribution, gated on <code>buy-app-store-licenses</code>); real permission-onboarding UX — targetSdk 36 mandates POST_NOTIFICATIONS + the two-step \"Allow all the time\" grant + battery-optimization exemption (all currently left to the plugin's auto-prompt).<br><br><strong>iOS:</strong> \"Always Allow\" onboarding (it's a Settings grant, not a dialog); App-Store background-location justification only if not TestFlight-internal; $99 account ends the 7-day re-sign ritual.<br><br><strong>Distribution decision:</strong> TestFlight-internal + APK sideload avoids Play's background-location review form."
+    },
+    {
+      "id": "ci-infra-reds-fixed",
+      "status": "done",
+      "title": "CI infra reds: artifact quota + lapsed GHAS painting every PR red",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "sourceRef": "#498",
+      "tags": [
+        "bug"
+      ],
+      "description": "<strong>DONE — PR #498 merged to development 2026-08-03.</strong><br><br>E2E Playwright artifact uploads made non-fatal (<code>continue-on-error</code>) with 7-day retention (artifact storage quota was failing a passing run), and <code>Dependency Review</code> gated behind repo variable <code>GHAS_ENABLED</code> so it skips instead of failing while GitHub Advanced Security is lapsed.<br><br>Verified on the PR&apos;s own run: Dependency Review → skipped, E2E → pass."
+    },
+    {
+      "id": "ghas-restore",
+      "status": "done",
+      "title": "Dependency Review restored (public repo + GHAS_ENABLED=true)",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "description": "<strong>DONE 2026-08-03 — no paid GHAS needed while the repo is public.</strong><br><br>Dependency graph is free on public repos; verified live: the <code>Dependency Review</code> job on dependabot PR #499 ran ungated (main&apos;s workflow) and PASSED. Repo variable <code>GHAS_ENABLED=true</code> set, so the gated job on development runs again too.<br><br>⚠️ If the repo ever goes private again without paid GHAS, flip <code>GHAS_ENABLED</code> back to false."
+    },
+    {
+      "id": "vercel-check-cleanup",
+      "status": "done",
+      "title": "Vercel PR check fixed by the public-repo flip",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "description": "<strong>DONE 2026-08-03 — resolved by making the repo public (no team seat needed).</strong><br><br>The <code>Vercel</code> check passes again (<em>Deployment has completed</em>, verified on PR #500) and deployments to <code>ready-set-dev</code> flow normally — the <em>Git author must have access</em> rejection only applied to private repos. No paid Vercel invite required.<br><br>Long-term the check disappears anyway with the Dokploy migration."
+    },
+    {
+      "id": "override-sweep-phase3",
+      "status": "progress",
+      "title": "Bound the ~70 remaining unbounded \">=X\" pnpm overrides (phase 3)",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "description": "<strong>PR #500 OPEN → development (2026-08-03).</strong><br><br>All 61 remaining unbounded <code>\">=X\"</code> overrides bounded to <code>&lt;next-major</code> (next-minor for 0.x), ceilings derived from current lockfile resolutions — zero resolution changes today. Also bumps brace-expansion 5.0.8→5.0.9 (new high advisory). Audit highs back to 2 (linkify-it ×2, unfixable).<br><br>Typecheck/lint clean, 8,346 tests green. Merge once CI passes.",
+      "sourceRef": "#500"
+    },
+    {
+      "id": "dev-main-sync-aug",
+      "status": "open",
+      "title": "Sync development → main (security/CI batch #493–#498)",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "description": "development now carries the security override sweep (#493), brace-expansion bump (#496), CI timeout fix (#495) and CI infra-red fixes (#498) — none of it in front of production users until a dev→main sync PR lands.<br><br>Check for pending prod migrations at sync time (e.g. <code>tracking_settings</code>); migrations are applied manually via Supabase MCP, not on deploy."
+    },
+    {
+      "id": "public-repo-creds-rotation",
+      "status": "progress",
+      "title": "Repo public again: scrub + rotate the exposed dev test credentials",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "tags": [
+        "critical"
+      ],
+      "description": "Repo flipped back to PUBLIC re-exposed the PR #461 walk-test handoff comment containing plaintext driver + admin logins for <code>development.readysetllc.com</code>.<br><br><strong>Done 2026-08-03:</strong> comment scrubbed (passwords redacted) and both rs-dev passwords rotated + login-verified.<br><br><strong>Remaining:</strong> (1) delete the comment&apos;s old edit revision (repo admin, GitHub UI &quot;edited&quot; dropdown — edit history is publicly viewable); (2) resend the new creds to Fernando privately for the walk test."
+    },
+    {
+      "id": "hetzner-boxes-unreachable",
+      "status": "done",
+      "title": "Hetzner boxes restored — unpaid invoices were the cause",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "tags": [
+        "critical"
+      ],
+      "description": "<strong>RESOLVED 2026-08-03 — it was the billing null-route, as suspected.</strong><br><br>The card on file had stopped going through, invoices accumulated ($24.82/mo), and Hetzner auto-suspended both servers. Gary paid the outstanding invoices (all now settled); both boxes (91.99.110.92, 5.78.141.250) answer on 443 again. Payment method switched to credit card so the monthly charge auto-processes going forward.<br><br>Follow-up: verify the Dokploy apps/mirrors come back up cleanly (preview.readysetllc.com was still booting at check time). VPS migration is unblocked."
+    },
+    {
+      "id": "merge-pr-497",
+      "status": "done",
+      "title": "Review + merge PR #497 (vendor-hero URL fragment fix)",
+      "owner": "emmanuel",
+      "source": "aug3",
+      "sourceRef": "#497",
+      "description": "<strong>DONE — merged to development 2026-08-03.</strong> Small fix removing the redundant <code>#vendor-hero</code> URL fragment from CTA links (Fernando, 4 files, tests updated). All checks green."
+    },
+    {
+      "id": "web-mobile-test-round1",
+      "status": "progress",
+      "title": "Web app mobile testing round 1 (Fernando, iPhone X/Safari)",
+      "owner": "fernando",
+      "source": "aug3",
+      "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted."
     }
   ]
 }
