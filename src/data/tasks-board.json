@@ -70,7 +70,7 @@
         "critical",
         "bug"
       ],
-      "description": "<code>PUT /api/profile/[id]/update</code> has no auth check (middleware does not run for <code>/api/*</code>) and accepts <code>companyName</code> for <strong>any</strong> profile id. Since companyName resolution outranks the email fallback in the vendor calculator, anyone can assign any pricing profile to any vendor without authentication. Pre-existing; surfaced during PR #479 review. Must gate with <code>withAuth</code> + owner-or-admin ownership check.<br><br><strong>Re-verified 2026-08-03: still unauthenticated</strong> (no <code>withAuth</code>/session read anywhere in the route).<br><br>Mitigating nuance found: the route's handlers are <em>mock stubs</em> (<code>setTimeout</code> + <code>Math.random</code>, no DB writes), so nothing persists today — but it's a live unauthenticated PUT that must be gated or deleted before anyone wires it to real data."
+      "description": "<code>PUT /api/profile/[id]/update</code> has no auth check (middleware does not run for <code>/api/*</code>) and accepts <code>companyName</code> for <strong>any</strong> profile id. Since companyName resolution outranks the email fallback in the vendor calculator, anyone can assign any pricing profile to any vendor without authentication. Pre-existing; surfaced during PR #479 review. Must gate with <code>withAuth</code> + owner-or-admin ownership check.<br><br><strong>Re-verified 2026-08-03: still unauthenticated</strong> (no <code>withAuth</code>/session read anywhere in the route).<br><br>Mitigating nuance found: the route's handlers are <em>mock stubs</em> (<code>setTimeout</code> + <code>Math.random</code>, no DB writes), so nothing persists today — but it's a live unauthenticated PUT that must be gated or deleted before anyone wires it to real data.<br><br><strong>Re-verified 2026-08-05 — still unauthenticated, and now confirmed to have ZERO callers.</strong> Nothing in <code>src/</code> or <code>e2e/</code> fetches this endpoint, and all three helpers (<code>isEmailInUse</code>, <code>validateCompanyAccess</code>, <code>updateUserProfile</code>) are <code>setTimeout</code>/<code>Math.random</code> stubs with no Prisma access. It is unfinished scaffolding, not a live feature. <strong>Recommended fix: delete <code>src/app/api/profile/[id]/update/route.ts</code> outright</strong> rather than gate it — deleting removes the unauthenticated PUT with zero behavior change, and whoever builds the real endpoint later starts with <code>withAuth</code> from day one."
     },
     {
       "id": "vercel-overdue-payment",
@@ -945,11 +945,11 @@
     },
     {
       "id": "override-sweep-phase3",
-      "status": "progress",
+      "status": "done",
       "title": "Bound the ~70 remaining unbounded \">=X\" pnpm overrides (phase 3)",
       "owner": "emmanuel",
       "source": "aug3",
-      "description": "<strong>PR #500 OPEN → development (2026-08-03).</strong><br><br>All 61 remaining unbounded <code>\">=X\"</code> overrides bounded to <code>&lt;next-major</code> (next-minor for 0.x), ceilings derived from current lockfile resolutions — zero resolution changes today. Also bumps brace-expansion 5.0.8→5.0.9 (new high advisory). Audit highs back to 2 (linkify-it ×2, unfixable).<br><br>Typecheck/lint clean, 8,346 tests green. Merge once CI passes.",
+      "description": "<strong>PR #500 OPEN → development (2026-08-03).</strong><br><br>All 61 remaining unbounded <code>\">=X\"</code> overrides bounded to <code>&lt;next-major</code> (next-minor for 0.x), ceilings derived from current lockfile resolutions — zero resolution changes today. Also bumps brace-expansion 5.0.8→5.0.9 (new high advisory). Audit highs back to 2 (linkify-it ×2, unfixable).<br><br>Typecheck/lint clean, 8,346 tests green. Merge once CI passes.<br><br><strong>Closed 2026-08-05:</strong> merged 2026-08-04; <code>development</code>'s <code>Security</code> workflow is green. Note this is what makes the red <code>NPM Security Audit</code> on any PR branched before 2026-08-04 a <em>stale</em> check rather than a real finding — rebase to clear it.",
       "sourceRef": "#500"
     },
     {
@@ -969,7 +969,7 @@
       "tags": [
         "critical"
       ],
-      "description": "Repo flipped back to PUBLIC re-exposed the PR #461 walk-test handoff comment containing plaintext driver + admin logins for <code>development.readysetllc.com</code>.<br><br><strong>Done 2026-08-03:</strong> comment scrubbed (passwords redacted) and both rs-dev passwords rotated + login-verified.<br><br><strong>Remaining:</strong> (1) delete the comment&apos;s old edit revision (repo admin, GitHub UI &quot;edited&quot; dropdown — edit history is publicly viewable); (2) resend the new creds to Fernando privately for the walk test."
+      "description": "Repo flipped back to PUBLIC re-exposed the PR #461 walk-test handoff comment containing plaintext driver + admin logins for <code>development.readysetllc.com</code>.<br><br><strong>Done 2026-08-03:</strong> comment scrubbed (passwords redacted) and both rs-dev passwords rotated + login-verified.<br><br><strong>Remaining:</strong> (1) delete the comment&apos;s old edit revision (repo admin, GitHub UI &quot;edited&quot; dropdown — edit history is publicly viewable); (2) resend the new creds to Fernando privately for the walk test.<br><br><strong>Update 2026-08-05 — scope reduced to ONE item.</strong> Remaining item (2) (&ldquo;resend the new creds to Fernando privately for the walk test&rdquo;) is now <strong>moot</strong>: the native walk test is parked and PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> is closed (see <code>persistent-gps-background</code>). <strong>Only item (1) still stands</strong> — delete the old edit revision of the scrubbed PR #461 comment. Closing a PR does <em>not</em> hide its comment edit history, and the repo is public, so the pre-scrub revision with the plaintext passwords remains publicly viewable until an admin removes it. The passwords themselves were already rotated and login-verified on 2026-08-03, so this is exposure hygiene, not a live credential leak."
     },
     {
       "id": "hetzner-boxes-unreachable",
