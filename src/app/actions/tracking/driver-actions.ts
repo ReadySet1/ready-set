@@ -214,6 +214,26 @@ export async function endDriverShift(
       }
     }
 
+    // Recompute delivery_count from the deliveries table before closing. The
+    // AFTER trigger on `deliveries` only fires on delivery writes, so rows
+    // mirrored before shift linkage existed — or with the uppercase status
+    // casing the orders PATCH writes (e.g. 'COMPLETED') — would otherwise
+    // close the shift with a stale count. Case-insensitive, and both
+    // 'delivered' and 'completed' count as a completed delivery.
+    await prisma.$executeRawUnsafe(`
+      UPDATE driver_shifts
+      SET
+        delivery_count = (
+          SELECT COUNT(*)
+          FROM deliveries
+          WHERE shift_id = $1::uuid
+            AND LOWER(status) IN ('delivered','completed')
+            AND deleted_at IS NULL
+        ),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+    `, shiftId);
+
     // Always record the end location in the database first so that the
     // mileage calculation window has a proper closing point.
     await prisma.$executeRawUnsafe(`
