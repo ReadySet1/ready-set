@@ -30,6 +30,7 @@ import {
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
+import { resolveActiveShiftIdForDriver } from '@/services/tracking/active-shift';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -663,7 +664,13 @@ export async function PATCH(
     // here (from existingOrder — the update never changes dispatch).
     const dbOrderNumber = (existingOrder as any).orderNumber as string;
     let mirror:
-      | { field: string; now: Date; driverId: string | null; deliveryAddress: string }
+      | {
+          field: string;
+          now: Date;
+          driverId: string | null;
+          shiftId: string | null;
+          deliveryAddress: string;
+        }
       | null = null;
     if (driverStatus) {
       const timestampField = getDeliveryTimestampField(driverStatus);
@@ -680,10 +687,16 @@ export async function PATCH(
           });
           deliveryDriverId = driverRecord?.id ?? null;
         }
+        // Stamp the driver's ACTIVE shift on the mirror so the
+        // delivery-count trigger can attribute the delivery to the shift.
+        // driver_shifts.driver_id references drivers.id (same as
+        // deliveries.driver_id), NOT the dispatch's profile id.
+        const deliveryShiftId = await resolveActiveShiftIdForDriver(deliveryDriverId);
         mirror = {
           field: timestampField,
           now,
           driverId: deliveryDriverId,
+          shiftId: deliveryShiftId,
           deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',
         };
         justSetTimestamp = { field: timestampField, value: now };
@@ -740,11 +753,15 @@ export async function PATCH(
             [mirror.field]: mirror.now,
             status: driverStatus,
             ...(mirror.driverId ? { driverId: mirror.driverId } : {}),
+            // Only stamp the shift when resolved — never clear an existing
+            // linkage on a later transition where the shift already ended.
+            ...(mirror.shiftId ? { shiftId: mirror.shiftId } : {}),
           },
           create: {
             orderNumber: dbOrderNumber,
             deliveryAddress: mirror.deliveryAddress,
             driverId: mirror.driverId,
+            shiftId: mirror.shiftId,
             status: driverStatus,
             [mirror.field]: mirror.now,
           },

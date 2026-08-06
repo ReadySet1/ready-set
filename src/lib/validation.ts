@@ -1,7 +1,25 @@
 // src/lib/validation.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import DOMPurify from 'isomorphic-dompurify';
+
+/**
+ * DOMPurify is loaded lazily: isomorphic-dompurify constructs a JSDOM window
+ * at module evaluation, and jsdom is a webpack external (next.config.js)
+ * whose html-encoding-sniffer dependency CJS-requires an ESM-only package —
+ * an eager top-level import made merely importing this module throw
+ * ERR_REQUIRE_ESM during SSR. Deferring (and memoizing) the require means
+ * only code paths that actually sanitize HTML evaluate jsdom.
+ */
+type DOMPurifyInstance = typeof import('isomorphic-dompurify').default;
+let domPurify: DOMPurifyInstance | null = null;
+function getDOMPurify(): DOMPurifyInstance {
+  if (!domPurify) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('isomorphic-dompurify');
+    domPurify = (mod.default ?? mod) as DOMPurifyInstance;
+  }
+  return domPurify;
+}
 
 // Common validation patterns
 export const ValidationPatterns = {
@@ -129,7 +147,7 @@ export class InputSanitizer {
    * Sanitize HTML content to prevent XSS
    */
   static sanitizeHtml(input: string): string {
-    return DOMPurify.sanitize(input, {
+    return getDOMPurify().sanitize(input, {
       ALLOWED_TAGS: [], // No HTML tags allowed by default
       ALLOWED_ATTR: [],
       KEEP_CONTENT: true
@@ -142,7 +160,7 @@ export class InputSanitizer {
    */
   static sanitizeText(input: string): string {
     // Use DOMPurify with strict settings to remove all HTML tags and malicious content
-    return DOMPurify.sanitize(input, {
+    return getDOMPurify().sanitize(input, {
       ALLOWED_TAGS: [], // Strip all HTML tags
       ALLOWED_ATTR: [], // Strip all attributes
       KEEP_CONTENT: true, // Keep the text content

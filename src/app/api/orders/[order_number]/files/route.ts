@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { STORAGE_BUCKETS } from '@/utils/file-service';
+import { POD_BUCKET_NAME } from '@/utils/supabase/storage';
+import { mergeSignedUrlMaps, splitFilePathsByBucket } from '@/utils/file-bucket-split';
 import { DEFAULT_SIGNED_URL_EXPIRATION } from '@/config/file-config';
 import { prisma } from '@/utils/prismaDB';
 import { UserType } from "@/types/prisma";
@@ -156,17 +158,31 @@ export async function GET(
     const { getSignedUrlCache } = await import('@/lib/signed-url-cache');
     const cache = getSignedUrlCache();
 
-    // Get all file paths that need signed URLs
-    const filePathsNeeded = files
-      .filter(file => file.filePath)
-      .map(file => file.filePath as string);
+    // POD photos and pickup signatures live in the dedicated
+    // 'delivery-proofs' bucket; everything else lives in the default
+    // 'fileUploader' bucket. Split per bucket, sign each non-empty group
+    // against its own bucket, then merge so the path -> URL lookup (and the
+    // response shape) is unchanged.
+    const { podPaths, defaultPaths } = splitFilePathsByBucket(files);
 
-    // Batch fetch signed URLs with caching
-    const signedUrlMap = await cache.getBatchSignedUrls(
-      STORAGE_BUCKETS.DEFAULT,
-      filePathsNeeded,
-      DEFAULT_SIGNED_URL_EXPIRATION
-    );
+    const emptyMap = new Map<string, string>();
+    const [defaultUrls, podUrls] = await Promise.all([
+      defaultPaths.length > 0
+        ? cache.getBatchSignedUrls(
+            STORAGE_BUCKETS.DEFAULT,
+            defaultPaths,
+            DEFAULT_SIGNED_URL_EXPIRATION
+          )
+        : Promise.resolve(emptyMap),
+      podPaths.length > 0
+        ? cache.getBatchSignedUrls(
+            POD_BUCKET_NAME,
+            podPaths,
+            DEFAULT_SIGNED_URL_EXPIRATION
+          )
+        : Promise.resolve(emptyMap),
+    ]);
+    const signedUrlMap = mergeSignedUrlMaps(defaultUrls, podUrls);
 
     // Map signed URLs back to files
     const filesWithSignedUrls = files.map(file => {
