@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import SignaturePad from "signature_pad";
-import { AlertCircle, Check, Eraser } from "lucide-react";
+import { AlertCircle, Check, Eraser, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { DriverButton } from "./ui/DriverButton";
@@ -11,8 +11,9 @@ interface SignatureCaptureProps {
   orderNumber: string;
   /** Endpoint override (defaults to /api/orders/[order_number]/signature). */
   uploadEndpoint?: string;
-  /** Called with the stored signature URL once capture + upload succeeds. */
-  onUploadComplete: (url: string) => void;
+  /** Called once the confirmation is stored. `url` is the signature image URL
+   *  when one was drawn, or null for a name-only confirmation. */
+  onUploadComplete: (url: string | null) => void;
   onCancel: () => void;
   className?: string;
 }
@@ -28,9 +29,10 @@ function dataURLToBlob(dataURL: string): Blob {
 }
 
 /**
- * In-app signature pad for the vendor pickup step. Captures a manual signature
- * from the restaurant staff (not DocuSign), exports a PNG, and uploads it to the
- * orders signature endpoint. Mandatory before a driver can mark a pickup done.
+ * In-app pickup confirmation for the vendor pickup step. The NAME of the person
+ * who handed over the order is required (2026-07-09 policy); the signature pad
+ * is optional. Posts both to the orders signature endpoint, which records the
+ * confirmation the PICKED_UP gate checks.
  */
 export function SignatureCapture({
   orderNumber,
@@ -42,10 +44,22 @@ export function SignatureCapture({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const [hasInk, setHasInk] = useState(false);
+  const [receivedBy, setReceivedBy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Full-screen signing mode (field feedback: the inline pad is too small).
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Initialise the pad and keep the canvas crisp on high-DPI screens.
+  //
+  // Sizing is driven by a ResizeObserver (not a mount-time read + window
+  // resize listener) because BOTH of those bit us in the field:
+  //  - at mount the bottom sheet is still animating in, so offsetWidth can be
+  //    0 (especially in the native WebView) → a 0×0 canvas that ignores touch;
+  //  - the iOS keyboard (opened by the receiver-name input) fires window
+  //    resize, and the old handler cleared the pad — wiping the signature.
+  // The observer resizes only on real dimension changes and PRESERVES the ink
+  // by replaying the stroke data after rescaling.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -58,23 +72,35 @@ export function SignatureCapture({
     });
     padRef.current = pad;
 
-    const resize = () => {
+    let lastW = 0;
+    let lastH = 0;
+    const applySize = () => {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (w === 0 || h === 0) return; // not laid out yet — wait for the observer
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      canvas.width = canvas.offsetWidth * ratio;
-      canvas.height = canvas.offsetHeight * ratio;
+      const strokes = pad.toData(); // preserve ink across the resize
+      canvas.width = w * ratio; // resets the 2d transform
+      canvas.height = h * ratio;
       canvas.getContext("2d")?.scale(ratio, ratio);
-      pad.clear(); // resizing wipes the canvas — reset pad state too
-      setHasInk(false);
+      pad.clear();
+      if (strokes.length > 0) pad.fromData(strokes);
+      setHasInk(!pad.isEmpty());
     };
-    resize();
+    applySize();
+
+    const observer = new ResizeObserver(() => applySize());
+    observer.observe(canvas);
 
     const onEnd = () => setHasInk(!pad.isEmpty());
     pad.addEventListener("endStroke", onEnd);
-    window.addEventListener("resize", resize);
 
     return () => {
+      observer.disconnect();
       pad.removeEventListener("endStroke", onEnd);
-      window.removeEventListener("resize", resize);
       pad.off();
       padRef.current = null;
     };
@@ -87,20 +113,26 @@ export function SignatureCapture({
   }, []);
 
   const handleConfirm = useCallback(async () => {
-    const pad = padRef.current;
-    if (!pad || pad.isEmpty()) {
-      setError("Please capture a signature first.");
+    const name = receivedBy.trim();
+    if (!name) {
+      setError("Please enter who handed over the order.");
       return;
     }
     setUploading(true);
     setError(null);
     try {
-      const blob = dataURLToBlob(pad.toDataURL("image/png"));
-      const file = new File([blob], "pickup-signature.png", {
-        type: "image/png",
-      });
       const formData = new FormData();
-      formData.append("file", file, file.name);
+      formData.append("receivedBy", name);
+
+      // The signature is optional — attach it only when the pad has ink.
+      const pad = padRef.current;
+      if (pad && !pad.isEmpty()) {
+        const blob = dataURLToBlob(pad.toDataURL("image/png"));
+        const file = new File([blob], "pickup-signature.png", {
+          type: "image/png",
+        });
+        formData.append("file", file, file.name);
+      }
 
       const endpoint =
         uploadEndpoint ??
@@ -111,8 +143,8 @@ export function SignatureCapture({
         throw new Error(body.error || "Upload failed");
       }
       const result = await res.json();
-      toast.success("Signature captured");
-      onUploadComplete(result.url);
+      toast.success("Pickup confirmed");
+      onUploadComplete(result.url ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
@@ -120,24 +152,94 @@ export function SignatureCapture({
     } finally {
       setUploading(false);
     }
-  }, [orderNumber, uploadEndpoint, onUploadComplete]);
+  }, [orderNumber, uploadEndpoint, onUploadComplete, receivedBy]);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <p className="text-[13.5px] font-semibold text-driver-muted">
-        Ask the restaurant staff to sign below to confirm pickup.
+        Enter the name of the person who handed over the order. Signature is
+        optional.
       </p>
 
-      <div className="relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt">
-        <canvas
-          ref={canvasRef}
-          className="h-48 w-full touch-none"
-          aria-label="Signature pad"
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[12.5px] font-semibold text-driver-muted">
+          Received / confirmed by
+        </span>
+        <input
+          type="text"
+          value={receivedBy}
+          onChange={(e) => {
+            setReceivedBy(e.target.value);
+            if (error) setError(null);
+          }}
+          placeholder="Name of restaurant staff"
+          maxLength={255}
+          autoComplete="off"
+          disabled={uploading}
+          className="w-full rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt px-4 py-3 text-[15px] font-semibold text-driver-text placeholder:text-driver-subtle focus:outline-none focus:ring-2 focus:ring-driver-brand disabled:opacity-50"
+          aria-label="Received / confirmed by"
         />
-        {!hasInk ? (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
-            Sign here
-          </span>
+      </label>
+
+      <div
+        className={cn(
+          fullscreen
+            ? "driver-theme fixed inset-0 z-[100] flex flex-col gap-3 bg-driver-surface p-4 pt-[max(env(safe-area-inset-top),1rem)]"
+            : "contents",
+        )}
+      >
+        {fullscreen ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[15px] font-semibold text-driver-text">
+              Sign here
+            </span>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="flex items-center gap-1.5 rounded-xl border-[1.5px] border-driver-border px-3 py-1.5 text-[12.5px] font-semibold text-driver-muted"
+              aria-label="Exit full screen"
+            >
+              <Minimize2 className="h-4 w-4" />
+              Done
+            </button>
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt",
+            fullscreen && "flex-1",
+          )}
+        >
+          <canvas
+            ref={canvasRef}
+            className={cn("w-full touch-none", fullscreen ? "h-full" : "h-48")}
+            aria-label="Signature pad (optional)"
+          />
+          {!hasInk ? (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
+              Sign here (optional)
+            </span>
+          ) : null}
+          {!fullscreen ? (
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              className="absolute right-2 top-2 rounded-xl border-[1.5px] border-driver-border bg-driver-surface p-2 text-driver-muted"
+              aria-label="Sign in full screen"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        {fullscreen ? (
+          <DriverButton
+            variant="outline"
+            onClick={handleClear}
+            disabled={uploading || !hasInk}
+          >
+            <Eraser className="h-4 w-4" strokeWidth={2.4} />
+            Clear
+          </DriverButton>
         ) : null}
       </div>
 
@@ -161,12 +263,12 @@ export function SignatureCapture({
           variant="brand"
           full
           loading={uploading}
-          disabled={uploading || !hasInk}
+          disabled={uploading || !receivedBy.trim()}
           onClick={handleConfirm}
           className="flex-1"
         >
           {!uploading ? <Check className="h-4 w-4" strokeWidth={2.6} /> : null}
-          Confirm signature
+          Confirm pickup
         </DriverButton>
       </div>
 

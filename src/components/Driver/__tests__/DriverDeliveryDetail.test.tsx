@@ -5,6 +5,17 @@ import { DriverDeliveryDetail } from "../DriverDeliveryDetail";
 import { DriverThemeProvider } from "@/components/Driver/ui/DriverThemeProvider";
 import { DriverStatus } from "@/types/user";
 
+// Tracking settings are fetched via TanStack Query in production; tests run
+// without a QueryClientProvider, so pin the hook to the fail-open defaults.
+jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ["tracking-settings"],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual("@/types/tracking-settings").TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
+
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -13,6 +24,12 @@ jest.mock("next/navigation", () => ({
 jest.mock("react-hot-toast", () => ({
   __esModule: true,
   default: { success: jest.fn(), error: jest.fn() },
+}));
+
+// The detail page reads live GPS for the arrival geofence; no provider in
+// these tests → null location = geofence fails open (advance stays enabled).
+jest.mock("@/contexts/DriverTrackingContext", () => ({
+  useDriverTracking: () => ({ currentLocation: null }),
 }));
 
 jest.mock("@/utils/supabase/client", () => ({

@@ -8,6 +8,15 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    # dependency-review-action requires GitHub Advanced Security on private
+    # repos. The GHAS licence lapsed ~2026-07-22, so the action hard-errors
+    # ("Dependency review is not supported on this repository") on every PR,
+    # painting the whole repo red and mailing a failure for each run.
+    # Gate it on a repo variable instead of deleting the workflow: set
+    # GHAS_ENABLED=true (Settings → Secrets and variables → Actions → Variables)
+    # the moment GHAS is restored and this gate returns to enforcing.
+    # Advisory coverage meanwhile: the "NPM Security Audit" job in security.yml.
+    if: vars.GHAS_ENABLED == 'true'
     permissions:
       contents: read
 

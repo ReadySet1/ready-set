@@ -15,8 +15,14 @@ const mockRemoveSource = jest.fn();
 const mockGetSource = jest.fn();
 const mockGetLayer = jest.fn();
 const mockEaseTo = jest.fn();
+const mockFitBounds = jest.fn();
 const mockSetLngLat = jest.fn().mockReturnThis();
 const mockMarkerAddTo = jest.fn().mockReturnThis();
+const mockMarkerSetPopup = jest.fn().mockReturnThis();
+const mockMarkerRemove = jest.fn();
+const mockMarkerGetLngLat = jest.fn(() => ({ lng: -122.4194, lat: 37.7749 }));
+const mockPopupSetHTML = jest.fn().mockReturnThis();
+const mockBoundsExtend = jest.fn();
 
 let mockMapInstance: any;
 let mockMarkerInstance: any;
@@ -37,11 +43,15 @@ const createMockMapInstance = () => ({
   getSource: mockGetSource,
   getLayer: mockGetLayer,
   easeTo: mockEaseTo,
+  fitBounds: mockFitBounds,
 });
 
 const createMockMarkerInstance = () => ({
   setLngLat: mockSetLngLat,
   addTo: mockMarkerAddTo,
+  setPopup: mockMarkerSetPopup,
+  remove: mockMarkerRemove,
+  getLngLat: mockMarkerGetLngLat,
 });
 
 jest.mock('mapbox-gl', () => {
@@ -54,10 +64,25 @@ jest.mock('mapbox-gl', () => {
       mockMarkerInstance = createMockMarkerInstance();
       return mockMarkerInstance;
     }),
+    Popup: jest.fn(() => ({
+      setHTML: mockPopupSetHTML,
+    })),
+    LngLatBounds: jest.fn(() => ({
+      extend: mockBoundsExtend,
+    })),
     NavigationControl: jest.fn(),
     accessToken: '',
   };
 });
+
+/** Marker constructor calls filtered by the DOM element class the component
+ *  builds ('pickup-marker' | 'delivery-marker' | 'driver-marker'). */
+const getMarkerCallsByClass = (className: string) => {
+  const mapboxgl = require('mapbox-gl');
+  return mapboxgl.Marker.mock.calls.filter(
+    (call: any[]) => call[0]?.element?.className === className
+  );
+};
 
 // Mock Sentry monitoring
 jest.mock('@/lib/monitoring/sentry', () => ({
@@ -73,6 +98,7 @@ jest.mock('@/constants/tracking-config', () => ({
     DEFAULT_ZOOM: 12,
     MAX_AUTO_ZOOM: 15,
     FIT_BOUNDS_DURATION: 1000,
+    BOUNDS_PADDING: 48,
   },
   MARKER_CONFIG: {
     DRIVER_MARKER_SIZE: 32,
@@ -331,7 +357,7 @@ describe('DriverLiveMap', () => {
   });
 
   describe('Delivery Markers', () => {
-    it('should add delivery markers layer when deliveries are provided', async () => {
+    it('should add pickup and drop-off markers when deliveries are provided', async () => {
       render(
         <DriverLiveMap
           currentLocation={mockCurrentLocation}
@@ -346,17 +372,24 @@ describe('DriverLiveMap', () => {
         }
       });
 
+      // One pickup + one drop-off marker per delivery
       await waitFor(() => {
-        expect(mockAddSource).toHaveBeenCalledWith(
-          'driver-deliveries',
-          expect.objectContaining({
-            type: 'geojson',
-          })
-        );
+        expect(getMarkerCallsByClass('pickup-marker')).toHaveLength(2);
+        expect(getMarkerCallsByClass('delivery-marker')).toHaveLength(2);
       });
+
+      // Each stop is placed at its delivery's coordinates...
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.4294, 37.7649]); // delivery-1 pickup
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.4094, 37.7849]); // delivery-1 drop-off
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.4394, 37.7549]); // delivery-2 pickup
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.4194, 37.7949]); // delivery-2 drop-off
+
+      // ...added to the map, and the viewport fits the delivery stops
+      expect(mockMarkerAddTo).toHaveBeenCalledWith(mockMapInstance);
+      expect(mockFitBounds).toHaveBeenCalled();
     });
 
-    it('should not add delivery layer when no deliveries exist', async () => {
+    it('should not add delivery markers when no deliveries exist', async () => {
       render(
         <DriverLiveMap
           currentLocation={mockCurrentLocation}
@@ -371,21 +404,17 @@ describe('DriverLiveMap', () => {
         }
       });
 
-      // Wait for initial source to be added, but not driver-deliveries
+      // Wait for the trail source to be added (map fully initialized)
       await waitFor(() => {
         expect(mockAddSource).toHaveBeenCalledWith('driver-trail', expect.anything());
       });
 
-      // Verify driver-deliveries was not added
-      const deliverySourceCalls = mockAddSource.mock.calls.filter(
-        (call: any[]) => call[0] === 'driver-deliveries'
-      );
-      expect(deliverySourceCalls.length).toBe(0);
+      // Verify no pickup/drop-off markers were created (driver marker is allowed)
+      expect(getMarkerCallsByClass('pickup-marker')).toHaveLength(0);
+      expect(getMarkerCallsByClass('delivery-marker')).toHaveLength(0);
     });
 
-    it('should remove and recreate delivery layer on deliveries update', async () => {
-      mockGetLayer.mockReturnValue(true);
-
+    it('should remove stale markers and create new ones on deliveries update', async () => {
       const { rerender } = render(
         <DriverLiveMap
           currentLocation={mockCurrentLocation}
@@ -400,13 +429,19 @@ describe('DriverLiveMap', () => {
         }
       });
 
-      // Update deliveries
+      // Initial set: 2 pickups + 2 drop-offs
+      await waitFor(() => {
+        expect(getMarkerCallsByClass('pickup-marker')).toHaveLength(2);
+        expect(getMarkerCallsByClass('delivery-marker')).toHaveLength(2);
+      });
+
+      // Update deliveries: delivery-1 / delivery-2 replaced by delivery-3
       const updatedDeliveries: DeliveryTracking[] = [
         {
           id: 'delivery-3',
           status: 'completed',
           deliveryLocation: { coordinates: [-122.3994, 37.7949], type: 'Point' },
-          pickupLocation: { coordinates: [-122.4194, 37.7749], type: 'Point' },
+          pickupLocation: { coordinates: [-122.4494, 37.7449], type: 'Point' },
         },
       ];
 
@@ -419,9 +454,16 @@ describe('DriverLiveMap', () => {
         );
       });
 
+      // The 4 markers of the stale deliveries are removed from the map
       await waitFor(() => {
-        expect(mockRemoveLayer).toHaveBeenCalledWith('driver-deliveries');
+        expect(mockMarkerRemove).toHaveBeenCalledTimes(4);
       });
+
+      // And fresh markers are created for delivery-3 at its coordinates
+      expect(getMarkerCallsByClass('pickup-marker')).toHaveLength(3);
+      expect(getMarkerCallsByClass('delivery-marker')).toHaveLength(3);
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.4494, 37.7449]); // delivery-3 pickup
+      expect(mockSetLngLat).toHaveBeenCalledWith([-122.3994, 37.7949]); // delivery-3 drop-off
     });
   });
 

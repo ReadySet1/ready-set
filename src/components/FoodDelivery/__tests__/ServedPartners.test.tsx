@@ -38,7 +38,7 @@ describe("ServedPartners", () => {
 
       const title = screen.getByRole("heading", {
         level: 2,
-        name: /we served the top marketplace and company/i,
+        name: /we've proudly served top marketplaces and companies/i,
       });
       expect(title).toBeInTheDocument();
     });
@@ -46,11 +46,9 @@ describe("ServedPartners", () => {
     it("renders the main title with correct styling", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We Served the Top Marketplace and Company",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass(
-        "mb-3",
+        "mb-6",
         "text-3xl",
         "font-black",
         "text-gray-800",
@@ -85,9 +83,7 @@ describe("ServedPartners", () => {
     it("uses Montserrat font for title and subtitle", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We Served the Top Marketplace and Company",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       const subtitle = screen.getByText(
         /zerocater, ezcater, google, netflix, apple/i,
       );
@@ -125,7 +121,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const expectedPartners = [
-        "Zerocater logo",
+        "ZeroCater logo",
         "EzCater logo",
         "Google logo",
         "Netflix logo",
@@ -154,10 +150,10 @@ describe("ServedPartners", () => {
       });
     });
 
-    it("applies Cloudinary transformations to Zerocater logo", () => {
+    it("applies Cloudinary transformations to ZeroCater logo", () => {
       render(<ServedPartners />);
 
-      const zerocaterImg = screen.getByAltText("Zerocater logo");
+      const zerocaterImg = screen.getByAltText("ZeroCater logo");
       // The component applies b_white,w_600,h_600,c_fit transformations
       // Since we're mocking getCloudinaryUrl, we just verify the image is present
       expect(zerocaterImg).toBeInTheDocument();
@@ -213,7 +209,7 @@ describe("ServedPartners", () => {
 
       const images = screen.getAllByRole("img");
       const expectedOrder = [
-        "Zerocater logo",
+        "ZeroCater logo",
         "EzCater logo",
         "Google logo",
         "Netflix logo",
@@ -251,20 +247,20 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const imageContainers = document.querySelectorAll(
-        ".relative.h-28.w-full",
+        ".relative.h-36.w-full",
       );
       expect(imageContainers.length).toBeGreaterThan(0);
 
       imageContainers.forEach((container) => {
         expect(container).toHaveClass(
           "relative",
-          "h-28",
+          "h-36",
           "w-full",
-          "min-w-[160px]",
-          "max-w-[240px]",
-          "sm:h-32",
-          "md:h-40",
-          "lg:h-44",
+          "min-w-[180px]",
+          "max-w-[280px]",
+          "sm:h-40",
+          "md:h-48",
+          "lg:h-52",
         );
       });
     });
@@ -302,7 +298,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const titleSection = screen
-        .getByText("We Served the Top Marketplace and Company")
+        .getByRole("heading", { level: 2 })
         .closest("div");
       expect(titleSection).toHaveClass("mb-4", "text-center");
     });
@@ -322,8 +318,9 @@ describe("ServedPartners", () => {
       const heading = screen.getByRole("heading", { level: 2 });
       expect(heading).toBeInTheDocument();
       expect(heading).toHaveTextContent(
-        "We Served the Top Marketplace and Company",
+        /we've proudly served top marketplaces and/i,
       );
+      expect(heading).toHaveTextContent(/companies/i);
     });
 
     it("all images have descriptive alt text", () => {
@@ -397,9 +394,7 @@ describe("ServedPartners", () => {
     it("applies responsive title sizing", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We Served the Top Marketplace and Company",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass("text-3xl", "md:text-4xl", "lg:text-5xl");
     });
 
@@ -415,9 +410,9 @@ describe("ServedPartners", () => {
     it("applies responsive height to image containers", () => {
       render(<ServedPartners />);
 
-      const imageContainers = document.querySelectorAll(".relative.h-28");
+      const imageContainers = document.querySelectorAll(".relative.h-36");
       imageContainers.forEach((container) => {
-        expect(container).toHaveClass("h-28", "sm:h-32", "md:h-40", "lg:h-44");
+        expect(container).toHaveClass("h-36", "sm:h-40", "md:h-48", "lg:h-52");
       });
     });
 
@@ -466,7 +461,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const titleSection = screen
-        .getByText("We Served the Top Marketplace and Company")
+        .getByRole("heading", { level: 2 })
         .closest("div");
       expect(titleSection).toHaveClass("mb-4");
 
@@ -495,7 +490,7 @@ describe("ServedPartners", () => {
     it("includes marketplace partners", () => {
       render(<ServedPartners />);
 
-      const marketplaces = ["Zerocater", "EzCater"];
+      const marketplaces = ["ZeroCater", "EzCater"];
       marketplaces.forEach((marketplace) => {
         expect(screen.getByAltText(`${marketplace} logo`)).toBeInTheDocument();
       });
@@ -522,9 +517,7 @@ describe("ServedPartners", () => {
     it("uses correct font weights for title", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We Served the Top Marketplace and Company",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       expect(title).toHaveClass("font-black");
     });
 
@@ -540,9 +533,7 @@ describe("ServedPartners", () => {
     it("applies correct text colors", () => {
       render(<ServedPartners />);
 
-      const title = screen.getByText(
-        "We Served the Top Marketplace and Company",
-      );
+      const title = screen.getByRole("heading", { level: 2 });
       const subtitle = screen.getByText(
         /zerocater, ezcater, google, netflix, apple/i,
       );

@@ -7,7 +7,34 @@ jest.useFakeTimers();
 describe('LocationRateLimiter', () => {
   beforeEach(() => {
     locationRateLimiter.clear();
+    // Restore the default interval — some tests configure() a custom one.
+    locationRateLimiter.configure(RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS);
     jest.clearAllTimers();
+  });
+
+  describe('configure', () => {
+    it('applies an admin-configured interval', () => {
+      locationRateLimiter.configure(10_000);
+      locationRateLimiter.checkAndRecordLimit('driver-1');
+
+      // Past the 5s default but inside the configured 10s window → blocked.
+      jest.advanceTimersByTime(RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS + 100);
+      expect(locationRateLimiter.checkAndRecordLimit('driver-1').allowed).toBe(false);
+
+      // Past the configured window → allowed.
+      jest.advanceTimersByTime(10_000);
+      expect(locationRateLimiter.checkAndRecordLimit('driver-1').allowed).toBe(true);
+    });
+
+    it('ignores invalid intervals (keeps the previous one)', () => {
+      locationRateLimiter.configure(NaN);
+      locationRateLimiter.configure(0);
+      locationRateLimiter.configure(-5);
+      locationRateLimiter.checkAndRecordLimit('driver-1');
+
+      jest.advanceTimersByTime(RATE_LIMIT_CONFIG.MIN_UPDATE_INTERVAL_MS + 100);
+      expect(locationRateLimiter.checkAndRecordLimit('driver-1').allowed).toBe(true);
+    });
   });
 
   afterAll(() => {

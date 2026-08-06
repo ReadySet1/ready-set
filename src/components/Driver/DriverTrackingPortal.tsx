@@ -34,6 +34,54 @@ import {
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import {
+  checkArrivalGeofence,
+  geofenceHint,
+  type GeofenceCheck,
+} from "@/lib/driver/geofence";
+import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import type { DeliveryTracking } from "@/types/tracking";
+
+/** Movement stages: the delivery has been started and MUST block ending the
+ *  shift. Mirrors the server-side guard in endDriverShift. */
+const IN_FLIGHT_STATUSES: DriverStatus[] = [
+  DriverStatus.EN_ROUTE_TO_VENDOR,
+  DriverStatus.ARRIVED_AT_VENDOR,
+  DriverStatus.PICKED_UP,
+  DriverStatus.EN_ROUTE_TO_CLIENT,
+  DriverStatus.ARRIVED_TO_CLIENT,
+];
+
+/** True when this delivery should block ending the shift: it's mid-flight, or
+ *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
+ *  Mirrors the server guard so the button state matches what the API will say.
+ *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks). */
+function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
+  if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
+  if (guardMs <= 0) return false;
+  if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
+    const pickup = new Date(delivery.scheduledPickupAt).getTime();
+    return pickup <= Date.now() + guardMs;
+  }
+  return false;
+}
+
+/** Geofence only the "arrived" steps: block advancing when the driver is
+ *  demonstrably far from the relevant stop (fail-open on unknown GPS/coords). */
+function arrivalGeofence(
+  delivery: DeliveryTracking,
+  current: { lat: number; lng: number } | null,
+  radiusM: number,
+): GeofenceCheck | null {
+  const next = getNextStatus(delivery.status);
+  if (next === DriverStatus.ARRIVED_AT_VENDOR) {
+    return checkArrivalGeofence(current, delivery.pickupLocation?.coordinates, radiusM);
+  }
+  if (next === DriverStatus.ARRIVED_TO_CLIENT) {
+    return checkArrivalGeofence(current, delivery.deliveryLocation?.coordinates, radiusM);
+  }
+  return null;
+}
 
 interface PodTarget {
   deliveryId: string;
@@ -77,6 +125,9 @@ export default function DriverTrackingPortal() {
     isOnline,
     queuedItems,
   } = useDriverTracking();
+
+  const { settings } = useTrackingSettings();
+  const endShiftGuardMs = settings.endShiftPickupGuardMinutes * 60_000;
 
   // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
@@ -137,8 +188,19 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
+  const endShiftBlockers = activeDeliveries.filter((d) =>
+    blocksEndShift(d, endShiftGuardMs),
+  ).length;
+
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
+    // Backstop for the disabled button (mirrors the server guard).
+    if (endShiftBlockers > 0) {
+      toast.error(
+        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} before ending your shift.`,
+      );
+      return;
+    }
     let location = currentLocation;
     if (!location) {
       location = {
@@ -155,6 +217,13 @@ export default function DriverTrackingPortal() {
     const ok = await endShift(currentShift.id, location);
     if (ok) stopTracking();
   };
+
+  // Surface shift failures (e.g. the server's active-delivery guard) instead
+  // of a button that silently does nothing. Effect-based so it reads the
+  // freshly-set error, not the render-time closure value.
+  useEffect(() => {
+    if (shiftError) toast.error(shiftError);
+  }, [shiftError]);
 
   const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
     setUpdatingId(deliveryId);
@@ -178,6 +247,17 @@ export default function DriverTrackingPortal() {
   const handleAdvance = (delivery: (typeof activeDeliveries)[number]) => {
     const next = getNextStatus(delivery.status);
     if (!next) return;
+    // Backstop for the disabled button: never advance an "arrived" step while
+    // the driver is demonstrably far from the stop.
+    const geofence = arrivalGeofence(
+      delivery,
+      currentLocation?.coordinates ?? null,
+      settings.arrivalGeofenceRadiusM,
+    );
+    if (geofence && !geofence.allowed && geofence.distanceM !== null) {
+      toast.error(geofenceHint(geofence.distanceM));
+      return;
+    }
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
     // The pickup step routes through vendor-signature capture (mandatory per
@@ -343,12 +423,20 @@ export default function DriverTrackingPortal() {
                       })
                     : ""}
                 </div>
+                {endShiftBlockers > 0 ? (
+                  <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                    {endShiftBlockers === 1
+                      ? "1 delivery to finish first"
+                      : `${endShiftBlockers} deliveries to finish first`}
+                  </div>
+                ) : null}
               </div>
               <DriverButton
                 variant="danger"
                 size="md"
                 onClick={handleEndShift}
                 loading={shiftLoading}
+                disabled={endShiftBlockers > 0}
               >
                 <Square className="h-4 w-4" />
                 End shift
@@ -417,6 +505,13 @@ export default function DriverTrackingPortal() {
                   const lead = idx === 0;
                   const atClient =
                     delivery.status === DriverStatus.ARRIVED_TO_CLIENT;
+                  const geofence = arrivalGeofence(
+                    delivery,
+                    currentLocation?.coordinates ?? null,
+                    settings.arrivalGeofenceRadiusM,
+                  );
+                  const geofenceBlocked =
+                    !!geofence && !geofence.allowed && geofence.distanceM !== null;
 
                   return (
                     <DriverCard
@@ -466,9 +561,15 @@ export default function DriverTrackingPortal() {
                           sub={atClient ? "Final step" : "Next step"}
                           tone={atClient ? "success" : "brand"}
                           icon={atClient ? CheckCircle2 : Navigation2}
-                          hint={lead ? "Tap to update your status" : undefined}
+                          hint={
+                            geofenceBlocked
+                              ? geofenceHint(geofence!.distanceM!)
+                              : lead
+                                ? "Tap to update your status"
+                                : undefined
+                          }
                           loading={updatingId === delivery.id}
-                          disabled={deliveriesLoading}
+                          disabled={deliveriesLoading || geofenceBlocked}
                           onClick={() => handleAdvance(delivery)}
                         />
                       ) : (

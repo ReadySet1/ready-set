@@ -30,6 +30,23 @@ jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
 // Rate limiter — default to "allowed" (null) in beforeEach.
 jest.mock('@/lib/security/rate-limit', () => ({ enforceRateLimit: jest.fn() }));
 
+// The route also enforces the admin-configured per-interval GPS cadence via
+// the module-singleton limiter — neutralize both so repeated test posts from
+// one user aren't 429'd.
+jest.mock('@/services/tracking/tracking-settings', () => ({
+  getTrackingSettings: () =>
+    Promise.resolve(
+      jest.requireActual('@/types/tracking-settings').TRACKING_SETTINGS_DEFAULTS,
+    ),
+  invalidateTrackingSettingsCache: () => {},
+}));
+jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
+  locationRateLimiter: {
+    configure: jest.fn(),
+    checkAndRecordLimit: jest.fn().mockReturnValue({ allowed: true, retryAfter: null, message: 'Request allowed' }),
+  },
+}));
+
 import { withAuth } from '@/lib/auth-middleware';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { withRawTx, rawQuery } from '@/lib/db/raw';
@@ -82,6 +99,32 @@ describe('/api/tracking/locations API', () => {
   });
 
   describe('POST /api/tracking/locations - Record Driver Location', () => {
+    describe('Admin-configured GPS interval enforcement', () => {
+      it('returns 429 when a post arrives inside the configured interval', async () => {
+        const { locationRateLimiter } = require('@/lib/rate-limiting/location-rate-limiter');
+        (locationRateLimiter.checkAndRecordLimit as jest.Mock).mockReturnValueOnce({
+          allowed: false,
+          retryAfter: 3000,
+          message: 'Rate limit exceeded. Try again in 3 seconds.',
+        });
+
+        const response = await POST(
+          createPostRequest('http://localhost:3000/api/tracking/locations', {
+            driver_id: 'driver-123',
+            latitude: 30.2672,
+            longitude: -97.7431,
+          }),
+        );
+
+        expect(response.status).toBe(429);
+        const data = await response.json();
+        expect(data.success).toBe(false);
+        // Configured with an 80% grace of the interval, keyed by the auth id.
+        expect(locationRateLimiter.configure).toHaveBeenCalledWith(5 * 800);
+        expect(locationRateLimiter.checkAndRecordLimit).toHaveBeenCalledWith('admin-1');
+      });
+    });
+
     describe('Successful Recording', () => {
       it('should record location with all fields', async () => {
         const locationData = {

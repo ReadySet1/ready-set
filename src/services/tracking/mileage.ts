@@ -5,7 +5,13 @@ import {
   MILEAGE_CONFIG,
   METERS_TO_MILES,
   milesToMeters,
+  mphToMs,
 } from '@/config/mileage-config';
+// Admin-editable settings (cache-backed, fail-open to defaults). These
+// supersede the MILEAGE_* env-var overrides for the accuracy / max-speed /
+// max-shift-miles knobs; the remaining MILEAGE_CONFIG keys are unchanged.
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import type { TrackingSettings } from '@/types/tracking-settings';
 
 /**
  * Internal type representing the minimal shift window needed for mileage calculation.
@@ -59,7 +65,11 @@ function assertUuid(id: string, field: 'shiftId' | 'driverId'): void {
 async function calculateWindowDistanceMiles(
   driverId: string,
   startTime: Date,
-  endTime: Date
+  endTime: Date,
+  // Snapshot resolved once per exported entry point, so one logical
+  // calculation (shift total + per-delivery breakdown) can never mix two
+  // configurations across a mid-run settings change.
+  settings: TrackingSettings
 ): Promise<{ miles: number; warnings: string[] }> {
   assertUuid(driverId, 'driverId');
   const warnings: string[] = [];
@@ -76,7 +86,7 @@ async function calculateWindowDistanceMiles(
     WHERE driver_id = $1::uuid
       AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
       AND deleted_at IS NULL
-  `, driverId, startTime, endTime, MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M);
+  `, driverId, startTime, endTime, settings.mileageGpsAccuracyThresholdM);
 
   const totalPoints = Number(diagnosticRows[0]?.total_points ?? 0);
   const filteredPoints = Number(diagnosticRows[0]?.filtered_points ?? 0);
@@ -111,7 +121,7 @@ async function calculateWindowDistanceMiles(
   }
 
   // Convert config values for SQL query
-  const maxSpeedMsForQuery = MILEAGE_CONFIG.MAX_SPEED_MPH / 2.23694; // mph to m/s
+  const maxSpeedMsForQuery = mphToMs(settings.mileageMaxSpeedMph);
   const maxSegmentMeters = milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES);
 
   const rows = await prisma.$queryRawUnsafe<{ total_miles: number | null }[]>(`
@@ -165,7 +175,7 @@ async function calculateWindowDistanceMiles(
     driverId,
     startTime,
     endTime,
-    MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M,
+    settings.mileageGpsAccuracyThresholdM,
     MILEAGE_CONFIG.MIN_MOVING_SPEED_MS,
     maxSegmentMeters,
     MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS,
@@ -222,22 +232,25 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
+  const settings = await getTrackingSettings();
   const { miles: totalMiles, warnings } = await calculateWindowDistanceMiles(
     shift.driver_id,
     startTime,
-    endTime
+    endTime,
+    settings
   );
 
   // Warn if mileage seems unrealistically high
-  if (totalMiles > MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES) {
-    const warningMsg = `Unusually high mileage: ${totalMiles.toFixed(2)} miles exceeds ${MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES} mile threshold`;
+  const maxReasonableMiles = settings.maxReasonableShiftMiles;
+  if (totalMiles > maxReasonableMiles) {
+    const warningMsg = `Unusually high mileage: ${totalMiles.toFixed(2)} miles exceeds ${maxReasonableMiles} mile threshold`;
     warnings.push(warningMsg);
     Sentry.captureMessage('Unusually high mileage for shift', {
       level: 'warning',
       extra: {
         shiftId,
         totalMiles: totalMiles.toFixed(2),
-        threshold: MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES,
+        threshold: maxReasonableMiles,
       },
     });
   }
@@ -283,8 +296,9 @@ export async function calculateShiftMileageWithBreakdown(
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
+  const settings = await getTrackingSettings();
   const [totalResult, deliveries] = await Promise.all([
-    calculateWindowDistanceMiles(shift.driver_id, startTime, endTime),
+    calculateWindowDistanceMiles(shift.driver_id, startTime, endTime, settings),
     prisma.$queryRawUnsafe<{
       id: string;
       driver_id: string;
@@ -336,7 +350,8 @@ export async function calculateShiftMileageWithBreakdown(
     const { miles: distanceMiles } = await calculateWindowDistanceMiles(
       shift.driver_id,
       windowStart,
-      windowEnd
+      windowEnd,
+      settings
     );
 
     breakdown.push({
@@ -408,10 +423,12 @@ export async function calculateShiftMileageWithValidation(
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
+  const settings = await getTrackingSettings();
   const { miles: gpsMiles, warnings } = await calculateWindowDistanceMiles(
     shift.driver_id,
     startTime,
-    endTime
+    endTime,
+    settings
   );
 
   // Calculate discrepancy between GPS and reported values

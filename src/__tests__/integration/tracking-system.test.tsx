@@ -35,6 +35,18 @@ jest.mock('@/contexts/DriverTrackingContext', () => ({
 // Mock admin tracking hook
 jest.mock('@/hooks/tracking/useAdminRealtimeTracking');
 
+// Tracking settings are fetched via TanStack Query in production; these
+// integration tests render without a QueryClientProvider, so pin the hook to
+// the fail-open defaults.
+jest.mock('@/hooks/tracking/useTrackingSettings', () => ({
+  TRACKING_SETTINGS_QUERY_KEY: ['tracking-settings'],
+  useTrackingSettings: () => ({
+    settings: jest.requireActual('@/types/tracking-settings')
+      .TRACKING_SETTINGS_DEFAULTS,
+    isLoaded: true,
+  }),
+}));
+
 // Mock the hooks with correct types
 const mockUseDriverTracking = useDriverTracking as jest.MockedFunction<typeof useDriverTracking>;
 const mockUseAdminRealtimeTracking = useAdminRealtimeTracking as jest.MockedFunction<

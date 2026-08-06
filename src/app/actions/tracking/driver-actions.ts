@@ -21,6 +21,7 @@ import {
   calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 
 /**
  * Start a new driver shift
@@ -148,11 +149,31 @@ export async function endDriverShift(
     // Guard: a driver may not end a shift while they still have active
     // deliveries — doing so would strand an in-progress order. Admins may
     // override by passing metadata.force. "Active" = a non-terminal row in the
-    // `deliveries` table (what the live portal shows), or a catering/on-demand
-    // order the driver has actually started (driverStatus in a movement stage).
+    // `deliveries` table (what the live portal shows), a catering/on-demand
+    // order the driver has actually started (driverStatus in a movement stage),
+    // or — 2026-07-09 drive-test feedback — an ASSIGNED order whose pickup is
+    // imminent (within the admin-configured window) or overdue. Future-dated
+    // assignments don't trap the driver. A window of 0 disables the
+    // imminent-pickup branch entirely (in-flight orders always block).
+    // Mirrored client-side by blocksEndShift in DriverTrackingPortal.
     const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
     if (!force) {
+      const settings = await getTrackingSettings();
+      const guardMinutes = settings.endShiftPickupGuardMinutes;
+      // The pickup window is bound as a parameter (never interpolated); the
+      // alias is a compile-time constant, one fragment builder for both tables.
+      const imminentPickup = (alias: 'cr' | 'od') =>
+        guardMinutes > 0
+          ? `OR (${alias}."driverStatus" = 'ASSIGNED'
+                      AND ${alias}."pickupDateTime" IS NOT NULL
+                      AND ${alias}."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
+          : '';
+      const imminentPickupCr = imminentPickup('cr');
+      const imminentPickupOd = imminentPickup('od');
+      const guardParams: unknown[] = guardMinutes > 0
+        ? [shift?.driver_id, guardMinutes]
+        : [shift?.driver_id];
       const blocking = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`
         SELECT
           (
@@ -170,18 +191,24 @@ export async function endDriverShift(
             WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
               AND (
                 (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
-                  AND cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+                  AND (
+                    cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                    ${imminentPickupCr}
+                  ))
                 OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
-                  AND od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT'))
+                  AND (
+                    od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                    ${imminentPickupOd}
+                  ))
               )
           ) AS n
-      `, shift?.driver_id);
+      `, ...guardParams);
 
       const activeCount = Number(blocking[0]?.n ?? 0);
       if (activeCount > 0) {
         return {
           success: false,
-          error: `You still have ${activeCount} active ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete or cancel ${activeCount === 1 ? 'it' : 'them'} before ending your shift.`,
+          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} (or ask dispatch to reassign) before ending your shift.`,
           activeDeliveries: activeCount,
         };
       }
@@ -523,9 +550,19 @@ export async function updateDriverLocation(
       return { success: false, error: 'Access denied' };
     }
 
-    // Check rate limit atomically (1 update per 5 seconds per driver)
+    // Check rate limit atomically (1 update per admin-configured interval per
+    // driver; cache-backed settings read, defaults on any failure). The same
+    // settings read keeps the server-side stale detector's threshold in step
+    // with what admins configured on the dashboard.
     // SECURITY FIX: Using checkAndRecordLimit() to prevent race conditions
     // This atomically checks AND records, preventing concurrent requests from bypassing the limit
+    const trackingSettings = await getTrackingSettings();
+    locationRateLimiter.configure(
+      trackingSettings.locationUpdateIntervalSeconds * 1000,
+    );
+    staleLocationDetector.setStaleThreshold(
+      trackingSettings.staleGpsThresholdSeconds * 1000,
+    );
     const rateLimit = locationRateLimiter.checkAndRecordLimit(driverId);
     if (!rateLimit.allowed) {
       realtimeLogger.rateLimit(driverId, rateLimit.retryAfter!);

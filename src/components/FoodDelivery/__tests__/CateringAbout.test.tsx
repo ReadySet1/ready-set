@@ -299,7 +299,7 @@ describe("CateringAbout", () => {
       render(<CateringAbout />);
 
       const link = screen.getByRole("link", { name: "How Our Service Works" });
-      expect(link).toHaveAttribute("href", "/vendor-hero#vendor-hero");
+      expect(link).toHaveAttribute("href", "/vendor-hero");
     });
 
     it("renders the link with correct text and styling", () => {

@@ -35,6 +35,7 @@ jest.mock('@/lib/auth/driver-ownership', () => ({
 jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
   locationRateLimiter: {
     checkAndRecordLimit: jest.fn().mockReturnValue({ allowed: true }),
+    configure: jest.fn(),
   },
   RateLimitExceededError: class extends Error {
     constructor(message: string) {
@@ -57,6 +58,7 @@ jest.mock('@/lib/logging/realtime-logger', () => ({
 jest.mock('@/lib/realtime/stale-detection', () => ({
   staleLocationDetector: {
     recordLocation: jest.fn(),
+    setStaleThreshold: jest.fn(),
   },
 }));
 
@@ -66,6 +68,16 @@ jest.mock('@/lib/cache/driver-metadata-cache', () => ({
     get: jest.fn(),
     set: jest.fn(),
   },
+}));
+
+// Mock tracking settings resolver — plain functions (not jest.fn) so the
+// suite's resetAllMocks can't wipe the implementation mid-run.
+jest.mock('@/services/tracking/tracking-settings', () => ({
+  getTrackingSettings: () =>
+    Promise.resolve(
+      jest.requireActual('@/types/tracking-settings').TRACKING_SETTINGS_DEFAULTS,
+    ),
+  invalidateTrackingSettingsCache: () => {},
 }));
 
 // Mock mileage calculation service

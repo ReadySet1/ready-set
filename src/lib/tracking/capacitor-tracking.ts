@@ -43,8 +43,19 @@ export interface NativeTrackingSession {
   getAccessToken: () => Promise<string | null>;
 }
 
-/** Match the server rate limit (~12/min) and the web client's throttle. */
-const POST_THROTTLE_MS = 5000;
+/**
+ * Post throttle, kept in step with the admin-configured GPS update interval
+ * (tracking settings) via setNativePostThrottleMs. The 5s default matches the
+ * historical server rate limit and applies until the setting is pushed in.
+ */
+let postThrottleMs = 5000;
+
+/** Ignores invalid values — keeps the previous throttle. */
+export function setNativePostThrottleMs(throttleMs: number): void {
+  if (Number.isFinite(throttleMs) && throttleMs > 0) {
+    postThrottleMs = throttleMs;
+  }
+}
 
 let watcherId: string | null = null;
 let lastPostAt = 0;
@@ -89,7 +100,7 @@ export async function startNativeShiftTracking(
       if (!location) return;
 
       const now = Date.now();
-      if (now - lastPostAt < POST_THROTTLE_MS) return;
+      if (now - lastPostAt < postThrottleMs) return;
       lastPostAt = now;
 
       const token = await session.getAccessToken();

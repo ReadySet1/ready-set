@@ -13,6 +13,25 @@ import { ClientDeliveryConfiguration, getConfiguration, getActiveConfigurations,
 import { captureMessage } from '@/lib/monitoring/sentry';
 
 // ============================================================================
+// ERRORS
+// ============================================================================
+
+/**
+ * Thrown when an order requires manual review (e.g. headcount >= threshold
+ * for a client with `requiresManualReview: true`).
+ *
+ * Exported so both engine consumers and API routes can detect this
+ * business condition via `instanceof` instead of string-matching on
+ * `error.message`.
+ */
+export class ManualReviewRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManualReviewRequiredError';
+  }
+}
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -229,6 +248,32 @@ function isInTier(value: number, min: number, max: number | null): boolean {
 }
 
 /**
+ * Rounds a dollar amount to cents. Percentage-based fees (e.g. 9% of food
+ * cost) produce float artifacts ($1,333.33 × 0.09 = 119.99969999999999)
+ * that would otherwise reach API responses verbatim.
+ */
+function roundToCents(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/**
+ * Returns true when a pricing tier is a manual-review sentinel: a
+ * placeholder row with rate 0 and no percentage override.
+ *
+ * Tiers that carry `regularRatePercent` / `within10MilesPercent`
+ * (e.g. CaterValley's 10 %) are intentionally percent-priced, NOT
+ * sentinels, so this returns false for them.
+ */
+function isSentinelTier(tier: PricingTier): boolean {
+  return (
+    tier.regularRate === 0 &&
+    tier.within10Miles === 0 &&
+    !tier.regularRatePercent &&
+    !tier.within10MilesPercent
+  );
+}
+
+/**
  * Calculates extra stops charge for multi-stop deliveries
  * First stop is included in base delivery cost, additional stops are charged extra
  *
@@ -287,7 +332,7 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
     });
 
     // Return sanitized message to client without exposing exact thresholds
-    throw new Error(
+    throw new ManualReviewRequiredError(
       `This order requires manual review. Please contact support for a custom quote.`
     );
   }
@@ -485,6 +530,19 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // 1. Determine if within 10 miles
   const isWithin10Miles = totalMileage <= config.distanceThreshold;
 
+  // 1.5. Early sentinel guard — if the headcount falls in a sentinel
+  // tier (rate 0, no percent override), fire the manual-review check
+  // BEFORE tier selection so that a food-cost tier's non-zero fee
+  // cannot bypass the deliveryCost===0 guard below.
+  if (config.driverPaySettings.requiresManualReview) {
+    const hcSentinel = config.pricingTiers.find(t =>
+      isInTier(headcount, t.headcountMin, t.headcountMax)
+    );
+    if (hcSentinel && isSentinelTier(hcSentinel)) {
+      checkManualReviewRequired(headcount, config);
+    }
+  }
+
   // 2. Determine pricing tier (LESSER FEE of headcount or food cost)
   const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
 
@@ -493,11 +551,11 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   let deliveryCost: number;
   if (isWithin10Miles) {
     deliveryCost = tier.within10MilesPercent
-      ? foodCost * tier.within10MilesPercent
+      ? roundToCents(foodCost * tier.within10MilesPercent)
       : tier.within10Miles;
   } else {
     deliveryCost = tier.regularRatePercent
-      ? foodCost * tier.regularRatePercent
+      ? roundToCents(foodCost * tier.regularRatePercent)
       : tier.regularRate;
   }
 
@@ -684,6 +742,18 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     };
   }
 
+  // Early sentinel guard — mirror of calculateDeliveryCost's guard.
+  // If the headcount falls in a sentinel pricing tier, fire the
+  // manual-review check before any fee resolution can proceed.
+  if (config.driverPaySettings.requiresManualReview) {
+    const hcSentinel = config.pricingTiers.find(t =>
+      isInTier(headcount, t.headcountMin, t.headcountMax)
+    );
+    if (hcSentinel && isSentinelTier(hcSentinel)) {
+      checkManualReviewRequired(headcount, config);
+    }
+  }
+
   // CRITICAL RULE: Direct tip = NO base pay, NO bonus
   // Driver only receives tip + mileage when a direct tip is given
   const hasDirectTip = directTip > 0;
@@ -759,8 +829,8 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     const isWithin10Miles = totalMileage <= config.distanceThreshold;
     const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
     readySetFee = isWithin10Miles
-      ? (tier.within10MilesPercent ? foodCost * tier.within10MilesPercent : tier.within10Miles)
-      : (tier.regularRatePercent ? foodCost * tier.regularRatePercent : tier.regularRate);
+      ? (tier.within10MilesPercent ? roundToCents(foodCost * tier.within10MilesPercent) : tier.within10Miles)
+      : (tier.regularRatePercent ? roundToCents(foodCost * tier.regularRatePercent) : tier.regularRate);
   } else {
     // Default: use fixed Ready Set fee from config
     readySetFee = config.driverPaySettings.readySetFee;

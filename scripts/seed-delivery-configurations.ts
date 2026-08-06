@@ -3,12 +3,17 @@
 /**
  * Seed Delivery Configurations Script
  *
- * Seeds ALL in-memory client delivery configurations into the database,
+ * Seeds in-memory client delivery configurations into the database,
  * including zeroOrderSettings. This ensures the DB has the current
  * production values as the baseline before operators start editing
  * via the Adjust Vendor Pricing UI.
  *
- * Run with: pnpm tsx scripts/seed-delivery-configurations.ts
+ * Run with:
+ *   pnpm tsx scripts/seed-delivery-configurations.ts              # all configs
+ *   pnpm tsx scripts/seed-delivery-configurations.ts --config-id try-hungry  # single config
+ *
+ * Production safety: when DATABASE_URL points to a production host,
+ * the script requires an explicit --confirm flag to proceed.
  */
 
 import { config } from 'dotenv';
@@ -22,18 +27,68 @@ config({ path: '.env.local' });
 config({ path: '.env.development.local' });
 config({ path: '.env' });
 
+// ---------------------------------------------------------------------------
+// CLI flags
+// ---------------------------------------------------------------------------
+
+const args = process.argv.slice(2);
+const configIdFlag = args.includes('--config-id')
+  ? args[args.indexOf('--config-id') + 1]
+  : undefined;
+const confirmFlag = args.includes('--confirm');
+
+// ---------------------------------------------------------------------------
+// Production safety guard
+// ---------------------------------------------------------------------------
+
+const PRODUCTION_HOST_PATTERNS = [
+  '.supabase.co',
+  '.supabase.com',
+  '.neon.tech',
+  'rds.amazonaws.com',
+  '.aivencloud.com',
+];
+
+function isProductionUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return PRODUCTION_HOST_PATTERNS.some((pattern) => url.includes(pattern));
+}
+
+if (isProductionUrl(process.env.DATABASE_URL) && !confirmFlag) {
+  console.error(
+    '❌ DATABASE_URL points to a production host.\n' +
+    '   Re-run with --confirm to proceed:\n' +
+    `   pnpm tsx scripts/seed-delivery-configurations.ts${configIdFlag ? ` --config-id ${configIdFlag}` : ''} --confirm`,
+  );
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 
 async function seedDeliveryConfigurations() {
-  console.log('Seeding delivery configurations to database...\n');
-
   const allConfigs = Object.values(CLIENT_CONFIGURATIONS);
-  console.log(`Found ${allConfigs.length} in-memory configurations\n`);
+
+  // Scope to a single config if --config-id was provided
+  const configs = configIdFlag
+    ? allConfigs.filter((c) => c.id === configIdFlag)
+    : allConfigs;
+
+  if (configIdFlag && configs.length === 0) {
+    console.error(`❌ No in-memory config found for id "${configIdFlag}".`);
+    console.error('   Available ids:', allConfigs.map((c) => c.id).join(', '));
+    process.exit(1);
+  }
+
+  console.log(
+    configIdFlag
+      ? `Seeding config "${configIdFlag}" to database...\n`
+      : `Seeding all ${configs.length} delivery configurations to database...\n`,
+  );
 
   let created = 0;
   let updated = 0;
 
-  for (const cfg of allConfigs) {
+  for (const cfg of configs) {
     console.log(`Processing: ${cfg.clientName} (${cfg.id})`);
 
     const dbData = {
@@ -81,19 +136,20 @@ async function seedDeliveryConfigurations() {
   console.log('\nSeed Summary:');
   console.log(`  Created: ${created}`);
   console.log(`  Updated: ${updated}`);
-  console.log(`  Total:   ${allConfigs.length}`);
+  console.log(`  Total:   ${configs.length}`);
 
   // Verify by reading back
   console.log('\nVerifying...');
-  const dbCount = await prisma.deliveryConfiguration.count();
-  console.log(`  DB records: ${dbCount}`);
-
-  const hyConfig = await prisma.deliveryConfiguration.findUnique({
-    where: { configId: 'hy-food-company-direct' },
-  });
-  if (hyConfig) {
-    const zos = hyConfig.zeroOrderSettings as any;
-    console.log(`  HY Food Company zeroOrderSettings: ${zos ? `enabled=${zos.enabled}, readySetFee=$${zos.readySetFee}` : 'null'}`);
+  if (configIdFlag) {
+    const seeded = await prisma.deliveryConfiguration.findUnique({
+      where: { configId: configIdFlag },
+    });
+    if (seeded) {
+      console.log(`  ${seeded.clientName}: mileageRate=$${seeded.mileageRate}, active=${seeded.isActive}`);
+    }
+  } else {
+    const dbCount = await prisma.deliveryConfiguration.count();
+    console.log(`  DB records: ${dbCount}`);
   }
 
   console.log('\nSeed complete!');

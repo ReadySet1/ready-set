@@ -106,7 +106,7 @@ const FlowersAbout: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.8 }}
             >
               <Link
-                href="/vendor-hero#vendor-hero"
+                href="/vendor-hero"
                 className="inline-block rounded-full bg-yellow-400 px-12 py-4 text-lg font-extrabold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2"
               >
                 How Our Service Works
