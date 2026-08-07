@@ -55,6 +55,7 @@
     "optimize:database": "psql $DATABASE_URL -f scripts/optimization/transaction-optimizer.sql",
     "studio": "dotenv -e .env.local -- npx prisma studio",
     "load-test:driver": "node scripts/load-test/driver-load-test.mjs",
+    "test:drive:reset": "dotenv -e .env.local -- tsx scripts/reset-driver-test-drive.ts",
     "db:generate": "dotenv -e .env.local -- npx prisma generate",
     "prisma": "prisma generate",
     "postinstall": "node -e \"if (process.env.PRISMA_SKIP_POSTINSTALL_GENERATE !== 'true' && process.env.CI !== 'true') { try { require('child_process').execSync('prisma generate', { stdio: 'inherit' }); } catch (e) { console.log('Skipping prisma generate in postinstall:', e.message); } }\"",
