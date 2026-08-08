@@ -43,7 +43,9 @@
   --rs-driver-bg: #eef2f7;
   --rs-driver-surface: #ffffff;
   --rs-driver-surface-alt: #f5f8fc;
-  --rs-driver-glass: rgba(244, 247, 251, 0.82);
+  /* Fixed/sticky bars. iOS Safari 16.x drops backdrop-filter in some stacking
+     contexts, so this alpha alone has to hide the content scrolling beneath. */
+  --rs-driver-glass: rgba(244, 247, 251, 0.96);
   --rs-driver-border: #e2e8f0;
   --rs-driver-border-hi: #cbd5e1;
   --rs-driver-text: #15202e;
@@ -92,7 +94,7 @@
   --rs-driver-bg: #070b14;
   --rs-driver-surface: #0f1828;
   --rs-driver-surface-alt: #16202f;
-  --rs-driver-glass: rgba(10, 17, 32, 0.78);
+  --rs-driver-glass: rgba(10, 17, 32, 0.95);
   --rs-driver-border: #22304a;
   --rs-driver-border-hi: #2e4060;
   --rs-driver-text: #f4f7fb;
