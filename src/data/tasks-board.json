@@ -1,7 +1,7 @@
 {
   "title": "Ready Set — Tasks Board",
-  "subtitle": "Action items from the Dev Team Meetings (May 4 – Aug 3) + driver walk/drive-test fixes — status as of August 5, 2026 (native driver-app track parked).",
-  "generated": "2026-08-05",
+  "subtitle": "Action items from the Dev Team Meetings (May 4 – Aug 10) + driver walk/drive-test fixes — status as of August 10, 2026 (native driver-app track parked).",
+  "generated": "2026-08-10",
   "sources": [
     "meetings/shared/2026-05-04-dev-team-meeting.md",
     "meetings/shared/2026-05-11-dev-team-meeting.md",
@@ -56,7 +56,8 @@
     "review": "Code Review",
     "jul13": "July 13",
     "jul21": "Jul 21 planning",
-    "aug3": "Aug 3 session"
+    "aug3": "Aug 3 session",
+    "aug10": "Aug 10"
   },
   "tasks": [
     {
@@ -998,6 +999,71 @@
       "owner": "fernando",
       "source": "aug3",
       "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted."
+    },
+    {
+      "id": "hide-duplicate-flowers-catering-ctas",
+      "status": "progress",
+      "title": "Hide duplicate CTAs on flowers + catering landing pages",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Hide the duplicate <em>How Our Service Works</em> button on <code>/flowers-deliveries</code> and the <em>Get Started</em> button on <code>/catering-deliveries</code>.<br><br><strong>Already implemented 2026-08-07 on branch <code>fix/hide-cta-buttons</code> (commit <code>b97da612</code>) — not yet merged.</strong> Both CTAs are gated behind visibility flags in <code>src/config/marketing-cta-config.ts</code>, defaulted off, and remain in source behind <code>{flag &amp;&amp; &lt;JSX/&gt;}</code> conditionals so they can be restored with a one-line flip. Touches <code>src/components/FlowersDelivery/FlowersAbout.tsx</code> and <code>src/components/FoodDelivery/CateringFeatures.tsx</code>; tests cover both flag states. Next step is a PR into <code>development</code>."
+    },
+    {
+      "id": "delivery-partners-componere-donaji-logos",
+      "status": "new",
+      "title": "Add Componere and Donaji logos to Food Delivery Partners",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Add two new partner logos, <em>Componere</em> and <em>Donaji</em>, to the Food Delivery Partners section of <code>/catering-deliveries</code>. Rendered by <code>src/components/FoodDelivery/DeliveryPartners.tsx</code>.<br><br>Blocked on receiving the logo assets from the team. Match the existing partner tile treatment and confirm the responsive grid still balances with the added entries."
+    },
+    {
+      "id": "remove-optional-label-headcount-order",
+      "status": "new",
+      "title": "Remove \"(Optional)\" label from Headcount and Order fields",
+      "owner": "fernando",
+      "source": "aug10",
+      "tags": ["bug"],
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The Headcount and Order fields in the order-creation flow are labelled <em>(Optional)</em> but are not optional — the label is misleading during order creation and should be removed.<br><br>Rendered by <code>src/components/CateringRequest/OnDemandForm.tsx</code>, which passes a shared <code>optional</code> prop into two label components that emit <code>(Optional)</code>. Check whether the fields are genuinely required in validation and align the label with the real requirement rather than only deleting the text."
+    },
+    {
+      "id": "add-tx-ga-counties-order-creation",
+      "status": "new",
+      "title": "Add TX and GA counties to order creation",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific."
+    },
+    {
+      "id": "order-created-inbox-notification",
+      "status": "new",
+      "title": "Email the Ready Set inbox on every order created",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Every order created on the website should trigger an email notification to the Ready Set inbox account, so the team sees new orders without polling the admin dashboard.<br><br>Order creation runs through <code>src/app/api/orders/route.ts</code>; email plumbing already exists in <code>src/lib/email-service.ts</code> and <code>src/services/email-notification.ts</code>. Confirm first whether a notification is already wired and failing silently rather than genuinely absent — that changes this from a feature to a bug. Make delivery failures non-fatal so a bounced notification can never roll back a successful order."
+    },
+    {
+      "id": "pricing-section-how-pricing-works",
+      "status": "new",
+      "title": "Add a pricing explainer to the website pricing section",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Add a new request to the pricing section of the website explaining how Ready Set pricing works. Target page is <code>src/app/(site)/pricing/page.tsx</code>.<br><br><strong>Scope pending:</strong> the ask does not yet specify whether this is static explanatory copy, an interactive calculator, or a form request. Confirm the intended output with the team before implementation."
+    },
+    {
+      "id": "catering-delivery-designed-redesign",
+      "status": "new",
+      "title": "Redesign \"Delivery Designed for Your Catering\" section",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>New redesign requested for the <em>Delivery Designed for Your Catering</em> section on <code>/catering-deliveries</code>, rendered by <code>src/components/FoodDelivery/CateringAbout.tsx</code>.<br><br><strong>Scope pending:</strong> no design direction supplied yet. Needs either a design handoff or an agreed direction before implementation, and should follow the same token-driven approach used by the tasks-board redesign so <code>pnpm lint:tokens:diff</code> stays clean."
+    },
+    {
+      "id": "web-app-mobile-testing-matrix-a-h",
+      "status": "new",
+      "title": "Finalize web app mobile testing matrix (sections A–H)",
+      "owner": "fernando",
+      "source": "aug10",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Complete the web app mobile testing matrix covering sections A through H. This is a QA deliverable rather than a code change.<br><br>Coordinate with the existing QA board so results feed the same reporting path, and consider linking finished sections back to QA test keys via <code>relatedQa</code> once they exist."
     }
   ]
 }
