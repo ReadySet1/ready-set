@@ -1,7 +1,7 @@
 {
   "title": "Ready Set — Tasks Board",
-  "subtitle": "Action items from the Dev Team Meetings (May 4 – Aug 10) + driver walk/drive-test fixes — status as of August 10, 2026 (native driver-app track parked).",
-  "generated": "2026-08-10",
+  "subtitle": "Action items from the Dev Team Meetings (May 4 – Aug 3) + driver walk/drive-test fixes — status as of August 5, 2026 (native driver-app track parked).",
+  "generated": "2026-08-05",
   "sources": [
     "meetings/shared/2026-05-04-dev-team-meeting.md",
     "meetings/shared/2026-05-11-dev-team-meeting.md",
@@ -1001,6 +1001,29 @@
       "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted."
     },
     {
+      "id": "ci-test-failure-masking",
+      "status": "open",
+      "title": "CI masks test failures: e2e swallowed twice, unit tests soft-gated",
+      "owner": "emmanuel",
+      "source": "aug10",
+      "sourceRef": "#511",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "description": "Found reviewing PR #511: <code>ci.yml</code> wraps <code>pnpm test:e2e</code> in <code>|| exit 0</code> AND the e2e job has <code>continue-on-error: true</code>, so a red e2e suite still shows a green check (PR #511 hides a link that <code>flowers-landing-page.spec.ts</code> test 12 asserts visible, and CI stayed green). Unit tests run with <code>|| true</code> plus a 95% aggregate pass-rate threshold (REA-285). Remove both e2e masking layers and reconsider the unit threshold so test checks actually gate merges."
+    },
+    {
+      "id": "calendar-url-dedup",
+      "status": "new",
+      "title": "Centralize the Google Calendar booking URL (duplicated in 20+ components)",
+      "owner": "emmanuel",
+      "source": "aug10",
+      "sourceRef": "#511",
+      "tags": [],
+      "description": "The same Google Calendar appointments URL is hardcoded verbatim in 20+ components (SpecialtyHero, BakeryHero, VendorHero, FlowerHero, LogisticsHero, PromoPopup, CateringFeatures, tests, etc.). Extract to a shared constant (e.g. <code>src/config/scheduling-config.ts</code>) so a booking-link change is one edit."
+    },
+    {
       "id": "hide-duplicate-flowers-catering-ctas",
       "status": "progress",
       "title": "Hide duplicate CTAs on flowers + catering landing pages",
@@ -1022,7 +1045,9 @@
       "title": "Remove \"(Optional)\" label from Headcount and Order fields",
       "owner": "fernando",
       "source": "aug10",
-      "tags": ["bug"],
+      "tags": [
+        "bug"
+      ],
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>The Headcount and Order fields in the order-creation flow are labelled <em>(Optional)</em> but are not optional — the label is misleading during order creation and should be removed.<br><br>Rendered by <code>src/components/CateringRequest/OnDemandForm.tsx</code>, which passes a shared <code>optional</code> prop into two label components that emit <code>(Optional)</code>. Check whether the fields are genuinely required in validation and align the label with the real requirement rather than only deleting the text."
     },
     {

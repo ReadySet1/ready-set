@@ -26,12 +26,14 @@ import {
   revokeImagePreviewUrl,
   formatFileSize,
   generatePODFilename,
+  POD_PHOTO_TOO_LARGE_ERROR,
 } from '@/lib/utils/image-compression';
 import {
   ProofOfDeliveryCaptureProps,
   PODCaptureState,
   PODMetadata,
   POD_STORAGE_CONFIG,
+  POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES,
 } from '@/types/proof-of-delivery';
 import { usePODOfflineQueue } from '@/hooks/tracking/usePODOfflineQueue';
 import { Badge } from '@/components/ui/badge';
@@ -196,6 +198,23 @@ export function ProofOfDeliveryCapture({
       return;
     }
 
+    // Belt-and-suspenders size guard: never send (or queue) a file the server
+    // would always reject — surface a clear error before any doomed POST.
+    if (state.file.size > POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES) {
+      if (state.previewUrl) {
+        revokeImagePreviewUrl(state.previewUrl);
+      }
+      setState({
+        status: 'error',
+        previewUrl: null,
+        uploadProgress: 0,
+        error: POD_PHOTO_TOO_LARGE_ERROR,
+        file: null, // no "Complete anyway" — queueing it would replay a doomed upload
+      });
+      onError?.(POD_PHOTO_TOO_LARGE_ERROR);
+      return;
+    }
+
     const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
 
     // Offline → queue for later and let completion proceed.
@@ -266,7 +285,7 @@ export function ProofOfDeliveryCapture({
       }));
       onError?.(errorMessage);
     }
-  }, [state.file, deliveryId, uploadEndpoint, offlineStatus.isOnline, queueForLater, onUploadComplete, onError]);
+  }, [state.file, state.previewUrl, deliveryId, uploadEndpoint, offlineStatus.isOnline, queueForLater, onUploadComplete, onError]);
 
   /**
    * Render camera permission error state

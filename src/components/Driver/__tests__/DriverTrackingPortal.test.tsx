@@ -75,6 +75,7 @@ const requestLocationPermission = jest.fn().mockResolvedValue(true);
 const startShift = jest.fn().mockResolvedValue(true);
 const endShift = jest.fn().mockResolvedValue(true);
 const updateDeliveryStatus = jest.fn().mockResolvedValue(true);
+const refreshDeliveries = jest.fn().mockResolvedValue(undefined);
 
 const sampleLocation = {
   driverId: "driver-1",
@@ -112,6 +113,7 @@ function baseCtx(overrides: Record<string, unknown> = {}) {
     deliveriesLoading: false,
     deliveriesError: null,
     updateDeliveryStatus,
+    refreshDeliveries,
     isOnline: true,
     queuedItems: 0,
     ...overrides,
@@ -416,19 +418,21 @@ describe("DriverTrackingPortal (redesigned)", () => {
         ],
       });
 
-    it("disables End shift while a delivery is mid-flight", () => {
+    it("blocks End shift while a delivery is mid-flight", () => {
       mockUseDriverTracking.mockReturnValue(
         withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
       );
       renderPortal();
+      // aria-disabled (not the disabled attribute) so a tap on a stale client
+      // can still trigger the self-heal path instead of being swallowed.
       expect(
         screen.getByRole("button", { name: /end shift/i }),
-      ).toBeDisabled();
+      ).toHaveAttribute("aria-disabled", "true");
       expect(screen.getByText(/1 delivery to finish first/i)).toBeInTheDocument();
       expect(endShift).not.toHaveBeenCalled();
     });
 
-    it("disables End shift for an ASSIGNED delivery whose pickup is overdue", () => {
+    it("blocks End shift for an ASSIGNED delivery whose pickup is overdue", () => {
       mockUseDriverTracking.mockReturnValue(
         withDelivery({
           status: DriverStatus.ASSIGNED,
@@ -438,7 +442,26 @@ describe("DriverTrackingPortal (redesigned)", () => {
       renderPortal();
       expect(
         screen.getByRole("button", { name: /end shift/i }),
-      ).toBeDisabled();
+      ).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("self-heals on tap while blocked: refreshes the feed, explains, and does not end the shift", async () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+
+      // The button is blocked but still tappable (aria-disabled, no disabled
+      // attribute) — a stale client heals itself instead of ignoring the tap.
+      fireEvent.click(screen.getByRole("button", { name: /end shift/i }));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringMatching(/you still have 1 active or due delivery/i),
+        ),
+      );
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+      expect(endShift).not.toHaveBeenCalled();
     });
 
     it("allows End shift when the only assignment is well in the future", async () => {
@@ -492,7 +515,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
         renderPortal();
         expect(
           screen.getByRole("button", { name: /end shift/i }),
-        ).toBeDisabled();
+        ).toHaveAttribute("aria-disabled", "true");
       });
 
       it("honors a shortened guard window from settings", () => {
@@ -523,7 +546,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
         renderPortal();
         expect(
           screen.getByRole("button", { name: /end shift/i }),
-        ).toBeDisabled();
+        ).toHaveAttribute("aria-disabled", "true");
       });
     });
   });

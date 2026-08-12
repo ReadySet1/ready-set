@@ -38,6 +38,7 @@ jest.mock('@/lib/utils/image-compression', () => ({
   revokeImagePreviewUrl: jest.fn(),
   formatFileSize: jest.fn((size: number) => `${(size / 1024).toFixed(1)} KB`),
   generatePODFilename: jest.fn((deliveryId: string) => `pod-${deliveryId}.jpg`),
+  POD_PHOTO_TOO_LARGE_ERROR: 'Photo too large to upload — try again',
 }));
 
 // Mock UI components
@@ -129,6 +130,8 @@ jest.mock('@/types/proof-of-delivery', () => ({
     pathPrefix: 'deliveries',
     filenamePattern: 'delivery-{deliveryId}-{timestamp}.jpg',
   },
+  // Client-side hard limit: server cap (4MB) minus safety margin (0.5MB).
+  POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES: 3.5 * 1024 * 1024,
 }));
 
 const { useCameraPermission, isMobileDevice } = require('@/hooks/useCameraPermission');
@@ -483,6 +486,93 @@ describe('ProofOfDeliveryCapture', () => {
       });
 
       expect(defaultProps.onError).toHaveBeenCalledWith('Upload failed');
+    });
+  });
+
+  describe('Oversized Compressed Photo Guard', () => {
+    const TOO_LARGE_ERROR = 'Photo too large to upload — try again';
+
+    /** A File whose reported size exceeds the 3.5MB client-side limit. */
+    const makeOversizedFile = (): File => {
+      const file = new File(['x'], 'big.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
+      return file;
+    };
+
+    const selectFileAndGetUploadButton = async (): Promise<HTMLButtonElement> => {
+      const input = document.querySelector('input[type="file"]');
+      const file = new File(['test image'], 'test.jpg', { type: 'image/jpeg' });
+      fireEvent.change(input!, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Retake')).toBeInTheDocument();
+      });
+
+      const buttons = screen.getAllByTestId('button');
+      const uploadButton = buttons.find(
+        btn => btn.textContent?.includes('Upload') && btn.getAttribute('data-variant') !== 'outline'
+      );
+      return uploadButton as HTMLButtonElement;
+    };
+
+    it('never reaches fetch when the compressed result is still over the cap', async () => {
+      compressImage.mockResolvedValueOnce({
+        file: makeOversizedFile(),
+        originalSize: 9 * 1024 * 1024,
+        compressedSize: 5 * 1024 * 1024,
+        compressionRatio: 1.8,
+        wasCompressed: true,
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(TOO_LARGE_ERROR)).toBeInTheDocument();
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockQueuePODUpload).not.toHaveBeenCalled();
+      expect(defaultProps.onError).toHaveBeenCalledWith(TOO_LARGE_ERROR);
+    });
+
+    it('does not offer "Complete anyway" for a photo the server would always reject', async () => {
+      compressImage.mockResolvedValueOnce({
+        file: makeOversizedFile(),
+        originalSize: 9 * 1024 * 1024,
+        compressedSize: 5 * 1024 * 1024,
+        compressionRatio: 1.8,
+        wasCompressed: true,
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(TOO_LARGE_ERROR)).toBeInTheDocument();
+      });
+
+      // Queueing a >cap file would replay a doomed POST forever.
+      expect(screen.queryByText(/Complete anyway/)).not.toBeInTheDocument();
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
+    });
+
+    it('uploads normally when the compressed result is within the cap', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: 'https://example.com/photo.jpg' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      expect(defaultProps.onError).not.toHaveBeenCalled();
     });
   });
 

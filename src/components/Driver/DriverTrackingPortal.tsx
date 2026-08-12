@@ -122,6 +122,7 @@ export default function DriverTrackingPortal() {
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
+    refreshDeliveries,
     isOnline,
     queuedItems,
   } = useDriverTracking();
@@ -194,11 +195,17 @@ export default function DriverTrackingPortal() {
 
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
-    // Backstop for the disabled button (mirrors the server guard).
+    // Backstop for the blocked button (mirrors the server guard). The button
+    // stays tappable (aria-disabled, not `disabled`) so a stale client can
+    // self-heal: explain the block AND re-check the server feed — a delivery
+    // completed on another screen unblocks this button without a reload.
     if (endShiftBlockers > 0) {
       toast.error(
         `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} before ending your shift.`,
       );
+      void refreshDeliveries().catch(() => {
+        /* best-effort re-check — the next poll will still correct it */
+      });
       return;
     }
     let location = currentLocation;
@@ -431,12 +438,20 @@ export default function DriverTrackingPortal() {
                   </div>
                 ) : null}
               </div>
+              {/* Blocked via aria-disabled (not `disabled`) so a tap still
+                  reaches handleEndShift, which explains the block and
+                  refreshes the feed — a stale count heals itself on tap. */}
               <DriverButton
                 variant="danger"
                 size="md"
                 onClick={handleEndShift}
                 loading={shiftLoading}
-                disabled={endShiftBlockers > 0}
+                aria-disabled={endShiftBlockers > 0}
+                className={
+                  endShiftBlockers > 0
+                    ? "cursor-not-allowed opacity-50"
+                    : undefined
+                }
               >
                 <Square className="h-4 w-4" />
                 End shift

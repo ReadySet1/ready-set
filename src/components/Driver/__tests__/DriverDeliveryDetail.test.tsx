@@ -28,9 +28,19 @@ jest.mock("react-hot-toast", () => ({
 
 // The detail page reads live GPS for the arrival geofence; no provider in
 // these tests → null location = geofence fails open (advance stays enabled).
+// It also pulls `refreshDeliveries` so a status change here syncs the shared
+// deliveries feed (End-shift guard on /driver/tracking) without a reload.
 jest.mock("@/contexts/DriverTrackingContext", () => ({
-  useDriverTracking: () => ({ currentLocation: null }),
+  useDriverTracking: jest.fn(),
 }));
+
+import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import toast from "react-hot-toast";
+
+const mockUseDriverTracking = useDriverTracking as jest.MockedFunction<
+  typeof useDriverTracking
+>;
+const refreshDeliveries = jest.fn().mockResolvedValue(undefined);
 
 jest.mock("@/utils/supabase/client", () => ({
   createClient: () => ({
@@ -44,8 +54,15 @@ jest.mock("@/utils/supabase/client", () => ({
 }));
 
 // POD capture pulls in camera APIs — stub it so the sheet renders cleanly.
+// The stub exposes a button so tests can drive the upload-complete callback.
 jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
-  ProofOfDeliveryCapture: () => <div data-testid="pod-capture" />,
+  ProofOfDeliveryCapture: ({ onUploadComplete }: any) => (
+    <div data-testid="pod-capture">
+      <button onClick={() => onUploadComplete("https://pod.example/photo.jpg")}>
+        finish pod upload
+      </button>
+    </div>
+  ),
 }));
 
 function makeOrder(overrides: Record<string, unknown> = {}) {
@@ -118,6 +135,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   currentOrder = makeOrder();
   installFetch();
+  mockUseDriverTracking.mockReturnValue({
+    currentLocation: null,
+    refreshDeliveries,
+  } as any);
 });
 
 describe("DriverDeliveryDetail", () => {
@@ -154,6 +175,48 @@ describe("DriverDeliveryDetail", () => {
         }),
       );
     });
+  });
+
+  it("refreshes the shared deliveries feed after a successful status advance", async () => {
+    renderDetail();
+    fireEvent.click(await screen.findByText("On my way to vendor"));
+
+    // The tracking screen (End-shift guard) reads the shared feed — a status
+    // change here must sync it immediately, not after the 60s poll.
+    await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+  });
+
+  it("refreshes the shared deliveries feed after POD completion (terminal status)", async () => {
+    currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_TO_CLIENT });
+    renderDetail();
+
+    fireEvent.click(await screen.findByText("Complete delivery"));
+    expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+
+    // Driving the capture flow to completion advances to COMPLETED...
+    fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/orders/CV-12345"),
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ driverStatus: DriverStatus.COMPLETED }),
+        }),
+      );
+    });
+    // ...and syncs the shared feed so End shift unblocks without a reload.
+    await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+  });
+
+  it("treats a failed feed refresh as non-fatal (local update already applied)", async () => {
+    refreshDeliveries.mockRejectedValueOnce(new Error("offline"));
+    renderDetail();
+    fireEvent.click(await screen.findByText("On my way to vendor"));
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Status updated"),
+    );
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("requires proof of delivery before completing (opens POD sheet, no immediate PATCH)", async () => {

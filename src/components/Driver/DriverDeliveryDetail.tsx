@@ -154,7 +154,10 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const router = useRouter();
   // Live GPS from the shared tracking provider (wraps all /driver/* routes).
   // May be null outside an active shift — the geofence fails open in that case.
-  const { currentLocation } = useDriverTracking();
+  // `refreshDeliveries` syncs the provider's shared deliveries feed after a
+  // status change here, so /driver/tracking (End-shift guard, active list)
+  // updates immediately instead of waiting on its 60s poll.
+  const { currentLocation, refreshDeliveries } = useDriverTracking();
   const { settings } = useTrackingSettings();
   const geofenceRadiusM = settings.arrivalGeofenceRadiusM;
   const supabase = useMemo(() => createClient(), []);
@@ -291,6 +294,13 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           }).catch((e) => console.warn("Order status sync failed:", e));
         }
 
+        // Sync the shared deliveries feed so other driver surfaces (the
+        // End-shift guard on /driver/tracking) see this change right away.
+        // Non-fatal: local state above is already updated.
+        await refreshDeliveries().catch((e) =>
+          console.warn("Deliveries feed refresh failed:", e),
+        );
+
         toast.success("Status updated");
       } catch (err) {
         console.error("Error updating driver status:", err);
@@ -301,7 +311,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         setIsAdvancing(false);
       }
     },
-    [order, getValidSession, router],
+    [order, getValidSession, router, refreshDeliveries],
   );
 
   /** Next-Action handler: gate the signature (pickup) + POD (delivery) steps,

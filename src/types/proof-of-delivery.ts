@@ -153,11 +153,41 @@ export interface ImageCompressionOptions {
 }
 
 /**
- * Default compression options for POD photos
+ * Server-side upload cap for POD photos — single source of truth shared by the
+ * POD API route, the storage helper, and the client-side pre-upload guard.
+ *
+ * 4MB keeps a multipart POST safely under Vercel's ~4.5MB platform body limit
+ * while leaving generous headroom over the client compression target, because
+ * browser-image-compression's maxSizeMB is best-effort: a phone photo
+ * "compressed to about 2MB" used to straddle the old exact 2MB cap.
+ */
+export const POD_MAX_UPLOAD_SIZE_MB = 4;
+export const POD_MAX_UPLOAD_SIZE_BYTES = POD_MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
+/**
+ * Safety margin between what the client will send and what the server accepts,
+ * so a compressed result can never straddle the server cap.
+ */
+export const POD_UPLOAD_SAFETY_MARGIN_MB = 0.5;
+
+/**
+ * Client-side hard limit: a compressed photo over this size is never POSTed —
+ * the capture UI surfaces an error instead of sending a doomed request.
+ */
+export const POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES =
+  (POD_MAX_UPLOAD_SIZE_MB - POD_UPLOAD_SAFETY_MARGIN_MB) * 1024 * 1024;
+
+/**
+ * Default compression options for POD photos.
+ *
+ * The target is deliberately well under POD_MAX_UPLOAD_SIZE_MB: maxSizeMB is a
+ * best-effort hint to browser-image-compression, so the target must leave room
+ * for overshoot (compressImage additionally retries and enforces
+ * POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES as a hard ceiling).
  */
 export const DEFAULT_POD_COMPRESSION_OPTIONS: Required<ImageCompressionOptions> = {
-  maxSizeMB: 2,
-  maxWidthOrHeight: 1920,
+  maxSizeMB: 1.5,
+  maxWidthOrHeight: 1600,
   quality: 0.85,
   fileType: 'image/jpeg',
   useWebWorker: true,
@@ -170,7 +200,7 @@ export const POD_VALIDATION_CONSTRAINTS = {
   maxFileSizeMB: 10, // Max size before compression
   minFileSizeMB: 0.001, // 1KB minimum
   allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
-  maxCompressedSizeMB: 2,
+  maxCompressedSizeMB: POD_MAX_UPLOAD_SIZE_MB,
   maxWidthOrHeight: 4096, // Max input dimensions
 } as const;
 

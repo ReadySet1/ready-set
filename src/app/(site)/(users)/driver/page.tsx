@@ -20,7 +20,6 @@ import {
   formatDurationShort,
 } from "@/components/Driver/ui";
 import { DriverProfileSheet } from "@/components/Driver/ui/DriverProfileSheet";
-import { DriverStatsPanel } from "@/components/Driver/DriverStatsPanel";
 import { DriverDeliveryList } from "@/components/Driver/DriverDeliveryList";
 import { useDriverDeliveriesFeed } from "@/hooks/driver/useDriverDeliveriesFeed";
 
@@ -42,7 +41,6 @@ export default function DriverHomePage() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(new Date());
   const [driverName, setDriverName] = useState("Driver");
-  const [driverId, setDriverId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -57,14 +55,6 @@ export default function DriverHomePage() {
         if (!profileRes.ok) return;
         const profile = await profileRes.json();
         setDriverName(profile.name || profile.firstName || "Driver");
-
-        const driverRes = await fetch("/api/tracking/drivers?limit=1");
-        if (driverRes.ok) {
-          const driverData = await driverRes.json();
-          if (driverData.success && driverData.data?.length > 0) {
-            setDriverId(driverData.data[0].id);
-          }
-        }
       } catch (err) {
         console.error("Error fetching driver info:", err);
       }
@@ -195,8 +185,6 @@ export default function DriverHomePage() {
             </Link>
           </div>
         </div>
-
-        {driverId ? <DriverStatsPanel driverId={driverId} /> : null}
 
         <DriverDeliveryList
           deliveries={deliveries}
