@@ -1,6 +1,10 @@
 // src/utils/supabase/storage.ts
 
 import { createClient } from '@/utils/supabase/server';
+import {
+  POD_MAX_UPLOAD_SIZE_BYTES,
+  POD_MAX_UPLOAD_SIZE_MB,
+} from '@/types/proof-of-delivery';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -72,10 +76,10 @@ export async function uploadPODImage(
   try {
     const supabase = await createClient();
 
-    // Validate file size (max 2MB - images are compressed client-side)
-    const maxSize = 2 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return { url: '', error: 'File too large (max 2MB)' };
+    // Validate file size — same shared cap as the POD API route (images are
+    // compressed client-side to a much smaller target).
+    if (file.size > POD_MAX_UPLOAD_SIZE_BYTES) {
+      return { url: '', error: `File too large (max ${POD_MAX_UPLOAD_SIZE_MB}MB)` };
     }
 
     // Validate file type

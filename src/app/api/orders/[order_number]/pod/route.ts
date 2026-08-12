@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
+import {
+  POD_MAX_UPLOAD_SIZE_BYTES,
+  POD_MAX_UPLOAD_SIZE_MB,
+} from '@/types/proof-of-delivery';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -130,11 +134,14 @@ export async function POST(
       );
     }
 
-    // Validate file size (max 2MB - should be compressed client-side)
-    const maxSize = 2 * 1024 * 1024;
-    if (file.size > maxSize) {
+    // Validate file size — shared cap (client compresses well under this, but
+    // compression is best-effort so the server allows generous headroom).
+    if (file.size > POD_MAX_UPLOAD_SIZE_BYTES) {
       return NextResponse.json(
-        { success: false, error: 'File too large. Maximum size is 2MB.' },
+        {
+          success: false,
+          error: `File too large. Maximum size is ${POD_MAX_UPLOAD_SIZE_MB}MB.`,
+        },
         { status: 400 }
       );
     }
