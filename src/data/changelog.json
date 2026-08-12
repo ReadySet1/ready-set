@@ -3,6 +3,38 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.5.0",
+      "date": "2026-08-06",
+      "title": "Smarter tracking, smoother pickups",
+      "summary": "Admins get live control over how driver tracking behaves, and drivers get a friendlier pickup flow: clear map pins, distances in feet and miles, and a pickup confirmation that no longer depends on a signature.",
+      "changes": [
+        {
+          "text": "Admins can now tune driver tracking (check-in radius, GPS cadence, offline detection, mileage filters) from the tracking dashboard.",
+          "type": "new"
+        },
+        {
+          "text": "Distance hints in the driver app now show feet and miles instead of meters.",
+          "type": "fixed"
+        },
+        {
+          "text": "Bigger, more reliable signature signing (with a full-screen mode), and drivers can no longer end a shift while a due delivery is still open.",
+          "type": "improved"
+        },
+        {
+          "text": "The driver map now shows pickup and drop-off pins, and the \"Arrived\" button only activates when you're actually near the stop.",
+          "type": "improved"
+        },
+        {
+          "text": "Drivers can confirm pickups by recording who handed over the order — a signature is now optional, and a bug that blocked the pickup step is fixed.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.5.0"
+      }
+    },
+    {
       "version": "2.4.0",
       "date": "2026-07-09",
       "title": "A smoother, safer driver experience",

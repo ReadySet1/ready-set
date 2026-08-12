@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/ReadySet1/ready-set/compare/v2.4.0...v2.5.0) (2026-08-06)
+
+
+### Added
+
+* **admin:** configurable driver-tracking settings + imperial geofence display ([962ea17](https://github.com/ReadySet1/ready-set/commit/962ea178a5ba5c6da78369d4c6224c10b1f38329))
+* **admin:** make driver-tracking settings editable from the tracking dashboard ([a5c5a8b](https://github.com/ReadySet1/ready-set/commit/a5c5a8bfb851955bdb2bb99242590317cd43f532))
+* **calculator:** complete Try Hungry vendor pricing — 9% band, email fallback, DB parity ([5beae88](https://github.com/ReadySet1/ready-set/commit/5beae88e934f75ff0ff2b74a2c7e0c16e001cd16))
+* **driver:** pickup/drop-off map markers + arrival geofence ([ae3726f](https://github.com/ReadySet1/ready-set/commit/ae3726fc6875c375f88d398fa997acb84467f6f7))
+* **driver:** pickup/drop-off map markers + arrival geofence ([ef1d827](https://github.com/ReadySet1/ready-set/commit/ef1d8277127c5bf77252a409cf46432c0f682136))
+
+
+### Fixed
+
+* **calculator:** review fixes — auth-email trust anchor, cent rounding, sentinel-guard pinning tests ([3a18e1b](https://github.com/ReadySet1/ready-set/commit/3a18e1ba43a62a4316a35fda241c7a4422870d6d))
+* **deps:** patch critical audit vulnerabilities in websocket-driver and tar ([41710ba](https://github.com/ReadySet1/ready-set/commit/41710ba54589af2d3f8cad1adaf3c5284551baa7))
+* **driver:** harden tracking settings from pre-landing + red-team review ([6711480](https://github.com/ReadySet1/ready-set/commit/671148009282c932316be37aae0de4c763181c67))
+* **driver:** show the arrival-geofence distance in feet/miles, not meters ([38d0579](https://github.com/ReadySet1/ready-set/commit/38d0579df70831ff6f8266cc40248428e4e13648))
+* **driver:** unblock pickup confirmation — storage path + optional signature with received-by name ([1d01913](https://github.com/ReadySet1/ready-set/commit/1d019135d2cdac452f2c5fa791f98d2aff85879f))
+* **driver:** unblock pickup confirmation — storage path + optional signature with received-by name ([e360ffe](https://github.com/ReadySet1/ready-set/commit/e360ffedcf62d812b76d6c039a1d7168dc6c8489))
+* **driver:** walk-test follow-ups — signature pad reliability + fullscreen, sign-in bounce, end-shift guard ([93e304a](https://github.com/ReadySet1/ready-set/commit/93e304ac47ddece0a960c783a824375185342467))
+* **driver:** walk-test follow-ups — signature pad reliability + fullscreen, sign-in bounce, end-shift guard ([8fb58aa](https://github.com/ReadySet1/ready-set/commit/8fb58aa3175dd28981b976613f1d3281dbd5b6a2))
+* remove redundant #vendor-hero URL fragment from CTA links ([16b1a1f](https://github.com/ReadySet1/ready-set/commit/16b1a1fa4db5912f2850a8c5b301cc0117734cea))
+
+
+### Security
+
+* bound all unbounded pnpm overrides and patch brace-expansion (phase 3) ([b2c8ca0](https://github.com/ReadySet1/ready-set/commit/b2c8ca0a1a6854c671c07ec3efafa39c52a00fb0))
+* bump fast-uri override 4.1.1 -&gt; 4.1.2 (GHSA-7p8r-x3mc-p8w7) ([f5b5691](https://github.com/ReadySet1/ready-set/commit/f5b5691d59dbd4c7311b70a1671c2aab7cf910f2))
+* lift brace-expansion to 5.0.8 — clears the last fixable audit highs ([0e7baff](https://github.com/ReadySet1/ready-set/commit/0e7baff292f5515446887cd3ff8403f7760eb01b))
+* repair rotted pnpm overrides — audit highs 20 -&gt; 4, 0 critical ([9e48519](https://github.com/ReadySet1/ready-set/commit/9e485197048259a6c7c68a169b30e1d1c48424f9))
+
+
+### Changed
+
+* improve heading line spacing and break "Companies" to its own line ([fb6c63b](https://github.com/ReadySet1/ready-set/commit/fb6c63b9a2e78009482e48a6caadb39db05d14b5))
+* improve ServedPartners logo sizing, copy, and mobile layout ([928827f](https://github.com/ReadySet1/ready-set/commit/928827fae55f35c4bc718e6c429e5f052b24417f))
+* tasks board redesign per design handoff ([1d32125](https://github.com/ReadySet1/ready-set/commit/1d3212543d1ec5ef1b973a4794d9def10ba549d8))
+
+
+### Documentation
+
+* correct MILEAGE_* env supersession wording — env overrides are dead unconditionally ([442abe6](https://github.com/ReadySet1/ready-set/commit/442abe61337990de7b50867d4ff7eeebd3e246ce))
+* document admin-configurable tracking settings in CLAUDE.md and ARCHITECTURE.md ([5cfacc2](https://github.com/ReadySet1/ready-set/commit/5cfacc23f2ffe7b0664e5c1d845359474b511b32))
+
 ## [2.4.0](https://github.com/ReadySet1/ready-set/compare/v2.3.0...v2.4.0) (2026-07-09)
 
 
