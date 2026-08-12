@@ -1,8 +1,11 @@
 import {
+  TEST_DRIVE_ROUTES,
   TEST_ORDER_PREFIX,
+  buildRouteTestDrivePlan,
   buildTestDrivePlan,
   isDisposableTestOrder,
   offsetCoords,
+  pickRouteLeg,
 } from '@/lib/driver/test-drive-plan';
 import { ARRIVAL_GEOFENCE_RADIUS_M, distanceToTargetM } from '@/lib/driver/geofence';
 
@@ -140,5 +143,86 @@ describe('buildTestDrivePlan', () => {
     expect(() =>
       buildTestDrivePlan({ origin: { lat: 91, lng: -101 }, runId: 'x', now }),
     ).toThrow(/origin/i);
+  });
+});
+
+describe('pickRouteLeg', () => {
+  const CDMX_TZ = 'America/Mexico_City';
+
+  it("returns 'am' during the morning commute (08:20 CDMX)", () => {
+    // CDMX is UTC-6 year-round (no DST since 2022): 14:20Z = 08:20 local.
+    expect(pickRouteLeg(new Date('2026-08-11T14:20:00.000Z'), CDMX_TZ)).toBe('am');
+  });
+
+  it("returns 'pm' for the evening return (18:05 CDMX)", () => {
+    // 00:05Z next day = 18:05 local the previous evening.
+    expect(pickRouteLeg(new Date('2026-08-12T00:05:00.000Z'), CDMX_TZ)).toBe('pm');
+  });
+
+  it('flips from am to pm at exactly 14:00 local', () => {
+    expect(pickRouteLeg(new Date('2026-08-11T19:59:00.000Z'), CDMX_TZ)).toBe('am'); // 13:59
+    expect(pickRouteLeg(new Date('2026-08-11T20:00:00.000Z'), CDMX_TZ)).toBe('pm'); // 14:00
+  });
+});
+
+describe('TEST_DRIVE_ROUTES.cdmx', () => {
+  const route = TEST_DRIVE_ROUTES.cdmx!;
+  const now = new Date('2026-08-11T14:20:00.000Z');
+
+  it('flags the vendor stop as a restaurant so the pickup address renders as one', () => {
+    expect(route.vendor.isRestaurant).toBe(true);
+  });
+
+  it('keeps both dropoffs outside the arrival geofence around the vendor', () => {
+    for (const leg of ['am', 'pm'] as const) {
+      const stop = route.legs[leg].dropoff;
+      const d = distanceToTargetM(route.vendor.coords, [
+        stop.coords.lng,
+        stop.coords.lat,
+      ]) as number;
+      expect(d).toBeGreaterThan(ARRIVAL_GEOFENCE_RADIUS_M);
+    }
+  });
+
+  it('stamps an order number that is recognisably disposable', () => {
+    const plan = buildRouteTestDrivePlan({ route, runId: '20260811-1', now });
+    expect(isDisposableTestOrder(plan.orderNumber)).toBe(true);
+  });
+});
+
+describe('buildRouteTestDrivePlan', () => {
+  const route = TEST_DRIVE_ROUTES.cdmx!;
+  /** 14:20Z = 08:20 in CDMX (UTC-6) — the tester's morning commute. */
+  const morning = new Date('2026-08-11T14:20:00.000Z');
+  /** 00:05Z = 18:05 in CDMX the previous evening — the return leg. */
+  const evening = new Date('2026-08-12T00:05:00.000Z');
+
+  it('routes the morning commute from the vendor to the office', () => {
+    const plan = buildRouteTestDrivePlan({ route, runId: '20260811-1', now: morning });
+    expect(plan.leg).toBe('am');
+    expect(plan.pickup).toBe(route.vendor);
+    expect(plan.dropoff).toBe(route.legs.am.dropoff);
+    expect(plan.startHint).toBe(route.legs.am.startHint);
+  });
+
+  it('routes the evening return from the vendor to home', () => {
+    const plan = buildRouteTestDrivePlan({ route, runId: '20260811-2', now: evening });
+    expect(plan.leg).toBe('pm');
+    expect(plan.dropoff).toBe(route.legs.pm.dropoff);
+    expect(plan.startHint).toBe(route.legs.pm.startHint);
+  });
+
+  it('lets an explicit leg override the clock', () => {
+    const plan = buildRouteTestDrivePlan({ route, leg: 'pm', runId: 'x', now: morning });
+    expect(plan.leg).toBe('pm');
+    expect(plan.dropoff).toBe(route.legs.pm.dropoff);
+  });
+
+  it('schedules the pickup window around now so the run is never pre-flagged as overdue', () => {
+    // Same rule as buildTestDrivePlan: the end-shift guard blocks ASSIGNED
+    // orders whose pickup is already past, so a fresh seed must start ahead.
+    const plan = buildRouteTestDrivePlan({ route, runId: 'x', now: morning });
+    expect(plan.pickupAt.getTime()).toBe(morning.getTime() + 30 * 60_000);
+    expect(plan.arriveBy.getTime()).toBe(plan.pickupAt.getTime() + 30 * 60_000);
   });
 });

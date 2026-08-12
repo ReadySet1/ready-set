@@ -65,12 +65,110 @@ export function offsetCoords(origin: Coords, meters: number, bearingDeg: number)
   return { lat: toDeg(lat2), lng: toDeg(lng2) };
 }
 
+/** Great-circle distance in meters between two coordinates (haversine). */
+function distanceMeters(a: Coords, b: Coords): number {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
+}
+
 /** True only for order numbers this tooling generated or is known to own. */
 export function isDisposableTestOrder(orderNumber: string | null | undefined): boolean {
   if (!orderNumber) return false;
   const trimmed = orderNumber.trim();
   if (!trimmed) return false;
   return DISPOSABLE_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/** One real-world stop on a named route preset, with a full postal address. */
+export interface RouteStop {
+  /** Human-readable label for logs and previews. */
+  label: string;
+  street1: string;
+  city: string;
+  state: string;
+  zip: string;
+  coords: Coords;
+  isRestaurant?: boolean;
+}
+
+/**
+ * A named recurring route: one vendor (the pickup for both legs) and one
+ * dropoff per leg, each anchored to a real geocoded address.
+ */
+export interface TestDriveRoute {
+  key: string;
+  description: string;
+  vendor: RouteStop;
+  legs: {
+    am: { dropoff: RouteStop; startHint: string };
+    pm: { dropoff: RouteStop; startHint: string };
+  };
+  timeZone: string;
+}
+
+/**
+ * Named route presets for the recurring field runs. Unlike the pin-based
+ * generator above, these stops are real places the tester already walks or
+ * drives, so the seeded orders match their actual day.
+ *
+ * The street1 strings deliberately match the historical rs-dev address rows
+ * (June 2026 walk tests) so find-or-create reuses them instead of minting
+ * duplicates.
+ */
+export const TEST_DRIVE_ROUTES: Record<string, TestDriveRoute> = {
+  cdmx: {
+    key: 'cdmx',
+    description: 'Recurring CDMX commute: Del Bosque → office (am) / home (pm)',
+    timeZone: 'America/Mexico_City',
+    vendor: {
+      label: 'Del Bosque restaurant',
+      street1: 'Lago Menor, Del Rosal s/n, Bosque de Chapultepec',
+      city: 'Ciudad de México',
+      state: 'CDMX',
+      zip: '11040',
+      coords: { lat: 19.41127, lng: -99.199556 },
+      isRestaurant: true,
+    },
+    legs: {
+      am: {
+        dropoff: {
+          label: 'Office — Lomas de Chapultepec',
+          street1: 'Aguiar y Seijas 25, Lomas - Virreyes, Lomas de Chapultepec',
+          city: 'Ciudad de México',
+          state: 'CDMX',
+          zip: '11000',
+          coords: { lat: 19.42222, lng: -99.20502 },
+        },
+        startHint: 'home (Col. Daniel Garza), departure ~08:15–08:30',
+      },
+      pm: {
+        dropoff: {
+          label: 'Home — Col. Daniel Garza',
+          street1: 'Daniel Garza al Poniente, Col. Daniel Garza',
+          city: 'Ciudad de México',
+          state: 'CDMX',
+          zip: '11840',
+          coords: { lat: 19.408785, lng: -99.196468 },
+        },
+        startHint: 'office (Aguiar y Seijas 25), departure ~18:00',
+      },
+    },
+  },
+};
+
+/**
+ * Which leg of a route fits `now`: 'am' while the local hour in `timeZone` is
+ * before 14:00, 'pm' from then on. Pure — the caller supplies the clock.
+ */
+export function pickRouteLeg(now: Date, timeZone: string): 'am' | 'pm' {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hourCycle: 'h23' }).format(now),
+  );
+  return hour < 14 ? 'am' : 'pm';
 }
 
 export interface TestDriveStop {
@@ -169,5 +267,63 @@ export function buildTestDrivePlan(options: BuildTestDrivePlanOptions): TestDriv
     },
     pickupAt,
     arriveBy,
+  };
+}
+
+export interface BuildRouteTestDrivePlanOptions {
+  route: TestDriveRoute;
+  /** Which leg to seed. Default: picked from `now` in the route's time zone. */
+  leg?: 'am' | 'pm';
+  /** Short identifier folded into the order number, e.g. "20260811-1". */
+  runId: string;
+  now: Date;
+  /** Minutes from `now` until the scheduled pickup. Default 30. */
+  leadMinutes?: number;
+  /** Minutes allowed between pickup and arrival. Default 30. */
+  windowMinutes?: number;
+}
+
+export interface RouteTestDrivePlan {
+  orderNumber: string;
+  leg: 'am' | 'pm';
+  pickup: RouteStop;
+  dropoff: RouteStop;
+  pickupAt: Date;
+  arriveBy: Date;
+  /** Where the tester should be standing when the run starts. */
+  startHint: string;
+}
+
+/**
+ * Build the stops and timings for one test drive along a named route preset.
+ *
+ * Same constraints as `buildTestDrivePlan`, for the same reasons: the vendor
+ * and dropoff must sit farther apart than the arrival geofence so the leg
+ * between them is real, and the pickup is scheduled ahead of `now` so the
+ * end-shift guard's overdue-assignment branch never fires on a fresh seed.
+ */
+export function buildRouteTestDrivePlan(options: BuildRouteTestDrivePlanOptions): RouteTestDrivePlan {
+  const { route, runId, now, leadMinutes = 30, windowMinutes = 30 } = options;
+  const leg = options.leg ?? pickRouteLeg(now, route.timeZone);
+  const { dropoff, startHint } = route.legs[leg];
+
+  const legM = distanceMeters(route.vendor.coords, dropoff.coords);
+  if (legM <= ARRIVAL_GEOFENCE_RADIUS_M) {
+    throw new Error(
+      `route ${route.key} ${leg} leg is only ${Math.round(legM)}m — vendor and dropoff must be farther apart than the ${ARRIVAL_GEOFENCE_RADIUS_M}m arrival geofence`,
+    );
+  }
+
+  const pickupAt = new Date(now.getTime() + leadMinutes * 60_000);
+  const arriveBy = new Date(pickupAt.getTime() + windowMinutes * 60_000);
+
+  return {
+    orderNumber: `${TEST_ORDER_PREFIX}${runId}`,
+    leg,
+    pickup: route.vendor,
+    dropoff,
+    pickupAt,
+    arriveBy,
+    startHint,
   };
 }

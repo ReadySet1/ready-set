@@ -26,18 +26,25 @@
  *   --driver <email>    Driver's login email (required)
  *   --lat/--lng         Where the tester will start (required unless --no-seed)
  *   --city <preset>     Convenience preset instead of --lat/--lng
+ *   --route <key>       Named route preset with real geocoded stops
+ *                       (mutually exclusive with --lat/--lng/--city)
+ *   --leg am|pm         Which route leg to seed (default: picked by local time)
  *   --run-id <id>       Order-number suffix (default: UTC timestamp)
+ *   --lead <minutes>    Minutes from now until the scheduled pickup (default 30)
  *   --no-seed           Clean up only, do not create a new order
  *   --force             Also clear orders that are NOT recognisably synthetic
  *   --apply             Perform the writes (otherwise dry run)
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import {
+  TEST_DRIVE_ROUTES,
   TEST_ORDER_PREFIX,
+  buildRouteTestDrivePlan,
   buildTestDrivePlan,
   isDisposableTestOrder,
   type Coords,
+  type RouteStop,
 } from '../src/lib/driver/test-drive-plan';
 
 /** Supabase ref of the production project. Never a target for this script. */
@@ -55,8 +62,11 @@ interface Args {
   lat?: number;
   lng?: number;
   city?: string;
+  route?: string;
+  leg?: 'am' | 'pm';
   runId?: string;
   pickupDistanceM?: number;
+  leadMinutes?: number;
   dropoffDistanceM?: number;
   noSeed: boolean;
   force: boolean;
@@ -85,6 +95,17 @@ function parseArgs(argv: string[]): Args {
         args.city = value?.toLowerCase();
         i += 1;
         break;
+      case '--route':
+        args.route = value?.toLowerCase();
+        i += 1;
+        break;
+      case '--leg':
+        if (value !== 'am' && value !== 'pm') {
+          throw new Error(`--leg must be am or pm, got ${value ?? '(nothing)'}`);
+        }
+        args.leg = value;
+        i += 1;
+        break;
       case '--run-id':
         args.runId = value;
         i += 1;
@@ -95,6 +116,10 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--dropoff-distance':
         args.dropoffDistanceM = Number(value);
+        i += 1;
+        break;
+      case '--lead':
+        args.leadMinutes = Number(value);
         i += 1;
         break;
       case '--no-seed':
@@ -116,6 +141,61 @@ function parseArgs(argv: string[]): Args {
 function defaultRunId(now: Date): string {
   const iso = now.toISOString();
   return `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 13)}${iso.slice(14, 16)}`;
+}
+
+/**
+ * Both seeding modes converge on RouteStop-shaped pickup/dropoff stops so the
+ * address writes go through one find-or-create path instead of minting new
+ * rows on every run (rs-dev accumulated 25 duplicated street+city keys that
+ * way, 96% of them without coordinates).
+ */
+interface SeedPlan {
+  orderNumber: string;
+  pickup: RouteStop;
+  dropoff: RouteStop;
+  pickupAt: Date;
+  arriveBy: Date;
+}
+
+/**
+ * Reuse the oldest active address row matching the stop's street1 + city, or
+ * create one with the full stop data. Rows found without coordinates get the
+ * stop's coords backfilled — most historical seed rows were never geocoded.
+ */
+async function findOrCreateAddress(tx: Prisma.TransactionClient, stop: RouteStop): Promise<string> {
+  const existing = await tx.address.findFirst({
+    where: { street1: stop.street1, city: stop.city, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, latitude: true },
+  });
+
+  if (existing) {
+    if (existing.latitude === null) {
+      await tx.address.update({
+        where: { id: existing.id },
+        data: { latitude: stop.coords.lat, longitude: stop.coords.lng },
+      });
+      console.log(`   ♻️  reused address "${stop.street1}" (coords backfilled)`);
+    } else {
+      console.log(`   ♻️  reused address "${stop.street1}"`);
+    }
+    return existing.id;
+  }
+
+  const created = await tx.address.create({
+    data: {
+      street1: stop.street1,
+      city: stop.city,
+      state: stop.state,
+      zip: stop.zip,
+      latitude: stop.coords.lat,
+      longitude: stop.coords.lng,
+      ...(stop.isRestaurant ? { isRestaurant: true } : {}),
+    },
+    select: { id: true },
+  });
+  console.log(`   ➕ created address "${stop.street1}"`);
+  return created.id;
 }
 
 /**
@@ -281,6 +361,16 @@ async function main() {
   }
 
   // ---------------------------------------------------------------- plan
+  const route = args.route ? TEST_DRIVE_ROUTES[args.route] : undefined;
+  if (args.route && !route) {
+    throw new Error(
+      `Unknown --route ${args.route}. Known: ${Object.keys(TEST_DRIVE_ROUTES).join(', ')}`,
+    );
+  }
+  if (route && (args.lat !== undefined || args.lng !== undefined || args.city !== undefined)) {
+    throw new Error('--route and --lat/--lng/--city are mutually exclusive — pick one');
+  }
+
   const preset = args.city ? CITY_PRESETS[args.city] : undefined;
   if (args.city && !preset) {
     throw new Error(`Unknown --city ${args.city}. Known: ${Object.keys(CITY_PRESETS).join(', ')}`);
@@ -291,23 +381,72 @@ async function main() {
       ? { lat: preset.lat, lng: preset.lng }
       : null;
 
-  if (!args.noSeed && !origin) {
-    throw new Error('Seeding needs a start point: pass --lat/--lng or --city');
+  if (!args.noSeed && !origin && !route) {
+    throw new Error('Seeding needs a start point: pass --route, --lat/--lng, or --city');
   }
 
-  const plan = origin
-    ? buildTestDrivePlan({
-        origin,
-        runId: args.runId ?? defaultRunId(now),
-        now,
-        ...(Number.isFinite(args.pickupDistanceM) ? { pickupDistanceM: args.pickupDistanceM } : {}),
-        ...(Number.isFinite(args.dropoffDistanceM)
-          ? { dropoffDistanceM: args.dropoffDistanceM }
-          : {}),
-      })
-    : null;
+  const runId = args.runId ?? defaultRunId(now);
+  let seed: SeedPlan | null = null;
+  let startHint: string | null = null;
 
-  if (plan) {
+  if (args.noSeed) {
+    // Cleanup-only run: an origin or route on the command line does not seed.
+  } else if (route) {
+    const plan = buildRouteTestDrivePlan({
+      route,
+      runId,
+      now,
+      ...(args.leg ? { leg: args.leg } : {}),
+      ...(Number.isFinite(args.leadMinutes) ? { leadMinutes: args.leadMinutes } : {}),
+    });
+    seed = {
+      orderNumber: plan.orderNumber,
+      pickup: plan.pickup,
+      dropoff: plan.dropoff,
+      pickupAt: plan.pickupAt,
+      arriveBy: plan.arriveBy,
+    };
+    startHint = plan.startHint;
+    console.log(`🌱 Will seed ${plan.orderNumber} (${plan.leg} leg — start from ${plan.startHint})`);
+    console.log(`   pickup  ${plan.pickup.street1} · ${plan.pickup.coords.lat.toFixed(6)}, ${plan.pickup.coords.lng.toFixed(6)}`);
+    console.log(`   dropoff ${plan.dropoff.street1} · ${plan.dropoff.coords.lat.toFixed(6)}, ${plan.dropoff.coords.lng.toFixed(6)}`);
+    console.log(`   pickup at ${plan.pickupAt.toISOString()} · arrive by ${plan.arriveBy.toISOString()}\n`);
+  } else if (origin) {
+    const plan = buildTestDrivePlan({
+      origin,
+      runId,
+      now,
+      ...(Number.isFinite(args.pickupDistanceM) ? { pickupDistanceM: args.pickupDistanceM } : {}),
+      ...(Number.isFinite(args.leadMinutes) ? { leadMinutes: args.leadMinutes } : {}),
+      ...(Number.isFinite(args.dropoffDistanceM)
+        ? { dropoffDistanceM: args.dropoffDistanceM }
+        : {}),
+    });
+    // Pin mode reuses the preset's postal fields as before; the generated
+    // labels double as street1, so repeated runs at the same distance dedupe.
+    const geo = preset ?? { city: 'Test City', state: 'NA', zip: '00000' };
+    seed = {
+      orderNumber: plan.orderNumber,
+      pickup: {
+        label: plan.pickup.label,
+        street1: plan.pickup.label,
+        city: geo.city,
+        state: geo.state,
+        zip: geo.zip,
+        coords: plan.pickup.coords,
+        isRestaurant: true,
+      },
+      dropoff: {
+        label: plan.dropoff.label,
+        street1: plan.dropoff.label,
+        city: geo.city,
+        state: geo.state,
+        zip: geo.zip,
+        coords: plan.dropoff.coords,
+      },
+      pickupAt: plan.pickupAt,
+      arriveBy: plan.arriveBy,
+    };
     console.log(`🌱 Will seed ${plan.orderNumber}`);
     console.log(`   pickup  ${plan.pickup.coords.lat.toFixed(6)}, ${plan.pickup.coords.lng.toFixed(6)}`);
     console.log(`   dropoff ${plan.dropoff.coords.lat.toFixed(6)}, ${plan.dropoff.coords.lng.toFixed(6)}`);
@@ -346,9 +485,8 @@ async function main() {
       console.log(`   ✅ closed ${openShifts.length} open shift(s)`);
     }
 
-    if (!plan || !origin) return;
+    if (!seed) return;
 
-    const geo = preset ?? { city: 'Test City', state: 'NA', zip: '00000' };
     const client = await tx.profile.findFirst({
       where: { type: 'CLIENT', deletedAt: null },
       select: { id: true },
@@ -356,39 +494,17 @@ async function main() {
     });
     if (!client) throw new Error('No CLIENT profile available to own the seeded order');
 
-    const pickupAddress = await tx.address.create({
-      data: {
-        street1: plan.pickup.label,
-        city: geo.city,
-        state: geo.state,
-        zip: geo.zip,
-        latitude: plan.pickup.coords.lat,
-        longitude: plan.pickup.coords.lng,
-        isRestaurant: true,
-      },
-      select: { id: true },
-    });
-
-    const deliveryAddress = await tx.address.create({
-      data: {
-        street1: plan.dropoff.label,
-        city: geo.city,
-        state: geo.state,
-        zip: geo.zip,
-        latitude: plan.dropoff.coords.lat,
-        longitude: plan.dropoff.coords.lng,
-      },
-      select: { id: true },
-    });
+    const pickupAddressId = await findOrCreateAddress(tx, seed.pickup);
+    const deliveryAddressId = await findOrCreateAddress(tx, seed.dropoff);
 
     const order = await tx.cateringRequest.create({
       data: {
         userId: client.id,
-        orderNumber: plan.orderNumber,
-        pickupAddressId: pickupAddress.id,
-        deliveryAddressId: deliveryAddress.id,
-        pickupDateTime: plan.pickupAt,
-        arrivalDateTime: plan.arriveBy,
+        orderNumber: seed.orderNumber,
+        pickupAddressId,
+        deliveryAddressId,
+        pickupDateTime: seed.pickupAt,
+        arrivalDateTime: seed.arriveBy,
         status: 'ASSIGNED',
         driverStatus: 'ASSIGNED',
         headcount: 5,
@@ -404,13 +520,17 @@ async function main() {
       },
     });
 
-    console.log(`   ✅ seeded ${plan.orderNumber}`);
+    console.log(`   ✅ seeded ${seed.orderNumber}`);
   });
 
   console.log(`\n🎉 ${args.driver} is clean and ready.`);
-  if (plan) {
-    console.log(`   Order: ${plan.orderNumber}`);
-    console.log(`   Tell the tester to start their shift standing at the origin, then walk north.`);
+  if (seed) {
+    console.log(`   Order: ${seed.orderNumber}`);
+    if (startHint) {
+      console.log(`   Tell the tester to start from ${startHint}.`);
+    } else {
+      console.log(`   Tell the tester to start their shift standing at the origin, then walk north.`);
+    }
   }
 }
 

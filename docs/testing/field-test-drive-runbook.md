@@ -69,6 +69,29 @@ flips the advance button from disabled to enabled. Override with
 The pickup is scheduled 30 minutes ahead of now, which keeps the guard's
 overdue-assignment branch from firing on a freshly seeded order.
 
+### Route presets
+
+For a recurring route, skip the pin entirely and use a named preset with real
+geocoded stops:
+
+```bash
+pnpm test:drive:reset -- --driver <tester-email> --route cdmx --apply
+```
+
+`cdmx` seeds the recurring CDMX commute run: pickup at the Del Bosque
+restaurant for both legs, dropoff at the office in the morning and at home in
+the evening. The leg is auto-picked from the local time in Mexico City
+(before 14:00 → morning, after → evening); pass `--leg am` or `--leg pm` to
+override. `--route` and `--lat/--lng/--city` are mutually exclusive.
+
+Route presets reuse existing address rows (matched on street + city, coords
+backfilled when missing) instead of duplicating them on every run — the pin
+mode dedupes the same way.
+
+Standing rule: **seed right before walking**. The pickup is scheduled at
+now + 30 minutes and goes overdue within hours, so never pre-seed the night
+before — the end-shift guard would block the run before it starts.
+
 ## During the run — tester
 
 1. Start the shift **standing at the coordinates you sent**, not en route.
