@@ -64,6 +64,7 @@ const mockIsMarketingCtaEnabled = isMarketingCtaEnabled as jest.MockedFunction<
 
 describe("FlowersAbout", () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     mockIsMarketingCtaEnabled.mockReturnValue(false);
   });
 

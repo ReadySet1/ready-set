@@ -11,16 +11,30 @@
 
 export const MARKETING_CTA_FLAGS = {
   /**
-   * "How Our Service Works" pill in `FlowersAbout`, under the florist photo
-   * on /flowers-deliveries. Links to /vendor-hero.
-   * Disabled 2026-08 — duplicated the CTA already present in ServiceFeaturesSection.
+   * FLOWERS_ABOUT_SERVICE_WORKS
+   * Controls the "How Our Service Works" link in FlowersAbout (/flowers-deliveries).
+   *
+   * Disabled 2026-08 as a marketing decision — NOT because it was a duplicate.
+   * The "Get Started" CTA in ServiceFeaturesSection opens the quote form: a
+   * different action to a different destination.
+   *
+   * Known trade-off: this was the only link to /vendor-hero on the flowers page.
+   * Site-wide, only FlowersAbout and CateringAbout link to that route, so while
+   * this flag is false /vendor-hero loses a discovery path from here. Mitigated
+   * by adding /vendor-hero to src/app/sitemap.ts (see Fix 3).
    */
   FLOWERS_ABOUT_SERVICE_WORKS: false,
 
   /**
-   * "Get Started" ScheduleDialog trigger in `CateringFeatures`, under the three
-   * feature cards on /catering-deliveries. Opens the Google Calendar booking flow.
-   * Disabled 2026-08 — CateringAbout already carries a CTA on the same page.
+   * CATERING_FEATURES_GET_STARTED
+   * Controls the "Get Started" ScheduleDialog trigger in CateringFeatures
+   * (/catering-deliveries). Opens the Google Calendar booking flow.
+   *
+   * Disabled 2026-08 as a marketing decision — NOT because it was a duplicate.
+   *
+   * Safe to hide because the booking path on this page is unaffected:
+   * FoodHeader, CateringStats and CateringContact each keep their own
+   * ScheduleDialog trigger.
    */
   CATERING_FEATURES_GET_STARTED: false,
 } as const;
