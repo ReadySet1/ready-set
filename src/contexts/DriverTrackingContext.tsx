@@ -45,6 +45,9 @@ interface DriverTrackingContextValue {
     status: DriverStatus,
     location?: LocationUpdate
   ) => Promise<boolean>;
+  /** Re-fetch the active deliveries feed on demand (e.g. after a status change
+   *  made outside this context, so guards don't wait on the 60s poll). */
+  refreshDeliveries: () => Promise<void>;
 
   // Offline support
   isOnline: boolean;
@@ -130,6 +133,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   const {
     activeDeliveries,
     updateDeliveryStatus,
+    refreshDeliveries,
     loading: deliveriesLoading,
     error: deliveriesError,
   } = useDriverDeliveries();
@@ -163,6 +167,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
+    refreshDeliveries,
 
     // Offline
     isOnline: offlineStatus.isOnline,
