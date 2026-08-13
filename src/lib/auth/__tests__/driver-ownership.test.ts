@@ -10,14 +10,21 @@
 
 import {
   driverOwnershipCondition,
+  getActionCaller,
   getDriverForUser,
   userOwnsDriver,
 } from "../driver-ownership";
 import { prisma } from "@/utils/prismaDB";
+import { headers } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
+import { getUserRole } from "@/lib/auth";
 
 jest.mock("@/utils/prismaDB", () => ({
   prisma: { $queryRawUnsafe: jest.fn() },
 }));
+jest.mock("next/headers", () => ({ headers: jest.fn() }));
+jest.mock("@/utils/supabase/server", () => ({ createClient: jest.fn() }));
+jest.mock("@/lib/auth", () => ({ getUserRole: jest.fn() }));
 
 const mockQuery = (prisma as unknown as { $queryRawUnsafe: jest.Mock })
   .$queryRawUnsafe;
@@ -77,6 +84,88 @@ describe("userOwnsDriver", () => {
 
     await userOwnsDriver(DRIVER_ID, USER_ID, { requireActive: true });
     expect(mockQuery.mock.calls[1][0]).toContain("is_active = true");
+  });
+});
+
+describe("getActionCaller (Bearer-or-cookie identity)", () => {
+  const mockHeaders = headers as jest.Mock;
+  const mockCreateClient = createClient as jest.Mock;
+  const mockGetUserRole = getUserRole as jest.Mock;
+  const mockGetUser = jest.fn();
+
+  /** Minimal ReadonlyHeaders stand-in. Keys are matched lowercase. */
+  const headerBag = (entries: Record<string, string>) => ({
+    get: (name: string) => entries[name.toLowerCase()] ?? null,
+  });
+
+  beforeEach(() => {
+    mockCreateClient.mockResolvedValue({ auth: { getUser: mockGetUser } });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+    mockHeaders.mockResolvedValue(headerBag({}));
+  });
+
+  it("resolves identity from the Bearer token without touching cookie auth", async () => {
+    // 2026-08 field failure: stale auth cookies, valid in-memory session — the
+    // Bearer header must be enough on its own.
+    mockHeaders.mockResolvedValue(headerBag({ authorization: "Bearer tok-123" }));
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+
+    const caller = await getActionCaller();
+
+    expect(caller).toEqual({ userId: USER_ID, isPrivileged: false });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+    expect(mockGetUser).toHaveBeenCalledWith("tok-123");
+  });
+
+  it("uses cookie auth when there is no Authorization header", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+
+    const caller = await getActionCaller();
+
+    expect(caller).toEqual({ userId: USER_ID, isPrivileged: false });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+    expect(mockGetUser).toHaveBeenCalledWith();
+  });
+
+  it("falls back to cookie auth when the Bearer token does not validate", async () => {
+    mockHeaders.mockResolvedValue(headerBag({ authorization: "Bearer stale-tok" }));
+    mockGetUser
+      .mockResolvedValueOnce({ data: { user: null }, error: { message: "invalid JWT" } })
+      .mockResolvedValueOnce({ data: { user: { id: USER_ID } }, error: null });
+
+    const caller = await getActionCaller();
+
+    expect(caller?.userId).toBe(USER_ID);
+    expect(mockGetUser).toHaveBeenNthCalledWith(1, "stale-tok");
+    expect(mockGetUser).toHaveBeenNthCalledWith(2);
+  });
+
+  it("falls back to cookie auth when headers() throws outside a request scope", async () => {
+    mockHeaders.mockImplementation(() => {
+      throw new Error("headers was called outside a request scope");
+    });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+
+    const caller = await getActionCaller();
+
+    expect(caller?.userId).toBe(USER_ID);
+    expect(mockGetUser).toHaveBeenCalledWith();
+  });
+
+  it("returns null when neither transport authenticates", async () => {
+    mockHeaders.mockResolvedValue(headerBag({ authorization: "Bearer stale-tok" }));
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    expect(await getActionCaller()).toBeNull();
+  });
+
+  it("marks ADMIN and SUPER_ADMIN callers as privileged", async () => {
+    mockGetUserRole.mockResolvedValue("ADMIN");
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+
+    const caller = await getActionCaller();
+
+    expect(caller).toEqual({ userId: USER_ID, isPrivileged: true });
   });
 });
 

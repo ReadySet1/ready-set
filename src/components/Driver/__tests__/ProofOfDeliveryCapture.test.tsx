@@ -137,6 +137,7 @@ jest.mock('@/types/proof-of-delivery', () => ({
 const { useCameraPermission, isMobileDevice } = require('@/hooks/useCameraPermission');
 const { usePODOfflineQueue } = require('@/hooks/tracking/usePODOfflineQueue');
 const { compressImage, createImagePreviewUrl, revokeImagePreviewUrl } = require('@/lib/utils/image-compression');
+const { createClient } = require('@/utils/supabase/client');
 
 describe('ProofOfDeliveryCapture', () => {
   const defaultProps = {
@@ -471,9 +472,38 @@ describe('ProofOfDeliveryCapture', () => {
       });
     });
 
-    it('should show error on upload failure', async () => {
+    it('attaches the Bearer token to the upload when a session exists (stale-cookie transport)', async () => {
+      (createClient as jest.Mock).mockReturnValueOnce({
+        auth: {
+          getSession: jest
+            .fn()
+            .mockResolvedValue({ data: { session: { access_token: 'tok-pod' } } }),
+        },
+      });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: 'https://example.com/photo.jpg' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      const init = (global.fetch as jest.Mock).mock.calls[0][1];
+      // Bearer token attached; Content-Type left to the browser so the
+      // multipart boundary stays intact.
+      expect(init.headers).toEqual({ Authorization: 'Bearer tok-pod' });
+      expect(init.method).toBe('POST');
+    });
+
+    it('should surface the HTTP status and server message on upload failure', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
         json: async () => ({ error: 'Upload failed' }),
       });
 
@@ -482,10 +512,81 @@ describe('ProofOfDeliveryCapture', () => {
       fireEvent.click(uploadButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Upload failed')).toBeInTheDocument();
+        expect(
+          screen.getByText('Failed to upload proof of delivery (500 — Upload failed)'),
+        ).toBeInTheDocument();
       });
 
-      expect(defaultProps.onError).toHaveBeenCalledWith('Upload failed');
+      expect(defaultProps.onError).toHaveBeenCalledWith(
+        'Failed to upload proof of delivery (500 — Upload failed)',
+      );
+    });
+
+    it('distinguishes a 429 and logs the full detail to the console', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: async () => ({ error: 'Too many requests' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to upload proof of delivery (429 — Too many requests)'),
+        ).toBeInTheDocument();
+      });
+
+      // The field failure left zero client-side trace — the full detail must
+      // reach the console for remote debugging.
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('falls back to the status text when the error body is not JSON', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 413,
+        statusText: 'Payload Too Large',
+        json: async () => {
+          throw new Error('not json');
+        },
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to upload proof of delivery (413 — Payload Too Large)'),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('queues the photo for background sync when fetch fails at the network level', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      // Safari reports network failures as TypeError('Load failed') — no
+      // "fetch" in the message — and Chrome as TypeError('Failed to fetch').
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Load failed'));
+      mockQueuePODUpload.mockResolvedValueOnce(true);
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      // Network error → offline queue; the queued UI tells the driver it
+      // retries when back online.
+      await waitFor(() => {
+        expect(mockQueuePODUpload).toHaveBeenCalled();
+      });
+      expect(screen.getByText('Photo Queued')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
     });
   });
 
