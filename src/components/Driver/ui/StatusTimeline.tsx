@@ -6,6 +6,7 @@ import { DriverStatus } from "@/types/user";
 import {
   DRIVER_STAGE_CONFIG,
   getStatusIndex,
+  isDeliveryCompleted,
   STATUS_ORDER,
 } from "./status-config";
 
@@ -26,12 +27,16 @@ export function StatusTimeline({
   className,
 }: StatusTimelineProps) {
   const cur = getStatusIndex(status);
+  // COMPLETED is terminal: its own step is done, not "in progress" — without
+  // this a delivered order shows "In progress now" on the Delivered step
+  // forever (2026-08-12 field report).
+  const terminal = isDeliveryCompleted(status);
 
   return (
     <div className={cn("flex flex-col", className)}>
       {STATUS_ORDER.map((stage, i) => {
-        const done = i < cur;
-        const active = i === cur;
+        const done = i < cur || (i === cur && terminal);
+        const active = i === cur && !terminal;
         const cfg = DRIVER_STAGE_CONFIG[stage];
         const ts = timestamps?.[stage];
         const isLast = i === STATUS_ORDER.length - 1;

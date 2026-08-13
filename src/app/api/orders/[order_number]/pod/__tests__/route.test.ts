@@ -142,6 +142,66 @@ describe('POD POST — deliveries mirror regression', () => {
     });
   });
 
+  describe('Bearer token identity (stale-cookie transport)', () => {
+    // 2026-08 field failure: iOS Safari let the auth cookies go stale while
+    // the JS session stayed valid — the route must accept the Bearer token
+    // even when cookie auth resolves no user.
+    const bearerOnlyGetUser = () =>
+      jest.fn(async (token?: string) =>
+        token === 'tok-123'
+          ? { data: { user: { id: 'user-1' } }, error: null }
+          : { data: { user: null }, error: { message: 'no cookie session' } },
+      );
+
+    it('POST resolves the user from the Authorization header when cookies are stale', async () => {
+      const getUser = bearerOnlyGetUser();
+      mockedCreateClient.mockResolvedValue({ auth: { getUser } } as any);
+
+      const req = new NextRequest('http://localhost:3000/api/orders/CAT-001/pod', {
+        method: 'POST',
+        headers: { authorization: 'Bearer tok-123' },
+      });
+      (req as any).formData = jest.fn().mockResolvedValue({
+        get: (k: string) => (k === 'file' ? makeFile() : null),
+      });
+
+      const { POST } = await importRoute();
+      const res = await POST(req, { params: Promise.resolve({ order_number: 'CAT-001' }) });
+
+      expect(res.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith('tok-123');
+    });
+
+    it('GET resolves the user from the Authorization header when cookies are stale', async () => {
+      const getUser = bearerOnlyGetUser();
+      mockedCreateClient.mockResolvedValue({ auth: { getUser } } as any);
+      (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
+        id: 'order-123',
+        orderNumber: 'CAT-001',
+        fileUploads: [],
+      });
+
+      const req = new NextRequest('http://localhost:3000/api/orders/CAT-001/pod', {
+        method: 'GET',
+        headers: { authorization: 'Bearer tok-123' },
+      });
+
+      const { GET } = await importRoute();
+      const res = await GET(req, { params: Promise.resolve({ order_number: 'CAT-001' }) });
+
+      expect(res.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith('tok-123');
+    });
+
+    it('POST still authenticates via cookies when no Authorization header is sent', async () => {
+      const { POST } = await importRoute();
+      const res = await POST(createPostRequest('CAT-001'), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
   it('does not run the mirror when the upload itself fails', async () => {
     setupMocks();
     mockedUpload.mockResolvedValue({ url: null, path: null, error: 'storage down' });

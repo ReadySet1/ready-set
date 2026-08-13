@@ -5,6 +5,7 @@ import SignaturePad from "signature_pad";
 import { AlertCircle, Check, Eraser, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { withBearerAuth } from "@/lib/auth/bearer-session";
 import { DriverButton } from "./ui/DriverButton";
 
 interface SignatureCaptureProps {
@@ -79,6 +80,8 @@ export function SignatureCapture({
       const h = canvas.offsetHeight;
       if (w === 0 || h === 0) return; // not laid out yet — wait for the observer
       if (w === lastW && h === lastH) return;
+      const prevW = lastW;
+      const prevH = lastH;
       lastW = w;
       lastH = h;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -87,7 +90,24 @@ export function SignatureCapture({
       canvas.height = h * ratio;
       canvas.getContext("2d")?.scale(ratio, ratio);
       pad.clear();
-      if (strokes.length > 0) pad.fromData(strokes);
+      if (strokes.length > 0) {
+        // toData() points are in CSS-pixel coordinates of the OLD canvas size;
+        // replaying them verbatim onto a differently-sized canvas draws them
+        // off-canvas (fullscreen → collapsed lost the whole signature in the
+        // field). Rescale every point to the new dimensions before replaying.
+        const rescale =
+          prevW > 0 && prevH > 0 && (prevW !== w || prevH !== h)
+            ? strokes.map((group) => ({
+                ...group,
+                points: group.points.map((p) => ({
+                  ...p,
+                  x: (p.x * w) / prevW,
+                  y: (p.y * h) / prevH,
+                })),
+              }))
+            : strokes;
+        pad.fromData(rescale);
+      }
       setHasInk(!pad.isEmpty());
     };
     applySize();
@@ -137,7 +157,13 @@ export function SignatureCapture({
       const endpoint =
         uploadEndpoint ??
         `/api/orders/${encodeURIComponent(orderNumber)}/signature`;
-      const res = await fetch(endpoint, { method: "POST", body: formData });
+      // Bearer token survives stale auth cookies (2026-08 field failure); no
+      // manual Content-Type — the browser must set the multipart boundary.
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: await withBearerAuth(),
+        body: formData,
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Upload failed");

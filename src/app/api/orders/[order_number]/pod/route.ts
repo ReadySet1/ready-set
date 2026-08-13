@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { getRequestUser } from '@/utils/supabase/request-user';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
 import {
@@ -22,9 +22,8 @@ export async function POST(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(
@@ -236,9 +235,8 @@ export async function GET(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(
@@ -336,9 +334,8 @@ export async function DELETE(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(

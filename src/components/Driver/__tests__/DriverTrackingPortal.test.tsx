@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import DriverTrackingPortal from "../DriverTrackingPortal";
 import { DriverThemeProvider } from "@/components/Driver/ui/DriverThemeProvider";
@@ -268,7 +268,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getAllByText(/^access denied$/i)).toHaveLength(2);
   });
 
-  it("keeps the POD sheet open when completing the delivery fails", async () => {
+  it("closes the POD sheet immediately and toasts when completing the delivery fails", async () => {
     updateDeliveryStatus.mockResolvedValueOnce(false);
     mockUseDriverTracking.mockReturnValue(
       baseCtx({
@@ -294,6 +294,12 @@ describe("DriverTrackingPortal (redesigned)", () => {
 
     // Drive the capture flow to completion; the status update fails.
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+
+    // The upload already succeeded — the sheet closes right away and the
+    // failed advance is surfaced via toast (retry from the delivery card).
+    await waitFor(() =>
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+    );
     await waitFor(() =>
       expect(updateDeliveryStatus).toHaveBeenCalledWith(
         "del-1",
@@ -306,9 +312,90 @@ describe("DriverTrackingPortal (redesigned)", () => {
         expect.stringMatching(/couldn't update the delivery status/i),
       ),
     );
-    // podTarget is only cleared on success — the sheet must stay open so the
-    // driver can retry without re-capturing the proof.
-    expect(screen.getByTestId("pod-capture")).toBeInTheDocument();
+  });
+
+  it("closes the POD sheet before the status update resolves", async () => {
+    let resolveAdvance: (ok: boolean) => void = () => {};
+    updateDeliveryStatus.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveAdvance = resolve)),
+    );
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_TO_CLIENT,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/complete delivery/i));
+    expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+
+    // The sheet must close while the PATCH + refetch are still in flight —
+    // on LTE they take seconds and an open sheet reads as a hang.
+    await waitFor(() =>
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+    );
+    expect(updateDeliveryStatus).toHaveBeenCalledWith(
+      "del-1",
+      DriverStatus.COMPLETED,
+      sampleLocation,
+    );
+
+    await act(async () => resolveAdvance(true));
+  });
+
+  it("closes the signature sheet before the status update resolves", async () => {
+    let resolveAdvance: (ok: boolean) => void = () => {};
+    updateDeliveryStatus.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveAdvance = resolve)),
+    );
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_AT_VENDOR,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/picked up the order/i));
+    expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /finish signature upload/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
+    );
+    expect(updateDeliveryStatus).toHaveBeenCalledWith(
+      "del-1",
+      DriverStatus.PICKED_UP,
+      sampleLocation,
+    );
+
+    await act(async () => resolveAdvance(true));
   });
 
   it("filters Active deliveries by scheduled pickup date via the Today/All chips", () => {

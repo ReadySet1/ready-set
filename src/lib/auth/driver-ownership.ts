@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { prisma } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
 import { getUserRole } from '@/lib/auth';
@@ -48,9 +49,30 @@ export interface ActionCaller {
  */
 export async function getActionCaller(): Promise<ActionCaller | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  let user: { id: string } | null = null;
+
+  // Prefer the Bearer token when the caller sent one. 2026-08 field failure
+  // (iOS Safari): the auth cookies went stale mid-shift while the client's
+  // in-memory session stayed valid — cookie-only getUser() 401'd every driver
+  // action. headers() reads the request the action/route is serving.
+  try {
+    const authHeader = (await headers()).get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice('Bearer '.length);
+      const { data } = await supabase.auth.getUser(token);
+      user = data.user;
+    }
+  } catch {
+    // headers() throws outside a request scope — fall back to cookies.
+  }
+
+  if (!user) {
+    const {
+      data: { user: cookieUser },
+    } = await supabase.auth.getUser();
+    user = cookieUser;
+  }
   if (!user) return null;
 
   const role = (await getUserRole(user.id))?.toUpperCase();

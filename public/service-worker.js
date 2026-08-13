@@ -12,6 +12,12 @@ const LOCATION_QUEUE_STORE = 'location-queue';
 const DB_NAME = 'readyset-driver-db';
 const DB_VERSION = 1;
 
+// Flush pacing (mirrors useLocationTracking): trickle queued posts instead of
+// bursting them into the server rate limiter, and back off entirely on a 429.
+const LOCATION_FLUSH_SPACING_MS = 250;
+const LOCATION_FLUSH_429_BACKOFF_MS = 30000;
+let locationFlushBackoffUntil = 0;
+
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing...');
@@ -91,6 +97,11 @@ async function handleLocationRequest(request) {
     if (response.ok) {
       return response;
     }
+    // Never queue a rate-limited post: replaying it later just repeats the
+    // same burst. Hand the 429 back so the client's own throttle handles it.
+    if (response.status === 429) {
+      return response;
+    }
     throw new Error('Network request failed');
   } catch (error) {
     console.log('Location request failed, queuing for later sync:', error);
@@ -156,24 +167,39 @@ self.addEventListener('sync', (event) => {
 
 // Sync queued location updates
 async function syncQueuedLocations() {
+  // Respect the 429 backoff gate before touching the queue again.
+  if (Date.now() < locationFlushBackoffUntil) {
+    return;
+  }
   try {
     const queuedRequests = await getQueuedRequests();
     console.log(`Syncing ${queuedRequests.length} queued location updates`);
-    
-    for (const requestData of queuedRequests) {
+
+    for (let i = 0; i < queuedRequests.length; i++) {
+      const requestData = queuedRequests[i];
       try {
         const response = await fetch(requestData.url, {
           method: requestData.method,
           headers: requestData.headers,
           body: requestData.body
         });
-        
+
         if (response.ok) {
           await removeQueuedRequest(requestData.id);
           console.log('Successfully synced location update:', requestData.id);
+        } else if (response.status === 429) {
+          // Rate limited: stop the flush, keep the rest of the queue intact,
+          // and gate the next attempt (~30s). The next sync retries it.
+          locationFlushBackoffUntil = Date.now() + LOCATION_FLUSH_429_BACKOFF_MS;
+          return;
         }
       } catch (error) {
         console.error('Failed to sync location update:', requestData.id, error);
+      }
+
+      // Trickle the queue instead of bursting it into the rate limiter.
+      if (i < queuedRequests.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, LOCATION_FLUSH_SPACING_MS));
       }
     }
   } catch (error) {

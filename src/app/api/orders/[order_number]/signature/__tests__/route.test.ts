@@ -205,6 +205,34 @@ describe('pickup confirmation POST', () => {
     expect(mockedSentry.captureException).toHaveBeenCalled();
   });
 
+  it('resolves the user from the Authorization header when cookies are stale', async () => {
+    // 2026-08 field failure transport: stale auth cookies, valid Bearer token.
+    const getUser = jest.fn(async (token?: string) =>
+      token === 'tok-123'
+        ? { data: { user: { id: 'user-1' } }, error: null }
+        : { data: { user: null }, error: { message: 'no cookie session' } },
+    );
+    mockedCreateClient.mockResolvedValue({ auth: { getUser } } as any);
+
+    const req = new NextRequest('http://localhost:3000/api/orders/CAT-001/signature', {
+      method: 'POST',
+      headers: { authorization: 'Bearer tok-123' },
+    });
+    (req as any).formData = jest.fn().mockResolvedValue({
+      get: (k: string) => {
+        if (k === 'file') return makeFile();
+        if (k === 'receivedBy') return 'Maria Lopez';
+        return null;
+      },
+    });
+
+    const { POST } = await importRoute();
+    const res = await POST(req, params('CAT-001'));
+
+    expect(res.status).toBe(200);
+    expect(getUser).toHaveBeenCalledWith('tok-123');
+  });
+
   it('returns 500 and records nothing when the upload fails', async () => {
     setupMocks();
     mockedUpload.mockResolvedValue({ url: null, path: null, error: 'storage down' });

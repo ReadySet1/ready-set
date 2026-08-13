@@ -36,6 +36,7 @@ import {
   POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES,
 } from '@/types/proof-of-delivery';
 import { usePODOfflineQueue } from '@/hooks/tracking/usePODOfflineQueue';
+import { withBearerAuth } from '@/lib/auth/bearer-session';
 import { Badge } from '@/components/ui/badge';
 
 /**
@@ -237,15 +238,26 @@ export function ProofOfDeliveryCapture({
       formData.append('file', state.file, filename);
       formData.append('deliveryId', deliveryId);
 
-      // Upload to API
+      // Upload to API. Bearer token survives stale auth cookies (2026-08
+      // field failure); no manual Content-Type — the browser must set the
+      // multipart boundary.
       const response = await fetch(apiEndpoint, {
         method: 'POST',
+        headers: await withBearerAuth(),
         body: formData,
       });
 
       if (!response.ok) {
+        // Surface the HTTP status + server message: the field failure showed
+        // only "Failed to upload proof of delivery" with no way to tell
+        // 401/403/413/429 apart, client- or server-side.
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Upload failed');
+        const serverMessage =
+          errorData.error || errorData.message || response.statusText || '';
+        console.error('POD upload failed:', response.status, errorData);
+        throw new Error(
+          `Failed to upload proof of delivery (${response.status}${serverMessage ? ` — ${serverMessage}` : ''})`,
+        );
       }
 
       const result = await response.json();
@@ -269,8 +281,13 @@ export function ProofOfDeliveryCapture({
       // Notify parent of successful upload
       onUploadComplete(result.url, metadata);
     } catch (err) {
-      // Network error → queue silently for background sync and complete.
-      if (!navigator.onLine || (err instanceof TypeError && err.message.includes('fetch'))) {
+      // Always leave a console trace — the field failure was undebuggable.
+      console.error('POD upload error:', err);
+
+      // Network-level failure (fetch rejects with TypeError: Chrome "Failed to
+      // fetch", Safari "Load failed") → queue for background sync and complete;
+      // the queued UI tells the driver it retries when back online.
+      if (!navigator.onLine || err instanceof TypeError) {
         await queueForLater();
         return;
       }
