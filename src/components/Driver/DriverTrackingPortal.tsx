@@ -284,17 +284,21 @@ export default function DriverTrackingPortal() {
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    // Keep the POD sheet open on failure so the driver can retry instead of
-    // having to re-capture the proof after only seeing the error toast.
-    const ok = await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
-    if (ok) setPodTarget(null);
+    const { deliveryId } = podTarget;
+    // The upload already succeeded (and toasted) — close the sheet NOW instead
+    // of holding it open across the status PATCH + deliveries refetch (2-5s on
+    // LTE reads as a hang). A failed advance is surfaced by advanceStatus's
+    // toast and retried from the delivery card. Mirrors DriverDeliveryDetail.
+    setPodTarget(null);
+    await advanceStatus(deliveryId, DriverStatus.COMPLETED);
   };
 
   const onSignatureComplete = async () => {
     if (!sigTarget) return;
-    // Same retry semantics as POD: keep the sheet open if the advance fails.
-    const ok = await advanceStatus(sigTarget.deliveryId, DriverStatus.PICKED_UP);
-    if (ok) setSigTarget(null);
+    const { deliveryId } = sigTarget;
+    // Same close-first semantics as POD.
+    setSigTarget(null);
+    await advanceStatus(deliveryId, DriverStatus.PICKED_UP);
   };
 
   const isPickupToday = (d?: Date) =>
