@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import Link from "next/link";
+import { isMarketingCtaEnabled } from "@/config/marketing-cta-config";
 
 interface StatProps {
   value: string;
@@ -32,6 +33,10 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
 };
 
 const FlowersAbout: React.FC = () => {
+  const showServiceWorksCta = isMarketingCtaEnabled(
+    "FLOWERS_ABOUT_SERVICE_WORKS",
+  );
+
   const stats = [
     { value: "2019", label: "Founded", delay: 0 },
     { value: "157K+", label: "Deliveries Completed", delay: 100 },
@@ -98,20 +103,22 @@ const FlowersAbout: React.FC = () => {
               />
             </div>
 
-            <motion.div
-              className="mt-8"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-            >
-              <Link
-                href="/vendor-hero"
-                className="inline-block rounded-full bg-yellow-400 px-12 py-4 text-lg font-extrabold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2"
+            {showServiceWorksCta && (
+              <motion.div
+                className="mt-8"
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.8 }}
               >
-                How Our Service Works
-              </Link>
-            </motion.div>
+                <Link
+                  href="/vendor-hero"
+                  className="inline-block rounded-full bg-yellow-400 px-12 py-4 text-lg font-extrabold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2"
+                >
+                  How Our Service Works
+                </Link>
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </div>

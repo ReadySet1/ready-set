@@ -49,9 +49,25 @@ jest.mock("@/lib/cloudinary", () => ({
   getCloudinaryUrl: (path: string) => `/images/${path}`,
 }));
 
+// Mock the CTA visibility flag so both states can be exercised
+jest.mock("@/config/marketing-cta-config", () => ({
+  isMarketingCtaEnabled: jest.fn(),
+}));
+
 import FlowersAbout from "../FlowersAbout";
 
+import { isMarketingCtaEnabled } from "@/config/marketing-cta-config";
+
+const mockIsMarketingCtaEnabled = isMarketingCtaEnabled as jest.MockedFunction<
+  typeof isMarketingCtaEnabled
+>;
+
 describe("FlowersAbout", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsMarketingCtaEnabled.mockReturnValue(false);
+  });
+
   describe("Basic Rendering", () => {
     it("renders without crashing", () => {
       expect(() => render(<FlowersAbout />)).not.toThrow();
@@ -115,13 +131,29 @@ describe("FlowersAbout", () => {
   });
 
   describe("CTA Link", () => {
-    it("renders the 'How Our Service Works' link", () => {
+    it("does not render the 'How Our Service Works' link when the flag is off", () => {
       render(<FlowersAbout />);
+      expect(
+        screen.queryByRole("link", { name: /how our service works/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the 'How Our Service Works' link when the flag is on", () => {
+      mockIsMarketingCtaEnabled.mockReturnValue(true);
+      render(<FlowersAbout />);
+
       const link = screen.getByRole("link", {
         name: /how our service works/i,
       });
       expect(link).toBeInTheDocument();
       expect(link).toHaveAttribute("href", "/vendor-hero");
+    });
+
+    it("reads the FLOWERS_ABOUT_SERVICE_WORKS flag", () => {
+      render(<FlowersAbout />);
+      expect(mockIsMarketingCtaEnabled).toHaveBeenCalledWith(
+        "FLOWERS_ABOUT_SERVICE_WORKS",
+      );
     });
   });
 

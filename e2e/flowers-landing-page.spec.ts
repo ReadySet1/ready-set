@@ -10,6 +10,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { isMarketingCtaEnabled } from '../src/config/marketing-cta-config';
 
 test.describe('Flowers Landing Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -91,10 +92,16 @@ test.describe('Flowers Landing Page', () => {
       await expect(page.locator('text=Professional Drivers')).toBeVisible();
     });
 
-    test('12. Renders How Our Service Works link', async ({ page }) => {
-      await expect(
-        page.locator('a:has-text("How Our Service Works")')
-      ).toBeVisible();
+    test('12. "How Our Service Works" link follows the marketing CTA flag', async ({ page }) => {
+      const serviceWorksLink = page.locator('a:has-text("How Our Service Works")');
+
+      if (isMarketingCtaEnabled('FLOWERS_ABOUT_SERVICE_WORKS')) {
+        await expect(serviceWorksLink.first()).toBeVisible();
+      } else {
+        // Absent from the DOM entirely — the flag short-circuits the render,
+        // it does not merely hide the element with CSS.
+        await expect(serviceWorksLink).toHaveCount(0);
+      }
     });
   });
 
