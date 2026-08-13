@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import DriverLiveMap from '../DriverLiveMap';
+import DriverLiveMap, { mergeTrailSeed, type TrailEntry } from '../DriverLiveMap';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
 
 // Mock mapbox-gl
@@ -697,6 +697,92 @@ describe('DriverLiveMap', () => {
       const mapContainer = screen.getByRole('application');
       expect(mapContainer).toHaveAttribute('role', 'application');
       expect(mapContainer).toHaveAttribute('aria-label', 'Driver live map');
+    });
+  });
+
+  describe('mergeTrailSeed (trail seed hygiene)', () => {
+    const entry = (lng: number, lat: number, t: number): TrailEntry => ({
+      coord: [lng, lat],
+      t,
+    });
+
+    it('sorts merged entries ascending by fix time', () => {
+      const seed = [entry(-122.3, 37.3, 3000), entry(-122.1, 37.1, 1000)];
+      const live = [entry(-122.2, 37.2, 2000)];
+
+      const merged = mergeTrailSeed(seed, live);
+
+      expect(merged.map((e) => e.t)).toEqual([1000, 2000, 3000]);
+      expect(merged.map((e) => e.coord)).toEqual([
+        [-122.1, 37.1],
+        [-122.2, 37.2],
+        [-122.3, 37.3],
+      ]);
+    });
+
+    it('drops invalid coordinates ([0,0] fallback, NaN, wrong shape)', () => {
+      const seed = [
+        entry(0, 0, 1000), // ungeocoded [0,0] fallback
+        entry(NaN, 37.1, 2000),
+        { coord: [-122.1] as unknown as [number, number], t: 3000 },
+        entry(-122.2, 37.2, 4000),
+      ];
+
+      const merged = mergeTrailSeed(seed, []);
+
+      expect(merged).toEqual([entry(-122.2, 37.2, 4000)]);
+    });
+
+    it('drops entries without a finite fix time', () => {
+      const merged = mergeTrailSeed(
+        [entry(-122.1, 37.1, NaN), entry(-122.2, 37.2, 1000)],
+        [],
+      );
+      expect(merged).toEqual([entry(-122.2, 37.2, 1000)]);
+    });
+
+    it('collapses consecutive duplicate coordinates but keeps revisits', () => {
+      const merged = mergeTrailSeed(
+        [
+          entry(-122.1, 37.1, 1000),
+          entry(-122.1, 37.1, 2000), // consecutive duplicate → dropped
+          entry(-122.2, 37.2, 3000),
+          entry(-122.1, 37.1, 4000), // revisit after moving → kept
+        ],
+        [],
+      );
+
+      expect(merged).toEqual([
+        entry(-122.1, 37.1, 1000),
+        entry(-122.2, 37.2, 3000),
+        entry(-122.1, 37.1, 4000),
+      ]);
+    });
+
+    it('interleaves live entries older than the seed tail by time (no back-jump)', () => {
+      // Live points that arrived while the seed fetch was in flight can be
+      // OLDER than the last seeded row — they must slot in by time, and the
+      // duplicate at the seam must collapse.
+      const seed = [entry(-122.1, 37.1, 1000), entry(-122.3, 37.3, 3000)];
+      const live = [entry(-122.2, 37.2, 2000), entry(-122.3, 37.3, 3000)];
+
+      const merged = mergeTrailSeed(seed, live);
+
+      expect(merged).toEqual([
+        entry(-122.1, 37.1, 1000),
+        entry(-122.2, 37.2, 2000),
+        entry(-122.3, 37.3, 3000),
+      ]);
+    });
+
+    it('caps the merged trail at the max point budget', () => {
+      const seed = Array.from({ length: 1500 }, (_, i) =>
+        entry(-122 - i * 0.0001, 37 + i * 0.0001, i),
+      );
+      const merged = mergeTrailSeed(seed, []);
+      expect(merged.length).toBeLessThanOrEqual(1000);
+      // The route start survives the cap (older half is thinned, not shifted).
+      expect(merged[0]).toEqual(seed[0]);
     });
   });
 });
