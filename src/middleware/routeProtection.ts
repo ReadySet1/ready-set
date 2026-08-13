@@ -24,7 +24,10 @@ const PUBLIC_ROUTES = [
   '/about',
   '/apply',
   '/privacy-policy',
-  '/terms-of-service'
+  '/terms-of-service',
+  // Native wrapper entry point — must always render 200 with zero server
+  // redirects (WKWebView fails redirected entry navigations).
+  '/native-launch'
 ];
 
 // Routes that require authentication but are not role-specific
