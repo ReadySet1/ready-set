@@ -348,6 +348,27 @@ describe('useLocationTracking', () => {
       });
     });
 
+    it('includes the GPS fix timestamp in the POST body', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+
+      await waitFor(() => {
+        expect(locationPostCalls().length).toBeGreaterThan(0);
+      });
+
+      // The body carries the fix time from the geolocation position, not the
+      // send time — offline-replayed points then keep their original time.
+      const body = JSON.parse(locationPostCalls().pop()![1].body);
+      expect(body.timestamp).toBe(new Date(mockPosition.timestamp).toISOString());
+    });
+
     it('should trigger offline sync when starting tracking', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
@@ -677,6 +698,8 @@ describe('useLocationTracking', () => {
       expect(body.driver_id).toBe(mockDriverId);
       expect(body.latitude).toBe(unsyncedLocation.coordinates.lat);
       expect(body.longitude).toBe(unsyncedLocation.coordinates.lng);
+      // Replayed points carry their ORIGINAL fix time, not the replay time.
+      expect(body.timestamp).toBe(unsyncedLocation.timestamp);
       expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
     });
 
@@ -758,6 +781,90 @@ describe('useLocationTracking', () => {
       });
 
       expect(mockLocationStore.getUnsyncedLocations).not.toHaveBeenCalled();
+    });
+
+    describe('burst protection (2026-08 field 429 storm)', () => {
+      const makeUnsynced = (id: string) => ({
+        id,
+        driverId: mockDriverId,
+        coordinates: { lat: 37.7749, lng: -122.4194 },
+        accuracy: 10,
+        speed: 5,
+        heading: 180,
+        altitude: 50,
+        activityType: 'driving' as const,
+        isMoving: true,
+        timestamp: new Date().toISOString(),
+        synced: false,
+        syncAttempts: 0,
+      });
+
+      it('spaces queued posts out instead of dumping the queue in one burst', async () => {
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+          makeUnsynced('loc-2'),
+        ]);
+
+        const { result } = renderHook(() => useLocationTracking());
+
+        let syncPromise: Promise<void> = Promise.resolve();
+        await act(async () => {
+          syncPromise = result.current.syncOfflineLocations();
+          // Let the first post settle; the flush is now waiting on the
+          // spacing timer before the second post.
+          await Promise.resolve();
+        });
+
+        expect(locationPostCalls()).toHaveLength(1);
+
+        await act(async () => {
+          jest.advanceTimersByTime(300);
+          await syncPromise;
+        });
+
+        expect(locationPostCalls()).toHaveLength(2);
+      });
+
+      it('stops the flush on 429, keeps the queue intact, and backs off ~30s', async () => {
+        postLocationHandler = () => okJson({ error: 'Rate limit exceeded' }, 429);
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+          makeUnsynced('loc-2'),
+        ]);
+
+        const { result } = renderHook(() => useLocationTracking());
+
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+
+        // The first 429 stops the flush: no second POST, and the rate-limited
+        // item is neither marked synced nor penalized (it stays queued as-is).
+        expect(locationPostCalls()).toHaveLength(1);
+        expect(mockLocationStore.markAsSynced).not.toHaveBeenCalled();
+        expect(mockLocationStore.incrementSyncAttempts).not.toHaveBeenCalled();
+        expect(mockLocationStore.deleteLocation).not.toHaveBeenCalled();
+
+        // Inside the backoff window the flush is a no-op.
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+        expect(locationPostCalls()).toHaveLength(1);
+
+        // After the backoff elapses the flush retries the queue.
+        postLocationHandler = () => okJson({ success: true }, 201);
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+        ]);
+        await act(async () => {
+          jest.advanceTimersByTime(30_000);
+        });
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+        expect(locationPostCalls()).toHaveLength(2);
+        expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
+      });
     });
 
     it('should clean up old synced locations after sync', async () => {

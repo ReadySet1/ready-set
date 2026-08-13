@@ -16,6 +16,25 @@ interface LocationUpdate {
   altitude?: number;
   battery_level?: number;
   is_moving?: boolean;
+  /** GPS fix time (ISO string) — offline-replayed points carry the original
+   *  capture time instead of the replay time. */
+  timestamp?: string;
+}
+
+// Sanity bounds for a client-supplied fix time: small clock skew forward,
+// up to a day of offline queueing backward. Anything outside → NOW().
+const RECORDED_AT_MAX_FUTURE_MS = 2 * 60 * 1000;
+const RECORDED_AT_MAX_PAST_MS = 24 * 60 * 60 * 1000;
+
+/** Returns the client fix time as an ISO string when plausible, else null. */
+function resolveRecordedAt(timestamp: unknown): string | null {
+  if (typeof timestamp !== 'string' && typeof timestamp !== 'number') return null;
+  const ms = new Date(timestamp).getTime();
+  if (!Number.isFinite(ms)) return null;
+  const now = Date.now();
+  if (ms > now + RECORDED_AT_MAX_FUTURE_MS) return null;
+  if (ms < now - RECORDED_AT_MAX_PAST_MS) return null;
+  return new Date(ms).toISOString();
 }
 
 // POST - Record driver location
@@ -61,8 +80,11 @@ export async function POST(request: NextRequest) {
       heading,
       altitude,
       battery_level,
-      is_moving
+      is_moving,
+      timestamp
     }: LocationUpdate = body;
+
+    const recordedAt = resolveRecordedAt(timestamp);
 
     // Validate required fields
     if (!driver_id || typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -124,7 +146,7 @@ export async function POST(request: NextRequest) {
           is_moving,
           recorded_at
         )
-        VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, NOW())
+        VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, COALESCE($10::timestamptz, NOW()))
         RETURNING
           id,
           ST_AsGeoJSON(location) as location_geojson,
@@ -146,6 +168,7 @@ export async function POST(request: NextRequest) {
         altitude ?? null,
         battery_level ?? null,
         is_moving ?? null,
+        recordedAt,
       );
 
       // Update driver's last known location
