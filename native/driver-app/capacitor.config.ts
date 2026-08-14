@@ -5,17 +5,17 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * so the native app always runs the live UI with zero duplication. Override the
  * target per environment at sync time:
  *
- *   DRIVER_URL="https://www.readysetllc.com/sign-in?returnTo=%2Fdriver" npx cap sync
+ *   DRIVER_URL="https://www.readysetllc.com/native-launch" npx cap sync
  *
- * The entry point MUST be /sign-in, never /driver: an unauthenticated /driver
- * load answers with a 307 to /sign-in, and iOS WKWebView fails that provisional
- * navigation (blank page, then the OS bounces the user out to Safari). /sign-in
- * never redirects for signed-out users, and authenticated users are self-healed
- * off /sign-in back to /driver by the web app itself.
+ * The entry point MUST be /native-launch and nothing else: it is the only
+ * route guaranteed to answer 200 in every auth state. Any server-issued
+ * redirect (307) on the entry navigation makes iOS WKWebView fail the
+ * provisional load (blank page, then the OS bounces the user out to Safari) —
+ * /driver redirects when signed out and /sign-in redirects when signed in.
+ * /native-launch routes on the client instead.
  */
 const driverUrl =
-  process.env.DRIVER_URL ??
-  'https://development.readysetllc.com/sign-in?returnTo=%2Fdriver';
+  process.env.DRIVER_URL ?? 'https://development.readysetllc.com/native-launch';
 
 const config: CapacitorConfig = {
   appId: 'co.readyset.driver',
