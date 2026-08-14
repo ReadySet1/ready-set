@@ -299,6 +299,11 @@ describe('Driver Tracking Actions', () => {
 
       expect(result.success).toBe(false);
       expect(result.activeDeliveries).toBe(2);
+      // The copy must offer the driver-side escape hatch (return to dispatch),
+      // not just "ask dispatch" — see issue #508.
+      expect(result.error).toBe(
+        'You still have 2 active or due deliveries. Complete them or return them to dispatch from the delivery screen before ending your shift.',
+      );
       expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
     });
 
