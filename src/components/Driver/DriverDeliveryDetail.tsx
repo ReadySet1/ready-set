@@ -30,6 +30,7 @@ import {
   resolveDriverStatus,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
@@ -168,6 +169,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [podOpen, setPodOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   // Cache the session per mount cycle to reduce auth-lock contention (same
   // pattern SingleOrder uses).
@@ -363,6 +365,16 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     await advanceStatus(DriverStatus.COMPLETED);
   }, [advanceStatus]);
 
+  /** The delivery is back with dispatch: sync the shared feed (End-shift
+   *  guard unblocks) and leave the screen — the order is no longer ours. */
+  const onReturnComplete = useCallback(async () => {
+    setReturnOpen(false);
+    await refreshDeliveries().catch((e) =>
+      console.warn("Deliveries feed refresh failed:", e),
+    );
+    router.back();
+  }, [refreshDeliveries, router]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -430,6 +442,17 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         : null;
   const geofenceBlocked =
     !!arrivalCheck && !arrivalCheck.allowed && arrivalCheck.distanceM !== null;
+
+  // Self-serve return is pre-pickup only (mirrors the server's POST_PICKUP
+  // guard) — once the driver holds the food, hand-back goes through dispatch.
+  const canReturn =
+    !isDone &&
+    (order.driverStatus == null ||
+      [
+        DriverStatus.ASSIGNED,
+        DriverStatus.EN_ROUTE_TO_VENDOR,
+        DriverStatus.ARRIVED_AT_VENDOR,
+      ].includes(order.driverStatus as DriverStatus));
 
   return (
     <div className="flex flex-col gap-3 px-2 pb-32">
@@ -604,6 +627,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
               onClick={handleNextAction}
             />
           )}
+          {canReturn ? (
+            <button
+              type="button"
+              onClick={() => setReturnOpen(true)}
+              className="mt-2 w-full pb-1 text-center text-[13px] font-semibold text-driver-subtle underline underline-offset-2"
+            >
+              Can&apos;t complete this delivery?
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -624,6 +656,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           orderNumber={order.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {returnOpen ? (
+        <DriverReturnSheet
+          open={returnOpen}
+          onOpenChange={setReturnOpen}
+          orderNumber={order.orderNumber}
+          onComplete={() => void onReturnComplete()}
         />
       ) : null}
     </div>

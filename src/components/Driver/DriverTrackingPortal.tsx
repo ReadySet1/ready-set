@@ -32,6 +32,7 @@ import {
   getStatusProgress,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import {
@@ -95,6 +96,8 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  /** Order number of the delivery being handed back to dispatch (issue #508). */
+  const [returnTarget, setReturnTarget] = useState<string | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
   // confusing — filter by scheduled pickup date. `null` = no explicit choice,
   // in which case we default to Today whenever today has at least one.
@@ -192,6 +195,23 @@ export default function DriverTrackingPortal() {
   const endShiftBlockers = activeDeliveries.filter((d) =>
     blocksEndShift(d, endShiftGuardMs),
   ).length;
+  // First blocking delivery — the one the "Return a delivery" escape hatch
+  // targets. The feed keys these by order number (cateringRequestId /
+  // onDemandId carry it; id is the deliveries-row fallback).
+  const firstBlocker = activeDeliveries.find((d) =>
+    blocksEndShift(d, endShiftGuardMs),
+  );
+  const firstBlockerOrderNumber = firstBlocker
+    ? firstBlocker.cateringRequestId || firstBlocker.onDemandId || firstBlocker.id
+    : null;
+
+  const onReturnComplete = async () => {
+    setReturnTarget(null);
+    // Re-sync the feed so the End-shift button unblocks without a reload.
+    await refreshDeliveries().catch(() => {
+      /* best-effort — the next poll will still correct it */
+    });
+  };
 
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
@@ -201,7 +221,7 @@ export default function DriverTrackingPortal() {
     // completed on another screen unblocks this button without a reload.
     if (endShiftBlockers > 0) {
       toast.error(
-        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} before ending your shift.`,
+        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} or return ${endShiftBlockers === 1 ? "it" : "them"} to dispatch before ending your shift.`,
       );
       void refreshDeliveries().catch(() => {
         /* best-effort re-check — the next poll will still correct it */
@@ -420,46 +440,60 @@ export default function DriverTrackingPortal() {
             </DriverCard>
 
             {/* Shift control bar */}
-            <DriverCard className="flex items-center justify-between">
-              <div>
-                <div className="text-[13px] font-semibold text-driver-text">
-                  On shift
-                </div>
-                <div className="text-[11.5px] font-semibold text-driver-muted">
-                  Since{" "}
-                  {currentShift
-                    ? new Date(currentShift.startTime).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                    : ""}
-                </div>
-                {endShiftBlockers > 0 ? (
-                  <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
-                    {endShiftBlockers === 1
-                      ? "1 delivery to finish first"
-                      : `${endShiftBlockers} deliveries to finish first`}
+            <DriverCard className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[13px] font-semibold text-driver-text">
+                    On shift
                   </div>
-                ) : null}
+                  <div className="text-[11.5px] font-semibold text-driver-muted">
+                    Since{" "}
+                    {currentShift
+                      ? new Date(currentShift.startTime).toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : ""}
+                  </div>
+                  {endShiftBlockers > 0 ? (
+                    <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                      {endShiftBlockers === 1
+                        ? "1 delivery to finish or return first"
+                        : `${endShiftBlockers} deliveries to finish or return first`}
+                    </div>
+                  ) : null}
+                </div>
+                {/* Blocked via aria-disabled (not `disabled`) so a tap still
+                    reaches handleEndShift, which explains the block and
+                    refreshes the feed — a stale count heals itself on tap. */}
+                <DriverButton
+                  variant="danger"
+                  size="md"
+                  onClick={handleEndShift}
+                  loading={shiftLoading}
+                  aria-disabled={endShiftBlockers > 0}
+                  className={
+                    endShiftBlockers > 0
+                      ? "cursor-not-allowed opacity-50"
+                      : undefined
+                  }
+                >
+                  <Square className="h-4 w-4" />
+                  End shift
+                </DriverButton>
               </div>
-              {/* Blocked via aria-disabled (not `disabled`) so a tap still
-                  reaches handleEndShift, which explains the block and
-                  refreshes the feed — a stale count heals itself on tap. */}
-              <DriverButton
-                variant="danger"
-                size="md"
-                onClick={handleEndShift}
-                loading={shiftLoading}
-                aria-disabled={endShiftBlockers > 0}
-                className={
-                  endShiftBlockers > 0
-                    ? "cursor-not-allowed opacity-50"
-                    : undefined
-                }
-              >
-                <Square className="h-4 w-4" />
-                End shift
-              </DriverButton>
+              {/* Issue #508 escape hatch: a driver who can't start a blocking
+                  assignment hands it back instead of being stuck on shift. */}
+              {endShiftBlockers > 0 && firstBlockerOrderNumber ? (
+                <DriverButton
+                  variant="outline"
+                  full
+                  size="md"
+                  onClick={() => setReturnTarget(firstBlockerOrderNumber)}
+                >
+                  Return a delivery to dispatch
+                </DriverButton>
+              ) : null}
             </DriverCard>
 
             {/* Active deliveries */}
@@ -683,6 +717,15 @@ export default function DriverTrackingPortal() {
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {returnTarget ? (
+        <DriverReturnSheet
+          open={!!returnTarget}
+          onOpenChange={(o) => !o && setReturnTarget(null)}
+          orderNumber={returnTarget}
+          onComplete={() => void onReturnComplete()}
         />
       ) : null}
     </DriverScreen>
