@@ -422,6 +422,57 @@ describe("/api/orders/assignDriver", () => {
       });
     });
 
+    describe("Delivery mirror upsert", () => {
+      it("resurrects a returned/cancelled mirror row on re-assignment", async () => {
+        // After a return-to-dispatch the mirror row is CANCELLED + soft-deleted
+        // with the old driver. The upsert's update branch must reset it, or the
+        // re-assigned order never reappears in the driver's feed.
+        mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+          return callback({
+            cateringRequest: {
+              findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
+              update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest
+                .fn()
+                .mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+            },
+            dispatch: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockDispatch),
+            },
+          });
+        });
+        mockPrisma.driver = {
+          findFirst: jest.fn().mockResolvedValue({ id: "driver-model-id" }),
+        };
+        mockPrisma.delivery = {
+          upsert: jest.fn().mockResolvedValue({ id: "delivery-1" }),
+        };
+
+        const request = createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+          orderId: mockCateringOrder.id,
+          driverId: mockDriver.id,
+          orderType: "catering",
+        });
+
+        const response = await POST(request);
+        await expectSuccessResponse(response, 200);
+
+        expect(mockPrisma.delivery.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { orderNumber: mockCateringOrder.orderNumber },
+            update: expect.objectContaining({
+              driverId: "driver-model-id",
+              status: "ASSIGNED",
+              deletedAt: null,
+              cancelledAt: null,
+              assignedAt: expect.any(Date),
+            }),
+          })
+        );
+      });
+    });
+
     describe("Partner ASSIGNED webhook", () => {
       it("emits the ASSIGNED lifecycle event for a catering assignment", async () => {
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {

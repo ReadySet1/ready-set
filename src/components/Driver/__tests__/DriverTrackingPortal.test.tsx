@@ -55,6 +55,14 @@ jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
   ),
 }));
 
+// Bearer transport for the return sheet's POST (cookie fallback stays on).
+jest.mock("@/lib/auth/bearer-session", () => ({
+  withBearerAuth: jest.fn(async (base: Record<string, string> = {}) => ({
+    ...base,
+    Authorization: "Bearer test-token",
+  })),
+}));
+
 jest.mock("@/components/Driver/SignatureCapture", () => ({
   SignatureCapture: ({ onUploadComplete }: any) => (
     <div data-testid="signature-capture">
@@ -515,8 +523,59 @@ describe("DriverTrackingPortal (redesigned)", () => {
       expect(
         screen.getByRole("button", { name: /end shift/i }),
       ).toHaveAttribute("aria-disabled", "true");
-      expect(screen.getByText(/1 delivery to finish first/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/1 delivery to finish or return first/i),
+      ).toBeInTheDocument();
       expect(endShift).not.toHaveBeenCalled();
+    });
+
+    it("offers a return-to-dispatch escape hatch while blocked", async () => {
+      // Issue #508: a driver stuck with an unstartable assignment could never
+      // end their shift — the blocked state must offer the hand-back path.
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.ASSIGNED, scheduledPickupAt: new Date(Date.now() - 3600_000) }),
+      );
+      renderPortal();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /return a delivery to dispatch/i }),
+      );
+
+      // The return sheet opens for the blocking delivery.
+      expect(await screen.findByText(/^return to dispatch$/i)).toBeInTheDocument();
+
+      // Drive the sheet to completion against the return endpoint.
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      ) as unknown as typeof fetch;
+      fireEvent.click(screen.getByRole("button", { name: /vehicle issue/i }));
+      fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          "/api/orders/cr-1/return",
+          expect.objectContaining({ method: "POST" }),
+        );
+      });
+      // The feed re-syncs so the End-shift button unblocks without a reload.
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+    });
+
+    it("does not offer the return button when nothing blocks the shift", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.ASSIGNED,
+          scheduledPickupAt: new Date(Date.now() + 26 * 60 * 60 * 1000),
+        }),
+      );
+      renderPortal();
+      expect(
+        screen.queryByRole("button", { name: /return a delivery to dispatch/i }),
+      ).not.toBeInTheDocument();
     });
 
     it("blocks End shift for an ASSIGNED delivery whose pickup is overdue", () => {

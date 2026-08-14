@@ -120,6 +120,40 @@ async function applyUpdate(
   }
 }
 
+/**
+ * Returns an assigned order to the dispatch pool: `status = ACTIVE`,
+ * `driverStatus = null`.
+ *
+ * This is a direct write, NOT a transitionOrder call, for two structural
+ * reasons: ORDER_TRANSITIONS is forward-only (ASSIGNED has no back-edge to
+ * ACTIVE, and adding one would legalize the reverse move everywhere), and
+ * applyUpdate treats null as "no change" so it can never clear driverStatus.
+ * This helper is the one sanctioned reverse move; callers own the companion
+ * dispatch/mirror cleanup.
+ */
+export async function returnOrderToDispatch(
+  db: Db,
+  orderType: OrderType,
+  orderId: string,
+): Promise<void> {
+  const data = {
+    status: 'ACTIVE' as OrderStatus,
+    driverStatus: null,
+    updatedAt: new Date(),
+  };
+  if (orderType === 'catering') {
+    await db.cateringRequest.update({
+      where: { id: orderId },
+      data: data as Prisma.CateringRequestUpdateInput,
+    });
+  } else {
+    await db.onDemand.update({
+      where: { id: orderId },
+      data: data as Prisma.OnDemandUpdateInput,
+    });
+  }
+}
+
 function collectSideEffects(
   req: TransitionRequest,
   newDriverStatus: DriverStatus | null,

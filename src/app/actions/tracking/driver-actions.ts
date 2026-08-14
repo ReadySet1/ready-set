@@ -208,7 +208,7 @@ export async function endDriverShift(
       if (activeCount > 0) {
         return {
           success: false,
-          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} (or ask dispatch to reassign) before ending your shift.`,
+          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} or return ${activeCount === 1 ? 'it' : 'them'} to dispatch from the delivery screen before ending your shift.`,
           activeDeliveries: activeCount,
         };
       }

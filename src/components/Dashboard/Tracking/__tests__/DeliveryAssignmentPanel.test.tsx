@@ -85,7 +85,8 @@ const mockAssignedDelivery: DeliveryTracking = {
   status: 'ASSIGNED',
   driverId: 'driver-1',
   estimatedArrival: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), // 3 hours - medium priority
-  onDemandId: 'ondemand-456'
+  onDemandId: 'ondemand-456',
+  orderNumber: 'OD-456'
 };
 
 const mockInProgressDelivery: DeliveryTracking = {
@@ -702,7 +703,18 @@ describe('DeliveryAssignmentPanel', () => {
       }
     });
 
-    it('should call assignDeliveryToDriver with empty string when unassigning', async () => {
+    it('POSTs to the return endpoint when unassigning (never assignDeliveryToDriver with ""))', async () => {
+      // The old implementation called assignDeliveryToDriver(id, '') — a
+      // silently-broken no-op. Unassign now routes through the driver-return
+      // mechanism with the admin-only reason, cookie-authenticated.
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true }),
+        }),
+      ) as unknown as typeof fetch;
+
       render(
         <DeliveryAssignmentPanel
           drivers={[mockDriver1]}
@@ -713,17 +725,42 @@ describe('DeliveryAssignmentPanel', () => {
       // Click to expand
       const cards = screen.getAllByTestId('card');
       const deliveryCard = cards.find(card => card.textContent?.includes('On-Demand Order'));
+      expect(deliveryCard).toBeTruthy();
+      fireEvent.click(deliveryCard!);
 
-      if (deliveryCard) {
-        fireEvent.click(deliveryCard);
+      const unassignButton = screen.getByText('Unassign');
+      fireEvent.click(unassignButton);
 
-        const unassignButton = screen.getByText('Unassign');
-        fireEvent.click(unassignButton);
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/orders/OD-456/return',
+          expect.objectContaining({
+            method: 'POST',
+            credentials: 'include',
+            headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ reason: 'ADMIN_UNASSIGNED' }),
+          }),
+        );
+      });
+      expect(mockAssignDeliveryToDriver).not.toHaveBeenCalled();
+    });
 
-        await waitFor(() => {
-          expect(mockAssignDeliveryToDriver).toHaveBeenCalledWith('delivery-2', '');
-        });
-      }
+    it('hides the Unassign button when the feed row carries no order number', () => {
+      const { orderNumber: _omitted, ...withoutOrderNumber } = mockAssignedDelivery;
+      render(
+        <DeliveryAssignmentPanel
+          drivers={[mockDriver1]}
+          deliveries={[withoutOrderNumber as DeliveryTracking]}
+        />
+      );
+
+      const cards = screen.getAllByTestId('card');
+      const deliveryCard = cards.find(card => card.textContent?.includes('On-Demand Order'));
+      expect(deliveryCard).toBeTruthy();
+      fireEvent.click(deliveryCard!);
+
+      expect(screen.getByText('Current Assignment')).toBeInTheDocument();
+      expect(screen.queryByText('Unassign')).not.toBeInTheDocument();
     });
   });
 

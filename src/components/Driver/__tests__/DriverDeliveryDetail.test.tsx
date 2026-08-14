@@ -17,8 +17,12 @@ jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
 
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+// Stable identity — a fresh object per render would recreate fetchOrder every
+// render and put the component in a permanent refetch/loading flicker.
+const mockRouter = { push: mockPush, back: mockBack };
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock("react-hot-toast", () => ({
@@ -232,6 +236,72 @@ describe("DriverDeliveryDetail", () => {
       (c) => c[1]?.method === "PATCH",
     );
     expect(patched).toBe(false);
+  });
+
+  describe("return to dispatch (issue #508 escape hatch)", () => {
+    function installFetchWithReturn() {
+      installFetch();
+      const base = global.fetch as jest.Mock;
+      global.fetch = jest.fn((url: string, opts?: RequestInit) => {
+        if (typeof url === "string" && url.includes("/return")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true }),
+          });
+        }
+        return base(url, opts);
+      }) as unknown as typeof fetch;
+    }
+
+    it("shows the return CTA while pre-pickup", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.EN_ROUTE_TO_VENDOR });
+      renderDetail();
+      expect(
+        await screen.findByRole("button", { name: /can't complete this delivery/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("hides the return CTA after pickup", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.PICKED_UP });
+      renderDetail();
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByRole("button", { name: /can't complete this delivery/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides the return CTA when the delivery is complete", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.COMPLETED });
+      renderDetail();
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByRole("button", { name: /can't complete this delivery/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("returns the delivery: POST, feed refresh, then back to the list", async () => {
+      installFetchWithReturn();
+      renderDetail();
+      fireEvent.click(
+        await screen.findByRole("button", { name: /can't complete this delivery/i }),
+      );
+
+      // The sheet opens with the reason list; pick one and submit.
+      fireEvent.click(await screen.findByRole("button", { name: /vehicle issue/i }));
+      fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          "/api/orders/CV-12345/return",
+          expect.objectContaining({ method: "POST" }),
+        );
+      });
+      // Success flow: sync the shared feed (End-shift guard) and leave the
+      // detail screen — the order no longer belongs to this driver.
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+      await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    });
   });
 
   it("shows a not-found state when the order is missing", async () => {
