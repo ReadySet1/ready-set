@@ -54,6 +54,9 @@ export interface DeliveryTracking {
   id: string;
   cateringRequestId?: string;  // Link to existing CateringRequest
   onDemandId?: string;         // Link to OnDemand orders
+  /** Human order number (SSE feed carries it) — keys order-scoped API calls
+   *  like the admin Unassign → return-to-dispatch POST. */
+  orderNumber?: string;
   driverId: string;
   dispatchDriverId?: string;   // Profile ID from dispatch assignment (for legacy dispatches)
   status: DriverStatus;        // Use existing enum
