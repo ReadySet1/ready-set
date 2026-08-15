@@ -208,6 +208,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Flag orders with a PENDING driver return request so the driver portal
+    // can mirror the server-side end-shift guard (a pending request stops the
+    // order from blocking) and show the "Return requested" state.
+    let pendingReturnOrderIds = new Set<string>();
+    const orderIds = allDeliveries.map((d: any) => d.id).filter(Boolean) as string[];
+    if (orderIds.length > 0) {
+      try {
+        const pendingRequests = await prisma.deliveryReturnRequest.findMany({
+          where: { orderId: { in: orderIds }, status: 'PENDING' },
+          select: { orderId: true },
+        });
+        pendingReturnOrderIds = new Set(pendingRequests.map((r) => r.orderId));
+      } catch (pendingErr) {
+        console.warn('Failed to fetch pending return requests for driver deliveries:', pendingErr);
+      }
+    }
+
     const serializedDeliveries = allDeliveries.map((delivery) => {
       const serialized = JSON.parse(
         JSON.stringify(delivery, (key, value) =>
@@ -218,6 +235,7 @@ export async function GET(req: NextRequest) {
       if (orderNum && deliveryTimestampsMap[orderNum]) {
         serialized.deliveryTimestamps = deliveryTimestampsMap[orderNum];
       }
+      serialized.pendingReturn = pendingReturnOrderIds.has((delivery as any).id);
       return serialized;
     });
 

@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import {
   AlertTriangle,
   CheckCircle2,
+  Hourglass,
   MapPin,
   Package,
   StickyNote,
@@ -170,6 +171,8 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [podOpen, setPodOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  /** True while this order has a PENDING return request awaiting dispatch. */
+  const [pendingReturn, setPendingReturn] = useState(false);
 
   // Cache the session per mount cycle to reduce auth-lock contention (same
   // pattern SingleOrder uses).
@@ -236,9 +239,35 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     }
   }, [orderNumber, getValidSession, router]);
 
+  /** Non-fatal lookup of the caller's PENDING return request for this order —
+   *  drives the "Return requested — awaiting dispatch" state. */
+  const fetchPendingReturn = useCallback(async () => {
+    if (!orderNumber) return;
+    try {
+      const session = await getValidSession();
+      if (!session) return;
+      const res = await fetch(
+        `/api/orders/${encodeURIComponent(orderNumber)}/return`,
+        {
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { request?: unknown };
+      setPendingReturn(data.request != null);
+    } catch {
+      /* best-effort — the badge simply stays hidden */
+    }
+  }, [orderNumber, getValidSession]);
+
   useEffect(() => {
     void fetchOrder();
-  }, [fetchOrder]);
+    void fetchPendingReturn();
+  }, [fetchOrder, fetchPendingReturn]);
 
   /** PATCH driverStatus (and order status on COMPLETED), then refresh. */
   const advanceStatus = useCallback(
@@ -282,6 +311,19 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           };
           return { ...updated, id: String(updated.id), deliveryTimestamps: merged };
         });
+
+        // The server auto-voids a PENDING return request at PICKED_UP and
+        // beyond (keeping the food means keeping the job) — mirror it locally.
+        if (
+          [
+            DriverStatus.PICKED_UP,
+            DriverStatus.EN_ROUTE_TO_CLIENT,
+            DriverStatus.ARRIVED_TO_CLIENT,
+            DriverStatus.COMPLETED,
+          ].includes(newStatus)
+        ) {
+          setPendingReturn(false);
+        }
 
         // Mirror SingleOrder: a completed delivery also completes the order.
         if (newStatus === DriverStatus.COMPLETED) {
@@ -365,15 +407,24 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     await advanceStatus(DriverStatus.COMPLETED);
   }, [advanceStatus]);
 
-  /** The delivery is back with dispatch: sync the shared feed (End-shift
-   *  guard unblocks) and leave the screen — the order is no longer ours. */
-  const onReturnComplete = useCallback(async () => {
-    setReturnOpen(false);
-    await refreshDeliveries().catch((e) =>
-      console.warn("Deliveries feed refresh failed:", e),
-    );
-    router.back();
-  }, [refreshDeliveries, router]);
+  /** pending: the request awaits dispatch review — the delivery is still ours,
+   *  so stay on the screen and show the pending state. Otherwise (privileged
+   *  immediate return) the order is no longer ours: sync the shared feed
+   *  (End-shift guard unblocks) and leave the screen. */
+  const onReturnComplete = useCallback(
+    async (result: { pending: boolean }) => {
+      setReturnOpen(false);
+      await refreshDeliveries().catch((e) =>
+        console.warn("Deliveries feed refresh failed:", e),
+      );
+      if (result.pending) {
+        setPendingReturn(true);
+        return;
+      }
+      router.back();
+    },
+    [refreshDeliveries, router],
+  );
 
   if (isLoading) {
     return (
@@ -473,6 +524,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         {order.arrivalDateTime ? (
           <div className="text-[12.5px] font-semibold text-driver-muted">
             Drop-off scheduled {formatTime(order.arrivalDateTime)}
+          </div>
+        ) : null}
+        {pendingReturn && !isDone ? (
+          <div className="flex items-center gap-2 rounded-xl bg-driver-surface-alt px-3 py-2 text-[12.5px] font-semibold text-driver-muted">
+            <Hourglass className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
+            Return requested — awaiting dispatch
           </div>
         ) : null}
       </DriverCard>
@@ -627,7 +684,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
               onClick={handleNextAction}
             />
           )}
-          {canReturn ? (
+          {pendingReturn && !isDone ? (
+            <div className="mt-2 flex w-full items-center justify-center gap-1.5 pb-1 text-center text-[13px] font-semibold text-driver-subtle">
+              <Hourglass className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
+              Return requested — awaiting dispatch
+            </div>
+          ) : canReturn ? (
             <button
               type="button"
               onClick={() => setReturnOpen(true)}
@@ -664,7 +726,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           open={returnOpen}
           onOpenChange={setReturnOpen}
           orderNumber={order.orderNumber}
-          onComplete={() => void onReturnComplete()}
+          onComplete={(result) => void onReturnComplete(result)}
         />
       ) : null}
     </div>

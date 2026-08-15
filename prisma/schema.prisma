@@ -645,6 +645,45 @@ enum FormType {
   @@schema("public")
 }
 
+enum ReturnRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  VOIDED
+  @@schema("public")
+}
+
+// Driver-initiated return-to-dispatch requests awaiting helpdesk/admin review
+// (follow-up to the #508 escape hatch). Driver returns no longer unwind the
+// assignment directly: they land here as PENDING until a dispatcher approves
+// (executes the return), rejects, or the request auto-voids when the driver
+// advances the order to PICKED_UP or beyond. Privileged callers still return
+// immediately and never create a row here.
+// NOTE: a partial unique index (one PENDING row per order_id) lives in the
+// migration SQL only — Prisma cannot express partial indexes.
+model DeliveryReturnRequest {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderType       String              @map("order_type") @db.VarChar(20) // 'catering' | 'on_demand'
+  orderId         String              @map("order_id") @db.Uuid
+  orderNumber     String              @map("order_number")
+  driverId        String              @map("driver_id") @db.Uuid // profile id (matches dispatches.driverId)
+  reason          String
+  details         String?
+  status          ReturnRequestStatus @default(PENDING)
+  requestedAt     DateTime            @default(now()) @map("requested_at") @db.Timestamptz(6)
+  resolvedAt      DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy      String?             @map("resolved_by") @db.Uuid // profile id of the resolver
+  resolutionNotes String?             @map("resolution_notes")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@index([orderId, status])
+  @@index([driverId, status])
+  @@schema("public")
+  @@map("delivery_return_requests")
+}
+
 model CalculatorTemplate {
   id                   String               @id @default(uuid()) @db.Uuid
   name                 String

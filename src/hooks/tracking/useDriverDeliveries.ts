@@ -94,6 +94,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             id: orderNumber,
             cateringRequestId: isCatering ? orderNumber : undefined,
             onDemandId: isCatering ? undefined : orderNumber,
+            pendingReturn: Boolean(o.pendingReturn),
             driverId: '',
             status: (o.driverStatus as DriverStatus) || DriverStatus.ASSIGNED,
             pickupLocation: { coordinates: toCoords(pickup) },

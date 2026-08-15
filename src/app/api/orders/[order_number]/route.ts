@@ -31,6 +31,10 @@ import {
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
 import { resolveActiveShiftIdForDriver } from '@/services/tracking/active-shift';
+import {
+  POST_PICKUP_DRIVER_STATUSES,
+  voidPendingReturnRequests,
+} from '@/lib/services/return-requests';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -771,6 +775,20 @@ export async function PATCH(
       return updated;
     });
     updatedOrder = { ...updatedRaw, order_type: orderType } as Order;
+
+    // Advancing to PICKED_UP (or beyond) means the driver kept working the
+    // delivery, so any PENDING return request no longer applies — auto-void
+    // it server-side. Non-fatal: the status update already committed.
+    if (
+      driverStatus &&
+      POST_PICKUP_DRIVER_STATUSES.includes(String(driverStatus))
+    ) {
+      try {
+        await voidPendingReturnRequests((updatedRaw as any).id);
+      } catch (voidErr) {
+        console.warn('Failed to auto-void pending return requests:', voidErr);
+      }
+    }
 
     if (updatedOrder) {
 

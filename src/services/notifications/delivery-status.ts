@@ -46,6 +46,21 @@ const CUSTOMER_MESSAGES: Record<DeliveryStatusEvent, { title: string; body: stri
     title: "Delivery could not be completed",
     body: "We were unable to complete your delivery. Please check your order status for details.",
   },
+  // Return-request lifecycle events are internal (dispatch/driver only) —
+  // customers never receive them (not routed to CUSTOMER anywhere), but the
+  // Record type requires total coverage.
+  "delivery:return_requested": {
+    title: "Delivery update",
+    body: "Your delivery is being reviewed by our dispatch team.",
+  },
+  "delivery:return_approved": {
+    title: "Delivery update",
+    body: "Your delivery is being reassigned to another driver.",
+  },
+  "delivery:return_rejected": {
+    title: "Delivery update",
+    body: "Your delivery is on track.",
+  },
 };
 
 const ADMIN_MESSAGES: Record<DeliveryStatusEvent, { title: string; body: string }> = {
@@ -72,6 +87,18 @@ const ADMIN_MESSAGES: Record<DeliveryStatusEvent, { title: string; body: string 
   "delivery:failed": {
     title: "Delivery Failed - Action Required",
     body: "Order delivery failed",
+  },
+  "delivery:return_requested": {
+    title: "Return Requested - Action Required",
+    body: "A driver requested to return order",
+  },
+  "delivery:return_approved": {
+    title: "Return Approved",
+    body: "A return request was approved for order",
+  },
+  "delivery:return_rejected": {
+    title: "Return Rejected",
+    body: "A return request was rejected for order",
   },
 };
 
@@ -274,6 +301,8 @@ export async function sendDispatchStatusNotification(
         "delivery:completed",
         "delivery:failed",
         "delivery:delayed",
+        // Driver return requests need a dispatcher decision.
+        "delivery:return_requested",
       ];
       if (criticalEvents.includes(event)) {
         profileIds = await resolveAdminProfiles();

@@ -177,6 +177,29 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.success).toBe(false);
     expect(res.activeDeliveries).toBe(1);
   });
+
+  it("excludes orders with a PENDING return request from BOTH blocking terms", async () => {
+    mockGetSettings.mockResolvedValue(TRACKING_SETTINGS_DEFAULTS);
+    // 0 blockers: the only assignment has a pending return request.
+    mockEndShiftQueries(0n);
+
+    const res = await endDriverShift(SHIFT_ID, endLocation);
+    expect(res.success).toBe(true);
+
+    const blockingCall = mockQueryRaw.mock.calls.find(
+      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+    );
+    expect(blockingCall).toBeDefined();
+    const [sql] = blockingCall!;
+    // Both terms carry a NOT EXISTS guard against delivery_return_requests:
+    // the deliveries mirror keys on order_number, the dispatch join on the
+    // catering/on-demand order id.
+    const notExists = (sql.match(/NOT EXISTS\s*\(\s*SELECT 1 FROM delivery_return_requests/g) || []).length;
+    expect(notExists).toBe(2);
+    expect(sql).toContain('rr.order_number = deliveries.order_number');
+    expect(sql).toContain('rr.order_id = COALESCE(cr.id, od.id)');
+    expect(sql).toContain("rr.status = 'PENDING'");
+  });
 });
 
 describe("updateDriverLocation rate-limit configuration", () => {

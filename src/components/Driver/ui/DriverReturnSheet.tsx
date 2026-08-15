@@ -29,11 +29,15 @@ interface DriverReturnSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderNumber: string;
-  /** Called once the delivery is back with dispatch. */
-  onComplete: () => void;
+  /** Called once the request is filed (pending: true — the delivery is still
+   *  the driver's while dispatch reviews) or, for privileged callers, once
+   *  the delivery is back with dispatch (pending: false). */
+  onComplete: (result: { pending: boolean }) => void;
 }
 
-/** Bottom-sheet flow for handing a delivery back to dispatch (issue #508).
+/** Bottom-sheet flow for requesting a return to dispatch (issue #508 +
+ *  helpdesk approval). Driver requests land as PENDING (HTTP 202) for
+ *  dispatch review; the driver keeps working the delivery meanwhile.
  *  Mirrors the DriverPodSheet chrome and the NavigationAppSheet option list. */
 export function DriverReturnSheet({
   open,
@@ -71,13 +75,20 @@ export function DriverReturnSheet({
         } catch {
           /* ignore */
         }
-        throw new Error(detail || "Failed to return the delivery. Please try again.");
+        throw new Error(detail || "Failed to request the return. Please try again.");
       }
-      toast.success("Delivery returned to dispatch");
-      onComplete();
+      // 202 = a PENDING request was filed (driver path); 200 = the delivery
+      // was returned immediately (privileged caller).
+      const pending = res.status === 202;
+      toast.success(
+        pending
+          ? "Return requested — dispatch will review it"
+          : "Delivery returned to dispatch",
+      );
+      onComplete({ pending });
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to return the delivery. Please try again.",
+        err instanceof Error ? err.message : "Failed to request the return. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -96,12 +107,12 @@ export function DriverReturnSheet({
         <div className="mx-auto w-full max-w-md">
           <SheetHeader className="items-start">
             <SheetTitle className="text-[18px] font-semibold text-driver-text">
-              Return to dispatch
+              Request a return
             </SheetTitle>
           </SheetHeader>
           <p className="mt-1 text-[13px] font-medium text-driver-muted">
-            The order goes back to dispatch for reassignment and they&apos;ll be
-            notified right away.
+            Request to return this delivery — a dispatcher will review it. You
+            can keep working the delivery while the request is pending.
           </p>
           <div className="mt-4 flex flex-col gap-2">
             {RETURN_REASONS.map((option) => {
@@ -144,7 +155,7 @@ export function DriverReturnSheet({
               disabled={!reason}
               loading={submitting}
             >
-              Return delivery
+              Request return
             </DriverButton>
           </div>
         </div>

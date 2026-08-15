@@ -238,19 +238,37 @@ describe("DriverDeliveryDetail", () => {
     expect(patched).toBe(false);
   });
 
-  describe("return to dispatch (issue #508 escape hatch)", () => {
-    function installFetchWithReturn() {
+  describe("return to dispatch (issue #508 escape hatch + approval flow)", () => {
+    /** Route "/return" calls: GET = pending-request lookup, POST = the
+     *  return itself (202 driver request by default, 200 privileged). */
+    function installFetchWithReturn(opts: {
+      postStatus?: number;
+      pendingRequest?: Record<string, unknown> | null;
+    } = {}) {
+      const { postStatus = 202, pendingRequest = null } = opts;
       installFetch();
       const base = global.fetch as jest.Mock;
-      global.fetch = jest.fn((url: string, opts?: RequestInit) => {
+      global.fetch = jest.fn((url: string, init?: RequestInit) => {
         if (typeof url === "string" && url.includes("/return")) {
+          if ((init?.method ?? "GET") === "POST") {
+            return Promise.resolve({
+              ok: true,
+              status: postStatus,
+              json: () =>
+                Promise.resolve(
+                  postStatus === 202
+                    ? { success: true, status: "PENDING_APPROVAL", requestId: "req-1" }
+                    : { success: true, status: "ACTIVE" },
+                ),
+            });
+          }
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: () => Promise.resolve({ success: true }),
+            json: () => Promise.resolve({ success: true, request: pendingRequest }),
           });
         }
-        return base(url, opts);
+        return base(url, init);
       }) as unknown as typeof fetch;
     }
 
@@ -280,8 +298,8 @@ describe("DriverDeliveryDetail", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("returns the delivery: POST, feed refresh, then back to the list", async () => {
-      installFetchWithReturn();
+    it("files a return request (202): POST, feed refresh, pending badge, and STAYS on the screen", async () => {
+      installFetchWithReturn({ postStatus: 202 });
       renderDetail();
       fireEvent.click(
         await screen.findByRole("button", { name: /can't complete this delivery/i }),
@@ -289,7 +307,7 @@ describe("DriverDeliveryDetail", () => {
 
       // The sheet opens with the reason list; pick one and submit.
       fireEvent.click(await screen.findByRole("button", { name: /vehicle issue/i }));
-      fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+      fireEvent.click(screen.getByRole("button", { name: /request return/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
@@ -297,10 +315,45 @@ describe("DriverDeliveryDetail", () => {
           expect.objectContaining({ method: "POST" }),
         );
       });
-      // Success flow: sync the shared feed (End-shift guard) and leave the
-      // detail screen — the order no longer belongs to this driver.
+      // Pending flow: the delivery is still the driver's while dispatch
+      // reviews — sync the feed (end-shift unblocks) but do NOT navigate away.
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+      expect(
+        await screen.findAllByText(/return requested — awaiting dispatch/i),
+      ).not.toHaveLength(0);
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it("leaves the screen on an immediate return (200, privileged caller)", async () => {
+      installFetchWithReturn({ postStatus: 200 });
+      renderDetail();
+      fireEvent.click(
+        await screen.findByRole("button", { name: /can't complete this delivery/i }),
+      );
+      fireEvent.click(await screen.findByRole("button", { name: /vehicle issue/i }));
+      fireEvent.click(screen.getByRole("button", { name: /request return/i }));
+
       await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
       await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    });
+
+    it("shows the pending state instead of the return CTA when a request already exists", async () => {
+      installFetchWithReturn({
+        pendingRequest: {
+          id: "req-1",
+          status: "PENDING",
+          reason: "VEHICLE_ISSUE",
+          requestedAt: "2026-08-14T10:00:00Z",
+        },
+      });
+      renderDetail();
+
+      expect(
+        await screen.findAllByText(/return requested — awaiting dispatch/i),
+      ).not.toHaveLength(0);
+      expect(
+        screen.queryByRole("button", { name: /can't complete this delivery/i }),
+      ).not.toBeInTheDocument();
     });
   });
 

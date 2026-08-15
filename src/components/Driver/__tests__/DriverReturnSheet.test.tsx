@@ -47,13 +47,20 @@ function renderSheet() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  installFetch({ ok: true, status: 200, body: { success: true } });
+  // Driver path default: the request is accepted for dispatch review (202).
+  installFetch({
+    ok: true,
+    status: 202,
+    body: { success: true, status: "PENDING_APPROVAL", requestId: "req-1" },
+  });
 });
 
 describe("DriverReturnSheet", () => {
-  it("renders the driver-facing reason options", () => {
+  it("renders the request-oriented copy and driver-facing reason options", () => {
     renderSheet();
-    expect(screen.getByText(/return to dispatch/i)).toBeInTheDocument();
+    expect(screen.getByText("Request a return")).toBeInTheDocument();
+    expect(screen.getByText(/a dispatcher will review it/i)).toBeInTheDocument();
+    expect(screen.getByText(/keep working the delivery/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /can't make the pickup/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /vehicle issue/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /emergency/i })).toBeInTheDocument();
@@ -64,7 +71,7 @@ describe("DriverReturnSheet", () => {
 
   it("keeps the submit button disabled until a reason is selected", () => {
     renderSheet();
-    const submit = screen.getByRole("button", { name: /return delivery/i });
+    const submit = screen.getByRole("button", { name: /request return/i });
     expect(submit).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /vehicle issue/i }));
     expect(submit).toBeEnabled();
@@ -76,7 +83,7 @@ describe("DriverReturnSheet", () => {
     fireEvent.change(screen.getByPlaceholderText(/optional/i), {
       target: { value: "Flat tire on the 101" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+    fireEvent.click(screen.getByRole("button", { name: /request return/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -98,10 +105,35 @@ describe("DriverReturnSheet", () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
   });
 
+  it("reports pending on the 202 driver path with the review toast", async () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /vehicle issue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /request return/i }));
+
+    await waitFor(() =>
+      expect(onComplete).toHaveBeenCalledWith({ pending: true }),
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Return requested — dispatch will review it",
+    );
+  });
+
+  it("reports an immediate return on a 200 response (privileged caller)", async () => {
+    installFetch({ ok: true, status: 200, body: { success: true, status: "ACTIVE" } });
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /emergency/i }));
+    fireEvent.click(screen.getByRole("button", { name: /request return/i }));
+
+    await waitFor(() =>
+      expect(onComplete).toHaveBeenCalledWith({ pending: false }),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Delivery returned to dispatch");
+  });
+
   it("omits empty details from the payload", async () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /emergency/i }));
-    fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+    fireEvent.click(screen.getByRole("button", { name: /request return/i }));
 
     await waitFor(() => {
       const body = JSON.parse(
@@ -123,7 +155,7 @@ describe("DriverReturnSheet", () => {
     });
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /can't make the pickup/i }));
-    fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+    fireEvent.click(screen.getByRole("button", { name: /request return/i }));
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
