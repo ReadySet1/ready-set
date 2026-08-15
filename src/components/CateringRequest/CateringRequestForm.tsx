@@ -265,7 +265,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   }, []);
 
   // Form initialization
-  const { control, handleSubmit, watch, setValue, reset } =
+  const { control, handleSubmit, watch, setValue, reset, getValues, trigger, formState: { isSubmitted } } =
     useForm<ExtendedCateringFormData>({
       defaultValues: {
         brokerage: "",
@@ -342,6 +342,22 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   }, [supabase]);
 
   const needHost = watch("needHost");
+
+  // Cross-field re-validation: clear sibling error when one field is filled
+  const headcountValue = watch("headcount");
+  const orderTotalValue = watch("orderTotal");
+
+  useEffect(() => {
+    if (isSubmitted) {
+      trigger("orderTotal");
+    }
+  }, [headcountValue, isSubmitted, trigger]);
+
+  useEffect(() => {
+    if (isSubmitted) {
+      trigger("headcount");
+    }
+  }, [orderTotalValue, isSubmitted, trigger]);
 
   // Initialize file upload hook
   const {
@@ -647,7 +663,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           label="Headcount"
           type="number"
           placeholder="Number of people"
-          required
+          rules={{
+            validate: () => {
+              const hc = getValues("headcount");
+              const ot = getValues("orderTotal");
+              const hcBlank = hc === "" || hc == null;
+              const otBlank = ot === "" || ot == null;
+              return (!hcBlank || !otBlank) || "Provide at least one: Headcount or Order Total.";
+            },
+          }}
           icon={<Users size={16} />}
         />
       </div>
@@ -745,9 +769,17 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           name="orderTotal"
           label="Order Total ($)"
           type="number"
-          required
           placeholder="0.00"
-          rules={{ min: { value: 0, message: "Order total must be positive" } }}
+          rules={{
+            min: { value: 0, message: "Order total must be positive" },
+            validate: () => {
+              const hc = getValues("headcount");
+              const ot = getValues("orderTotal");
+              const hcBlank = hc === "" || hc == null;
+              const otBlank = ot === "" || ot == null;
+              return (!hcBlank || !otBlank) || "Provide at least one: Headcount or Order Total.";
+            },
+          }}
           icon={<DollarSign size={16} />}
         />
         <InputField

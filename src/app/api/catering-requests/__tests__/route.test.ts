@@ -277,17 +277,27 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("arrivalTime");
     });
 
-    it("should require headcount field", async () => {
-      const { headcount, ...dataWithoutHeadcount } = validCateringData;
+    it("should accept order with headcount only (no orderTotal)", async () => {
+      const { orderTotal, ...dataWithHeadcountOnly } = validCateringData;
 
       const request = createPostRequest(
         "http://localhost:3000/api/catering-requests",
-        dataWithoutHeadcount
+        dataWithHeadcountOnly
       );
 
       const response = await POST(request);
-      const data = await expectValidationError(response);
-      expect(data.message).toContain("headcount");
+      const data = await expectSuccessResponse(response, 201);
+      expect(data.message).toContain("created successfully");
+
+      // Verify null orderTotal reaches Prisma (not omitted, not 0)
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 50,
+            orderTotal: null,
+          }),
+        })
+      );
     });
 
     it("should require needHost field", async () => {
@@ -316,17 +326,65 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("clientAttention");
     });
 
-    it("should require orderTotal field", async () => {
-      const { orderTotal, ...dataWithoutOrderTotal } = validCateringData;
+    it("should accept order with orderTotal only (no headcount)", async () => {
+      const { headcount, ...dataWithOrderTotalOnly } = validCateringData;
 
       const request = createPostRequest(
         "http://localhost:3000/api/catering-requests",
-        dataWithoutOrderTotal
+        dataWithOrderTotalOnly
+      );
+
+      const response = await POST(request);
+      const data = await expectSuccessResponse(response, 201);
+      expect(data.message).toContain("created successfully");
+
+      // Verify null headcount reaches Prisma
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: null,
+            orderTotal: expect.any(Object), // Decimal
+          }),
+        })
+      );
+    });
+
+    it("should return 400 when both headcount and orderTotal are blank", async () => {
+      const { headcount, orderTotal, ...dataWithoutBoth } = validCateringData;
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithoutBoth
       );
 
       const response = await POST(request);
       const data = await expectValidationError(response);
-      expect(data.message).toContain("orderTotal");
+      expect(data.message).toContain("Provide at least one: Headcount or Order Total.");
+    });
+
+    it("should store null orderTotal when orderTotal is empty string", async () => {
+      const dataWithEmptyOrderTotal = {
+        ...validCateringData,
+        orderTotal: "",
+      };
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithEmptyOrderTotal
+      );
+
+      const response = await POST(request);
+      const data = await expectSuccessResponse(response, 201);
+
+      // headcount is 50, so at-least-one passes; orderTotal "" → null
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 50,
+            orderTotal: null,
+          }),
+        })
+      );
     });
 
     it("should require pickupAddress.id field", async () => {

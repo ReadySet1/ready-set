@@ -29,8 +29,8 @@ const sendOrderConfirmationEmail = async (
     arrivalTime: Date;
     pickupAddress: string;
     deliveryAddress: string;
-    headcount: number;
-    orderTotal: string;
+    headcount: number | null;
+    orderTotal: string | null;
     orderId: string;
   }
 ) => {
@@ -56,12 +56,16 @@ const sendOrderConfirmationEmail = async (
     hour12: true,
   });
 
-  // Generate order details table
+  // Generate order details table (omit null fields rather than showing "null people" or "$null")
   const orderDetailsTable = generateDetailsTable([
     { label: 'Order Number', value: orderDetails.orderNumber },
     { label: 'Order Date', value: orderDateStr },
-    { label: 'Headcount', value: `${orderDetails.headcount} people` },
-    { label: 'Order Total', value: `$${orderDetails.orderTotal}` },
+    ...(orderDetails.headcount != null
+      ? [{ label: 'Headcount', value: `${orderDetails.headcount} people` }]
+      : []),
+    ...(orderDetails.orderTotal != null
+      ? [{ label: 'Order Total', value: `$${orderDetails.orderTotal}` }]
+      : []),
   ]);
 
   // Generate content
@@ -156,10 +160,8 @@ export async function POST(request: NextRequest) {
       "date",
       "pickupTime",
       "arrivalTime",
-      "headcount",
       "needHost",
       "clientAttention",
-      "orderTotal",
       "pickupAddress.id",
       "deliveryAddress.id",
     ];
@@ -196,6 +198,16 @@ export async function POST(request: NextRequest) {
     if (missingFields.length > 0) {
       return NextResponse.json(
         { message: `Missing required fields: ${missingFields.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // At least one of headcount / orderTotal must be provided
+    const headcountBlank = data.headcount === undefined || data.headcount === null || data.headcount === '';
+    const orderTotalBlank = data.orderTotal === undefined || data.orderTotal === null || data.orderTotal === '';
+    if (headcountBlank && orderTotalBlank) {
+      return NextResponse.json(
+        { message: "Provide at least one: Headcount or Order Total." },
         { status: 400 }
       );
     }
@@ -242,9 +254,13 @@ export async function POST(request: NextRequest) {
       ? new Date(localTimeToUtc(data.date, data.completeTime))
       : null;
 
-    // Convert numeric values
-    const headcount = parseInt(data.headcount, 10);
-    const orderTotal = new Decimal(data.orderTotal);
+    // Convert numeric values — guard blank/null to produce explicit null (not NaN or throw)
+    const headcount = (data.headcount != null && data.headcount !== '')
+      ? parseInt(String(data.headcount), 10)
+      : null;
+    const orderTotal = (data.orderTotal != null && data.orderTotal !== '')
+      ? new Decimal(data.orderTotal)
+      : null;
     const tip = data.tip ? new Decimal(data.tip) : new Decimal(0);
     
     let hoursNeeded = null;
@@ -323,8 +339,8 @@ export async function POST(request: NextRequest) {
             arrivalTime: arrivalDateTime,
             pickupAddress: pickupAddressStr,
             deliveryAddress: deliveryAddressStr,
-            headcount: cateringRequest.headcount ?? 0,
-            orderTotal: cateringRequest.orderTotal?.toString() ?? '0.00',
+            headcount: cateringRequest.headcount ?? null,
+            orderTotal: cateringRequest.orderTotal?.toString() ?? null,
             orderId: cateringRequest.id,
           }
         );
