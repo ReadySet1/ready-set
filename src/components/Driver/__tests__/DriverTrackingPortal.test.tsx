@@ -529,31 +529,34 @@ describe("DriverTrackingPortal (redesigned)", () => {
       expect(endShift).not.toHaveBeenCalled();
     });
 
-    it("offers a return-to-dispatch escape hatch while blocked", async () => {
+    it("offers a return-request escape hatch while blocked", async () => {
       // Issue #508: a driver stuck with an unstartable assignment could never
-      // end their shift — the blocked state must offer the hand-back path.
+      // end their shift — the blocked state must offer the hand-back path
+      // (now a request that dispatch reviews).
       mockUseDriverTracking.mockReturnValue(
         withDelivery({ status: DriverStatus.ASSIGNED, scheduledPickupAt: new Date(Date.now() - 3600_000) }),
       );
       renderPortal();
 
       fireEvent.click(
-        screen.getByRole("button", { name: /return a delivery to dispatch/i }),
+        screen.getByRole("button", { name: /request a return to dispatch/i }),
       );
 
       // The return sheet opens for the blocking delivery.
-      expect(await screen.findByText(/^return to dispatch$/i)).toBeInTheDocument();
+      expect(await screen.findByText(/^request a return$/i)).toBeInTheDocument();
 
-      // Drive the sheet to completion against the return endpoint.
+      // Drive the sheet to completion against the return endpoint (202 =
+      // request filed for dispatch review).
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true }),
+          status: 202,
+          json: () =>
+            Promise.resolve({ success: true, status: "PENDING_APPROVAL" }),
         }),
       ) as unknown as typeof fetch;
       fireEvent.click(screen.getByRole("button", { name: /vehicle issue/i }));
-      fireEvent.click(screen.getByRole("button", { name: /return delivery/i }));
+      fireEvent.click(screen.getByRole("button", { name: /request return/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
@@ -561,7 +564,8 @@ describe("DriverTrackingPortal (redesigned)", () => {
           expect.objectContaining({ method: "POST" }),
         );
       });
-      // The feed re-syncs so the End-shift button unblocks without a reload.
+      // The feed re-syncs so the End-shift button unblocks without a reload
+      // (the feed now flags the order pendingReturn).
       await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
     });
 
@@ -574,7 +578,25 @@ describe("DriverTrackingPortal (redesigned)", () => {
       );
       renderPortal();
       expect(
-        screen.queryByRole("button", { name: /return a delivery to dispatch/i }),
+        screen.queryByRole("button", { name: /request a return to dispatch/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("stops counting a delivery as a blocker once its return request is pending", () => {
+      // Server parity: the end-shift guard excludes orders with a PENDING
+      // return request, so the client mirror must not contradict it.
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.EN_ROUTE_TO_CLIENT,
+          pendingReturn: true,
+        }),
+      );
+      renderPortal();
+      expect(
+        screen.getByRole("button", { name: /end shift/i }),
+      ).not.toHaveAttribute("aria-disabled", "true");
+      expect(
+        screen.queryByRole("button", { name: /request a return to dispatch/i }),
       ).not.toBeInTheDocument();
     });
 

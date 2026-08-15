@@ -1,17 +1,24 @@
 /**
- * Tests for the return-to-dispatch POST route (issue #508 escape hatch).
+ * Tests for the return-to-dispatch route (issue #508 escape hatch + the
+ * helpdesk-approval flow).
  *
  * AuthZ matrix under test:
- * - assigned driver, pre-pickup (null/ASSIGNED/EN_ROUTE_TO_VENDOR/ARRIVED_AT_VENDOR) -> 200
- * - assigned driver, post-pickup -> 409 POST_PICKUP
+ * - assigned DRIVER, pre-pickup -> 202 PENDING_APPROVAL (a DeliveryReturnRequest
+ *   row is created; the assignment is NOT unwound). Idempotent on repeat.
+ * - assigned DRIVER, post-pickup -> 409 POST_PICKUP
  * - unassigned driver -> 403
- * - ADMIN / SUPER_ADMIN / HELPDESK -> 200 in any non-terminal state
+ * - ADMIN / SUPER_ADMIN / HELPDESK -> 200 immediate return in any non-terminal
+ *   state (unchanged pre-approval behavior).
  * - terminal order -> 409; no dispatch rows -> 409 NOT_ASSIGNED; bad reason -> 400
  *
- * The unwind runs in one transaction: mirror tombstone (CANCELLED + deletedAt),
- * dispatch delete, order back to ACTIVE with driverStatus null, and a
- * RETURNED_TO_DISPATCH history row for non-partner catering orders only.
- * The admin push notification fires after the response.
+ * The privileged unwind runs in one transaction: mirror tombstone (CANCELLED +
+ * deletedAt), dispatch delete, order back to ACTIVE with driverStatus null, and
+ * a RETURNED_TO_DISPATCH history row for non-partner catering orders only.
+ * Push notifications fire after the response: RETURN_REQUESTED for a new driver
+ * request, FAILED for a privileged unwind.
+ *
+ * GET returns the caller's PENDING request for the order (drivers see only
+ * their own) so the driver UI can render the "Return requested" state.
  */
 
 jest.mock('@/utils/prismaDB', () => ({
@@ -20,6 +27,7 @@ jest.mock('@/utils/prismaDB', () => ({
     profile: { findUnique: jest.fn() },
     cateringRequest: { findFirst: jest.fn() },
     onDemand: { findFirst: jest.fn() },
+    deliveryReturnRequest: { findFirst: jest.fn() },
   },
 }));
 jest.mock('@/utils/supabase/server');
@@ -55,11 +63,13 @@ const makeTx = () => ({
   dispatch: { findMany: jest.fn(), deleteMany: jest.fn() },
   delivery: { updateMany: jest.fn() },
   orderStatusHistory: { create: jest.fn() },
+  deliveryReturnRequest: { findFirst: jest.fn(), create: jest.fn() },
 });
 let tx: ReturnType<typeof makeTx>;
 
 const DRIVER_ID = 'driver-profile-1';
 const ORDER_ID = 'order-123';
+const REQUEST_ID = 'return-request-1';
 
 const createPostRequest = (
   orderNumber = 'CAT-001',
@@ -73,6 +83,11 @@ const createPostRequest = (
   return req;
 };
 
+const createGetRequest = (orderNumber = 'CAT-001') =>
+  new NextRequest(`http://localhost:3000/api/orders/${orderNumber}/return`, {
+    method: 'GET',
+  });
+
 interface SetupOpts {
   role?: string;
   user?: { id: string } | null;
@@ -81,6 +96,7 @@ interface SetupOpts {
   driverStatus?: string | null;
   dispatches?: Array<{ id: string; driverId: string | null }>;
   partner?: unknown;
+  existingPending?: Record<string, unknown> | null;
 }
 
 const setupMocks = (opts: SetupOpts = {}) => {
@@ -110,6 +126,7 @@ const setupMocks = (opts: SetupOpts = {}) => {
   (mockedPrisma.onDemand.findFirst as jest.Mock).mockResolvedValue(
     orderType === 'on_demand' ? { id: ORDER_ID, orderNumber: 'OD-001' } : null,
   );
+  (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(null);
 
   tx = makeTx();
   tx.cateringRequest.findFirst.mockResolvedValue(orderType === 'catering' ? order : null);
@@ -124,6 +141,13 @@ const setupMocks = (opts: SetupOpts = {}) => {
   tx.cateringRequest.update.mockResolvedValue(order);
   tx.onDemand.update.mockResolvedValue(order);
   tx.orderStatusHistory.create.mockResolvedValue({ id: 'hist-1' });
+  tx.deliveryReturnRequest.findFirst.mockResolvedValue(opts.existingPending ?? null);
+  tx.deliveryReturnRequest.create.mockImplementation(async ({ data }: any) => ({
+    id: REQUEST_ID,
+    status: 'PENDING',
+    requestedAt: new Date(),
+    ...data,
+  }));
 
   (mockedPrisma.$transaction as jest.Mock).mockImplementation(
     async (fn: (t: unknown) => Promise<unknown>) => fn(tx),
@@ -187,8 +211,106 @@ describe('return-to-dispatch POST', () => {
     expect(mockedPrisma.$transaction as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it('lets the assigned driver return a pre-pickup order and unwinds the assignment', async () => {
+  it('files a PENDING request (202) for the assigned driver instead of unwinding', async () => {
     setupMocks({ driverStatus: 'EN_ROUTE_TO_VENDOR', orderStatus: 'IN_PROGRESS' });
+    const { POST } = await importRoute();
+    const res = await POST(
+      createPostRequest('CAT-001', { reason: 'VEHICLE_ISSUE', details: 'Flat tire' }),
+      params('CAT-001'),
+    );
+
+    expect(res.status).toBe(202);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.status).toBe('PENDING_APPROVAL');
+    expect(data.requestId).toBe(REQUEST_ID);
+    expect(data.alreadyPending).toBe(false);
+
+    // The request row carries the driver, order, and durable reason.
+    expect(tx.deliveryReturnRequest.create).toHaveBeenCalledWith({
+      data: {
+        orderType: 'catering',
+        orderId: ORDER_ID,
+        orderNumber: 'CAT-001',
+        driverId: DRIVER_ID,
+        reason: 'VEHICLE_ISSUE',
+        details: 'Flat tire',
+      },
+    });
+
+    // NOTHING is unwound until dispatch approves.
+    expect(tx.delivery.updateMany).not.toHaveBeenCalled();
+    expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
+    expect(tx.cateringRequest.update).not.toHaveBeenCalled();
+    expect(tx.orderStatusHistory.create).not.toHaveBeenCalled();
+
+    // Dispatch gets the action-required "return requested" push.
+    await flush();
+    expect(mockedNotify).toHaveBeenCalledWith({
+      status: 'RETURN_REQUESTED',
+      dispatchId: 'dispatch-1',
+      orderId: ORDER_ID,
+      recipientType: 'ADMIN',
+    });
+  });
+
+  it('is idempotent: a second driver request returns the existing PENDING row', async () => {
+    const existing = {
+      id: 'existing-request',
+      status: 'PENDING',
+      orderNumber: 'CAT-001',
+      requestedAt: new Date(),
+    };
+    setupMocks({ existingPending: existing });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(202);
+    const data = await res.json();
+    expect(data.requestId).toBe('existing-request');
+    expect(data.alreadyPending).toBe(true);
+    expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+    // No duplicate push for an idempotent repeat.
+    await flush();
+    expect(mockedNotify).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 POST_PICKUP for the assigned driver after pickup', async () => {
+    setupMocks({ driverStatus: 'PICKED_UP', orderStatus: 'IN_PROGRESS' });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe('POST_PICKUP');
+    expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+    expect(tx.delivery.updateMany).not.toHaveBeenCalled();
+    expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
+    expect(mockedNotify).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for a driver who is not assigned to the order', async () => {
+    setupMocks({ dispatches: [{ id: 'dispatch-1', driverId: 'someone-else' }] });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(403);
+    expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+    expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 NOT_ASSIGNED to a driver when no dispatch rows exist', async () => {
+    setupMocks({ dispatches: [] });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe('NOT_ASSIGNED');
+  });
+
+  it('lets an ADMIN return immediately (no approval step) and unwinds the assignment', async () => {
+    setupMocks({ role: 'ADMIN', driverStatus: 'EN_ROUTE_TO_VENDOR', orderStatus: 'IN_PROGRESS' });
     const { POST } = await importRoute();
     const res = await POST(
       createPostRequest('CAT-001', { reason: 'VEHICLE_ISSUE', details: 'Flat tire' }),
@@ -198,6 +320,10 @@ describe('return-to-dispatch POST', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.success).toBe(true);
+    expect(data.status).toBe('ACTIVE');
+
+    // No request row for privileged callers.
+    expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
 
     // Mirror tombstone: CANCELLED + deletedAt (SSE feed filters live rows) + reason.
     expect(tx.delivery.updateMany).toHaveBeenCalledWith(
@@ -247,29 +373,6 @@ describe('return-to-dispatch POST', () => {
     });
   });
 
-  it('returns 409 POST_PICKUP for the assigned driver after pickup', async () => {
-    setupMocks({ driverStatus: 'PICKED_UP', orderStatus: 'IN_PROGRESS' });
-    const { POST } = await importRoute();
-    const res = await POST(createPostRequest(), params('CAT-001'));
-
-    expect(res.status).toBe(409);
-    const data = await res.json();
-    expect(data.code).toBe('POST_PICKUP');
-    expect(tx.delivery.updateMany).not.toHaveBeenCalled();
-    expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
-    expect(tx.cateringRequest.update).not.toHaveBeenCalled();
-    expect(mockedNotify).not.toHaveBeenCalled();
-  });
-
-  it('returns 403 for a driver who is not assigned to the order', async () => {
-    setupMocks({ dispatches: [{ id: 'dispatch-1', driverId: 'someone-else' }] });
-    const { POST } = await importRoute();
-    const res = await POST(createPostRequest(), params('CAT-001'));
-
-    expect(res.status).toBe(403);
-    expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
-  });
-
   it('lets an ADMIN force a return after pickup', async () => {
     setupMocks({ role: 'ADMIN', driverStatus: 'PICKED_UP', orderStatus: 'IN_PROGRESS' });
     const { POST } = await importRoute();
@@ -299,8 +402,19 @@ describe('return-to-dispatch POST', () => {
     expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('returns 409 NOT_ASSIGNED when no dispatch rows exist', async () => {
-    setupMocks({ dispatches: [] });
+  it('returns 409 for a terminal order on the driver request path too', async () => {
+    setupMocks({ orderStatus: 'CANCELLED', driverStatus: null });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe('TERMINAL');
+    expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 NOT_ASSIGNED for an admin when no dispatch rows exist', async () => {
+    setupMocks({ role: 'ADMIN', dispatches: [] });
     const { POST } = await importRoute();
     const res = await POST(createPostRequest(), params('CAT-001'));
 
@@ -310,7 +424,7 @@ describe('return-to-dispatch POST', () => {
   });
 
   it('skips the history row for partner orders (no partner webhook surface)', async () => {
-    setupMocks({ partner: { id: 'partner-1', orderPrefix: 'CAT-' } });
+    setupMocks({ role: 'ADMIN', partner: { id: 'partner-1', orderPrefix: 'CAT-' } });
     const { POST } = await importRoute();
     const res = await POST(createPostRequest(), params('CAT-001'));
 
@@ -319,7 +433,7 @@ describe('return-to-dispatch POST', () => {
   });
 
   it('handles on-demand orders without a history row (no FK to on_demand)', async () => {
-    setupMocks({ orderType: 'on_demand' });
+    setupMocks({ role: 'ADMIN', orderType: 'on_demand' });
     const { POST } = await importRoute();
     const res = await POST(createPostRequest('OD-001'), params('OD-001'));
 
@@ -334,6 +448,19 @@ describe('return-to-dispatch POST', () => {
       expect.objectContaining({ where: expect.objectContaining({ onDemandId: ORDER_ID }) }),
     );
     expect(tx.orderStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('files an on-demand request with the right orderType for a driver', async () => {
+    setupMocks({ orderType: 'on_demand' });
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest('OD-001'), params('OD-001'));
+
+    expect(res.status).toBe(202);
+    expect(tx.deliveryReturnRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ orderType: 'on_demand', orderNumber: 'OD-001' }),
+      }),
+    );
   });
 
   it('resolves the user from the Authorization header when cookies are stale', async () => {
@@ -353,7 +480,68 @@ describe('return-to-dispatch POST', () => {
     const { POST } = await importRoute();
     const res = await POST(req, params('CAT-001'));
 
-    expect(res.status).toBe(200);
+    // Driver path now files a request (202) — auth still resolved via Bearer.
+    expect(res.status).toBe(202);
     expect(getUser).toHaveBeenCalledWith('tok-123');
+  });
+});
+
+describe('return-to-dispatch GET (pending request lookup)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    setupMocks({ user: null });
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the driver's own PENDING request", async () => {
+    const pending = {
+      id: REQUEST_ID,
+      status: 'PENDING',
+      reason: 'VEHICLE_ISSUE',
+      details: null,
+      requestedAt: new Date('2026-08-14T10:00:00Z'),
+    };
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(pending);
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.request.id).toBe(REQUEST_ID);
+    // Drivers are scoped to their own request.
+    expect(mockedPrisma.deliveryReturnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'PENDING',
+          driverId: DRIVER_ID,
+        }),
+      }),
+    );
+  });
+
+  it('returns null when nothing is pending', async () => {
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.request).toBeNull();
+  });
+
+  it('does not scope by driver for privileged callers', async () => {
+    setupMocks({ role: 'HELPDESK' });
+    const { GET } = await importRoute();
+    await GET(createGetRequest(), params('CAT-001'));
+
+    const where = (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mock
+      .calls[0][0].where;
+    expect(where.driverId).toBeUndefined();
   });
 });

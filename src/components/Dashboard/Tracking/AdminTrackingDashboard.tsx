@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
+import ReturnRequestsPanel from './ReturnRequestsPanel';
 import TrackingSettingsTab from './TrackingSettingsTab';
 import { useAdminRealtimeTracking } from '@/hooks/tracking/useAdminRealtimeTracking';
 import { useUser } from '@/contexts/UserContext';
@@ -454,7 +455,10 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <span>Delivery Management</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Driver return requests need a dispatcher decision — surface
+                  them above the assignment list so they aren't missed. */}
+              <ReturnRequestsPanel />
               <DeliveryAssignmentPanel
                 drivers={activeDrivers}
                 deliveries={activeDeliveries}

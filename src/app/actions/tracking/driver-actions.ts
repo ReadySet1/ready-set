@@ -155,6 +155,9 @@ export async function endDriverShift(
     // imminent (within the admin-configured window) or overdue. Future-dated
     // assignments don't trap the driver. A window of 0 disables the
     // imminent-pickup branch entirely (in-flight orders always block).
+    // Orders with a PENDING return request (delivery_return_requests) never
+    // block: the driver has already asked dispatch to take the order back,
+    // so the shift can end while the request awaits review.
     // Mirrored client-side by blocksEndShift in DriverTrackingPortal.
     const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
@@ -181,6 +184,11 @@ export async function endDriverShift(
             WHERE driver_id = $1::uuid
               AND deleted_at IS NULL
               AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+              AND NOT EXISTS (
+                SELECT 1 FROM delivery_return_requests rr
+                WHERE rr.order_number = deliveries.order_number
+                  AND rr.status = 'PENDING'
+              )
           )
           +
           (
@@ -200,6 +208,11 @@ export async function endDriverShift(
                     od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
                     ${imminentPickupOd}
                   ))
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM delivery_return_requests rr
+                WHERE rr.order_id = COALESCE(cr.id, od.id)
+                  AND rr.status = 'PENDING'
               )
           ) AS n
       `, ...guardParams);

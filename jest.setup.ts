@@ -520,6 +520,7 @@ const mockPrismaClientInstance: any = {
   driverLocation: createMockPrismaModel(),
   driverShift: createMockPrismaModel(),
   delivery: createMockPrismaModel(),
+  deliveryReturnRequest: createMockPrismaModel(),
 
   // Misc models
   verificationToken: createMockPrismaModel(),

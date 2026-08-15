@@ -191,6 +191,13 @@ jest.mock('../DeliveryAssignmentPanel', () => {
   };
 });
 
+// Return-requests panel fetches its own data — covered by its own suite.
+jest.mock('../ReturnRequestsPanel', () => {
+  return function MockReturnRequestsPanel() {
+    return <div data-testid="return-requests-panel">0 return requests</div>;
+  };
+});
+
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   NavigationIcon: () => <span data-testid="navigation-icon">Nav</span>,
@@ -610,6 +617,21 @@ describe('AdminTrackingDashboard', () => {
       fireEvent.click(deliveriesTab);
 
       expect(screen.getByTestId('delivery-assignment-panel')).toBeInTheDocument();
+    });
+
+    it('should surface the pending return-requests panel above the assignment list', () => {
+      render(<AdminTrackingDashboard />);
+
+      fireEvent.click(screen.getByTestId('tab-deliveries'));
+
+      const returnPanel = screen.getByTestId('return-requests-panel');
+      const assignmentPanel = screen.getByTestId('delivery-assignment-panel');
+      expect(returnPanel).toBeInTheDocument();
+      // Requests need a dispatcher decision — they render before assignments.
+      expect(
+        returnPanel.compareDocumentPosition(assignmentPanel) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
   });
 

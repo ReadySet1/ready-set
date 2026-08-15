@@ -177,6 +177,50 @@ describe('Orders API PATCH — completion regression', () => {
     expect(upsertArg.update.driverId).toBe('delivery-driver-1');
   });
 
+  it('auto-voids PENDING return requests when the driver advances to PICKED_UP', async () => {
+    setupMocks({ driverStatus: 'ARRIVED_AT_VENDOR', status: 'IN_PROGRESS' });
+    (mockedPrisma.deliveryReturnRequest.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+      params: Promise.resolve({ order_number: 'CAT-001' }),
+    });
+
+    expect(res.status).toBe(200);
+    // Keeping the food means keeping the job — the pending request is voided.
+    expect(mockedPrisma.deliveryReturnRequest.updateMany as jest.Mock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { orderId: 'order-123', status: 'PENDING' },
+        data: expect.objectContaining({ status: 'VOIDED' }),
+      }),
+    );
+  });
+
+  it('does NOT touch return requests on a pre-pickup transition', async () => {
+    setupMocks({ driverStatus: 'ASSIGNED', status: 'ASSIGNED' });
+    const { PATCH } = await importRoute();
+
+    await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+      params: Promise.resolve({ order_number: 'CAT-001' }),
+    });
+
+    expect(mockedPrisma.deliveryReturnRequest.updateMany as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the status update successful when the auto-void fails (non-fatal)', async () => {
+    setupMocks({ driverStatus: 'ARRIVED_AT_VENDOR', status: 'IN_PROGRESS' });
+    (mockedPrisma.deliveryReturnRequest.updateMany as jest.Mock).mockRejectedValue(
+      new Error('void failed'),
+    );
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+      params: Promise.resolve({ order_number: 'CAT-001' }),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
   it('propagates a deliveries-mirror failure as a 500 (no silent terminal order)', async () => {
     // P1: the order update + mirror upsert run in one transaction. If the mirror
     // upsert throws, the request fails (retryable) instead of swallowing the error

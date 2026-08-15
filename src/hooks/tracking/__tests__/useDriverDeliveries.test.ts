@@ -167,6 +167,19 @@ describe('useDriverDeliveries', () => {
       expect(delivery.id).toBe(mockDeliveryId);
       expect(delivery.cateringRequestId).toBe(mockDeliveryId);
       expect(delivery.status).toBe(DriverStatus.ASSIGNED);
+      // Absent feed flag maps to false (no pending return request).
+      expect(delivery.pendingReturn).toBe(false);
+    });
+
+    it('maps the feed pendingReturn flag onto the delivery (end-shift mirror)', async () => {
+      setDeliveries([makeOrder({ pendingReturn: true })]);
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+      expect(result.current.activeDeliveries[0].pendingReturn).toBe(true);
     });
 
     it('should set error if driver ID not found', async () => {

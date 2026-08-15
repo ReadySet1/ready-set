@@ -56,8 +56,11 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 /** True when this delivery should block ending the shift: it's mid-flight, or
  *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
  *  Mirrors the server guard so the button state matches what the API will say.
- *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks). */
+ *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks).
+ *  A PENDING return request never blocks — the driver already asked dispatch
+ *  to take the order back (server guard excludes these the same way). */
 function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
+  if (delivery.pendingReturn) return false;
   if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
   if (guardMs <= 0) return false;
   if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
@@ -483,7 +486,8 @@ export default function DriverTrackingPortal() {
                 </DriverButton>
               </div>
               {/* Issue #508 escape hatch: a driver who can't start a blocking
-                  assignment hands it back instead of being stuck on shift. */}
+                  assignment requests a return instead of being stuck on shift.
+                  Once the request is PENDING the order stops blocking. */}
               {endShiftBlockers > 0 && firstBlockerOrderNumber ? (
                 <DriverButton
                   variant="outline"
@@ -491,7 +495,7 @@ export default function DriverTrackingPortal() {
                   size="md"
                   onClick={() => setReturnTarget(firstBlockerOrderNumber)}
                 >
-                  Return a delivery to dispatch
+                  Request a return to dispatch
                 </DriverButton>
               ) : null}
             </DriverCard>
