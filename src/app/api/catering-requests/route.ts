@@ -269,6 +269,12 @@ export async function POST(request: NextRequest) {
     if (data.orderTotal != null && data.orderTotal !== '') {
       try {
         orderTotal = new Decimal(data.orderTotal);
+        if (!orderTotal.isFinite()) {
+          return NextResponse.json(
+            { message: "Order total must be a valid number" },
+            { status: 400 }
+          );
+        }
         if (orderTotal.lte(0)) {
           return NextResponse.json(
             { message: "Order total must be positive" },

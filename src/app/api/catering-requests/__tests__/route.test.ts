@@ -442,6 +442,28 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("Order total must be positive");
     });
 
+    it("should return 400 when orderTotal is NaN string", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "NaN" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
+    });
+
+    it("should return 400 when orderTotal is Infinity string", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "Infinity" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
+    });
+
     it("should require pickupAddress.id field", async () => {
       const dataWithoutPickupAddressId = {
         ...validCateringData,

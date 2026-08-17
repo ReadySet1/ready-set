@@ -343,6 +343,17 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
   const needHost = watch("needHost");
 
+  // --- shared validators (headcount / orderTotal) ---
+  const isBlank = (v: string | undefined | null): boolean =>
+    v === "" || v == null;
+
+  const atLeastOneProvided = (): true | string => {
+    const hc = getValues("headcount");
+    const ot = getValues("orderTotal");
+    return (!isBlank(hc) || !isBlank(ot)) ||
+      "Provide at least one: Headcount or Order Total.";
+  };
+
   // Cross-field re-validation: clear sibling error when one field is filled
   const headcountValue = watch("headcount");
   const orderTotalValue = watch("orderTotal");
@@ -664,12 +675,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           type="number"
           placeholder="Number of people"
           rules={{
-            validate: () => {
-              const hc = getValues("headcount");
-              const ot = getValues("orderTotal");
-              const hcBlank = hc === "" || hc == null;
-              const otBlank = ot === "" || ot == null;
-              return (!hcBlank || !otBlank) || "Provide at least one: Headcount or Order Total.";
+            validate: {
+              atLeastOne: atLeastOneProvided,
+              positive: (v: string | undefined) => {
+                if (isBlank(v)) return true;
+                const n = parseInt(String(v), 10);
+                return (!isNaN(n) && n > 0) ||
+                  "Headcount must be a positive integer";
+              },
             },
           }}
           icon={<Users size={16} />}
@@ -771,13 +784,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           type="number"
           placeholder="0.00"
           rules={{
-            min: { value: 0, message: "Order total must be positive" },
-            validate: () => {
-              const hc = getValues("headcount");
-              const ot = getValues("orderTotal");
-              const hcBlank = hc === "" || hc == null;
-              const otBlank = ot === "" || ot == null;
-              return (!hcBlank || !otBlank) || "Provide at least one: Headcount or Order Total.";
+            validate: {
+              atLeastOne: atLeastOneProvided,
+              positive: (v: string | undefined) => {
+                if (isBlank(v)) return true;
+                const n = parseFloat(String(v));
+                return (isFinite(n) && n > 0) ||
+                  "Order total must be positive";
+              },
             },
           }}
           icon={<DollarSign size={16} />}

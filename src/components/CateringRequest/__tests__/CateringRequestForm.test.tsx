@@ -757,6 +757,110 @@ describe("CateringRequestForm — headcount / orderTotal at-least-one rule", () 
     });
   });
 
+  it("blocks submit and shows error when headcount is 0", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/headcount/i), "0");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("blocks submit and shows error when headcount is negative", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    // type "-5" into headcount — clear first in case default is present
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.clear(headcountInput);
+    await user.type(headcountInput, "-5");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("blocks submit and shows error when orderTotal is 0", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/order total/i), "0");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Order total must be positive"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("REGRESSION: headcount filled with orderTotal blank still submits", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/headcount/i), "25");
+    // orderTotal deliberately left blank
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+  });
+
   it("filling headcount clears the stale error on orderTotal", async () => {
     const user = userEvent.setup();
     await act(async () => {
