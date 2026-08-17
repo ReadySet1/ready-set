@@ -97,6 +97,18 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
       alt: "FreshRoll Vietnamese Rolls & Bowls logo",
       url: "https://freshroll.square.site/",
     },
+    {
+      name: "Donaji",
+      image: getCloudinaryUrl("food/partners/donaji"),
+      alt: "Donaji logo",
+      url: "https://www.donajisf.com/",
+    },
+    {
+      name: "Componere",
+      image: getCloudinaryUrl("food/partners/componere", { version: ASSET_CACHE_VERSION }),
+      alt: "Componere Culinary and Events logo",
+      url: "https://www.componere.co/",
+    },
   ];
 
 const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
