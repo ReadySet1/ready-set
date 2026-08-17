@@ -894,4 +894,92 @@ describe("CateringRequestForm — headcount / orderTotal at-least-one rule", () 
       ).toHaveLength(0);
     }, { timeout: 3000 });
   });
+
+  // --- B1: Number() + Number.isInteger() for headcount ---
+
+  it("submits '1e3' as headcount 1000 without error", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "1e3");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+
+    // HTML number input normalizes "1e3" to "1000"; validator accepts it
+    const callBody = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+    );
+    expect(Number(callBody.headcount)).toBe(1000);
+  });
+
+  it("blocks submit when headcount is '5.9' (not an integer)", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "5.9");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // --- B3: headcount ceiling on client ---
+
+  it("blocks submit when headcount exceeds INT4 ceiling", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "2147483648");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount is too large"),
+      ).toBeInTheDocument();
+    });
+  });
 });

@@ -679,9 +679,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
               atLeastOne: atLeastOneProvided,
               positive: (v: string | undefined) => {
                 if (isBlank(v)) return true;
-                const n = parseInt(String(v), 10);
-                return (!isNaN(n) && n > 0) ||
+                const n = Number(String(v));
+                return (Number.isInteger(n) && n > 0) ||
                   "Headcount must be a positive integer";
+              },
+              ceiling: (v: string | undefined) => {
+                if (isBlank(v)) return true;
+                const n = Number(String(v));
+                if (!Number.isInteger(n) || n <= 0) return true; // caught by positive
+                return n <= 2147483647 || "Headcount is too large";
               },
             },
           }}
@@ -791,6 +797,12 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
                 const n = parseFloat(String(v));
                 return (isFinite(n) && n > 0) ||
                   "Order total must be positive";
+              },
+              ceiling: (v: string | undefined) => {
+                if (isBlank(v)) return true;
+                const n = parseFloat(String(v));
+                if (!isFinite(n) || n <= 0) return true; // caught by positive
+                return n <= 99999999.99 || "Order total is too large";
               },
             },
           }}

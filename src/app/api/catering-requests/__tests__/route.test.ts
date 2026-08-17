@@ -835,5 +835,135 @@ describe("/api/catering-requests", () => {
         })
       );
     });
+
+    // --- B1: headcount Number() + Number.isInteger() ---
+
+    it("should create with headcount 1000 when headcount is '1e3'", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "1e3" }
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 1000,
+          }),
+        })
+      );
+    });
+
+    it("should return 400 when headcount is '5.9' (not an integer)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "5.9" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is '12abc' (trailing garbage)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "12abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    // --- B3: headcount upper bound ---
+
+    it("should return 400 when headcount exceeds INT4 ceiling", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "2147483648" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount is too large");
+    });
+
+    // --- B2: tip guard ---
+
+    it("should return 400 when tip is 'abc' (not a 500)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Tip must be a valid number");
+    });
+
+    it("should return 400 when tip is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "-5" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Tip cannot be negative");
+    });
+
+    it("should create with tip 0 when tip is '0'", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "0" }
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tip: expect.objectContaining({ s: 1, e: 0 }), // Decimal(0)
+          }),
+        })
+      );
+    });
+
+    it("should create with tip 0 when tip is omitted", async () => {
+      const { tip, ...dataWithoutTip } = validCateringData as any;
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithoutTip
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tip: expect.objectContaining({ s: 1, e: 0 }), // Decimal(0)
+          }),
+        })
+      );
+    });
+
+    // --- B3: orderTotal upper bound ---
+
+    it("should return 400 when orderTotal is '1e99' (too large)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "1e99" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total is too large");
+    });
   });
 });

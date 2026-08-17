@@ -10,6 +10,10 @@ import { randomUUID } from "crypto";
 import { Resend } from "resend";
 import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
 
+// Column-limit ceilings (from prisma/schema.prisma)
+const MAX_HEADCOUNT = 2147483647; // INT4 ceiling
+const MAX_DECIMAL_10_2 = new Decimal("99999999.99"); // Decimal(10,2) ceiling
+
 // Lazy initialization to avoid build-time errors when API key is not set
 const getResendClient = () => {
   if (!process.env.RESEND_API_KEY) {
@@ -256,11 +260,17 @@ export async function POST(request: NextRequest) {
 
     // Convert numeric values — guard blank/null to produce explicit null (not NaN or throw)
     const headcount = (data.headcount != null && data.headcount !== '')
-      ? parseInt(String(data.headcount), 10)
+      ? Number(String(data.headcount))
       : null;
-    if (headcount !== null && (isNaN(headcount) || headcount <= 0)) {
+    if (headcount !== null && (!Number.isInteger(headcount) || headcount <= 0)) {
       return NextResponse.json(
         { message: "Headcount must be a positive integer" },
+        { status: 400 }
+      );
+    }
+    if (headcount !== null && (!Number.isSafeInteger(headcount) || headcount > MAX_HEADCOUNT)) {
+      return NextResponse.json(
+        { message: "Headcount is too large" },
         { status: 400 }
       );
     }
@@ -281,6 +291,12 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        if (orderTotal.gt(MAX_DECIMAL_10_2)) {
+          return NextResponse.json(
+            { message: "Order total is too large" },
+            { status: 400 }
+          );
+        }
       } catch {
         return NextResponse.json(
           { message: "Order total must be a valid number" },
@@ -288,7 +304,36 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    const tip = data.tip ? new Decimal(data.tip) : new Decimal(0);
+
+    let tip = new Decimal(0);
+    if (data.tip != null && data.tip !== '') {
+      try {
+        tip = new Decimal(data.tip);
+        if (!tip.isFinite()) {
+          return NextResponse.json(
+            { message: "Tip must be a valid number" },
+            { status: 400 }
+          );
+        }
+        if (tip.lt(0)) {
+          return NextResponse.json(
+            { message: "Tip cannot be negative" },
+            { status: 400 }
+          );
+        }
+        if (tip.gt(MAX_DECIMAL_10_2)) {
+          return NextResponse.json(
+            { message: "Tip is too large" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Tip must be a valid number" },
+          { status: 400 }
+        );
+      }
+    }
     
     let hoursNeeded = null;
     let numberOfHosts = null;
