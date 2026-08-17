@@ -258,9 +258,30 @@ export async function POST(request: NextRequest) {
     const headcount = (data.headcount != null && data.headcount !== '')
       ? parseInt(String(data.headcount), 10)
       : null;
-    const orderTotal = (data.orderTotal != null && data.orderTotal !== '')
-      ? new Decimal(data.orderTotal)
-      : null;
+    if (headcount !== null && (isNaN(headcount) || headcount <= 0)) {
+      return NextResponse.json(
+        { message: "Headcount must be a positive integer" },
+        { status: 400 }
+      );
+    }
+
+    let orderTotal: Decimal | null = null;
+    if (data.orderTotal != null && data.orderTotal !== '') {
+      try {
+        orderTotal = new Decimal(data.orderTotal);
+        if (orderTotal.lte(0)) {
+          return NextResponse.json(
+            { message: "Order total must be positive" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Order total must be a valid number" },
+          { status: 400 }
+        );
+      }
+    }
     const tip = data.tip ? new Decimal(data.tip) : new Decimal(0);
     
     let hoursNeeded = null;

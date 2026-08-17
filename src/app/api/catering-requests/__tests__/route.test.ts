@@ -387,6 +387,61 @@ describe("/api/catering-requests", () => {
       );
     });
 
+    it("should return 400 when headcount is non-numeric", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: -5 }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is zero", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: 0 }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when orderTotal is non-numeric", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "not-a-number" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
+    });
+
+    it("should return 400 when orderTotal is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "-100" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be positive");
+    });
+
     it("should require pickupAddress.id field", async () => {
       const dataWithoutPickupAddressId = {
         ...validCateringData,
