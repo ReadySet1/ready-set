@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * Returns the list of allowed counties for a user.
- * Currently returns all available Bay Area counties.
+ * Currently returns all available service area counties.
  * Can be extended to filter based on user profile's countiesServed field.
  */
 async function fetchAllowedCountiesForUser(userId: string): Promise<string[]> {
@@ -33,9 +33,13 @@ async function fetchAllowedCountiesForUser(userId: string): Promise<string[]> {
   return [
     'Alameda',
     'Contra Costa',
+    'Marin',
+    'Napa',
     'San Francisco',
     'San Mateo',
     'Santa Clara',
+    'Solano',
+    'Sonoma',
     'Atlanta',
     'Dallas',
     'Houston',
