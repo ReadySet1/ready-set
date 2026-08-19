@@ -16,6 +16,9 @@ export const COUNTIES: readonly Option[] = [
   { label: "Santa Clara", value: "Santa Clara" },
   { label: "Solano", value: "Solano" },
   { label: "Sonoma", value: "Sonoma" },
+  { label: "Atlanta", value: "Atlanta" },
+  { label: "Dallas", value: "Dallas" },
+  { label: "Houston", value: "Houston" },
 ] as const;
 
 export const US_STATES: readonly Option[] = [

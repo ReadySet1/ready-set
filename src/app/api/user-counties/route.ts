@@ -29,12 +29,15 @@ export async function GET(request: NextRequest) {
  * Can be extended to filter based on user profile's countiesServed field.
  */
 async function fetchAllowedCountiesForUser(userId: string): Promise<string[]> {
-  // Return all available Bay Area counties including San Francisco and Santa Clara
+  // Return all available service area counties
   return [
     'Alameda',
     'Contra Costa',
     'San Francisco',
     'San Mateo',
-    'Santa Clara'
+    'Santa Clara',
+    'Atlanta',
+    'Dallas',
+    'Houston',
   ];
 }
