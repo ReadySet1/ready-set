@@ -64,7 +64,7 @@ export function ProofOfDeliveryCapture({
   hideTitle = false,
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { permission, requestPermission, error: permissionError, isCameraSupported } = useCameraPermission();
+  const { permission, error: permissionError, isCameraSupported } = useCameraPermission();
   const { offlineStatus, queuePODUpload, syncPendingUploads } = usePODOfflineQueue();
 
   const [state, setState] = useState<PODCaptureState>({
@@ -124,17 +124,20 @@ export function ProofOfDeliveryCapture({
   }, [onError]);
 
   /**
-   * Trigger the file input click
+   * Trigger the file input click.
+   *
+   * Must stay fully synchronous: iOS WKWebView only honors a programmatic
+   * file-input click inside the tap's transient user activation. The previous
+   * `await requestPermission()` (a getUserMedia round-trip) consumed it, so
+   * the first tap silently did nothing and only the second tap opened the
+   * camera (2026-08 field failure). The capture input prompts for camera
+   * access natively, so no getUserMedia pre-flight is needed — and running
+   * one while the native camera sheet opens can fail with
+   * NotReadable/NotAllowed and wrongly flip the UI into a permission error.
    */
-  const handleCaptureClick = useCallback(async () => {
-    // Request permission if needed (this will trigger browser dialog)
-    if (permission === 'prompt' || permission === 'denied') {
-      await requestPermission();
-    }
-
-    // Open file picker / camera
+  const handleCaptureClick = useCallback(() => {
     fileInputRef.current?.click();
-  }, [permission, requestPermission]);
+  }, []);
 
   /**
    * Handle retake - clear current preview

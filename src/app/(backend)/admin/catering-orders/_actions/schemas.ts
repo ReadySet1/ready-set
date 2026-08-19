@@ -120,6 +120,15 @@ export const createCateringOrderSchema = z.object({
       });
     }
   }
+
+  // At least one of headcount / orderTotal must be provided on creation.
+  if (data.headcount === null && data.orderTotal === null) {
+    const message =
+      "Provide at least one: Headcount or Order Total.";
+    for (const path of ["headcount", "orderTotal"] as const) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] });
+    }
+  }
 });
 
 // Type inferred from the schema - use z.output to properly handle preprocessor types

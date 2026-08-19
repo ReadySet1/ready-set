@@ -180,7 +180,7 @@ describe("SignatureCapture", () => {
       points: points.map((p, i) => ({ ...p, time: 1000 + i, pressure: 0.5 })),
     });
 
-    it("scales stroke coordinates to the new canvas size when collapsing from fullscreen", () => {
+    it("uniformly scales and centers stroke coordinates when collapsing from fullscreen", () => {
       render(
         <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
       );
@@ -199,16 +199,27 @@ describe("SignatureCapture", () => {
         ]),
       ]);
 
-      // Collapse to the inline h-48 pad (350×192): y scales by 192/600.
+      // Collapse to the inline h-48 pad (350×192). Independent per-axis
+      // factors would squash y by 0.32 while leaving x untouched — the field
+      // distortion. Instead both axes share s = min(350/350, 192/600) = 0.32
+      // and the shrunk 112px-wide stroke box is centered: offsetX = 119.
       setCanvasSize(canvas, 350, 192);
       fireResize();
 
       expect(mockPad.fromData).toHaveBeenCalledTimes(1);
       const replayed = mockPad.fromData.mock.calls[0][0];
-      expect(replayed[0].points).toEqual([
-        { x: 100, y: 96, time: 1000, pressure: 0.5 },
-        { x: 200, y: 192, time: 1001, pressure: 0.5 },
-      ]);
+      const pts = replayed[0].points;
+      expect(pts[0].x).toBeCloseTo(100 * 0.32 + 119); // 151
+      expect(pts[0].y).toBeCloseTo(300 * 0.32); // 96
+      expect(pts[1].x).toBeCloseTo(200 * 0.32 + 119); // 183
+      expect(pts[1].y).toBeCloseTo(600 * 0.32); // 192
+      // Same factor on both axes ⇒ the stroke's dx/dy proportions survive.
+      const scaleX = (pts[1].x - pts[0].x) / (200 - 100);
+      const scaleY = (pts[1].y - pts[0].y) / (600 - 300);
+      expect(scaleX).toBeCloseTo(scaleY);
+      // Non-coordinate point fields pass through untouched.
+      expect(pts[0]).toMatchObject({ time: 1000, pressure: 0.5 });
+      expect(pts[1]).toMatchObject({ time: 1001, pressure: 0.5 });
       // Group-level pen settings survive untouched.
       expect(replayed[0]).toMatchObject({
         penColor: "#15202e",
@@ -216,9 +227,16 @@ describe("SignatureCapture", () => {
         maxWidth: 2.4,
         compositeOperation: "source-over",
       });
+      // Everything stays on-canvas — the uploaded PNG must show the ink.
+      for (const p of pts) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(350);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThanOrEqual(192);
+      }
     });
 
-    it("keeps the signature intact across a fullscreen → collapsed → fullscreen round trip", () => {
+    it("keeps the signature undistorted and on-canvas across a fullscreen → collapsed → fullscreen round trip", () => {
       render(
         <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
       );
@@ -227,20 +245,35 @@ describe("SignatureCapture", () => {
       setCanvasSize(canvas, 350, 600);
       fireResize();
 
-      mockPad.toData.mockReturnValue([strokeGroup([{ x: 100, y: 300 }])]);
+      mockPad.toData.mockReturnValue([
+        strokeGroup([
+          { x: 100, y: 300 },
+          { x: 200, y: 600 },
+        ]),
+      ]);
       setCanvasSize(canvas, 350, 192);
       fireResize();
 
       // The pad now reports the collapsed-space strokes; expanding again must
-      // restore the original coordinates.
+      // keep the stroke's proportions (uniform scaling is not a perfect
+      // inverse when aspect ratios differ, so exact coordinates may shift —
+      // but the shape must never squash and the ink must stay visible).
       const collapsed = mockPad.fromData.mock.calls[0][0];
       mockPad.toData.mockReturnValue(collapsed);
       setCanvasSize(canvas, 350, 600);
       fireResize();
 
-      const restored = mockPad.fromData.mock.calls[1][0];
-      expect(restored[0].points[0].x).toBeCloseTo(100);
-      expect(restored[0].points[0].y).toBeCloseTo(300);
+      const restored = mockPad.fromData.mock.calls[1]![0];
+      const pts = restored[0].points;
+      const scaleX = (pts[1].x - pts[0].x) / (200 - 100);
+      const scaleY = (pts[1].y - pts[0].y) / (600 - 300);
+      expect(scaleX).toBeCloseTo(scaleY); // aspect ratio preserved end-to-end
+      for (const p of pts) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(350);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThanOrEqual(600);
+      }
     });
 
     it("does not rescale when the size is unchanged", () => {

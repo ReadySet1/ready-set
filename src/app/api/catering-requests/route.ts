@@ -10,6 +10,10 @@ import { randomUUID } from "crypto";
 import { Resend } from "resend";
 import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
 
+// Column-limit ceilings (from prisma/schema.prisma)
+const MAX_HEADCOUNT = 2147483647; // INT4 ceiling
+const MAX_DECIMAL_10_2 = new Decimal("99999999.99"); // Decimal(10,2) ceiling
+
 // Lazy initialization to avoid build-time errors when API key is not set
 const getResendClient = () => {
   if (!process.env.RESEND_API_KEY) {
@@ -29,8 +33,8 @@ const sendOrderConfirmationEmail = async (
     arrivalTime: Date;
     pickupAddress: string;
     deliveryAddress: string;
-    headcount: number;
-    orderTotal: string;
+    headcount: number | null;
+    orderTotal: string | null;
     orderId: string;
   }
 ) => {
@@ -56,12 +60,16 @@ const sendOrderConfirmationEmail = async (
     hour12: true,
   });
 
-  // Generate order details table
+  // Generate order details table (omit null fields rather than showing "null people" or "$null")
   const orderDetailsTable = generateDetailsTable([
     { label: 'Order Number', value: orderDetails.orderNumber },
     { label: 'Order Date', value: orderDateStr },
-    { label: 'Headcount', value: `${orderDetails.headcount} people` },
-    { label: 'Order Total', value: `$${orderDetails.orderTotal}` },
+    ...(orderDetails.headcount != null
+      ? [{ label: 'Headcount', value: `${orderDetails.headcount} people` }]
+      : []),
+    ...(orderDetails.orderTotal != null
+      ? [{ label: 'Order Total', value: `$${orderDetails.orderTotal}` }]
+      : []),
   ]);
 
   // Generate content
@@ -156,10 +164,8 @@ export async function POST(request: NextRequest) {
       "date",
       "pickupTime",
       "arrivalTime",
-      "headcount",
       "needHost",
       "clientAttention",
-      "orderTotal",
       "pickupAddress.id",
       "deliveryAddress.id",
     ];
@@ -196,6 +202,16 @@ export async function POST(request: NextRequest) {
     if (missingFields.length > 0) {
       return NextResponse.json(
         { message: `Missing required fields: ${missingFields.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // At least one of headcount / orderTotal must be provided
+    const headcountBlank = data.headcount === undefined || data.headcount === null || data.headcount === '';
+    const orderTotalBlank = data.orderTotal === undefined || data.orderTotal === null || data.orderTotal === '';
+    if (headcountBlank && orderTotalBlank) {
+      return NextResponse.json(
+        { message: "Provide at least one: Headcount or Order Total." },
         { status: 400 }
       );
     }
@@ -242,10 +258,82 @@ export async function POST(request: NextRequest) {
       ? new Date(localTimeToUtc(data.date, data.completeTime))
       : null;
 
-    // Convert numeric values
-    const headcount = parseInt(data.headcount, 10);
-    const orderTotal = new Decimal(data.orderTotal);
-    const tip = data.tip ? new Decimal(data.tip) : new Decimal(0);
+    // Convert numeric values — guard blank/null to produce explicit null (not NaN or throw)
+    const headcount = (data.headcount != null && data.headcount !== '')
+      ? Number(String(data.headcount))
+      : null;
+    if (headcount !== null && (!Number.isInteger(headcount) || headcount <= 0)) {
+      return NextResponse.json(
+        { message: "Headcount must be a positive integer" },
+        { status: 400 }
+      );
+    }
+    if (headcount !== null && (!Number.isSafeInteger(headcount) || headcount > MAX_HEADCOUNT)) {
+      return NextResponse.json(
+        { message: "Headcount is too large" },
+        { status: 400 }
+      );
+    }
+
+    let orderTotal: Decimal | null = null;
+    if (data.orderTotal != null && data.orderTotal !== '') {
+      try {
+        orderTotal = new Decimal(data.orderTotal);
+        if (!orderTotal.isFinite()) {
+          return NextResponse.json(
+            { message: "Order total must be a valid number" },
+            { status: 400 }
+          );
+        }
+        if (orderTotal.lte(0)) {
+          return NextResponse.json(
+            { message: "Order total must be positive" },
+            { status: 400 }
+          );
+        }
+        if (orderTotal.gt(MAX_DECIMAL_10_2)) {
+          return NextResponse.json(
+            { message: "Order total is too large" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Order total must be a valid number" },
+          { status: 400 }
+        );
+      }
+    }
+
+    let tip = new Decimal(0);
+    if (data.tip != null && data.tip !== '') {
+      try {
+        tip = new Decimal(data.tip);
+        if (!tip.isFinite()) {
+          return NextResponse.json(
+            { message: "Tip must be a valid number" },
+            { status: 400 }
+          );
+        }
+        if (tip.lt(0)) {
+          return NextResponse.json(
+            { message: "Tip cannot be negative" },
+            { status: 400 }
+          );
+        }
+        if (tip.gt(MAX_DECIMAL_10_2)) {
+          return NextResponse.json(
+            { message: "Tip is too large" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Tip must be a valid number" },
+          { status: 400 }
+        );
+      }
+    }
     
     let hoursNeeded = null;
     let numberOfHosts = null;
@@ -323,8 +411,8 @@ export async function POST(request: NextRequest) {
             arrivalTime: arrivalDateTime,
             pickupAddress: pickupAddressStr,
             deliveryAddress: deliveryAddressStr,
-            headcount: cateringRequest.headcount ?? 0,
-            orderTotal: cateringRequest.orderTotal?.toString() ?? '0.00',
+            headcount: cateringRequest.headcount ?? null,
+            orderTotal: cateringRequest.orderTotal?.toString() ?? null,
             orderId: cateringRequest.id,
           }
         );

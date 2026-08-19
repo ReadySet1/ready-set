@@ -985,7 +985,7 @@ export const CreateCateringOrderForm: React.FC<
 
           {/* Headcount */}
           <div className="space-y-2">
-            <Label htmlFor="headcount">Headcount (Optional)</Label>
+            <Label htmlFor="headcount">Headcount</Label>
             <Controller
               name="headcount"
               control={control}
@@ -1013,7 +1013,7 @@ export const CreateCateringOrderForm: React.FC<
 
           {/* Order Total */}
           <div className="space-y-2">
-            <Label htmlFor="orderTotal">Order Total (Optional)</Label>
+            <Label htmlFor="orderTotal">Order Total</Label>
             <Controller
               name="orderTotal"
               control={control}
@@ -1070,6 +1070,10 @@ export const CreateCateringOrderForm: React.FC<
               <p className="text-sm text-red-500">{errors.tip.message}</p>
             )}
           </div>
+
+          <p className="text-xs text-slate-500 md:col-span-2 lg:col-span-3">
+            Enter Headcount or Order Total — at least one is required.
+          </p>
         </div>
 
         {/* Host Needs Section */}

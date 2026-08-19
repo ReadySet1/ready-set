@@ -95,16 +95,30 @@ export function SignatureCapture({
         // replaying them verbatim onto a differently-sized canvas draws them
         // off-canvas (fullscreen → collapsed lost the whole signature in the
         // field). Rescale every point to the new dimensions before replaying.
+        //
+        // The scale factor must be UNIFORM — one `s` for both axes. The first
+        // fix scaled x and y independently (x·w/prevW, y·h/prevH), which
+        // squashed the fullscreen portrait signature ~8× vertically on
+        // collapse — and handleConfirm snapshots the CURRENT canvas, so the
+        // distorted PNG is what got persisted (2026-08-18 field failure).
+        // s = min(...) guarantees the whole ink box fits the new canvas, and
+        // centering the leftover space keeps it visible instead of pinned to
+        // the top-left corner.
         const rescale =
           prevW > 0 && prevH > 0 && (prevW !== w || prevH !== h)
-            ? strokes.map((group) => ({
-                ...group,
-                points: group.points.map((p) => ({
-                  ...p,
-                  x: (p.x * w) / prevW,
-                  y: (p.y * h) / prevH,
-                })),
-              }))
+            ? (() => {
+                const s = Math.min(w / prevW, h / prevH);
+                const offsetX = (w - prevW * s) / 2;
+                const offsetY = (h - prevH * s) / 2;
+                return strokes.map((group) => ({
+                  ...group,
+                  points: group.points.map((p) => ({
+                    ...p,
+                    x: p.x * s + offsetX,
+                    y: p.y * s + offsetY,
+                  })),
+                }));
+              })()
             : strokes;
         pad.fromData(rescale);
       }
