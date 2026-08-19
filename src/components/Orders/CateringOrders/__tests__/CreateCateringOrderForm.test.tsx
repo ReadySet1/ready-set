@@ -311,3 +311,86 @@ describe.skip("CreateCateringOrderForm Address Auto-Selection", () => {
     }
   });
 });
+
+// Mock the server action so it never fires during label / validation tests
+jest.mock(
+  "@/app/(backend)/admin/catering-orders/_actions/catering-orders",
+  () => ({
+    createCateringOrder: jest.fn(),
+  }),
+);
+
+// Mock next/navigation
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
+}));
+
+// Mock AddressSelector
+jest.mock("@/components/AddressSelector", () => ({
+  AddressSelector: () => <div data-testid="address-selector" />,
+}));
+
+// Mock use-upload-file hook
+jest.mock("@/hooks/use-upload-file", () => ({
+  useUploadFile: () => ({
+    onUpload: jest.fn().mockResolvedValue([]),
+    uploadedFiles: [],
+    progresses: {},
+    isUploading: false,
+    tempEntityId: "temp-123",
+    updateEntityId: jest.fn(),
+    deleteFile: jest.fn(),
+  }),
+}));
+
+// Mock use-toast
+jest.mock("@/components/ui/use-toast", () => ({
+  useToast: () => ({ toast: jest.fn() }),
+}));
+
+describe("CreateCateringOrderForm — headcount / orderTotal labels", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSupabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "tok", user: { id: "u1" } } },
+      error: null,
+    });
+  });
+
+  it("does not show (Optional) on Headcount or Order Total labels", () => {
+    render(<CreateCateringOrderForm clients={[]} />);
+
+    // The labels should read "Headcount" and "Order Total" without "(Optional)"
+    const headcountLabel = screen.getByText("Headcount");
+    const orderTotalLabel = screen.getByText("Order Total");
+
+    expect(headcountLabel).toBeInTheDocument();
+    expect(orderTotalLabel).toBeInTheDocument();
+
+    // Confirm "(Optional)" is NOT attached to these labels
+    expect(screen.queryByText("Headcount (Optional)")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Order Total (Optional)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still shows (Optional) on Tip and Complete Date & Time", () => {
+    render(<CreateCateringOrderForm clients={[]} />);
+
+    expect(screen.getByText("Tip (Optional)")).toBeInTheDocument();
+    // Complete Date & Time renders "(Optional)" in a child <span>,
+    // so check the parent label contains both fragments.
+    const completeDateLabel = screen.getByText(/Complete Date & Time/);
+    expect(completeDateLabel.textContent).toContain("(Optional)");
+  });
+
+  it("shows helper text about the at-least-one rule", () => {
+    render(<CreateCateringOrderForm clients={[]} />);
+
+    expect(
+      screen.getByText(
+        /enter headcount or order total.*at least one is required/i,
+      ),
+    ).toBeInTheDocument();
+  });
+});

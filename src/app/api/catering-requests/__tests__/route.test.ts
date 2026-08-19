@@ -277,17 +277,27 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("arrivalTime");
     });
 
-    it("should require headcount field", async () => {
-      const { headcount, ...dataWithoutHeadcount } = validCateringData;
+    it("should accept order with headcount only (no orderTotal)", async () => {
+      const { orderTotal, ...dataWithHeadcountOnly } = validCateringData;
 
       const request = createPostRequest(
         "http://localhost:3000/api/catering-requests",
-        dataWithoutHeadcount
+        dataWithHeadcountOnly
       );
 
       const response = await POST(request);
-      const data = await expectValidationError(response);
-      expect(data.message).toContain("headcount");
+      const data = await expectSuccessResponse(response, 201);
+      expect(data.message).toContain("created successfully");
+
+      // Verify null orderTotal reaches Prisma (not omitted, not 0)
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 50,
+            orderTotal: null,
+          }),
+        })
+      );
     });
 
     it("should require needHost field", async () => {
@@ -316,17 +326,142 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("clientAttention");
     });
 
-    it("should require orderTotal field", async () => {
-      const { orderTotal, ...dataWithoutOrderTotal } = validCateringData;
+    it("should accept order with orderTotal only (no headcount)", async () => {
+      const { headcount, ...dataWithOrderTotalOnly } = validCateringData;
 
       const request = createPostRequest(
         "http://localhost:3000/api/catering-requests",
-        dataWithoutOrderTotal
+        dataWithOrderTotalOnly
+      );
+
+      const response = await POST(request);
+      const data = await expectSuccessResponse(response, 201);
+      expect(data.message).toContain("created successfully");
+
+      // Verify null headcount reaches Prisma
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: null,
+            orderTotal: expect.any(Object), // Decimal
+          }),
+        })
+      );
+    });
+
+    it("should return 400 when both headcount and orderTotal are blank", async () => {
+      const { headcount, orderTotal, ...dataWithoutBoth } = validCateringData;
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithoutBoth
       );
 
       const response = await POST(request);
       const data = await expectValidationError(response);
-      expect(data.message).toContain("orderTotal");
+      expect(data.message).toContain("Provide at least one: Headcount or Order Total.");
+    });
+
+    it("should store null orderTotal when orderTotal is empty string", async () => {
+      const dataWithEmptyOrderTotal = {
+        ...validCateringData,
+        orderTotal: "",
+      };
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithEmptyOrderTotal
+      );
+
+      const response = await POST(request);
+      const data = await expectSuccessResponse(response, 201);
+
+      // headcount is 50, so at-least-one passes; orderTotal "" → null
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 50,
+            orderTotal: null,
+          }),
+        })
+      );
+    });
+
+    it("should return 400 when headcount is non-numeric", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: -5 }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is zero", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: 0 }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when orderTotal is non-numeric", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "not-a-number" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
+    });
+
+    it("should return 400 when orderTotal is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "-100" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be positive");
+    });
+
+    it("should return 400 when orderTotal is NaN string", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "NaN" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
+    });
+
+    it("should return 400 when orderTotal is Infinity string", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "Infinity" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total must be a valid number");
     });
 
     it("should require pickupAddress.id field", async () => {
@@ -699,6 +834,136 @@ describe("/api/catering-requests", () => {
           }),
         })
       );
+    });
+
+    // --- B1: headcount Number() + Number.isInteger() ---
+
+    it("should create with headcount 1000 when headcount is '1e3'", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "1e3" }
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            headcount: 1000,
+          }),
+        })
+      );
+    });
+
+    it("should return 400 when headcount is '5.9' (not an integer)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "5.9" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    it("should return 400 when headcount is '12abc' (trailing garbage)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "12abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount must be a positive integer");
+    });
+
+    // --- B3: headcount upper bound ---
+
+    it("should return 400 when headcount exceeds INT4 ceiling", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, headcount: "2147483648" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Headcount is too large");
+    });
+
+    // --- B2: tip guard ---
+
+    it("should return 400 when tip is 'abc' (not a 500)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "abc" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Tip must be a valid number");
+    });
+
+    it("should return 400 when tip is negative", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "-5" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Tip cannot be negative");
+    });
+
+    it("should create with tip 0 when tip is '0'", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, tip: "0" }
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tip: expect.objectContaining({ s: 1, e: 0 }), // Decimal(0)
+          }),
+        })
+      );
+    });
+
+    it("should create with tip 0 when tip is omitted", async () => {
+      const { tip, ...dataWithoutTip } = validCateringData as any;
+
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        dataWithoutTip
+      );
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 201);
+
+      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tip: expect.objectContaining({ s: 1, e: 0 }), // Decimal(0)
+          }),
+        })
+      );
+    });
+
+    // --- B3: orderTotal upper bound ---
+
+    it("should return 400 when orderTotal is '1e99' (too large)", async () => {
+      const request = createPostRequest(
+        "http://localhost:3000/api/catering-requests",
+        { ...validCateringData, orderTotal: "1e99" }
+      );
+
+      const response = await POST(request);
+      const data = await expectValidationError(response);
+      expect(data.message).toContain("Order total is too large");
     });
   });
 });
