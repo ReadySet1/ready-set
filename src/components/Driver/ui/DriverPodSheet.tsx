@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -32,6 +33,15 @@ export function DriverPodSheet({
   onComplete,
 }: DriverPodSheetProps) {
   const { resolved } = useDriverTheme();
+
+  // The step right before this sheet is a text input (pickup confirmation).
+  // Blur whatever still holds focus when the sheet opens so a lingering iOS
+  // keyboard / focus state can't swallow the first tap inside the sheet.
+  useEffect(() => {
+    if (open && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [open]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

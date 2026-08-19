@@ -286,17 +286,43 @@ describe('ProofOfDeliveryCapture', () => {
       expect(screen.getByText('Camera not available. You can select an existing photo instead.')).toBeInTheDocument();
     });
 
-    it('should request permission when Take Photo is clicked', async () => {
-      mockRequestPermission.mockResolvedValue(true);
+  });
 
+  describe('First-Tap Capture (iOS user-activation)', () => {
+    // Field bug (order RSQA-20260818-2347, iOS WKWebView): the first tap on
+    // "Take Photo" did nothing and only the second tap opened the camera.
+    // iOS only honors a programmatic file-input click inside the tap's
+    // transient user activation; awaiting a getUserMedia permission
+    // round-trip before calling input.click() consumes that activation.
+
+    it('opens the file picker synchronously on the first tap even while permission is unresolved', () => {
+      // A pending permission request must never gate the picker.
+      mockRequestPermission.mockReturnValue(new Promise(() => {})); // never resolves
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const clickSpy = jest.spyOn(input, 'click');
+
+      const takePhotoButton = screen.getByText('Take Photo').closest('button');
+      fireEvent.click(takePhotoButton!);
+
+      // Synchronous assertion — no waitFor: the click must fire inside the
+      // gesture, not after a microtask/permission round-trip.
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not run a getUserMedia round-trip from the tap', () => {
       render(<ProofOfDeliveryCapture {...defaultProps} />);
 
       const takePhotoButton = screen.getByText('Take Photo').closest('button');
       fireEvent.click(takePhotoButton!);
 
-      await waitFor(() => {
-        expect(mockRequestPermission).toHaveBeenCalled();
-      });
+      // The capture input prompts for camera access natively; a concurrent
+      // getUserMedia while the native camera sheet opens can fail with
+      // NotReadable/NotAllowed and wrongly flip the UI into a permission
+      // error even though the picker works fine.
+      expect(mockRequestPermission).not.toHaveBeenCalled();
     });
   });
 
