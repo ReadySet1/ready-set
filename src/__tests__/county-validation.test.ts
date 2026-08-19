@@ -100,4 +100,26 @@ describe("County validation for new service areas", () => {
     const result = vendorSchema.safeParse(data);
     expect(result.success).toBe(false);
   });
+
+  it("clientSchema rejects an invalid county", () => {
+    const data = {
+      userType: "client" as const,
+      contact_name: "Test Client",
+      email: "client@example.com",
+      phoneNumber: "415-555-5678",
+      password: "P@ssword1!",
+      company: "Test Corp",
+      street1: "456 Oak Ave",
+      city: "Test City",
+      state: "TX",
+      zip: "75001",
+      countiesServed: ["Nonexistent County"],
+      timeNeeded: ["Lunch"],
+      frequency: "1-5 per week",
+      head_count: "1-24",
+    };
+
+    const result = clientSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
 });
