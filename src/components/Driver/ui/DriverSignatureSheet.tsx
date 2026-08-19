@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { SignatureCapture } from "@/components/Driver/SignatureCapture";
+import { useVisualViewportInset } from "@/hooks/useVisualViewportInset";
 import { useDriverTheme } from "./DriverThemeProvider";
 
 interface DriverSignatureSheetProps {
@@ -31,6 +32,13 @@ export function DriverSignatureSheet({
   onComplete,
 }: DriverSignatureSheetProps) {
   const { resolved } = useDriverTheme();
+  // iOS WKWebView keyboard handling: the keyboard slides OVER this fixed
+  // bottom sheet without resizing the layout viewport (2026-08-18 field
+  // failure — the receiver-name input disappeared behind the keyboard and the
+  // driver had to close/reopen the sheet). Pad the scrollable content by the
+  // occluded height so the input and action buttons stay reachable. Scoped
+  // here on purpose — the shared sheet primitive stays untouched.
+  const keyboardInset = useVisualViewportInset();
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -40,6 +48,19 @@ export function DriverSignatureSheet({
           "driver-theme max-h-[90dvh] overflow-auto rounded-t-3xl border-driver-border bg-driver-surface",
           resolved === "dark" && "dark",
         )}
+        style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+        onFocusCapture={(event) => {
+          // With the padding in place there IS room below the keyboard, but
+          // WebKit doesn't auto-scroll inputs inside overflow containers.
+          // Delay past the keyboard slide-in so the visual viewport has its
+          // final size before we scroll.
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (!target.matches("input, textarea")) return;
+          window.setTimeout(() => {
+            target.scrollIntoView?.({ block: "center", behavior: "smooth" });
+          }, 300);
+        }}
       >
         <div className="mx-auto w-full max-w-2xl">
           <SheetHeader className="items-start">
