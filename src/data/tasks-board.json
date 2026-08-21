@@ -58,7 +58,11 @@
     "jul21": "Jul 21 planning",
     "aug3": "Aug 3 session",
     "aug10": "Aug 10",
-    "aug14walk": "Drive Tests 8/11–14"
+    "aug14walk": "Drive Tests 8/11–14",
+    "aug17": "Aug 17",
+    "aug18walk": "Drive Test 8/18",
+    "aug20": "Aug 20 session",
+    "aug20walk": "Drive Test 8/20"
   },
   "tasks": [
     {
@@ -123,7 +127,7 @@
     },
     {
       "id": "coolfire-bridge-api",
-      "status": "open",
+      "status": "done",
       "title": "Internal Website → Google Sheet → Coolfire bridge API",
       "owner": "emmanuel",
       "source": "may4",
@@ -131,7 +135,7 @@
       "tags": [
         "moot"
       ],
-      "description": "<strong>Superseded 2026-08-03:</strong> the Coolfire-sunset replacement path chosen at the 7/9–7/13 meetings is the <strong>sheet → orders import</strong> (<code>sheet-orders-sync</code> + <code>sheet-sync-decision-proof-prep</code>), pulling drives from the COOLFIRE MASTER UPLOAD sheet into our orders system — not a bridge API.<br><br>Keeping this card only until the import ships; if a direct Coolfire API integration ever revives, re-scope it then (see also <code>coolfire-api-docs</code>)."
+      "description": "<strong>Superseded 2026-08-03:</strong> the Coolfire-sunset replacement path chosen at the 7/9–7/13 meetings is the <strong>sheet → orders import</strong> (<code>sheet-orders-sync</code> + <code>sheet-sync-decision-proof-prep</code>), pulling drives from the COOLFIRE MASTER UPLOAD sheet into our orders system — not a bridge API.<br><br>Keeping this card only until the import ships; if a direct Coolfire API integration ever revives, re-scope it then (see also <code>coolfire-api-docs</code>).<br><br><strong>Closed 2026-08-17 (board audit):</strong> superseded by the sheet → orders import path (<code>sheet-orders-sync</code>); already tagged moot on 08-03."
     },
     {
       "id": "driver-tracking-sync",
@@ -152,21 +156,27 @@
     },
     {
       "id": "coolfire-api-docs",
-      "status": "open",
+      "status": "done",
       "title": "Review Coolfire API docs & scope endpoints",
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#2",
-      "description": "July transition target — clock is ticking."
+      "description": "July transition target — clock is ticking.<br><br><strong>Closed 2026-08-17 (board audit):</strong> moot with the bridge card — the 7/13 decision keeps the Coolfire uploader untouched and the replacement is the sheet → orders import.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "destino-square-integration",
-      "status": "open",
+      "status": "done",
       "title": "Integrate Destino via Square backend",
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#3",
-      "description": "This week's Destino work was firefighting (stability/auth/deps), not the Square→ReadySet order API."
+      "description": "This week's Destino work was firefighting (stability/auth/deps), not the Square→ReadySet order API.<br><br><strong>Closed 2026-08-17 (board audit):</strong> Destino SF is PAUSED (James has not paid the pending invoices, 08-17); this card dies with the pause — revisit only if the project resumes. Was also in the 7/13 parking lot.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "fresh-rolls-review",
@@ -179,12 +189,15 @@
     },
     {
       "id": "consult-james-catercow",
-      "status": "open",
+      "status": "done",
       "title": "Consult James — Destino + existing CaterCow link?",
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#5",
-      "description": "Gary planned to chat with him this week as well."
+      "description": "Gary planned to chat with him this week as well.<br><br><strong>Closed 2026-08-17 (board audit):</strong> Destino SF is PAUSED (James has not paid the pending invoices, 08-17); this card dies with the pause — revisit only if the project resumes. Was also in the 7/13 parking lot.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "princess-payment-reconcile",
@@ -206,7 +219,7 @@
     },
     {
       "id": "verify-twilio-region-isolation",
-      "status": "open",
+      "status": "done",
       "title": "Verify Twilio per-region isolation",
       "owner": "fernando",
       "source": "may4",
@@ -214,7 +227,7 @@
       "tags": [
         "moot"
       ],
-      "description": "Likely moot if Telnyx is approved; confirm equivalent in Telnyx evaluation instead."
+      "description": "Likely moot if Telnyx is approved; confirm equivalent in Telnyx evaluation instead.<br><br><strong>Closed 2026-08-17 (board audit):</strong> moot — the provider decision consolidated into <code>sms-provider-final-call</code> (Telnyx recommendation)."
     },
     {
       "id": "rea-342-soft-delete-orders",
@@ -278,11 +291,14 @@
     },
     {
       "id": "contact-james-trial",
-      "status": "new",
+      "status": "done",
       "title": "Contact James — order processing trial",
       "owner": "gary",
       "source": "may11",
-      "description": "Reach out this week to coordinate a trial for order processing using the new integration. James is the pilot client."
+      "description": "Reach out this week to coordinate a trial for order processing using the new integration. James is the pilot client.<br><br><strong>Closed 2026-08-17 (board audit):</strong> Destino SF is PAUSED (James has not paid the pending invoices, 08-17); the trial dies with the pause — revisit only if the project resumes.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "james-payment-plan",
@@ -290,7 +306,7 @@
       "title": "Create payment plan for James",
       "owner": "gary",
       "source": "may11",
-      "description": "Establish a schedule for James to pay outstanding invoices — funds additional testing resources."
+      "description": "Establish a schedule for James to pay outstanding invoices — funds additional testing resources.<br><br><strong>Update 2026-08-17:</strong> still ACTIVE — this is now the collection vehicle: Destino was paused 08-17 over these unpaid invoices, so the payment plan is the path back."
     },
     {
       "id": "kco-calculator-scope",
@@ -397,15 +413,18 @@
       "title": "Vendor multi-pickup-location support",
       "owner": "emmanuel",
       "source": "may19",
-      "description": "Implement multiple pickup locations per vendor. Test with Fresh (3 locations). Fresh is lenient on expectations since the company uses the product themselves."
+      "description": "Implement multiple pickup locations per vendor. Test with Fresh (3 locations). Fresh is lenient on expectations since the company uses the product themselves.<br><br><strong>Update 2026-08-17:</strong> in the 7/13 PARKING LOT (test with Fresh when revived)."
     },
     {
       "id": "fernando-ux-report-fixes",
-      "status": "progress",
+      "status": "done",
       "title": "Address Fernando's UX report",
       "owner": "emmanuel",
       "source": "may19",
-      "description": "Triage + ship fixes from the UX report Fernando provided. In progress per Emmanuel's May 19 update."
+      "description": "Triage + ship fixes from the UX report Fernando provided. In progress per Emmanuel's May 19 update.<br><br><strong>Closed 2026-08-17 (board audit):</strong> superseded — the May UX report predates the full driver redesign (#434), the v2 restyle (#472) and the Jun–Aug walk-test fix waves; anything still valid has been re-found and carded since.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "christino-demo-prep",
@@ -413,7 +432,7 @@
       "title": "Prepare Christino demo endpoint (deferred to next week)",
       "owner": "emmanuel",
       "source": "may19",
-      "description": "First version of the ordering system is functional on the testing site (local mode). Gary deferred today's demo to focus the Christino 2:00 meeting on financials; demo to land next week."
+      "description": "First version of the ordering system is functional on the testing site (local mode). Gary deferred today's demo to focus the Christino 2:00 meeting on financials; demo to land next week.<br><br><strong>Update 2026-08-17:</strong> moved to the PARKING LOT at the 7/13 meeting — not active work; revive only if Gary re-prioritizes."
     },
     {
       "id": "rea-367-realtime-channel-off-cleanup",
@@ -459,7 +478,7 @@
       "title": "Self-host the error-tracking app on the VPS",
       "owner": "emmanuel",
       "source": "jun1",
-      "description": "The free hosted error-tracking tier hit its event-capture limit. Relocate the error-tracking app to the dedicated VPS to remove usage caps. Part of the Vercel → VPS migration."
+      "description": "The free hosted error-tracking tier hit its event-capture limit. Relocate the error-tracking app to the dedicated VPS to remove usage caps. Part of the Vercel → VPS migration.<br><br><strong>Update 2026-08-17:</strong> confirmed still pending — Sentry remains in <code>package.json</code>; GlitchTip exists only on Emmanuel&rsquo;s personal box, not ReadySet infra. Rides the Vercel → VPS migration."
     },
     {
       "id": "driver-photo-signature-required",
@@ -505,11 +524,14 @@
     },
     {
       "id": "gary-screenshot-layout-errors",
-      "status": "new",
+      "status": "done",
       "title": "Capture screenshots of layout problems / errors",
       "owner": "gary",
       "source": "jun1",
-      "description": "Gary to capture and provide screenshots of any layout issues or errors encountered while using the app, to feed the bug queue."
+      "description": "Gary to capture and provide screenshots of any layout issues or errors encountered while using the app, to feed the bug queue.<br><br><strong>Closed 2026-08-17 (board audit):</strong> superseded by structured QA: the web-mobile test matrix, the CDMX drive-test series and the QA board.",
+      "tags": [
+        "moot"
+      ]
     },
     {
       "id": "fernando-verify-driver-pay",
@@ -566,7 +588,26 @@
       "title": "Hire Robert for QA testing",
       "owner": "gary",
       "source": "jun8",
-      "description": "<strong>Decision aligned Jun 8.</strong> Robert approved for hire to handle QA testing (Emmanuel has worked with him before — more proactive than Fernando). Gary to contact Mark to authorize bringing him on. Pairs with the 35–40 hr/wk budget under Emmanuel's management (<code>manage-dev-budget</code>) and Fernando's transition out of the dev role."
+      "description": "<strong>Decision aligned Jun 8.</strong> Robert approved for hire to handle QA testing (Emmanuel has worked with him before — more proactive than Fernando). Gary to contact Mark to authorize bringing him on. Pairs with the 35–40 hr/wk budget under Emmanuel's management (<code>manage-dev-budget</code>) and Fernando's transition out of the dev role.<br><br><strong>Update 2026-08-17:</strong> Mark + Gary conditioned the hire on James (Destino SF owner) paying his pending invoices; James never paid, <strong>Destino is paused and Robert was never hired</strong>. Decision re-queued for Gary at the 8/17 weekly (D3): un-gate the hire for the Ready Set deliveries app anyway — the new weekly 3-round test cadence with Fernando and the Android coverage gap (<code>android-test-coverage</code>) both need a dedicated QA owner."
+    },
+    {
+      "id": "android-test-coverage",
+      "status": "open",
+      "title": "Android test coverage for the native wrapper",
+      "owner": "emmanuel",
+      "source": "aug17",
+      "description": "The Android APK with the zero-redirect entry fix (prerelease <code>native-walk-test-apk-2026-08-13</code>) is <strong>device-unverified</strong> — nobody on the team currently has an Android device (Fernando is on an iPhone X).<br><br><strong>Plan, cheapest first:</strong> (1) emulator smoke test of the <code>/native-launch</code> entry + sign-in flow with mocked GPS — verifies the entry fix, <em>not</em> the background walk; (2) ask Aziel to sideload the APK on the Redmi (installs from the file, no adb needed) to verify the entry fix on real hardware; (3) ask <strong>Mark</strong> whether he has an Android phone to borrow for the locked-screen background-GPS walk; (4) if Robert's hire is un-gated (<code>hire-robert-qa</code>), fold the Android walk into his onboarding; (5) consider buying a ~$100 test device (Moto G / Redmi) as permanent team hardware.<br><br><strong>Pass bar for the walk</strong> (same as iOS, per <code>persistent-gps-background</code>): no trail gap &gt;~30s over a 15–20 min locked-screen/Waze-in-front walk; if Android drops points, evaluate the paid transistorsoft plugin (OEM battery killers)."
+    },
+    {
+      "id": "web-mobile-round1-findings-triage",
+      "status": "open",
+      "title": "Triage + fix the 5 findings from Fernando's mobile test round 1",
+      "owner": "emmanuel",
+      "source": "aug17",
+      "tags": [
+        "bug"
+      ],
+      "description": "Fernando's full-round report (2026-08-17, iPhone X / iOS 16.7.16 / Safari / LTE) — Group W clean end-to-end, 5 findings need triage: <strong>C11</strong> (FAIL-GATE) no feet/miles shown after completing the walk; <strong>C4</strong> dark-mode signature-pad strokes invisible while signing; <strong>C6</strong> POD photo uploads but doesn't render on the driver dashboard completed-order screen; <strong>F1</strong> client sign-up onboarding modal can't be closed on mobile without a hard refresh; <strong>F3</strong> public track-order page needs horizontal scrolling on mobile.<br><br>Triage leads: C4 → re-check on the current dev build (his round may predate the #512/#513 signature rework); C6 → verify against the #506 bucket-split fix (different read surface?); C11 → mileage/units path (<code>src/lib/units.ts</code>). F1/F3 are client-facing, new. Full summary + email refs: <code>docs/ready-set/reports/2026-08-17-web-mobile-test-round1-results.md</code>. ⚠️ Download the 13K result-log attachment from Gmail into <code>reports/</code> for the per-case detail."
     },
     {
       "id": "manage-dev-budget",
@@ -622,7 +663,7 @@
       "title": "Review James's documents + provide feedback",
       "owner": "gary",
       "source": "jun8",
-      "description": "Analyze the documents James provided and give feedback (Gary committed \"by tomorrow\" on Jun 8; was delayed by the Will lawsuit). Relates to the James order-processing pilot (<code>contact-james-trial</code>, <code>james-payment-plan</code>)."
+      "description": "Analyze the documents James provided and give feedback (Gary committed \"by tomorrow\" on Jun 8; was delayed by the Will lawsuit). Relates to the James order-processing pilot (<code>contact-james-trial</code>, <code>james-payment-plan</code>).<br><br><strong>Update 2026-08-17:</strong> kept active — relevant to the collection/pause situation (Destino paused 08-17 over unpaid invoices)."
     },
     {
       "id": "gary-file-lawsuit-will",
@@ -896,7 +937,7 @@
       "title": "Collect outstanding Destino payment (unblocks the QA hire)",
       "owner": "gary",
       "source": "jul13",
-      "description": "QA support (Mark / Robert) is contingent on collecting the outstanding funds from Destino; Gary requests payment this week. Gates <code>hire-robert-qa</code>."
+      "description": "QA support (Mark / Robert) is contingent on collecting the outstanding funds from Destino; Gary requests payment this week. Gates <code>hire-robert-qa</code>.<br><br><strong>Update 2026-08-17:</strong> reframed — the collection ask stands (James unpaid → Destino paused 08-17), but it no longer gates the QA hire: Robert&rsquo;s hire is its own D3 decision for Gary (<code>hire-robert-qa</code>)."
     },
     {
       "id": "webview-session-divergence",
@@ -995,11 +1036,11 @@
     },
     {
       "id": "web-mobile-test-round1",
-      "status": "progress",
+      "status": "done",
       "title": "Web app mobile testing round 1 (Fernando, iPhone X/Safari)",
       "owner": "fernando",
       "source": "aug3",
-      "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted."
+      "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted.<br><br><strong>COMPLETE 2026-08-17:</strong> Fernando delivered the full-round report (email 3:33 PM). Session 1 (Aug 6 walking run): W1–W10 all PASS; its two findings became <a href=\"https://github.com/ReadySet1/ready-set/issues/508\">#508</a> (shipped as #515/#516) and the tab-bar fix. Session 2 (full matrix): Group W clean again; <strong>5 new findings</strong> → triage card <code>web-mobile-round1-findings-triage</code>. Summary: <code>docs/ready-set/reports/2026-08-17-web-mobile-test-round1-results.md</code>."
     },
     {
       "id": "ci-test-failure-masking",
@@ -1126,6 +1167,120 @@
       "owner": "fernando",
       "source": "aug10",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>Complete the web app mobile testing matrix covering sections A through H. This is a QA deliverable rather than a code change.<br><br>Coordinate with the existing QA board so results feed the same reporting path, and consider linking finished sections back to QA test keys via <code>relatedQa</code> once they exist."
+    },
+    {
+      "id": "signature-rescale-distortion",
+      "status": "done",
+      "title": "Pickup signature persisted distorted after fullscreen → collapsed resize",
+      "owner": "emmanuel",
+      "source": "aug18walk",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Found on the 2026-08-18 CDMX drive (RSQA-20260818-2347). Drawing in the fullscreen pad and tapping <strong>Done</strong> squashes the signature: <code>SignatureCapture.tsx</code> <code>applySize()</code> rescales stroke points with <em>independent</em> x/y factors (<code>x*w/prevW</code>, <code>y*h/prevH</code>), and fullscreen (tall canvas) → collapsed (<code>h-48</code>) crushes Y ~8×. The upload snapshots the collapsed canvas, so the <strong>distorted PNG is what gets stored and shown to admins</strong> (verified against the delivery-proofs bucket for RSQA-20260818-2347).<br><br>Fix: uniform scale (<code>min(w/prevW, h/prevH)</code>) + centering on replay, or re-render the upload from stroke data at drawn proportions. Data-corrupting, so first of the 8/18 batch. <br><br><strong>VERIFIED FIXED</strong> on-device by Fernando on the 2026-08-20 León drive (order <code>Test 0820261</code>), on the dev build carrying PR #521 (merged 2026-08-19)."
+    },
+    {
+      "id": "pickup-sheet-keyboard-overlap",
+      "status": "done",
+      "title": "iOS keyboard overlaps the Confirm-pickup sheet",
+      "owner": "emmanuel",
+      "source": "aug18walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Found on the 2026-08-18 CDMX drive. Focusing the <em>Received / confirmed by</em> input in the Confirm-pickup sheet brings up the iOS keyboard over the sheet UI, garbling the layout; the driver has to close and reopen the sheet to recover. The pad already survives keyboard-triggered resizes (ResizeObserver work), but the sheet layout has no keyboard-inset handling — needs <code>visualViewport</code>/keyboard-inset-aware positioning or scroll-into-view for the focused field in the WKWebView. <br><br><strong>VERIFIED FIXED</strong> on-device by Fernando on the 2026-08-20 León drive (order <code>Test 0820261</code>), on the dev build carrying PR #521 (merged 2026-08-19)."
+    },
+    {
+      "id": "pod-take-photo-double-tap",
+      "status": "done",
+      "title": "Proof-of-delivery “Take Photo” needs two taps",
+      "owner": "emmanuel",
+      "source": "aug18walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Found on the 2026-08-18 CDMX drive. On the Proof of delivery sheet, the first tap on <strong>Take Photo</strong> did nothing; only the second tap opened the camera. Likely the first tap is consumed dismissing keyboard/focus state left over from the flow (same WKWebView family as the keyboard-overlap bug). Reproduce with an input focused beforehand and check for a stray blur/overlay eating the first touch. <br><br><strong>VERIFIED FIXED</strong> on-device by Fernando on the 2026-08-20 León drive (order <code>Test 0820261</code>), on the dev build carrying PR #521 (merged 2026-08-19)."
+    },
+    {
+      "id": "wrapper-post-login-safari-bounce",
+      "status": "open",
+      "title": "Wrapper: successful sign-in opens Safari alongside the app",
+      "owner": "emmanuel",
+      "source": "aug18walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Seen 2026-08-18 in the renewed iOS wrapper: entry via <code>/native-launch</code> is clean, but after submitting sign-in the phone opens Safari while the WebView also completes login (user returns to the app already signed in). Suspect the post-auth <code>window.location.href</code> navigation in <code>src/components/Auth/SignIn/index.tsx</code> escaping the WebView. Need the URL from the Safari tab to pin the escaping navigation; distinct from the (fixed) entry-redirect bounce of PR #514."
+    },
+    {
+      "id": "apex-tls-default-cert",
+      "status": "done",
+      "title": "Apex readysetllc.com served Traefik default cert after DNS cutover",
+      "owner": "emmanuel",
+      "source": "aug20",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Found 2026-08-20: <code>https://readysetllc.com</code> was serving Traefik's self-signed default cert since the 08-18 cutover (LE issuance failed at 08-19 01:57, apex A record had just flipped so ACME still saw the old Vercel IP; <code>www</code>/<code>app</code> issued fine seconds apart). Fixed same day: Dokploy Traefik reload re-triggered ACME, apex now has a valid Let's Encrypt cert (expires 2026-11-18) and strict-TLS requests pass. Reinforces the pending uptime-monitoring card — a cert check on the apex would have caught this within minutes."
+    },
+    {
+      "id": "fernando-0820-gps-zero-drive",
+      "status": "done",
+      "title": "08-20 drive: delivery flow passed but zero GPS points (0.00 mi shift)",
+      "owner": "emmanuel",
+      "source": "aug20",
+      "tags": [
+        "bug"
+      ],
+      "description": "Fernando's 2026-08-20 rs-dev drive completed the delivery flow end-to-end (picked up 5:33 PM, delivered 5:46 PM, pickup signature + POD photo stored) but produced <strong>zero GPS points</strong> for the whole shift — live map empty, shift closed at 0.00 mi. Prime suspect: he logged in with <code>cromo181@yahoo.com</code>, whose driver row is <code>is_active=false</code>, and the app silently drops location updates for inactive drivers (the account set up for him, <code>fernando.driver@readysetllc.com</code>, is active).<br><br><strong>Follow-up SENT 2026-08-21</strong> — Slack message to Fernando with 5 questions: account used, location-permission prompt / error banners, web vs installed app (+ browser/URL), end-of-shift mileage shown, and whether the 3 PR #521 fixes (signature not stretched, keyboard clear of the confirm-pickup sheet, first-tap camera) were noticeable in that build. <strong>Awaiting his reply</strong> — the account and permission answers gate the repro. Fix side to evaluate once confirmed: an inactive-driver drop should at minimum surface a tracking-off state to the driver instead of failing silently. <br><br><strong>ANSWERED 2026-08-21.</strong> Fernando confirmed: logged in with <code>cromo181@yahoo.com</code>, <strong>no error or banner shown</strong>, location permission granted, Safari web on <code>development.readysetllc.com</code>, and no mileage displayed. Diagnosis confirmed and split into two engineering cards — <code>driver-inactive-blocks-gps-writes</code> (the <code>is_active</code> gate on <code>POST /api/tracking/locations</code>) and <code>driver-tracking-failure-silent</code> (the client swallowing the 403). He also verified all three PR #521 fixes on-device. This card is closed as the diagnostic ask; the fixes live on the two new cards."
+    },
+    {
+      "id": "driver-inactive-blocks-gps-writes",
+      "status": "new",
+      "title": "Inactive driver can run a full shift but every GPS point is rejected",
+      "owner": "emmanuel",
+      "source": "aug20walk",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Found on the 2026-08-20 León drive (Fernando, shift <code>3a9c4725</code>, order <code>Test 0820261</code>). He drove on <code>cromo181@yahoo.com</code>, whose <code>drivers</code> row has <code>is_active = false</code>. <code>POST /api/tracking/locations</code> gates its ownership check on <code>AND is_active = true</code> (<code>route.ts:118-125</code>) and <strong>403s every location point</strong> — <code>driver_locations</code> ended with 0 rows, shift mileage 0.00 mi, admin live map blank for the whole shift.<br><br>The gate is <em>inconsistent</em>: starting a shift and advancing every delivery stage worked fine (the <code>is_active</code> check in <code>delivery-actions.ts:36-44</code> only guards admin assignment), so an inactive driver can complete a delivery end-to-end while producing no tracking data at all. Decide the invariant: either an inactive driver cannot start a shift, or location writes stop requiring <code>is_active</code>."
+    },
+    {
+      "id": "driver-tracking-failure-silent",
+      "status": "new",
+      "title": "Driver app never surfaces failed location writes",
+      "owner": "emmanuel",
+      "source": "aug20walk",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Same 2026-08-20 drive. Fernando granted location permission, saw <strong>no error, warning, or banner</strong>, and completed a full shift believing tracking worked — while every point was being rejected server-side. <code>useLocationTracking.ts:243-253</code> posts to <code>/api/tracking/locations</code> and swallows the non-OK response.<br><br>Needs a visible driver-side state when N consecutive location writes fail (403/401/5xx): persistent banner on the driver screen, and ideally a block or loud warning at shift start. A tracking system that fails silently is worse than one that fails loudly — the whole walk produced no usable data and nobody knew until the DB was inspected the next day."
+    },
+    {
+      "id": "driver-history-stale-weekly-summaries",
+      "status": "new",
+      "title": "Driver History shows zeros — stale weekly summaries override live shifts",
+      "owner": "emmanuel",
+      "source": "aug20walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Screenshot from Fernando 2026-08-21: <em>Your history</em> reports <strong>0 Total Shifts / 0 Deliveries / 0.0 Total Miles / 0h</strong> for May 24 – Aug 20, although his 08-20 shift is COMPLETED in the DB with <code>delivery_count = 1</code>.<br><br><code>GET /api/drivers/[driverId]/history</code> computes period totals from <code>driver_weekly_summaries</code> first and only falls back to live shift/delivery rows when <code>summaries.length === 0</code> (<code>route.ts:177</code>). His driver has 10 <em>zero-valued</em> summary rows in the window, so the fallback never fires and the stale zeros win. Fix the condition to per-week coverage: any week in range without a fresh summary should be computed from shifts.<br><br><strong>Blocks QA signal:</strong> <code>fernando.driver@readysetllc.com</code> (driver <code>c509f094</code>) carries the same 10 zero rows, so a correct GPS run still shows zeros on this screen until this lands or the rows are cleared on rs-dev."
+    },
+    {
+      "id": "enable-vps-crons",
+      "status": "new",
+      "title": "Scheduled jobs not running since the Dokploy cutover",
+      "owner": "emmanuel",
+      "source": "aug20walk",
+      "tags": [
+        "bug"
+      ],
+      "description": "Surfaced while diagnosing the History zeros: <code>driver_weekly_summaries</code> on rs-dev has no row past <code>week_start 2026-08-03</code>, last written <code>2026-08-16 04:00</code> — <code>src/jobs/driverSummaryGeneration.ts</code> has not run since. Matches the still-open post-cutover item &quot;enable prod crons&quot; from the 08-18 DNS migration. Audit every scheduled job that used to run on Vercel, re-create them on the Dokploy side, and verify one full cycle on dev before prod."
     }
   ]
 }
