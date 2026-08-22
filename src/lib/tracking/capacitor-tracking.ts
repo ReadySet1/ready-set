@@ -24,6 +24,11 @@ import type {
   Location,
   CallbackError,
 } from '@capacitor-community/background-geolocation';
+import {
+  createMotionState,
+  nextMotionState,
+  type MotionState,
+} from './motion-state';
 
 // v1.x exposes only the plugin TYPE; the runtime object is obtained via
 // Capacitor's registerPlugin, which binds to the native implementation inside
@@ -60,6 +65,8 @@ export function setNativePostThrottleMs(throttleMs: number): void {
 let watcherId: string | null = null;
 let lastPostAt = 0;
 let cachedDriverId: string | null = null;
+// Per-session moving/stopped hysteresis (src/lib/tracking/motion-state.ts).
+let motionState: MotionState = createMotionState();
 
 /** True only inside the Capacitor native shell — false in any web browser. */
 export function isNativeTrackingAvailable(): boolean {
@@ -124,6 +131,7 @@ export async function stopNativeShiftTracking(): Promise<void> {
     watcherId = null;
     lastPostAt = 0;
     cachedDriverId = null;
+    motionState = createMotionState();
   }
 }
 
@@ -137,6 +145,7 @@ async function postLocation(
   driverId: string,
   token: string,
 ): Promise<void> {
+  motionState = nextMotionState(motionState, location.speed);
   try {
     await fetch('/api/tracking/locations', {
       method: 'POST',
@@ -152,7 +161,7 @@ async function postLocation(
         speed: location.speed ?? undefined,
         heading: location.bearing ?? undefined,
         altitude: location.altitude ?? undefined,
-        is_moving: (location.speed ?? 0) > 1,
+        is_moving: motionState.isMoving,
       }),
     });
   } catch {
