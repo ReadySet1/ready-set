@@ -18,14 +18,22 @@ jest.mock('@/utils/supabase/server');
 jest.mock('@/services/notifications/delivery-status', () => ({
   sendDispatchStatusNotification: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('@/services/notifications/driver-cancellation', () => ({
+  notifyDriverOrderCancelled: jest.fn().mockResolvedValue({ sms: 'sent' }),
+}));
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/utils/prismaDB';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
+import { notifyDriverOrderCancelled } from '@/services/notifications/driver-cancellation';
 
 const mockedPrisma = jest.mocked(prisma);
 const mockedCreateClient = jest.mocked(createClient);
 const mockedCreateAdminClient = jest.mocked(createAdminClient);
+const mockedNotifyDriver = jest.mocked(notifyDriverOrderCancelled);
+
+/** The realtime channel handed out by the mocked admin client (per setupMocks). */
+let lastChannel: { send: jest.Mock; subscribe: jest.Mock };
 
 const createMockOrder = (overrides: Record<string, unknown> = {}) => ({
   id: 'order-123',
@@ -96,10 +104,38 @@ const setupMocks = (
       return mockChannel;
     }),
   };
+  lastChannel = mockChannel;
   mockedCreateAdminClient.mockResolvedValue({
     channel: jest.fn().mockReturnValue(mockChannel),
     removeChannel: jest.fn().mockResolvedValue(undefined),
   } as any);
+};
+
+const expectDriverNotified = (orderType: 'catering' | 'on_demand') => {
+  expect(mockedNotifyDriver).toHaveBeenCalledTimes(1);
+  expect(mockedNotifyDriver).toHaveBeenCalledWith(
+    expect.objectContaining({
+      driverProfileId: 'driver-456',
+      phone: '555',
+      orderNumber: 'Test 0821261',
+      orderType,
+    }),
+  );
+
+  expect(lastChannel.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'broadcast',
+      event: 'delivery:status:updated',
+      payload: expect.objectContaining({
+        driverId: 'driver-456',
+        orderId: 'order-123',
+        orderNumber: 'Test 0821261',
+        orderType,
+        status: 'CANCELLED',
+        timestamp: expect.any(String),
+      }),
+    }),
+  );
 };
 
 const importRoute = async () => import('../route');
@@ -182,5 +218,78 @@ describe('Orders API PATCH — cancel cascade', () => {
 
     expect(mockedPrisma.dispatch.deleteMany as jest.Mock).not.toHaveBeenCalled();
     expect(mockedPrisma.delivery.updateMany as jest.Mock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Orders API PATCH — driver cancellation notification', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('texts and broadcasts to the assigned driver when a catering order is cancelled', async () => {
+    setupMocks('catering');
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    expect(res.status).toBe(200);
+    expectDriverNotified('catering');
+  });
+
+  it('texts and broadcasts to the assigned driver when an on-demand order is cancelled', async () => {
+    setupMocks('on_demand');
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    expect(res.status).toBe(200);
+    expectDriverNotified('on_demand');
+  });
+
+  it('does NOT notify the driver on a non-cancel status change', async () => {
+    setupMocks('catering', { status: 'ACTIVE', driverStatus: null });
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'ASSIGNED' }), params);
+
+    expect(res.status).toBe(200);
+    expect(mockedNotifyDriver).not.toHaveBeenCalled();
+    expect(lastChannel.send).not.toHaveBeenCalled();
+  });
+
+  it('does NOT notify anyone when the cancelled order has no driver', async () => {
+    setupMocks('catering', { dispatches: [] });
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    expect(res.status).toBe(200);
+    expect(mockedNotifyDriver).not.toHaveBeenCalled();
+    expect(lastChannel.send).not.toHaveBeenCalled();
+  });
+
+  it('still returns 200 when the SMS notifier rejects', async () => {
+    setupMocks('catering');
+    mockedNotifyDriver.mockRejectedValueOnce(new Error('twilio down'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    expect(res.status).toBe(200);
+    expect(mockedNotifyDriver).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
+  it('still returns 200 when the realtime broadcast fails', async () => {
+    setupMocks('catering');
+    lastChannel.send.mockRejectedValue(new Error('channel down'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { PATCH } = await importRoute();
+
+    const res = await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    expect(res.status).toBe(200);
+    errorSpy.mockRestore();
   });
 });

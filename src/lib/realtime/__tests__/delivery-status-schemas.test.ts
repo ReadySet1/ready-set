@@ -26,6 +26,8 @@ describe('DeliveryTrackingStatusSchema', () => {
     'EN_ROUTE_TO_CLIENT',
     'ARRIVED_TO_CLIENT',
     'COMPLETED',
+    // Dispatch-side cancellation alert for the assigned driver (2026-08-22).
+    'CANCELLED',
   ];
 
   it.each(validStatuses)('should accept valid status: %s', (status) => {
@@ -37,7 +39,7 @@ describe('DeliveryTrackingStatusSchema', () => {
     const invalidStatuses = [
       'PENDING',
       'IN_PROGRESS',
-      'CANCELLED',
+      'DELIVERED',
       'invalid',
       '',
       null,
