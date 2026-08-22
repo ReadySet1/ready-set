@@ -49,6 +49,9 @@ const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
 // Driver→Order status mapping is owned by the state machine; see
 // src/lib/state-machine/driver-state.ts (deriveOrderStatusFromDriver).
 
+// Terminal `deliveries` mirror statuses — the cancel cascade leaves these alone.
+const TERMINAL_DELIVERY_STATUSES = ['COMPLETED', 'CANCELLED', 'DELIVERED'] as const;
+
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
   DriverStatus.EN_ROUTE_TO_VENDOR,
@@ -744,6 +747,29 @@ export async function PATCH(
             },
             fileUploads: true,
           },
+        });
+      }
+
+      // Cancel cascade (2026-08-21 drive finding #8): an admin cancel used to
+      // leave the driver-side rows alive — `dispatches` kept, `deliveries`
+      // mirror still ASSIGNED — so the end-shift guard deadlocked the driver.
+      // Same transaction: drop the dispatch rows and close the live mirror
+      // rows. The order row itself keeps driverStatus as-is (the enum has no
+      // CANCELLED value); every consumer checks `status` first.
+      if (updateData.status === 'CANCELLED') {
+        await tx.dispatch.deleteMany({
+          where:
+            orderType === 'catering'
+              ? { cateringRequestId: updated.id }
+              : { onDemandId: updated.id },
+        });
+        await tx.delivery.updateMany({
+          where: {
+            orderNumber: dbOrderNumber,
+            deletedAt: null,
+            status: { notIn: [...TERMINAL_DELIVERY_STATUSES] },
+          },
+          data: { status: 'CANCELLED', cancelledAt: new Date() },
         });
       }
 

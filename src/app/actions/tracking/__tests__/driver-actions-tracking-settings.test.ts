@@ -92,8 +92,13 @@ function mockEndShiftQueries(blockingCount: bigint) {
     if (sql.includes("FROM driver_shifts")) {
       return Promise.resolve([{ driver_id: DRIVER_ID, status: "active" }]);
     }
-    if (sql.includes("AS n")) {
-      return Promise.resolve([{ n: blockingCount }]);
+    if (sql.includes("end-shift-blockers")) {
+      return Promise.resolve(
+        Array.from({ length: Number(blockingCount) }, (_, i) => ({
+          order_number: `ORD-${i + 1}`,
+          reason: "ACTIVE_DELIVERY",
+        })),
+      );
     }
     return Promise.resolve([]);
   });
@@ -126,7 +131,7 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.activeDeliveries).toBe(2);
 
     const blockingCall = mockQueryRaw.mock.calls.find(
-      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
     );
     expect(blockingCall).toBeDefined();
     const [sql, ...params] = blockingCall!;
@@ -155,7 +160,7 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.success).toBe(true);
 
     const blockingCall = mockQueryRaw.mock.calls.find(
-      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
     );
     const [sql, ...params] = blockingCall!;
     // No imminent-pickup branch and no dangling $2 parameter.
@@ -187,7 +192,7 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.success).toBe(true);
 
     const blockingCall = mockQueryRaw.mock.calls.find(
-      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
     );
     expect(blockingCall).toBeDefined();
     const [sql] = blockingCall!;

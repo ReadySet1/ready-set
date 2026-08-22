@@ -88,8 +88,13 @@ function mockEndShiftQueries(blockingCount: bigint) {
     if (sql.includes("FROM driver_shifts")) {
       return Promise.resolve([{ driver_id: DRIVER_ID, status: "active" }]);
     }
-    if (sql.includes("AS n")) {
-      return Promise.resolve([{ n: blockingCount }]);
+    if (sql.includes("end-shift-blockers")) {
+      return Promise.resolve(
+        Array.from({ length: Number(blockingCount) }, (_, i) => ({
+          order_number: `ORD-${i + 1}`,
+          reason: "ACTIVE_DELIVERY",
+        })),
+      );
     }
     return Promise.resolve([]);
   });

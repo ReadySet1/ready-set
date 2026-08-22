@@ -22,6 +22,10 @@ import {
 } from '@/services/tracking/mileage';
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import {
+  formatBlockingOrdersMessage,
+  type BlockingOrder,
+} from '@/lib/driver/end-shift-blockers';
 
 /**
  * Start a new driver shift
@@ -121,7 +125,14 @@ export async function endDriverShift(
   endLocation: LocationUpdate,
   finalMileage?: number,
   metadata: Record<string, any> = {}
-): Promise<{ success: boolean; error?: string; activeDeliveries?: number }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  /** Number of blocking orders (kept for older clients). */
+  activeDeliveries?: number;
+  /** The orders keeping the shift open, so the UI can name them. */
+  blockingOrders?: BlockingOrder[];
+}> {
   try {
     // Get shift info and ensure it is active before proceeding
     const shiftInfo = await prisma.$queryRawUnsafe<{
@@ -177,52 +188,87 @@ export async function endDriverShift(
       const guardParams: unknown[] = guardMinutes > 0
         ? [shift?.driver_id, guardMinutes]
         : [shift?.driver_id];
-      const blocking = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`
-        SELECT
-          (
-            SELECT COUNT(*) FROM deliveries
-            WHERE driver_id = $1::uuid
-              AND deleted_at IS NULL
-              AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
-              AND NOT EXISTS (
-                SELECT 1 FROM delivery_return_requests rr
-                WHERE rr.order_number = deliveries.order_number
-                  AND rr.status = 'PENDING'
-              )
+      // Returns one row per blocking reason (an order hit by both branches
+      // appears twice; deduped below). Cancelled orders never block: the
+      // dispatch branch checks the order's status, and the deliveries branch
+      // ignores mirror rows whose parent order is CANCELLED — legacy rows
+      // written before the cancel cascade (2026-08-21 finding #8).
+      const blockingRows = await prisma.$queryRawUnsafe<
+        { order_number: string | null; reason: string }[]
+      >(`
+        -- end-shift-blockers
+        SELECT deliveries.order_number, 'ACTIVE_DELIVERY' AS reason
+        FROM deliveries
+        WHERE driver_id = $1::uuid
+          AND deleted_at IS NULL
+          AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_return_requests rr
+            WHERE rr.order_number = deliveries.order_number
+              AND rr.status = 'PENDING'
           )
-          +
-          (
-            SELECT COUNT(*)
-            FROM dispatches di
-            LEFT JOIN catering_requests cr ON cr.id = di."cateringRequestId"
-            LEFT JOIN on_demand_requests od ON od.id = di."onDemandId"
-            WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
+          AND NOT EXISTS (
+            SELECT 1 FROM catering_requests xc
+            WHERE xc."orderNumber" = deliveries.order_number
+              AND xc.status = 'CANCELLED'
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM on_demand_requests xo
+            WHERE xo."orderNumber" = deliveries.order_number
+              AND xo.status = 'CANCELLED'
+          )
+        UNION ALL
+        SELECT
+          COALESCE(cr."orderNumber", od."orderNumber") AS order_number,
+          CASE
+            WHEN COALESCE(cr."driverStatus", od."driverStatus") = 'ASSIGNED' THEN 'PICKUP_DUE'
+            ELSE 'IN_PROGRESS'
+          END AS reason
+        FROM dispatches di
+        LEFT JOIN catering_requests cr ON cr.id = di."cateringRequestId"
+        LEFT JOIN on_demand_requests od ON od.id = di."onDemandId"
+        WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
+          AND (
+            (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
+              AND cr.status <> 'CANCELLED'
               AND (
-                (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
-                  AND (
-                    cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    ${imminentPickupCr}
-                  ))
-                OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
-                  AND (
-                    od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    ${imminentPickupOd}
-                  ))
-              )
-              AND NOT EXISTS (
-                SELECT 1 FROM delivery_return_requests rr
-                WHERE rr.order_id = COALESCE(cr.id, od.id)
-                  AND rr.status = 'PENDING'
-              )
-          ) AS n
+                cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                ${imminentPickupCr}
+              ))
+            OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
+              AND od.status <> 'CANCELLED'
+              AND (
+                od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                ${imminentPickupOd}
+              ))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_return_requests rr
+            WHERE rr.order_id = COALESCE(cr.id, od.id)
+              AND rr.status = 'PENDING'
+          )
       `, ...guardParams);
 
-      const activeCount = Number(blocking[0]?.n ?? 0);
-      if (activeCount > 0) {
+      if (blockingRows.length > 0) {
+        // Dedupe by order number (first reason wins); rows with no order
+        // number still count toward the total but can't be named.
+        const seen = new Set<string>();
+        const blockingOrders: BlockingOrder[] = [];
+        let unnamed = 0;
+        for (const row of blockingRows) {
+          if (!row.order_number) {
+            unnamed += 1;
+            continue;
+          }
+          if (seen.has(row.order_number)) continue;
+          seen.add(row.order_number);
+          blockingOrders.push({ orderNumber: row.order_number, reason: row.reason });
+        }
         return {
           success: false,
-          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} or return ${activeCount === 1 ? 'it' : 'them'} to dispatch from the delivery screen before ending your shift.`,
-          activeDeliveries: activeCount,
+          error: formatBlockingOrdersMessage(blockingOrders),
+          activeDeliveries: blockingOrders.length + unnamed,
+          blockingOrders,
         };
       }
     }
