@@ -42,6 +42,10 @@ import {
 } from "@/lib/driver/geofence";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import type { DeliveryTracking } from "@/types/tracking";
+import {
+  formatBlockingOrdersMessage,
+  type BlockingOrder,
+} from "@/lib/driver/end-shift-blockers";
 
 /** Movement stages: the delivery has been started and MUST block ending the
  *  shift. Mirrors the server-side guard in endDriverShift. */
@@ -195,18 +199,19 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
-  const endShiftBlockers = activeDeliveries.filter((d) =>
-    blocksEndShift(d, endShiftGuardMs),
-  ).length;
+  // Blocking deliveries, keyed by order number (cateringRequestId /
+  // onDemandId carry it; id is the deliveries-row fallback). Named in the
+  // blocked-state hint and the backstop toast (finding #8, 2026-08-21).
+  const blockingOrders: BlockingOrder[] = activeDeliveries
+    .filter((d) => blocksEndShift(d, endShiftGuardMs))
+    .map((d) => ({
+      orderNumber: d.cateringRequestId || d.onDemandId || d.id,
+      reason: "ACTIVE_DELIVERY",
+    }));
+  const endShiftBlockers = blockingOrders.length;
   // First blocking delivery — the one the "Return a delivery" escape hatch
-  // targets. The feed keys these by order number (cateringRequestId /
-  // onDemandId carry it; id is the deliveries-row fallback).
-  const firstBlocker = activeDeliveries.find((d) =>
-    blocksEndShift(d, endShiftGuardMs),
-  );
-  const firstBlockerOrderNumber = firstBlocker
-    ? firstBlocker.cateringRequestId || firstBlocker.onDemandId || firstBlocker.id
-    : null;
+  // targets.
+  const firstBlockerOrderNumber = blockingOrders[0]?.orderNumber ?? null;
 
   const onReturnComplete = async () => {
     setReturnTarget(null);
@@ -223,9 +228,7 @@ export default function DriverTrackingPortal() {
     // self-heal: explain the block AND re-check the server feed — a delivery
     // completed on another screen unblocks this button without a reload.
     if (endShiftBlockers > 0) {
-      toast.error(
-        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} or return ${endShiftBlockers === 1 ? "it" : "them"} to dispatch before ending your shift.`,
-      );
+      toast.error(formatBlockingOrdersMessage(blockingOrders));
       void refreshDeliveries().catch(() => {
         /* best-effort re-check — the next poll will still correct it */
       });
@@ -461,7 +464,7 @@ export default function DriverTrackingPortal() {
                   {endShiftBlockers > 0 ? (
                     <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
                       {endShiftBlockers === 1
-                        ? "1 delivery to finish or return first"
+                        ? `Order ${firstBlockerOrderNumber} to finish or return first`
                         : `${endShiftBlockers} deliveries to finish or return first`}
                     </div>
                   ) : null}
