@@ -155,7 +155,9 @@ export type DeliveryTrackingStatus =
   | 'PICKED_UP'
   | 'EN_ROUTE_TO_CLIENT'
   | 'ARRIVED_TO_CLIENT'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  // Dispatch cancelled the order — tells the assigned driver to stop.
+  | 'CANCELLED';
 
 /**
  * Payload for delivery status update events
@@ -481,6 +483,7 @@ function isDeliveryStatusPayload(payload: unknown): payload is DeliveryStatusPay
     'EN_ROUTE_TO_CLIENT',
     'ARRIVED_TO_CLIENT',
     'COMPLETED',
+    'CANCELLED',
   ];
   return (
     typeof p.orderId === 'string' &&

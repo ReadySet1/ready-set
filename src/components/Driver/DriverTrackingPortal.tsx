@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { useUser } from "@/contexts/UserContext";
 import { DriverStatus } from "@/types/user";
 import DriverLiveMap from "@/components/Driver/DriverLiveMap";
 import {
@@ -41,6 +42,14 @@ import {
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import {
+  useDeliveryStatusRealtime,
+  type DeliveryStatusUpdatedPayload,
+} from "@/hooks/tracking/useDeliveryStatusRealtime";
+import {
+  CANCELLED_ORDER_ALERT_DURATION_MS,
+  createCancelledOrderAlertHandler,
+} from "@/lib/driver/cancelled-order-alert";
 import type { DeliveryTracking } from "@/types/tracking";
 import {
   formatBlockingOrdersMessage,
@@ -139,6 +148,30 @@ export default function DriverTrackingPortal() {
 
   const { settings } = useTrackingSettings();
   const endShiftGuardMs = settings.endShiftPickupGuardMinutes * 60_000;
+
+  // In-app cancellation alert: dispatch cancelling one of this driver's orders
+  // broadcasts a CANCELLED delivery-status event (orders PATCH route). Toast
+  // it loudly and refresh the feed so the order drops off right away; the 60s
+  // poll stays as the fallback when realtime is down. The callback must stay
+  // referentially stable — the hook resubscribes whenever it changes.
+  const { user } = useUser();
+  const driverProfileId = user?.id ?? null;
+  const handleCancelledOrder = useCallback(
+    (payload: DeliveryStatusUpdatedPayload) => {
+      createCancelledOrderAlertHandler({
+        driverProfileId,
+        notify: (message) =>
+          toast.error(message, { duration: CANCELLED_ORDER_ALERT_DURATION_MS }),
+        refresh: refreshDeliveries,
+      })(payload);
+    },
+    [driverProfileId, refreshDeliveries],
+  );
+  useDeliveryStatusRealtime({
+    enabled: Boolean(driverProfileId),
+    showNotifications: false,
+    onStatusUpdate: handleCancelledOrder,
+  });
 
   // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
