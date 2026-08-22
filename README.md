@@ -50,7 +50,7 @@ Ready Set features a production-ready real-time tracking system powered by **Sup
 
 ### Architecture
 - **Supabase Realtime** - WebSocket-based pub/sub using Phoenix Channels
-- **No custom server required** - Fully serverless compatible (works on Vercel)
+- **No custom server required** - Runs as a standard Next.js standalone container (self-hosted via Dokploy)
 - **Built-in authentication** - Leverages existing Supabase auth
 - **Graceful fallback** - Automatic SSE fallback when WebSocket unavailable
 - **Feature flag controlled** - Safe gradual rollout with environment variables
@@ -323,13 +323,13 @@ SENTRY_PROJECT=your-project-name               # Sentry project name
 
 See [Sentry Setup Guide](docs/sentry-setup-guide.md) for detailed configuration instructions.
 
-## 🕐 Automated Maintenance (Vercel Cron)
+## 🕐 Automated Maintenance (Cron)
 
-This project uses Vercel Cron Jobs for scheduled maintenance tasks:
+Scheduled maintenance jobs are HTTP endpoints triggered by cron on the VPS. The full list (six jobs: quarantine cleanup, mileage recalculation, data archiving, weekly driver summaries, two SMS reminder runs), schedules, and a ready-to-paste crontab live in [docs/deployment/CRON_JOBS.md](docs/deployment/CRON_JOBS.md).
 
 ### Quarantine Cleanup Cron Job
 
-**Schedule:** Daily at 2 AM UTC (configured in `vercel.json`)
+**Schedule:** Daily at 2 AM UTC (see `docs/deployment/CRON_JOBS.md`)
 **Endpoint:** `/api/admin/quarantine-cleanup`
 **Purpose:** Automatically clean up quarantined files and expired rate limit entries
 
@@ -346,14 +346,12 @@ The cron endpoint is secured using the `CRON_SECRET` environment variable:
    openssl rand -base64 32
    ```
 
-2. **Configure in Vercel:**
-   - Go to your Vercel project → Settings → Environment Variables
+2. **Configure in Dokploy:**
+   - Open the application → Environment
    - Add variable name: `CRON_SECRET`
-   - Set the generated secret as the value
-   - Select "Production" environment (and "Preview" if needed)
-   - Save changes
+   - Set the generated secret as the value and redeploy
 
-3. **Vercel automatically passes this secret** in the `Authorization` header when invoking cron jobs
+3. **The VPS crontab sends this secret** as `Authorization: Bearer <CRON_SECRET>` when invoking cron jobs
 
 #### Manual Triggering
 
@@ -364,7 +362,7 @@ Admins can manually trigger cleanup by accessing the endpoint:
 
 #### Monitoring
 
-Check Vercel Dashboard → Your Project → Cron Jobs to view:
+Check the cron log on the VPS (`/var/log/ready-set-cron.log` per the crontab in `docs/deployment/CRON_JOBS.md`) and the app container logs in Dokploy for:
 - Execution history
 - Success/failure status
 - Execution duration
