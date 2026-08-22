@@ -1070,22 +1070,70 @@ describe('useLocationTracking', () => {
       });
     });
 
-    it('should set isMoving based on speed', async () => {
-      // Test moving (speed > 1)
+    it('should set isMoving after two consecutive vehicle-speed samples (hysteresis)', async () => {
       const movingPosition = {
         ...mockPosition,
         coords: { ...mockPosition.coords, speed: 5 },
       };
 
+      // The mount effect may request more than one fix, so count samples
+      // instead of assuming the first render saw exactly one.
+      let samples = 0;
       (navigator.geolocation.getCurrentPosition as jest.Mock).mockImplementation(
-        (success: PositionCallback) => success(movingPosition as GeolocationPosition)
+        (success: PositionCallback) => {
+          samples += 1;
+          success(movingPosition as GeolocationPosition);
+        }
       );
 
       const { result } = renderHook(() => useLocationTracking());
 
       await waitFor(() => {
+        expect(result.current.currentLocation).not.toBe(null);
+      });
+      // The 2-sample rule: "moving" only once two vehicle-speed fixes landed.
+      expect(result.current.currentLocation?.isMoving).toBe(samples >= 2);
+
+      while (samples < 2) {
+        await act(async () => {
+          await result.current.updateLocationManually();
+        });
+      }
+      await waitFor(() => {
         expect(result.current.currentLocation?.isMoving).toBe(true);
       });
+    });
+
+    it('should not flicker isMoving at walking pace', async () => {
+      const speeds = [0.9, 1.1, 0.9, 1.2, 0.8, 0.4, 0.3];
+      let call = 0;
+      (navigator.geolocation.getCurrentPosition as jest.Mock).mockImplementation(
+        (success: PositionCallback) => {
+          const speed = speeds[Math.min(call, speeds.length - 1)];
+          call += 1;
+          success({
+            ...mockPosition,
+            coords: { ...mockPosition.coords, speed },
+          } as GeolocationPosition);
+        }
+      );
+
+      const { result } = renderHook(() => useLocationTracking());
+      await waitFor(() => {
+        expect(result.current.currentLocation).not.toBe(null);
+      });
+
+      const seen: boolean[] = [result.current.currentLocation!.isMoving];
+      while (call < speeds.length) {
+        await act(async () => {
+          await result.current.updateLocationManually();
+        });
+        seen.push(result.current.currentLocation!.isMoving);
+      }
+
+      const flips = seen.filter((v, i) => i > 0 && v !== seen[i - 1]).length;
+      expect(flips).toBeLessThanOrEqual(1);
+      expect(seen.at(-1)).toBe(false);
     });
   });
 

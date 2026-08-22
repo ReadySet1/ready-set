@@ -5,6 +5,7 @@ import type { LocationUpdate } from '@/types/tracking';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { setNativePostThrottleMs } from '@/lib/tracking/capacitor-tracking';
+import { createMotionState, nextMotionState } from '@/lib/tracking/motion-state';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
@@ -105,6 +106,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
+  // Moving/stopped hysteresis (see src/lib/tracking/motion-state.ts). Kept in
+  // a ref so it survives re-renders without re-creating the callback chain.
+  const motionStateRef = useRef(createMotionState());
   // Admin-configurable sync throttle (matches the server rate limit). Kept in
   // a ref so a settings refetch doesn't re-create the callback chain and tear
   // down the geolocation watcher.
@@ -203,6 +207,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     const heading = position.coords.heading ?? 0;
     const accuracy = position.coords.accuracy ?? 0;
 
+    motionStateRef.current = nextMotionState(motionStateRef.current, position.coords.speed);
+
     return {
       driverId,
       coordinates: {
@@ -215,7 +221,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       altitude: position.coords.altitude ?? undefined,
       batteryLevel: await getBatteryLevel(),
       activityType: determineActivityType(speed),
-      isMoving: speed > 1, // Moving if speed > 1 m/s
+      isMoving: motionStateRef.current.isMoving,
       timestamp: new Date(position.timestamp)
     };
   }, [getDriverId]);
@@ -574,6 +580,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const stopTracking = useCallback(() => {
     setIsTracking(false);
     isTrackingRef.current = false;
+    motionStateRef.current = createMotionState();
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
