@@ -1333,20 +1333,22 @@
       "owner": "emmanuel",
       "source": "aug21",
       "id": "tracking-shift-detail-wrong-columns",
-      "status": "open",
+      "status": "done",
       "title": "GET /api/tracking/shifts/[id] selects start_time/end_time but the columns are shift_start/shift_end",
       "tags": [
         "bug"
       ],
-      "description": "Spotted while wiring the trail endpoint for PR #526. <code>GET /api/tracking/shifts/[id]</code> selects <code>start_time</code> / <code>end_time</code> from <code>driver_shifts</code>, but the table columns are <code>shift_start</code> / <code>shift_end</code>, so the route fails today. Rename the selected columns (and any mapped response fields) and add a test that hits the route against the real schema."
+      "description": "Spotted while wiring the trail endpoint for PR #526. <code>GET /api/tracking/shifts/[id]</code> selects <code>start_time</code> / <code>end_time</code> from <code>driver_shifts</code>, but the table columns are <code>shift_start</code> / <code>shift_end</code>, so the route fails today. Rename the selected columns (and any mapped response fields) and add a test that hits the route against the real schema. <br><br><strong>Fixed (PR #529, merged 2026-08-22):</strong> route rewritten against the real <code>driver_shifts</code> schema with a soft-delete filter; <code>PUT action=end</code> now delegates to <code>endDriverShift</code> so the cancel guard cannot be bypassed. Merged to <code>development</code>, awaiting the next dev→main sync.",
+      "sourceRef": "#529"
     },
     {
       "owner": "emmanuel",
       "source": "aug21",
       "id": "driver-cancel-notification",
-      "status": "open",
+      "status": "done",
       "title": "No driver notification when an assigned order is cancelled",
-      "description": "Follow-up to the 2026-08-21 cancel deadlock. PR #525 makes the cancel cascade to the driver-side rows, but the driver still learns about the cancellation only by noticing the order disappeared. Push or in-app notification to the assigned driver (and a visible state on the delivery screen) when an admin cancels an order they are assigned to."
+      "description": "Follow-up to the 2026-08-21 cancel deadlock. PR #525 makes the cancel cascade to the driver-side rows, but the driver still learns about the cancellation only by noticing the order disappeared. Push or in-app notification to the assigned driver (and a visible state on the delivery screen) when an admin cancels an order they are assigned to. <br><br><strong>Shipped (PR #530, merged 2026-08-22):</strong> the assigned driver now gets an SMS (Twilio) and an in-app realtime alert in the driver portal when dispatch cancels the order. SMS degrades to a logged skip if <code>TWILIO_*</code> is unset on the server. Merged to <code>development</code>, awaiting the next dev→main sync.",
+      "sourceRef": "#530"
     },
     {
       "owner": "emmanuel",
