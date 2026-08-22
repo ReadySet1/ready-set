@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { useRealTimeTracking } from './useRealTimeTracking';
 import {
   createDriverLocationChannel,
@@ -72,16 +72,100 @@ interface UseAdminRealtimeTrackingOptions {
   enableRealtimeReceive?: boolean;
 }
 
+/**
+ * Window for "recent" GPS updates. Mirrors the 5-minute window the SSE
+ * endpoint uses for its `recentLocations` query so both sources agree.
+ */
+const RECENT_LOCATION_WINDOW_MS = 5 * 60 * 1000;
+
+function toTime(value: Date | string | undefined | null): number {
+  if (!value) return 0;
+  const t = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Merge the SSE roster (DB truth: shift stats, names, delivery counts) with
+ * the Realtime overlay (freshest GPS position). The SSE list is the base so
+ * drivers never disappear between pings; per driver the newer position wins;
+ * drivers only seen over Realtime are appended.
+ */
+export function mergeTrackedDrivers(
+  sseDrivers: TrackedDriver[],
+  realtimeDrivers: Map<string, TrackedDriver>,
+): TrackedDriver[] {
+  const merged: TrackedDriver[] = sseDrivers.map((sse) => {
+    const rt = realtimeDrivers.get(sse.id);
+    if (!rt) return sse;
+
+    const realtimeIsNewer = toTime(rt.lastLocationUpdate) > toTime(sse.lastLocationUpdate);
+
+    return {
+      ...sse,
+      // Realtime already resolved the most trustworthy name (delivery > SSE > payload)
+      name: rt.name ?? sse.name,
+      vehicleNumber: sse.vehicleNumber ?? rt.vehicleNumber,
+      isOnDuty: sse.isOnDuty || rt.isOnDuty,
+      lastKnownLocation: realtimeIsNewer ? rt.lastKnownLocation : sse.lastKnownLocation,
+      lastLocationUpdate: realtimeIsNewer ? rt.lastLocationUpdate : sse.lastLocationUpdate,
+      // Shift-derived stats come from the DB snapshot; Realtime pings don't carry them
+      deliveryCount: sse.deliveryCount ?? rt.deliveryCount,
+      totalDistanceMiles: sse.totalDistanceMiles ?? rt.totalDistanceMiles,
+      activeDeliveries: sse.activeDeliveries ?? rt.activeDeliveries,
+    };
+  });
+
+  const seen = new Set(sseDrivers.map((d) => d.id));
+  realtimeDrivers.forEach((rt, id) => {
+    if (!seen.has(id)) merged.push(rt);
+  });
+
+  return merged;
+}
+
+/**
+ * Merge SSE recent locations (DB, last 5 min) with every Realtime ping
+ * received, deduped by driver + timestamp, newest first, trimmed to the
+ * recent window relative to the newest ping and capped for memory.
+ */
+export function mergeRecentLocations(
+  sseLocations: LocationData[],
+  realtimeLocations: LocationData[],
+): LocationData[] {
+  const byKey = new Map<string, LocationData>();
+  for (const loc of [...sseLocations, ...realtimeLocations]) {
+    byKey.set(`${loc.driverId}:${toTime(loc.recordedAt)}`, loc);
+  }
+
+  const sorted = Array.from(byKey.values()).sort(
+    (a, b) => toTime(b.recordedAt) - toTime(a.recordedAt),
+  );
+  const newest = sorted.length > 0 ? toTime(sorted[0]!.recordedAt) : 0;
+  const cutoff = newest - RECENT_LOCATION_WINDOW_MS;
+
+  return sorted
+    .filter((loc) => toTime(loc.recordedAt) >= cutoff)
+    .slice(0, MEMORY_CONFIG.MAX_RECENT_LOCATIONS);
+}
+
 interface UseAdminRealtimeTrackingReturn {
   /**
-   * Active drivers with current location and status
+   * Active drivers with current location and status.
+   * Always the merged SSE + Realtime list — every consumer (header, stats
+   * cards, status list, both map instances) reads the same array.
    */
   activeDrivers: TrackedDriver[];
 
   /**
-   * Recent location updates from drivers
+   * Recent location updates from drivers (SSE rows + Realtime pings, merged)
    */
   recentLocations: LocationData[];
+
+  /**
+   * When the dashboard last received fresh data from either source.
+   * Null until the first snapshot or ping lands.
+   */
+  lastUpdatedAt: Date | null;
 
   /**
    * Active deliveries being tracked
@@ -166,6 +250,7 @@ export function useAdminRealtimeTracking(
   // Realtime data (merged with SSE data)
   const [realtimeDrivers, setRealtimeDrivers] = useState<Map<string, TrackedDriver>>(new Map());
   const [realtimeLocations, setRealtimeLocations] = useState<LocationData[]>([]);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   /**
    * Global Realtime enablement based on feature flags and configuration.
@@ -285,6 +370,14 @@ export function useAdminRealtimeTracking(
     sseActiveDriversRef.current = sseActiveDrivers;
   }, [sseActiveDrivers]);
 
+  // Every SSE snapshot is a fresh array, so identity changes mark "last update"
+  useEffect(() => {
+    if (sseIsLoading && sseActiveDrivers.length === 0 && sseRecentLocations.length === 0) {
+      return;
+    }
+    setLastUpdatedAt(new Date());
+  }, [sseActiveDrivers, sseRecentLocations, sseIsLoading]);
+
   // Keep SSE deliveries ref up to date (for driver name enrichment in Realtime mode)
   useEffect(() => {
     sseActiveDeliveriesRef.current = sseActiveDeliveries;
@@ -392,11 +485,10 @@ export function useAdminRealtimeTracking(
         recordedAt: payload.timestamp,
       };
 
-      // Update recent locations (keep last 100)
-      setRealtimeLocations((prev) => {
-        const updated = [locationData, ...prev.filter((loc) => loc.driverId !== payload.driverId)];
-        return updated.slice(0, 100);
-      });
+      // Accumulate every ping (not one per driver) so "GPS updates" counts
+      // real updates; trimmed to the recent window and capped for memory.
+      setRealtimeLocations((prev) => mergeRecentLocations(prev, [locationData]));
+      setLastUpdatedAt(new Date());
 
       // Update driver in Realtime drivers map
       setRealtimeDrivers((prev) => {
@@ -614,16 +706,20 @@ export function useAdminRealtimeTracking(
   }, []);
 
   /**
-   * Merge Realtime and SSE data
-   * Priority: Realtime > SSE (Realtime is more up-to-date)
+   * Merge Realtime and SSE data into ONE driver list and ONE location list.
+   * SSE is the base (roster + shift stats), Realtime overlays the freshest
+   * position per driver. The same arrays feed the header, the stats cards,
+   * the status list and both LiveDriverMap instances, so they can't drift.
    */
-  const activeDrivers =
-    isRealtimeConnected && useRealtime
-      ? Array.from(realtimeDrivers.values())
-      : sseActiveDrivers;
+  const activeDrivers = useMemo(
+    () => mergeTrackedDrivers(sseActiveDrivers, realtimeDrivers),
+    [sseActiveDrivers, realtimeDrivers],
+  );
 
-  const recentLocations =
-    isRealtimeConnected && useRealtime ? realtimeLocations : sseRecentLocations;
+  const recentLocations = useMemo(
+    () => mergeRecentLocations(sseRecentLocations, realtimeLocations),
+    [sseRecentLocations, realtimeLocations],
+  );
 
   // Always use SSE for deliveries (Realtime doesn't handle these yet)
   const activeDeliveries = sseActiveDeliveries;
@@ -638,6 +734,7 @@ export function useAdminRealtimeTracking(
   return {
     activeDrivers,
     recentLocations,
+    lastUpdatedAt,
     activeDeliveries,
     isConnected,
     isLoading: sseIsLoading,
