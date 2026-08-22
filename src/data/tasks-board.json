@@ -62,7 +62,8 @@
     "aug17": "Aug 17",
     "aug18walk": "Drive Test 8/18",
     "aug20": "Aug 20 session",
-    "aug20walk": "Drive Test 8/20"
+    "aug20walk": "Drive Test 8/20",
+    "aug21": "Drive Test 8/21"
   },
   "tasks": [
     {
@@ -1281,6 +1282,79 @@
         "bug"
       ],
       "description": "Surfaced while diagnosing the History zeros: <code>driver_weekly_summaries</code> on rs-dev has no row past <code>week_start 2026-08-03</code>, last written <code>2026-08-16 04:00</code> — <code>src/jobs/driverSummaryGeneration.ts</code> has not run since. Matches the still-open post-cutover item &quot;enable prod crons&quot; from the 08-18 DNS migration. Audit every scheduled job that used to run on Vercel, re-create them on the Dokploy side, and verify one full cycle on dev before prod."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "cancel-order-cascade-end-shift-guard",
+      "status": "done",
+      "title": "Cancelling an order did not cascade to driver rows — driver deadlocked at End Shift",
+      "sourceRef": "#525",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Finding #8 from the 2026-08-21 drive (<code>Test 0821261</code>). Cancelling an order from admin only set <code>catering_requests.status = CANCELLED</code>; <code>driverStatus</code> stayed <code>ASSIGNED</code>, the <code>deliveries</code> row stayed <code>ASSIGNED</code> and the <code>dispatches</code> row remained. <code>endDriverShift</code> then blocked on both guard branches and the #515 escape hatch rejected the order as already cancelled — Fernando was stuck at End Shift for ~40 min until the rows were fixed by hand in the DB.<br><br><strong>Fix (PR #525):</strong> the admin cancel path now cascades to <code>driverStatus</code>, the <code>deliveries</code> row and the dispatch; the end-shift guard ignores cancelled orders and names the blocking order in its error. Merged to <code>development</code>, awaiting the next dev→main sync."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "admin-tracking-overview-stale",
+      "status": "done",
+      "title": "Admin tracking Overview tab froze after first load (stale counts, 0 mi, 48 active deliveries)",
+      "sourceRef": "#527",
+      "tags": [
+        "bug"
+      ],
+      "description": "Findings #1–#4 from the 2026-08-21 drive. The Overview header stayed on the first ping's timestamp for the whole shift while the Live Map moved; the <em>Active Deliveries</em> card counted 48 stale non-terminal rows for one real delivery; the popup and <em>Total Miles today</em> card showed 0 deliveries / 0 mi; the Overview mini-map centred on San Francisco with no marker.<br><br><strong>Fix (PR #527):</strong> SSE and Supabase Realtime updates are merged into one feed so the Overview refreshes with every ping; the delivery scope matches status with <code>LOWER(status)</code> and is limited to on-duty drivers; live miles are computed from the shift's pings. Merged to <code>development</code>, awaiting the next dev→main sync."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "live-map-trails-routes-links",
+      "status": "done",
+      "title": "Live Map: travelled trail, planned route and order links in the driver popup",
+      "sourceRef": "#526",
+      "description": "Feature gaps #6 and #7 requested during the 2026-08-21 drive. <code>LiveDriverMap</code> only rendered point markers and a static popup with no links.<br><br><strong>Shipped (PR #526):</strong> per-driver travelled trail from <code>driver_locations</code> for the active shift (served by the new <code>GET /api/tracking/shifts/[id]/trail</code>, realtime-appended), planned pickup→dropoff route for the active delivery, legend toggles for both layers, and <em>View order</em> / <em>View delivery</em> links in the popup. Merged to <code>development</code>, awaiting the next dev→main sync."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "is-moving-hysteresis",
+      "status": "done",
+      "title": "Driver status flickered STOPPED/MOVING at walking pace",
+      "sourceRef": "#524",
+      "tags": [
+        "bug"
+      ],
+      "description": "Finding #5 from the 2026-08-21 drive. <code>is_moving</code> was a bare <code>speed &gt; 1 m/s</code> check, so walking pace (0.5–1.3 m/s) straddled the threshold and the status pill flickered while the marker moved.<br><br><strong>Fix (PR #524):</strong> motion state now uses hysteresis (<code>src/lib/tracking/motion-state.ts</code>) with separate start/stop thresholds so the flag holds steady across small speed dips. Merged to <code>development</code>, awaiting the next dev→main sync."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "tracking-shift-detail-wrong-columns",
+      "status": "open",
+      "title": "GET /api/tracking/shifts/[id] selects start_time/end_time but the columns are shift_start/shift_end",
+      "tags": [
+        "bug"
+      ],
+      "description": "Spotted while wiring the trail endpoint for PR #526. <code>GET /api/tracking/shifts/[id]</code> selects <code>start_time</code> / <code>end_time</code> from <code>driver_shifts</code>, but the table columns are <code>shift_start</code> / <code>shift_end</code>, so the route fails today. Rename the selected columns (and any mapped response fields) and add a test that hits the route against the real schema."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "driver-cancel-notification",
+      "status": "open",
+      "title": "No driver notification when an assigned order is cancelled",
+      "description": "Follow-up to the 2026-08-21 cancel deadlock. PR #525 makes the cancel cascade to the driver-side rows, but the driver still learns about the cancellation only by noticing the order disappeared. Push or in-app notification to the assigned driver (and a visible state on the delivery screen) when an admin cancels an order they are assigned to."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "aug21",
+      "id": "rewalk-0821-cancel-end-shift",
+      "status": "open",
+      "title": "Device re-walk on rs-dev: cancel an assigned order, then End Shift; compare live vs closed-shift miles",
+      "description": "Verification pass for the 2026-08-21 fixes once <code>development</code> is deployed on rs-dev. Start a shift on <code>fernando.driver@readysetllc.com</code>, get an order assigned, cancel it from admin, and confirm <strong>End Shift succeeds</strong> without DB surgery (#525). During the walk, compare the live miles shown on the admin Overview / popup (#527) against the closed-shift mileage on the driver History and shift record; note any gap. Also eyeball the trail and planned route layers (#526) and the status pill stability (#524)."
     }
   ]
 }
