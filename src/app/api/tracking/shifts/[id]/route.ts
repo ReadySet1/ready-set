@@ -1,7 +1,43 @@
+/**
+ * GET/PUT /api/tracking/shifts/[id] — shift detail.
+ *
+ * Targets the shipped `driver_shifts` schema (prisma model `DriverShift`):
+ * `shift_start` / `shift_end` (not start_time/end_time), `total_distance` (legacy
+ * km), `total_distance_miles`, `gps_distance_miles`, `mileage_source`,
+ * `delivery_count`, `status`, `notes`, `break_start` / `break_end`, `deleted_at`.
+ * There is no `metadata` column and no `shift_breaks` table: a shift carries at
+ * most one break, inline on the row.
+ *
+ * `PUT action=end` delegates to `endDriverShift`, which owns the active-delivery
+ * guard, mileage computation and the driver's on-duty reset.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { userOwnsDriver } from '@/lib/auth/driver-ownership';
+import { endDriverShift } from '@/app/actions/tracking/driver-actions';
+
+interface ShiftDetailRow {
+  id: string;
+  driver_id: string;
+  shift_start: Date;
+  shift_end: Date | null;
+  start_location_geojson: string | null;
+  end_location_geojson: string | null;
+  total_distance: number | null;
+  total_distance_miles: number | null;
+  gps_distance_miles: number | null;
+  mileage_source: string | null;
+  delivery_count: number | null;
+  status: string;
+  notes: string | null;
+  break_start: Date | null;
+  break_end: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  employee_id: string | null;
+  vehicle_number: string | null;
+}
 
 // GET - Get specific shift details
 export async function GET(
@@ -10,7 +46,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
     const authResult = await withAuth(request, {
       allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
       requireAuth: true
@@ -20,39 +56,41 @@ export async function GET(
       return authResult.response;
     }
 
-    let query = `
-      SELECT 
+    const result = await prisma.$queryRawUnsafe<ShiftDetailRow[]>(`
+      SELECT
         ds.id,
         ds.driver_id,
-        ds.start_time,
-        ds.end_time,
+        ds.shift_start,
+        ds.shift_end,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_km,
+        ds.total_distance,
+        ds.total_distance_miles,
+        ds.gps_distance_miles,
+        ds.mileage_source,
         ds.delivery_count,
         ds.status,
-        ds.metadata,
+        ds.notes,
+        ds.break_start,
+        ds.break_end,
         ds.created_at,
         ds.updated_at,
         d.employee_id,
         d.vehicle_number
       FROM driver_shifts ds
       LEFT JOIN drivers d ON ds.driver_id = d.id
-      WHERE ds.id = $1
-    `;
+      WHERE ds.id = $1::uuid
+        AND ds.deleted_at IS NULL
+    `, id);
 
-    const params_array = [id];
+    const shift = result[0];
 
-    const result = await prisma.$queryRawUnsafe<any[]>(query, ...params_array);
-
-    if (result.length === 0) {
+    if (!shift) {
       return NextResponse.json(
         { success: false, error: 'Shift not found' },
         { status: 404 }
       );
     }
-
-    const shift = result[0];
 
     // If user is DRIVER, verify they own this shift. Report non-owned shifts
     // as 404 (not 403) so the route is not an existence oracle.
@@ -66,44 +104,26 @@ export async function GET(
       }
     }
 
-    // Get breaks for this shift
-    const breaks = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
-        id,
-        shift_id,
-        start_time,
-        end_time,
-        break_type,
-        ST_AsGeoJSON(location) as location_geojson,
-        created_at
-      FROM shift_breaks
-      WHERE shift_id = $1
-      ORDER BY start_time DESC
-    `, shift.id);
-
     const shiftData = {
       id: shift.id,
       driverId: shift.driver_id,
-      startTime: shift.start_time,
-      endTime: shift.end_time,
-      startLocation: shift.start_location_geojson ? 
+      startTime: shift.shift_start,
+      endTime: shift.shift_end,
+      startLocation: shift.start_location_geojson ?
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      endLocation: shift.end_location_geojson ? 
+      endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceKm: shift.total_distance_km,
+      totalDistanceMiles: shift.total_distance_miles,
+      gpsDistanceMiles: shift.gps_distance_miles,
+      mileageSource: shift.mileage_source,
+      totalDistanceKm: shift.total_distance,
       deliveryCount: shift.delivery_count,
       status: shift.status,
-      breaks: breaks.map(b => ({
-        id: b.id,
-        shiftId: b.shift_id,
-        startTime: b.start_time,
-        endTime: b.end_time,
-        breakType: b.break_type,
-        location: b.location_geojson ? 
-          JSON.parse(b.location_geojson).coordinates.reverse() : undefined,
-        createdAt: b.created_at
-      })),
-      metadata: shift.metadata,
+      notes: shift.notes,
+      // Single inline break per shift (break_start/break_end on the row).
+      breaks: shift.break_start
+        ? [{ startTime: shift.break_start, endTime: shift.break_end }]
+        : [],
       createdAt: shift.created_at,
       updatedAt: shift.updated_at,
       // Additional driver info for admin views
@@ -121,8 +141,8 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching shift:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch shift',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -138,7 +158,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    
+
     const authResult = await withAuth(request, {
       allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN'],
       requireAuth: true
@@ -152,29 +172,28 @@ export async function PUT(
     const { action, location, metadata = {} } = body;
 
     // Verify shift exists and user has permission
-    let verifyQuery = `
-      SELECT ds.driver_id, ds.status
-      FROM driver_shifts ds
-      WHERE ds.id = $1
-    `;
-
     const verifyResult = await prisma.$queryRawUnsafe<{
       driver_id: string;
       status: string;
-    }[]>(verifyQuery, id);
+    }[]>(`
+      SELECT ds.driver_id, ds.status
+      FROM driver_shifts ds
+      WHERE ds.id = $1::uuid
+        AND ds.deleted_at IS NULL
+    `, id);
 
-    if (verifyResult.length === 0) {
+    const shift = verifyResult[0];
+
+    if (!shift) {
       return NextResponse.json(
         { success: false, error: 'Shift not found' },
         { status: 404 }
       );
     }
 
-    const shift = verifyResult[0];
-
     // If user is DRIVER, verify they own this shift
     if (authResult.context.user.type === 'DRIVER') {
-      const owns = await userOwnsDriver(shift?.driver_id, authResult.context.user.id);
+      const owns = await userOwnsDriver(shift.driver_id, authResult.context.user.id);
       if (!owns) {
         return NextResponse.json(
           { success: false, error: 'Access denied' },
@@ -184,78 +203,42 @@ export async function PUT(
     }
 
     switch (action) {
-      case 'end':
-        if (shift?.status !== 'active' && shift?.status !== 'paused') {
+      case 'end': {
+        if (shift.status !== 'active' && shift.status !== 'paused') {
           return NextResponse.json(
             { success: false, error: 'Shift is not active' },
             { status: 400 }
           );
         }
 
-        // End shift: record end location and mark as completed. Detailed mileage
-        // calculation is now handled by the mileage service and driver actions.
-        // Postgres rejects statements whose bind parameters don't line up with
-        // the placeholders, so the with/without-location variants are split.
-        if (location) {
-          const endPoint = `POINT(${location.coordinates.lng} ${location.coordinates.lat})`;
-          await prisma.$executeRawUnsafe(`
-            UPDATE driver_shifts
-            SET
-              end_time = NOW(),
-              end_location = ST_GeogFromText($2),
-              status = 'completed',
-              metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
-              updated_at = NOW()
-            WHERE id = $1::uuid
-          `, id, endPoint, JSON.stringify(metadata));
-
-          // Update driver status
-          await prisma.$executeRawUnsafe(`
-            UPDATE drivers
-            SET
-              is_on_duty = false,
-              current_shift_id = NULL,
-              shift_start_time = NULL,
-              last_known_location = ST_GeogFromText($2),
-              last_location_update = NOW(),
-              updated_at = NOW()
-            WHERE id = $1::uuid
-          `, shift?.driver_id, endPoint);
-        } else {
-          await prisma.$executeRawUnsafe(`
-            UPDATE driver_shifts
-            SET
-              end_time = NOW(),
-              end_location = NULL,
-              status = 'completed',
-              metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
-              updated_at = NOW()
-            WHERE id = $1::uuid
-          `, id, JSON.stringify(metadata));
-
-          // Update driver status
-          await prisma.$executeRawUnsafe(`
-            UPDATE drivers
-            SET
-              is_on_duty = false,
-              current_shift_id = NULL,
-              shift_start_time = NULL,
-              last_location_update = NOW(),
-              updated_at = NOW()
-            WHERE id = $1::uuid
-          `, shift?.driver_id);
+        if (!location?.coordinates) {
+          return NextResponse.json(
+            { success: false, error: 'Missing location' },
+            { status: 400 }
+          );
         }
 
-        break;
+        // Same contract as POST /api/tracking/shifts/end: endDriverShift owns the
+        // active-delivery guard, mileage, and the driver's on-duty reset.
+        // 200 on success; 409 when the guard blocks; 400 otherwise.
+        const result = await endDriverShift(id, location, body.finalMileage, metadata ?? {});
+        const status = result.success ? 200 : result.activeDeliveries ? 409 : 400;
+        return NextResponse.json(result, { status });
+      }
 
       case 'update_metadata':
+        // driver_shifts has no metadata column (and no jsonb anywhere on the
+        // row). The only free-form field is `notes`, so the payload is appended
+        // there as serialized JSON — same convention endDriverShift uses for
+        // metadata.notes / client-reported mileage.
         await prisma.$executeRawUnsafe(`
-          UPDATE driver_shifts 
-          SET 
-            metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+          UPDATE driver_shifts
+          SET
+            notes = COALESCE(notes, '') || $2,
             updated_at = NOW()
           WHERE id = $1::uuid
-        `, id, JSON.stringify(metadata));
+            AND deleted_at IS NULL
+        `, id, ' ' + JSON.stringify(metadata ?? {}));
         break;
 
       default:
@@ -273,8 +256,8 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating shift:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to update shift',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
