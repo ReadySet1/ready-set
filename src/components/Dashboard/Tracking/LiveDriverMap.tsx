@@ -23,6 +23,13 @@ import { MAP_CONFIG, MARKER_CONFIG, BATTERY_THRESHOLDS } from '@/constants/track
 import { isLocationStale } from '@/lib/realtime/stale-detection';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { buildDriverPopupHtml } from '@/lib/tracking/driver-popup';
+import {
+  appendTrailPoint,
+  trailLengthMiles,
+  type LngLat,
+  type TrailFeature,
+} from '@/lib/tracking/trail-geojson';
 
 // Ensure Mapbox token is available
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -54,6 +61,75 @@ interface LiveDriverMapProps {
 
 type MapStyle = 'streets' | 'satellite';
 
+const TRAIL_SOURCE_PREFIX = 'trail-';
+const ROUTE_SOURCE_PREFIX = 'route-';
+const ROUTE_LINE_COLOR = '#6b7280';
+const TERMINAL_DELIVERY_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'delivered', 'cancelled']);
+
+interface TrailState {
+  shiftId: string;
+  feature: TrailFeature;
+}
+
+interface LineStyle {
+  color: string;
+  dashed?: boolean;
+}
+
+const resolveMapboxToken = (): string | undefined => {
+  const token = mapboxgl.accessToken || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  return token && token !== 'YOUR_MAPBOX_TOKEN_HERE' && token !== 'your_mapbox_access_token'
+    ? token
+    : undefined;
+};
+
+/** Add (or refresh) a GeoJSON line source + layer. Safe to call repeatedly. */
+const upsertLineLayer = (
+  map: mapboxgl.Map,
+  id: string,
+  feature: TrailFeature,
+  style: LineStyle,
+  visible: boolean,
+): void => {
+  const existing = map.getSource(id) as mapboxgl.GeoJSONSource | undefined;
+  if (existing) {
+    existing.setData(feature);
+    return;
+  }
+  map.addSource(id, { type: 'geojson', data: feature });
+  map.addLayer({
+    id,
+    type: 'line',
+    source: id,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+      visibility: visible ? 'visible' : 'none',
+    },
+    paint: {
+      'line-color': style.color,
+      'line-width': style.dashed ? 3 : 4,
+      'line-opacity': style.dashed ? 0.8 : 0.9,
+      ...(style.dashed ? { 'line-dasharray': [2, 2] } : {}),
+    },
+  });
+};
+
+const removeLineLayer = (map: mapboxgl.Map, id: string): void => {
+  if (map.getLayer(id)) map.removeLayer(id);
+  if (map.getSource(id)) map.removeSource(id);
+};
+
+const setLineVisibility = (map: mapboxgl.Map, id: string, visible: boolean): void => {
+  if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+};
+
+const isActiveDeliveryFor = (delivery: DeliveryTracking, driver: TrackedDriver): boolean => {
+  if (TERMINAL_DELIVERY_STATUSES.has(String(delivery.status))) return false;
+  if (delivery.driverId === driver.id) return true;
+  return Boolean(driver.userId && delivery.dispatchDriverId && delivery.dispatchDriverId === driver.userId);
+};
+
 export default function LiveDriverMap({
   drivers,
   deliveries,
@@ -74,6 +150,22 @@ export default function LiveDriverMap({
   const [mapError, setMapError] = useState<string | null>(null);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [shouldAutoFit, setShouldAutoFit] = useState(true);
+  const [showTrails, setShowTrails] = useState(true);
+  const [showRoutes, setShowRoutes] = useState(true);
+  // Travelled trails keyed by driver id; planned routes keyed by delivery id.
+  const trailsRef = useRef<Map<string, TrailState>>(new Map());
+  const trailRequestsRef = useRef<Set<string>>(new Set());
+  const seenPingsRef = useRef<Set<string>>(new Set());
+  const routesRef = useRef<Map<string, TrailFeature>>(new Map());
+  const routeRequestsRef = useRef<Set<string>>(new Set());
+  const showTrailsRef = useRef(showTrails);
+  const showRoutesRef = useRef(showRoutes);
+  showTrailsRef.current = showTrails;
+  showRoutesRef.current = showRoutes;
+  const lineColorsRef = useRef<Map<string, string>>(new Map());
+  // Keeps the newest pings reachable from the async trail fetch.
+  const recentLocationsRef = useRef(recentLocations);
+  recentLocationsRef.current = recentLocations;
 
   // Initialize map
   useEffect(() => {
@@ -124,6 +216,19 @@ export default function LiveDriverMap({
         setMapLoaded(true);
       });
 
+      // setStyle() drops every custom source/layer; redraw the lines once the
+      // new style is ready.
+      map.on('style.load', () => {
+        trailsRef.current.forEach((trail, driverId) => {
+          upsertLineLayer(map, `${TRAIL_SOURCE_PREFIX}${driverId}`, trail.feature,
+            { color: lineColorsRef.current.get(driverId) ?? DRIVER_STATUS_COLORS.onDuty }, showTrailsRef.current);
+        });
+        routesRef.current.forEach((feature, deliveryId) => {
+          upsertLineLayer(map, `${ROUTE_SOURCE_PREFIX}${deliveryId}`, feature,
+            { color: ROUTE_LINE_COLOR, dashed: true }, showRoutesRef.current);
+        });
+      });
+
       map.on('error', (e) => {
         captureException(e, {
           feature: 'live-driver-map',
@@ -139,6 +244,11 @@ export default function LiveDriverMap({
       const markersRefCurrent = markersRef.current;
       const deliveryMarkersRefCurrent = deliveryMarkersRef.current;
       const pickupMarkersRefCurrent = pickupMarkersRef.current;
+      const trailsRefCurrent = trailsRef.current;
+      const trailRequestsRefCurrent = trailRequestsRef.current;
+      const seenPingsRefCurrent = seenPingsRef.current;
+      const routesRefCurrent = routesRef.current;
+      const routeRequestsRefCurrent = routeRequestsRef.current;
 
       return () => {
         // Clean up markers before removing map to prevent memory leaks
@@ -149,6 +259,12 @@ export default function LiveDriverMap({
         markersRefCurrent.clear();
         deliveryMarkersRefCurrent.clear();
         pickupMarkersRefCurrent.clear();
+        // map.remove() disposes sources/layers; drop our bookkeeping too.
+        trailsRefCurrent.clear();
+        trailRequestsRefCurrent.clear();
+        seenPingsRefCurrent.clear();
+        routesRefCurrent.clear();
+        routeRequestsRefCurrent.clear();
 
         map.remove();
         mapRef.current = null;
@@ -319,42 +435,15 @@ export default function LiveDriverMap({
 
   // Create popup content
   const createPopupContent = useCallback((driver: TrackedDriver): string => {
-    const battery = getBatteryStatus(driver.id);
-    const batteryIcon = battery.status === 'good' ? '🔋' : battery.status === 'low' ? '🪫' : '⚠️';
-    const dutyColor = driver.isOnDuty ? DRIVER_STATUS_COLORS.moving : DRIVER_STATUS_COLORS.offDuty;
-
-    return `
-      <div style="padding: 8px; min-width: 200px;">
-        <div style="font-weight: 600; margin-bottom: 8px;">${driver.name || `Driver #${driver.employeeId}`}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
-          Vehicle: ${driver.vehicleNumber || 'Not set'}
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-          <span style="
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            background-color: ${dutyColor};
-            color: white;
-          ">
-            ${driver.isOnDuty ? 'On Duty' : 'Off Duty'}
-          </span>
-          ${battery.level ? `
-            <span style="font-size: 11px;">
-              ${batteryIcon} ${battery.level}%
-            </span>
-          ` : ''}
-        </div>
-        ${driver.isOnDuty ? `
-          <div style="font-size: 11px; color: #6b7280;">
-            <div>Deliveries: ${driver.deliveryCount || 0}</div>
-            <div>Distance: ${Math.round((driver.totalDistanceMiles || 0) * 10) / 10} mi</div>
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }, [getBatteryStatus]);
+    const activeDelivery = deliveries.find(delivery => isActiveDeliveryFor(delivery, driver));
+    const trail = trailsRef.current.get(driver.id);
+    return buildDriverPopupHtml({
+      driver,
+      battery: getBatteryStatus(driver.id),
+      activeDelivery,
+      trailMiles: trail ? trailLengthMiles(trail.feature) : undefined,
+    });
+  }, [getBatteryStatus, deliveries]);
 
   // Store previous driver states to detect visual changes
   const previousDriverStatesRef = useRef<Map<string, { color: string; batteryStatus: string }>>(new Map());
@@ -574,6 +663,176 @@ export default function LiveDriverMap({
     });
   }, [deliveries, mapLoaded, createPickupMarkerElement]);
 
+  // Travelled trails: fetch each on-duty driver's active-shift trail once,
+  // then keep the Mapbox source in sync. Drivers that leave the map take their
+  // trail with them.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const currentDriverIds = new Set(drivers.map(d => d.id));
+    trailsRef.current.forEach((_trail, driverId) => {
+      if (!currentDriverIds.has(driverId)) {
+        removeLineLayer(map, `${TRAIL_SOURCE_PREFIX}${driverId}`);
+        trailsRef.current.delete(driverId);
+        lineColorsRef.current.delete(driverId);
+      }
+    });
+
+    drivers.forEach(driver => {
+      const sourceId = `${TRAIL_SOURCE_PREFIX}${driver.id}`;
+      const shiftId = driver.isOnDuty ? driver.currentShiftId : undefined;
+      const existing = trailsRef.current.get(driver.id);
+
+      if (!shiftId) {
+        if (existing) {
+          removeLineLayer(map, sourceId);
+          trailsRef.current.delete(driver.id);
+        }
+        return;
+      }
+
+      const color = getDriverColor(driver);
+      if (existing && existing.shiftId === shiftId) {
+        if (lineColorsRef.current.get(driver.id) !== color) {
+          lineColorsRef.current.set(driver.id, color);
+          if (map.getLayer(sourceId)) map.setPaintProperty(sourceId, 'line-color', color);
+        }
+        return;
+      }
+
+      if (existing) {
+        // New shift for the same driver: start a fresh trail.
+        removeLineLayer(map, sourceId);
+        trailsRef.current.delete(driver.id);
+      }
+
+      if (trailRequestsRef.current.has(shiftId) || typeof fetch !== 'function') return;
+      trailRequestsRef.current.add(shiftId);
+
+      fetch(`/api/tracking/shifts/${encodeURIComponent(shiftId)}/trail`, { credentials: 'same-origin' })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Trail request failed with ${response.status}`);
+          const json = await response.json();
+          const feature = json?.data?.trail as TrailFeature | undefined;
+          if (!feature || feature.geometry?.type !== 'LineString') return;
+          const liveMap = mapRef.current;
+          if (!liveMap) return;
+          trailsRef.current.set(driver.id, { shiftId, feature });
+          lineColorsRef.current.set(driver.id, color);
+          // Pings already on screen are already persisted in the trail.
+          recentLocationsRef.current
+            .filter(loc => loc.driverId === driver.id)
+            .forEach(loc => seenPingsRef.current.add(`${loc.driverId}:${loc.recordedAt}`));
+          upsertLineLayer(liveMap, sourceId, feature, { color }, showTrailsRef.current);
+        })
+        .catch((error) => {
+          trailRequestsRef.current.delete(shiftId);
+          addSentryBreadcrumb('Trail fetch failed', {
+            feature: 'live-driver-map',
+            shiftId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        });
+    });
+  }, [drivers, mapLoaded, getDriverColor]);
+
+  // Append realtime pings to the trails client-side (no refetch).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const fresh = recentLocations
+      .filter(loc => !seenPingsRef.current.has(`${loc.driverId}:${loc.recordedAt}`))
+      .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
+
+    const touched = new Set<string>();
+    fresh.forEach(loc => {
+      const trail = trailsRef.current.get(loc.driverId);
+      if (!trail) return; // trail not loaded yet — the fetch marks pings as seen
+      seenPingsRef.current.add(`${loc.driverId}:${loc.recordedAt}`);
+      const next = appendTrailPoint(trail.feature, loc.location.coordinates as LngLat);
+      if (next === trail.feature) return;
+      trail.feature = next;
+      touched.add(loc.driverId);
+    });
+
+    touched.forEach(driverId => {
+      const source = map.getSource(`${TRAIL_SOURCE_PREFIX}${driverId}`) as mapboxgl.GeoJSONSource | undefined;
+      const trail = trailsRef.current.get(driverId);
+      if (source && trail) source.setData(trail.feature);
+    });
+  }, [recentLocations, mapLoaded]);
+
+  // Planned routes: pickup → drop-off via Mapbox Directions, cached per delivery.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const currentDeliveryIds = new Set(deliveries.map(d => d.id));
+    routesRef.current.forEach((_feature, deliveryId) => {
+      if (!currentDeliveryIds.has(deliveryId)) {
+        removeLineLayer(map, `${ROUTE_SOURCE_PREFIX}${deliveryId}`);
+        routesRef.current.delete(deliveryId);
+        routeRequestsRef.current.delete(deliveryId);
+      }
+    });
+
+    const token = resolveMapboxToken();
+    if (!token || typeof fetch !== 'function') return;
+
+    deliveries.forEach(delivery => {
+      const pickup = delivery.pickupLocation?.coordinates;
+      const dropoff = delivery.deliveryLocation?.coordinates;
+      if (!pickup || !dropoff || routeRequestsRef.current.has(delivery.id)) return;
+      routeRequestsRef.current.add(delivery.id);
+
+      const coords = `${pickup[0]},${pickup[1]};${dropoff[0]},${dropoff[1]}`;
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${encodeURIComponent(token)}`;
+
+      fetch(url)
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Directions request failed with ${response.status}`);
+          const json = await response.json();
+          const geometry = json?.routes?.[0]?.geometry;
+          if (!geometry || geometry.type !== 'LineString' || !Array.isArray(geometry.coordinates)) return;
+          const liveMap = mapRef.current;
+          if (!liveMap) return;
+          const feature: TrailFeature = {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: geometry.coordinates as LngLat[] },
+            properties: { pointCount: geometry.coordinates.length },
+          };
+          routesRef.current.set(delivery.id, feature);
+          upsertLineLayer(liveMap, `${ROUTE_SOURCE_PREFIX}${delivery.id}`, feature,
+            { color: ROUTE_LINE_COLOR, dashed: true }, showRoutesRef.current);
+        })
+        .catch((error) => {
+          // Silent by design: a missing route must never break the map.
+          addSentryBreadcrumb('Directions fetch failed', {
+            feature: 'live-driver-map',
+            deliveryId: delivery.id,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        });
+    });
+  }, [deliveries, mapLoaded]);
+
+  // Legend toggles.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    trailsRef.current.forEach((_trail, driverId) =>
+      setLineVisibility(map, `${TRAIL_SOURCE_PREFIX}${driverId}`, showTrails));
+  }, [showTrails, mapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    routesRef.current.forEach((_feature, deliveryId) =>
+      setLineVisibility(map, `${ROUTE_SOURCE_PREFIX}${deliveryId}`, showRoutes));
+  }, [showRoutes, mapLoaded]);
+
   // Zoom controls
   const zoomIn = () => {
     mapRef.current?.zoomIn();
@@ -720,6 +979,24 @@ export default function LiveDriverMap({
             <div className="w-3 h-3 bg-violet-500 rounded-sm" />
             <span>Pickup</span>
           </div>
+          <label className="flex items-center space-x-2 pt-1 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-3 w-3"
+              checked={showTrails}
+              onChange={(e) => setShowTrails(e.target.checked)}
+            />
+            <span>Show trails</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-3 w-3"
+              checked={showRoutes}
+              onChange={(e) => setShowRoutes(e.target.checked)}
+            />
+            <span>Show routes</span>
+          </label>
         </div>
       </div>
 
