@@ -2,6 +2,7 @@
 
 import { POST } from '@/app/api/cater-valley/orders/confirm/route';
 import { prisma } from '@/lib/db/prisma';
+import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
 import {
   createPostRequest,
   expectSuccessResponse,
@@ -17,6 +18,8 @@ jest.mock('@/lib/db/prisma', () => ({
     },
   },
 }));
+
+jest.mock('@/services/orders/notifyOrderCreated');
 
 jest.mock('@/lib/services/partner-registry', () => ({
   authenticatePartner: jest.fn(async (req: Request) => {
@@ -100,6 +103,13 @@ describe('POST /api/cater-valley/orders/confirm - Confirm/Cancel Order', () => {
       expect(data.estimatedDeliveryTime).toBeDefined();
       expect(data.driverAssignment).toBeDefined();
       expect(data.driverAssignment.trackingAvailable).toBe(true);
+
+      // Admin notification dispatched on confirm with partner_api source
+      expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+        orderId: mockOrder.id,
+        orderType: 'catering',
+        source: 'partner_api',
+      });
     });
 
     it('should update order status to CONFIRMED', async () => {
@@ -192,6 +202,9 @@ describe('POST /api/cater-valley/orders/confirm - Confirm/Cancel Order', () => {
 
       expect(data.status).toBe('CANCELLED');
       expect(data.message).toContain('cancelled');
+
+      // Admin notification must NOT fire on cancellation
+      expect(notifyOrderCreatedSafe).not.toHaveBeenCalled();
     });
 
     it('should append cancellation reason to notes', async () => {

@@ -56,6 +56,9 @@ jest.mock("@/lib/soft-delete-handlers", () => ({
   validateUserNotSoftDeleted: jest.fn(),
 }));
 
+jest.mock("@/services/orders/notifyOrderCreated");
+import { notifyOrderCreatedSafe } from "@/services/orders/notifyOrderCreated";
+
 jest.mock("resend", () => ({
   Resend: jest.fn().mockImplementation(() => ({
     emails: {
@@ -604,6 +607,13 @@ describe("/api/catering-requests", () => {
       expect(data.message).toContain("created successfully");
       expect(data).toHaveProperty("orderId");
       expect(data).toHaveProperty("emailSent");
+
+      // Admin notification dispatched with correct source
+      expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+        orderId: mockCateringRequest.id,
+        orderType: "catering",
+        source: "customer_portal",
+      });
     });
 
     it("should set userId from authenticated user", async () => {
