@@ -184,6 +184,8 @@ export const DeliveryTrackingStatusSchema = z.enum([
   'EN_ROUTE_TO_CLIENT',
   'ARRIVED_TO_CLIENT',
   'COMPLETED',
+  // Dispatch cancelled the order — tells the assigned driver to stop.
+  'CANCELLED',
 ]);
 
 export const OrderTypeSchema = z.enum(['catering', 'on_demand']);

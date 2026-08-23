@@ -81,6 +81,23 @@ describe('POST /api/tracking/shifts/end', () => {
     const data = await res.json();
     expect(data.activeDeliveries).toBe(2);
   });
+
+  it('409 passes blockingOrders through so the client can name the order', async () => {
+    const blockingOrders = [{ orderNumber: 'Test 0821261', reason: 'ACTIVE_DELIVERY' }];
+    mockEnd.mockResolvedValue({
+      success: false,
+      error: 'Order Test 0821261 is still assigned to you. Complete it or return it to dispatch before ending your shift.',
+      activeDeliveries: 1,
+      blockingOrders,
+    });
+    const res = await endPOST(
+      jsonPost('http://localhost/api/tracking/shifts/end', { shiftId: 's-1', location: LOC }),
+    );
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.blockingOrders).toEqual(blockingOrders);
+    expect(data.error).toContain('Order Test 0821261');
+  });
 });
 
 describe('GET /api/tracking/shifts/active', () => {

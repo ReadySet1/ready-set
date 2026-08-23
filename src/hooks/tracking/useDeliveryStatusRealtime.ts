@@ -29,6 +29,7 @@ const STATUS_DISPLAY: Record<DeliveryTrackingStatus, { emoji: string; label: str
   EN_ROUTE_TO_CLIENT: { emoji: '🚚', label: 'Driver En Route' },
   ARRIVED_TO_CLIENT: { emoji: '📍', label: 'Driver Arrived' },
   COMPLETED: { emoji: '✅', label: 'Delivery Completed' },
+  CANCELLED: { emoji: '🚫', label: 'Order Cancelled' },
 };
 
 // If the channel neither connects nor errors within this window, stop showing
@@ -161,6 +162,10 @@ export function useDeliveryStatusRealtime({
 
       if (statusPayload.status === 'COMPLETED') {
         toast.success(`${statusInfo.emoji} ${statusInfo.label} - ${orderLabel}`, {
+          duration: 5000,
+        });
+      } else if (statusPayload.status === 'CANCELLED') {
+        toast.error(`${statusInfo.emoji} ${statusInfo.label} - ${orderLabel}`, {
           duration: 5000,
         });
       } else {

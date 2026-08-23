@@ -173,6 +173,44 @@ export async function executeReturnToDispatch(
   }
 }
 
+export interface ReleaseCancelledOrderParams {
+  orderType: ReturnOrderType;
+  orderId: string;
+  /** Order number exactly as stored in the DB (mirror rows key on it). */
+  dbOrderNumber: string;
+}
+
+/**
+ * Clear the driver-side rows of an order that is already CANCELLED
+ * (2026-08-21 finding #8). Returning a cancelled order is a no-op for the
+ * order itself — it must never go back in the pool — but stale `dispatches`
+ * / `deliveries` rows left by a pre-cascade cancel would keep the driver's
+ * end-shift guard blocking, so drop them here. Idempotent.
+ */
+export async function releaseCancelledOrder(
+  tx: Db,
+  params: ReleaseCancelledOrderParams,
+): Promise<void> {
+  const { orderType, orderId, dbOrderNumber } = params;
+  const now = new Date();
+
+  await tx.delivery.updateMany({
+    where: {
+      orderNumber: dbOrderNumber,
+      deletedAt: null,
+      status: { notIn: ['COMPLETED', 'CANCELLED', 'DELIVERED'] },
+    },
+    data: { status: 'CANCELLED', cancelledAt: now },
+  });
+
+  await tx.dispatch.deleteMany({
+    where:
+      orderType === 'catering'
+        ? { cateringRequestId: orderId }
+        : { onDemandId: orderId },
+  });
+}
+
 export interface CreateReturnRequestParams {
   orderType: ReturnOrderType;
   orderId: string;
