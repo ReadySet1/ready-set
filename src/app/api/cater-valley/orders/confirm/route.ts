@@ -21,6 +21,7 @@ import {
   isPartnerOrder,
 } from '@/app/api/cater-valley/_lib';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
+import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
 
 const ConfirmOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID format'),
@@ -187,6 +188,15 @@ export async function POST(request: NextRequest) {
     });
 
     await triggerOrderDispatch(confirmedOrder.id);
+
+    // Admin notification on partner order confirmation. The draft was created
+    // earlier (via /orders/draft) without notification — we notify only once
+    // the partner explicitly confirms.
+    notifyOrderCreatedSafe({
+      orderId: confirmedOrder.id,
+      orderType: "catering",
+      source: "partner_api",
+    });
 
     const estimatedDeliveryTime = confirmedOrder.pickupDateTime
       ? calculateEstimatedDeliveryTime(confirmedOrder.pickupDateTime)

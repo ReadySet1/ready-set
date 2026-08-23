@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { Decimal } from "@/types/prisma";
-import { sendOrderEmail, CateringOrder as EmailSenderCateringOrder, OnDemandOrder as EmailSenderOnDemandOrder } from "@/utils/emailSender";
 import { createClient } from "@/utils/supabase/server";
 import { CateringNeedHost } from "@/types/order";
 import { CateringStatus, OnDemandStatus } from "@/types/order-status";
@@ -15,6 +14,7 @@ import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
 import { sendDeliveryNotifications } from '@/app/actions/email';
 import { invalidateVendorCacheOnOrderCreate } from '@/lib/cache/cache-invalidation';
+import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
 
 import { prisma as prismaClient } from "@/utils/prismaDB";
 
@@ -338,17 +338,6 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Send notifications
-        try {
-          await sendDeliveryNotifications({
-            orderId: cateringOrder.id,
-            customerEmail: cateringOrder.user.email,
-          });
-        } catch (notificationError) {
-          console.error('Failed to send notifications:', notificationError);
-          // Don't fail the order creation if notifications fail
-        }
-
         return { order: cateringOrder, type: 'catering' };
       } else if (type === 'ondemand') {
         const onDemandOrder = await tx.onDemand.create({
@@ -360,21 +349,28 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Send notifications
-        try {
-          await sendDeliveryNotifications({
-            orderId: onDemandOrder.id,
-            customerEmail: onDemandOrder.user.email,
-          });
-        } catch (notificationError) {
-          console.error('Failed to send notifications:', notificationError);
-          // Don't fail the order creation if notifications fail
-        }
-
         return { order: onDemandOrder, type: 'ondemand' };
       } else {
         throw new Error('Invalid order type');
       }
+    });
+
+    // Notifications moved outside transaction — an email failure must never
+    // roll back a successful order create.
+    try {
+      await sendDeliveryNotifications({
+        orderId: result.order.id,
+        customerEmail: result.order.user.email,
+      });
+    } catch (notificationError) {
+      console.error('Failed to send notifications:', notificationError);
+    }
+
+    // Admin order notification
+    notifyOrderCreatedSafe({
+      orderId: result.order.id,
+      orderType: result.type === "catering" ? "catering" : "on_demand",
+      source: "orders_api",
     });
 
     // Invalidate vendor cache since new order affects metrics and order lists

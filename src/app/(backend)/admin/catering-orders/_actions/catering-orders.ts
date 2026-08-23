@@ -14,6 +14,7 @@ import {
   CreateOrderResult
 } from './schemas';
 import { createClient } from '@/utils/supabase/server';
+import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
 
 // Define UserType enum locally to match schema
 enum UserType {
@@ -149,7 +150,13 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
             return order;
     });
 
-        
+    // Admin order notification
+    notifyOrderCreatedSafe({
+      orderId: newOrder.id,
+      orderType: "catering",
+      source: "admin_dashboard",
+    });
+
     // 3. Update any temporary file associations
     if (tempEntityId && user) {
       try {
