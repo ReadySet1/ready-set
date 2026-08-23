@@ -23,6 +23,7 @@ import {
   generateInfoBox,
   BRAND_COLORS
 } from "@/utils/email-templates";
+import { getOrderNotificationConfig } from "@/config/order-notifications";
 
 // Lazy initialization to avoid build-time errors when API key is not set
 const getResendClient = () => {
@@ -35,7 +36,6 @@ const getResendClient = () => {
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 const fromEmail = process.env.EMAIL_FROM || "solutions@updates.readysetllc.com";
-const adminEmail = process.env.ADMIN_EMAIL || "info@ready-set.co";
 
 /**
  * Vendor-specific details for registration email
@@ -74,7 +74,7 @@ interface UserRegistrationData {
 /**
  * Order Notification Email Data
  */
-interface OrderNotificationData {
+export interface OrderNotificationData {
   orderNumber: string;
   orderType: 'catering' | 'on_demand';
   customerName: string;
@@ -106,9 +106,11 @@ interface OrderNotificationData {
     height?: string | null;
   };
   weight?: string | null;
+  // Creation source — surfaced in the email body when provided
+  source?: string | null;
 }
 
-interface AddressData {
+export interface AddressData {
   street1: string;
   street2?: string | null;
   city: string;
@@ -313,6 +315,13 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
  * Send order notification to admin when new order is created
  */
 export async function sendOrderNotificationToAdmin(data: OrderNotificationData): Promise<boolean> {
+  const { recipients } = getOrderNotificationConfig();
+
+  if (recipients.length === 0) {
+    console.warn("[sendOrderNotificationToAdmin] No recipients configured; skipping");
+    return false;
+  }
+
   const formatDate = (date: Date | null) => {
     if (!date) return "N/A";
     return new Date(date).toLocaleDateString("en-US", {
@@ -349,16 +358,27 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
   };
 
   // Build order details
-  const orderDetails = [
+  const orderDetails: Array<{ label: string; value: string }> = [
     { label: 'Order Number', value: data.orderNumber },
     { label: 'Order Type', value: data.orderType === 'catering' ? 'Catering' : 'On-Demand' },
+  ];
+
+  if (data.source) {
+    const sourceLabel = data.source
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    orderDetails.push({ label: 'Source', value: sourceLabel });
+  }
+
+  orderDetails.push(
     { label: 'Brokerage', value: data.brokerage || "N/A" },
     { label: 'Customer Name', value: data.customerName },
     { label: 'Customer Email', value: data.customerEmail },
     { label: 'Date', value: formatDate(data.date) },
     { label: 'Pickup Time', value: formatTime(data.pickupTime) },
     { label: 'Arrival Time', value: formatTime(data.arrivalTime) },
-  ];
+  );
 
   if (data.completeTime) {
     orderDetails.push({ label: 'Complete Time', value: formatTime(data.completeTime) });
@@ -453,7 +473,7 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
       }
 
       return await resend.emails.send({
-        to: adminEmail,
+        to: [...recipients],
         from: fromEmail,
         subject: `New ${data.orderType === 'catering' ? 'Catering' : 'On-Demand'} Order - ${data.orderNumber}`,
         html: emailBody,
