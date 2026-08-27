@@ -21,7 +21,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://ready-set-nextjs.vercel.app
 
     steps:
       - name: Checkout code
@@ -42,12 +41,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma generate
 
-      - name: Deploy to Vercel
+      - name: Deployment gate (Dokploy auto-deploys the GHCR image)
         run: |
           echo "🚀 Deploying to production..."
           echo "All tests passed - deployment proceeding"
-          # Vercel will handle the actual deployment via their Git integration
-          # This step is here to show the deployment gate concept
+          # The actual deploy is build-and-push.yml -> GHCR -> Dokploy auto-deploy.
+          # This step only records that the CI gate passed for this ref.
 
       - name: Post-deployment verification
         run: |

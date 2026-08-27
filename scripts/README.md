@@ -23,7 +23,6 @@ This directory contains utility scripts for development, testing, deployment, an
 - `rebuild.sh` - Complete project rebuild with cache clearing
 - `check-build.sh` - Verify build will succeed in production environment
 - `type-check.js` - TypeScript type checking utility
-- `vercel-build-simulation.js` - Simulate Vercel build environment
 
 ### Database Management
 

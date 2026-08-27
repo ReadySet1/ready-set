@@ -56,7 +56,7 @@ SmsReminderBatch / SmsReminderLog (Prisma)
 | `/api/admin/sms-reminders/preview` | POST | Admin session | Dry-run preview of messages to send |
 | `/api/admin/sms-reminders/send` | POST | Admin session | Send SMS to all or selected drivers |
 | `/api/admin/sms-reminders/history` | GET | Admin session | Paginated batch history with logs |
-| `/api/admin/sms-reminders/cron` | GET | CRON_SECRET or admin | Vercel Cron endpoint |
+| `/api/admin/sms-reminders/cron` | GET | CRON_SECRET or admin | Scheduled cron endpoint |
 | `/api/webhooks/twilio` | POST | Public (Twilio callback) | Delivery status updates |
 
 ### Database Models
@@ -95,7 +95,7 @@ Accepted formats: `5125551234`, `(512) 555-1234`, `+15125551234`, `512-555-1234`
 
 ### 3. Environment Variables
 
-Add to `.env.local` (and Vercel project settings for production):
+Add to `.env.local` (and the Dokploy application environment for production):
 
 ```env
 # Twilio
@@ -140,7 +140,7 @@ dotenv -e .env.local -- npx prisma migrate dev --name add-sms-reminder-tables
 
 ### Automated Cron
 
-Two Vercel Cron jobs run daily (configured in `vercel.json`):
+Two cron jobs run daily from the VPS crontab (see `docs/deployment/CRON_JOBS.md`):
 
 | Schedule | UTC | CST | Type |
 |----------|-----|-----|------|
@@ -261,5 +261,5 @@ To add a new provider:
 | SMS not delivered | Check Twilio console for delivery status. Verify phone number format. Check A2P 10DLC registration status |
 | "Missing Twilio configuration" | Ensure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` are set |
 | "Missing Google Sheets configuration" | Ensure `GOOGLE_SHEETS_CLIENT_EMAIL` and `GOOGLE_SHEETS_PRIVATE_KEY` are set |
-| Cron not triggering | Verify `CRON_SECRET` is set in Vercel environment variables and matches `vercel.json` cron config |
+| Cron not triggering | Verify `CRON_SECRET` is set in the Dokploy app environment and matches the value in the VPS crontab (`docs/deployment/CRON_JOBS.md`) |
 | Driver shows "No phone number" | Add the driver's phone to the "Driver Phone" column in the Google Sheet |
