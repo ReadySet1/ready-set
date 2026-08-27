@@ -16,6 +16,30 @@ export interface BlockingOrder {
   reason: BlockingOrderReason | string;
 }
 
+/**
+ * A not-started assignment whose pickup is older than this never blocks
+ * end-shift: it is stale dispatch data, not work the driver is about to do
+ * (2026-08-26 incident: two Aug-23 ASSIGNED rows deadlocked a driver).
+ * Compile-time constant — interpolated into SQL as a literal, never user input.
+ */
+export const END_SHIFT_STALE_PICKUP_HOURS = 24;
+
+/**
+ * Client-side mirror of the server guard's not-started window:
+ * `pickup >= now - END_SHIFT_STALE_PICKUP_HOURS AND pickup <= now + guardMs`.
+ * A guard of 0 disables the window entirely; an unknown pickup never blocks.
+ */
+export function isPickupInsideEndShiftWindow(
+  pickupMs: number | null | undefined,
+  guardMs: number,
+  nowMs: number = Date.now(),
+): boolean {
+  if (guardMs <= 0) return false;
+  if (pickupMs == null || Number.isNaN(pickupMs)) return false;
+  const staleBefore = nowMs - END_SHIFT_STALE_PICKUP_HOURS * 60 * 60 * 1000;
+  return pickupMs >= staleBefore && pickupMs <= nowMs + guardMs;
+}
+
 const GENERIC_MESSAGE =
   'You still have an active or due delivery. Complete it or return it to dispatch before ending your shift.';
 

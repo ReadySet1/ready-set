@@ -703,6 +703,42 @@ describe("DriverTrackingPortal (redesigned)", () => {
         ).toBeEnabled();
       });
 
+      it("does not block for a stale ASSIGNED pickup more than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+          }),
+        );
+        renderPortal();
+        // The button is aria-disabled (not `disabled`), so toBeEnabled() would
+        // pass vacuously — assert on the attribute the guard actually sets.
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).not.toHaveAttribute("aria-disabled", "true");
+      });
+
+      it("still blocks an overdue ASSIGNED pickup less than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6h overdue
+          }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toHaveAttribute("aria-disabled", "true");
+      });
+
       it("still blocks a mid-flight delivery when the guard is disabled (0)", () => {
         mockTrackingSettingsOverride.current = {
           ...TRACKING_SETTINGS_DEFAULTS,
