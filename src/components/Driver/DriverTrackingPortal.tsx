@@ -52,7 +52,9 @@ import {
 } from "@/lib/driver/cancelled-order-alert";
 import type { DeliveryTracking } from "@/types/tracking";
 import {
+  END_SHIFT_STALE_PICKUP_HOURS,
   formatBlockingOrdersMessage,
+  isPickupInsideEndShiftWindow,
   type BlockingOrder,
 } from "@/lib/driver/end-shift-blockers";
 
@@ -67,7 +69,9 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 ];
 
 /** True when this delivery should block ending the shift: it's mid-flight, or
- *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
+ *  it's ASSIGNED with a pickup inside the guard window — imminent (within
+ *  `guardMs`) or overdue by less than END_SHIFT_STALE_PICKUP_HOURS. Older
+ *  assignments are stale dispatch data and never trap the driver.
  *  Mirrors the server guard so the button state matches what the API will say.
  *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks).
  *  A PENDING return request never blocks — the driver already asked dispatch
@@ -75,10 +79,9 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
   if (delivery.pendingReturn) return false;
   if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
-  if (guardMs <= 0) return false;
   if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
     const pickup = new Date(delivery.scheduledPickupAt).getTime();
-    return pickup <= Date.now() + guardMs;
+    return isPickupInsideEndShiftWindow(pickup, guardMs);
   }
   return false;
 }
