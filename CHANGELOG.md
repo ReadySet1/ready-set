@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0](https://github.com/ReadySet1/ready-set/compare/v2.5.0...v2.6.0) (2026-08-31)
+
+
+### Added
+
+* **api:** let drivers return an assigned delivery to dispatch ([68ff1d4](https://github.com/ReadySet1/ready-set/commit/68ff1d40e891c4067be5943b800c65f757957954)), closes [#508](https://github.com/ReadySet1/ready-set/issues/508)
+* **driver:** require dispatch approval for driver-initiated returns ([a91f4ff](https://github.com/ReadySet1/ready-set/commit/a91f4ffb042ea0ce1304ab846e2e2ca68c688c0b))
+* **driver:** require dispatch approval for driver-initiated returns ([c004895](https://github.com/ReadySet1/ready-set/commit/c0048957202dd818b7957a7ae9eb6611544ffbd5))
+* **driver:** return a delivery to dispatch ([#508](https://github.com/ReadySet1/ready-set/issues/508) escape hatch) ([476f2d9](https://github.com/ReadySet1/ready-set/commit/476f2d9016c15aefa180424553365bbfecbbaf97))
+* **driver:** return a delivery to dispatch from the driver app ([e2aaaea](https://github.com/ReadySet1/ready-set/commit/e2aaaeac3296bc057c1b39231648cbc5ff0ca89c)), closes [#508](https://github.com/ReadySet1/ready-set/issues/508)
+* gate flowers and catering CTAs behind marketing flags ([3c5f726](https://github.com/ReadySet1/ready-set/commit/3c5f726301838338d927c65f9373d1e9c07d7e47))
+* **orders:** notify the assigned driver by SMS and in-app when an order is cancelled ([b4ddc29](https://github.com/ReadySet1/ready-set/commit/b4ddc29bebe47aafbd805a40c973798bc36f496a))
+* **orders:** notify the assigned driver by SMS and in-app when an order is cancelled ([9afb19d](https://github.com/ReadySet1/ready-set/commit/9afb19d626571040d0146aae5e43fe85e4687b8d))
+* **partners:** add Donaji and Componere logos to delivery partners ([5982013](https://github.com/ReadySet1/ready-set/commit/59820139fd07d1d14bfaf49a904c835e8a16a198))
+* **tracking:** add moving/stopped hysteresis helper ([792a9bf](https://github.com/ReadySet1/ready-set/commit/792a9bf3df52f36a0574aa6bc3f3573412c09b4e))
+* **tracking:** draw driver trails and planned routes on the admin live map ([4705c4c](https://github.com/ReadySet1/ready-set/commit/4705c4ccedaf6c09f4104857c48684d1a042cbc0))
+* **tracking:** driver trails, planned routes and order links on the admin live map ([38d418e](https://github.com/ReadySet1/ready-set/commit/38d418ecdbb8da0f310dedccec951108dbf5d235))
+
+
+### Fixed
+
+* **admin:** repoint the tracking Unassign button at the return endpoint ([fe5edbd](https://github.com/ReadySet1/ready-set/commit/fe5edbde8abf3dff754e11a77975a23048918452)), closes [#508](https://github.com/ReadySet1/ready-set/issues/508)
+* **auth:** accept Bearer tokens on driver upload and shift endpoints ([5667a47](https://github.com/ReadySet1/ready-set/commit/5667a47803ac367fedc4c44dce7c8b544c7ea347))
+* cancel cascade + end-shift guard names the blocking order (finding [#8](https://github.com/ReadySet1/ready-set/issues/8)) ([3997154](https://github.com/ReadySet1/ready-set/commit/399715441394093eb16530ee553cc86c77ffc781))
+* **driver:** 8/18 drive-test polish — signature distortion, keyboard overlap, POD first tap ([5b1a0d7](https://github.com/ReadySet1/ready-set/commit/5b1a0d71e6a31d04154cde220d505af0ea7b26cb))
+* **driver:** add /native-launch zero-redirect entry for the native wrapper ([51c7651](https://github.com/ReadySet1/ready-set/commit/51c76513a095b321e12cba3ac4e7ad259c4d30f0))
+* **driver:** add /native-launch zero-redirect entry for the native wrapper ([1139331](https://github.com/ReadySet1/ready-set/commit/113933127ac55a8e945fb6f8e9f113167f7f2b9b))
+* **driver:** close proof sheets as soon as the upload succeeds ([1ddcb9c](https://github.com/ReadySet1/ready-set/commit/1ddcb9c92f9c991a901baea72d31dc07255890e3))
+* **driver:** draw the tracking-map route line in GPS fix order ([5f79c8c](https://github.com/ReadySet1/ready-set/commit/5f79c8caaa6dcb93c9f0ad6a3e17117536759f61))
+* **driver:** field-QA batch from the 2026-08-12 walk — signature loss, route scribble, 429 storm, Bearer auth ([4cd50c0](https://github.com/ReadySet1/ready-set/commit/4cd50c09df4bcc6c058fa0a72f663c3deacb8178))
+* **driver:** ignore cancelled orders in the end-shift guard and name the blocker ([491cd09](https://github.com/ReadySet1/ready-set/commit/491cd09fe69657ced69c275effc921ed32ca0e39))
+* **driver:** keep confirm-pickup sheet clear of the iOS keyboard ([deb0928](https://github.com/ReadySet1/ready-set/commit/deb0928b589854828ba07126dbc4dc4fbd6101ea))
+* **driver:** keep signature strokes when the pad is expanded or collapsed ([9b05ba8](https://github.com/ReadySet1/ready-set/commit/9b05ba8611e0c84cbfb47b73aee65cdf83de9909))
+* **driver:** open the POD camera on the first Take Photo tap ([c878348](https://github.com/ReadySet1/ready-set/commit/c8783482aacb9f83c3266bce9331ee3dca3b2257))
+* **driver:** preserve signature aspect ratio across pad resizes ([d05be8c](https://github.com/ReadySet1/ready-set/commit/d05be8cf3258988d74ec1fb8abc2fc418f9ae40c))
+* **driver:** show a completed delivery's terminal step as done in the timeline ([0e798d1](https://github.com/ReadySet1/ready-set/commit/0e798d1e9b503ba2fd0c76391411006478f9437d))
+* **health:** parallelize DB sub-checks and size thresholds for VPS latency ([e5d87ca](https://github.com/ReadySet1/ready-set/commit/e5d87cad842f0c1d9b78ac0a8036e2e58716c906))
+* **health:** parallelize DB sub-checks and size thresholds for VPS latency ([19fabbf](https://github.com/ReadySet1/ready-set/commit/19fabbf66bd2952c14cb39e5e3262ff013a9cb6f))
+* **orders:** cascade an admin cancel to dispatches and the deliveries mirror ([162220c](https://github.com/ReadySet1/ready-set/commit/162220c1172c7525e809b5cfaa15468faa01dd16))
+* **orders:** require at least one of headcount or order total, remove "(Optional)" labels ([2e9cc94](https://github.com/ReadySet1/ready-set/commit/2e9cc94dac943f8e5f8288f866ba9a7666cac29c))
+* **orders:** treat a return on a cancelled order as a no-op success ([8b3752f](https://github.com/ReadySet1/ready-set/commit/8b3752fa24405c151c391ba2932998e4433a199a))
+* **tracking:** admin overview updates live; accurate delivery and mileage counts ([5c85101](https://github.com/ReadySet1/ready-set/commit/5c851013c6b6f0f76b12e320880b75250c89b47f))
+* **tracking:** keep the admin overview live from one merged driver state ([9ef6904](https://github.com/ReadySet1/ready-set/commit/9ef69048601a068a37cd2830fea4095f5b61f4dd))
+* **tracking:** moving/stopped hysteresis for is_moving (finding [#5](https://github.com/ReadySet1/ready-set/issues/5)) ([2069273](https://github.com/ReadySet1/ready-set/commit/2069273ed22db595fb7c4a3da6396f1bbf47fd8b))
+* **tracking:** scope active deliveries and report live shift miles in SSE feed ([2c4f6da](https://github.com/ReadySet1/ready-set/commit/2c4f6da6be3222443e3a974077d90c9b82900951))
+* **tracking:** send the GPS fix time with location updates and throttle offline flushes ([fd45014](https://github.com/ReadySet1/ready-set/commit/fd45014a153b1ac2e61959ce7c9631ff2e1d8922))
+* **tracking:** shift detail route reads the real driver_shifts schema and ends shifts via the guarded path ([9fe8bdc](https://github.com/ReadySet1/ready-set/commit/9fe8bdcee6b4e18d94656ea5dd3f7c7d641e1f7b))
+* **tracking:** shift detail route reads the real driver_shifts schema and ends shifts via the guarded path ([f853675](https://github.com/ReadySet1/ready-set/commit/f8536759d8ffb4821a02f87ce5aa14b0aeb421d4))
+* **tracking:** stop is_moving flicker at walking pace ([db55845](https://github.com/ReadySet1/ready-set/commit/db558452950809c514e766ee134082aaf7661886))
+* **tracking:** stop stale never-started deliveries from blocking end of shift ([7e87a11](https://github.com/ReadySet1/ready-set/commit/7e87a11691fc6438d7f743242186c9a38b2ced43))
+* **tracking:** stop stale never-started deliveries from blocking end of shift ([8e7cd4a](https://github.com/ReadySet1/ready-set/commit/8e7cd4a85b124287c0db93897c2d6c50f524ab97))
+
 ## [2.5.0](https://github.com/ReadySet1/ready-set/compare/v2.4.0...v2.5.0) (2026-08-06)
 
 
