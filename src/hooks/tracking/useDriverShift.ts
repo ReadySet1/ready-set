@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DriverShift, LocationUpdate } from '@/types/tracking';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { withBearerAuth } from '@/lib/auth/bearer-session';
 import {
   startShiftBreak,
   endShiftBreak
@@ -17,7 +18,9 @@ import {
 async function fetchActiveShift(driverId: string): Promise<DriverShift | null> {
   const res = await fetch(
     `/api/tracking/shifts/active?driverId=${encodeURIComponent(driverId)}`,
-    { credentials: 'include' },
+    // Bearer token + cookies: the token survives the stale-cookie failure
+    // mode (see @/lib/auth/bearer-session); cookies remain the fallback.
+    { credentials: 'include', headers: await withBearerAuth() },
   );
   if (!res.ok) throw new Error(`Failed to load shift (${res.status})`);
   const data = await res.json();
@@ -111,7 +114,7 @@ export function useDriverShift(): UseDriverShiftReturn {
       const res = await fetch('/api/tracking/shifts/start', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await withBearerAuth({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           driverId,
           location,
@@ -164,7 +167,7 @@ export function useDriverShift(): UseDriverShiftReturn {
       const res = await fetch('/api/tracking/shifts/end', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await withBearerAuth({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           shiftId,
           location,

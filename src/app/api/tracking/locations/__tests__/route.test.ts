@@ -343,6 +343,74 @@ describe("/api/tracking/locations", () => {
       });
     });
 
+    describe("recorded_at from the client fix timestamp", () => {
+      const insertCall = () =>
+        mockTxQuery.mock.calls.find(
+          ([sql]: any[]) =>
+            typeof sql === "string" && sql.includes("INSERT INTO driver_locations"),
+        );
+      // tx.$queryRawUnsafe(sql, driver_id, lng, lat, accuracy, speed, heading,
+      // altitude, battery_level, is_moving, recorded_at) → recorded_at is the
+      // 10th bind param (index 10 counting the sql).
+      const recordedAtParam = () => insertCall()?.[10];
+
+      it("uses a valid client timestamp for recorded_at", async () => {
+        const ts = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/tracking/locations", {
+            ...mockLocationData,
+            timestamp: ts,
+          }),
+        );
+        expect(response.status).toBe(201);
+        expect(insertCall()?.[0]).toContain("COALESCE($10::timestamptz, NOW())");
+        expect(recordedAtParam()).toBe(ts);
+      });
+
+      it("falls back to NOW() when the timestamp is too far in the future", async () => {
+        const ts = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/tracking/locations", {
+            ...mockLocationData,
+            timestamp: ts,
+          }),
+        );
+        expect(response.status).toBe(201);
+        expect(recordedAtParam()).toBeNull();
+      });
+
+      it("falls back to NOW() when the timestamp is older than 24 hours", async () => {
+        const ts = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/tracking/locations", {
+            ...mockLocationData,
+            timestamp: ts,
+          }),
+        );
+        expect(response.status).toBe(201);
+        expect(recordedAtParam()).toBeNull();
+      });
+
+      it("falls back to NOW() for a garbage timestamp", async () => {
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/tracking/locations", {
+            ...mockLocationData,
+            timestamp: "not-a-date",
+          }),
+        );
+        expect(response.status).toBe(201);
+        expect(recordedAtParam()).toBeNull();
+      });
+
+      it("falls back to NOW() when no timestamp is sent", async () => {
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+        );
+        expect(response.status).toBe(201);
+        expect(recordedAtParam()).toBeNull();
+      });
+    });
+
     describe("Error handling", () => {
       it("should return 500 when database insert fails", async () => {
         mockTxQuery.mockImplementation((sql: string) => {

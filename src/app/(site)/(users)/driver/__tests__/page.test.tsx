@@ -24,7 +24,9 @@ jest.mock('@/contexts/DriverTrackingContext', () => ({
 }));
 
 // Stub the leaf integrations — each owns its own fetch/context and is tested
-// separately. The page test only cares that they're mounted.
+// separately. The page test only cares that they're mounted. The stats-panel
+// stub stays so the not-rendered assertion below fails loudly if the panel is
+// ever mounted on the home screen again.
 jest.mock('@/components/Driver/DriverStatsPanel', () => ({
   DriverStatsPanel: ({ driverId }: { driverId: string }) => (
     <div data-testid="driver-stats-panel">{driverId}</div>
@@ -164,25 +166,28 @@ describe('DriverPage (redesigned home)', () => {
   });
 
   describe('child integrations', () => {
-    it('renders the deliveries list and the stats panel once a driverId resolves', async () => {
+    it('renders the deliveries list but never the removed Performance stats panel', async () => {
       renderDriverHome();
 
       expect(await screen.findByTestId('driver-delivery-list')).toBeInTheDocument();
-      // DriverStatsPanel only mounts after /api/tracking/drivers resolves a driver.
-      expect(await screen.findByTestId('driver-stats-panel')).toHaveTextContent('driver-123');
+      // The Performance section was removed from the home screen — wait for the
+      // mount effects to settle, then assert the panel is NOT rendered.
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith('/api/profile');
+      });
+      expect(screen.queryByTestId('driver-stats-panel')).not.toBeInTheDocument();
     });
   });
 
   describe('API calls', () => {
-    it('fetches the profile and the driver record on mount', async () => {
+    it('fetches the profile on mount without the driver-record lookup', async () => {
       renderDriverHome();
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('/api/profile');
       });
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/tracking/drivers?limit=1');
-      });
+      // The driver-record lookup only fed the removed stats panel.
+      expect(global.fetch).not.toHaveBeenCalledWith('/api/tracking/drivers?limit=1');
     });
   });
 

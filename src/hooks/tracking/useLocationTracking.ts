@@ -5,6 +5,7 @@ import type { LocationUpdate } from '@/types/tracking';
 import { getLocationStore } from '@/utils/indexedDB/locationStore';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { setNativePostThrottleMs } from '@/lib/tracking/capacitor-tracking';
+import { createMotionState, nextMotionState } from '@/lib/tracking/motion-state';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
@@ -66,6 +67,13 @@ const getIOSBrowserName = (): string => {
 const TRACKING_INTERVAL = 30000; // 30 seconds
 const MAX_RETRY_ATTEMPTS = 3;
 
+// Offline-queue flush pacing. The 2026-08 test drive fired dozens of queued
+// POSTs within one second and 78/84 got 429'd — the flush must trickle, and a
+// 429 must stop it entirely until the backoff elapses (mirrored in
+// public/service-worker.js).
+const OFFLINE_FLUSH_SPACING_MS = 250;
+const OFFLINE_FLUSH_429_BACKOFF_MS = 30_000;
+
 // High accuracy options - for GPS when available
 const HIGH_ACCURACY_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
@@ -98,6 +106,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
+  // Moving/stopped hysteresis (see src/lib/tracking/motion-state.ts). Kept in
+  // a ref so it survives re-renders without re-creating the callback chain.
+  const motionStateRef = useRef(createMotionState());
   // Admin-configurable sync throttle (matches the server rate limit). Kept in
   // a ref so a settings refetch doesn't re-create the callback chain and tear
   // down the geolocation watcher.
@@ -196,6 +207,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     const heading = position.coords.heading ?? 0;
     const accuracy = position.coords.accuracy ?? 0;
 
+    motionStateRef.current = nextMotionState(motionStateRef.current, position.coords.speed);
+
     return {
       driverId,
       coordinates: {
@@ -208,7 +221,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       altitude: position.coords.altitude ?? undefined,
       batteryLevel: await getBatteryLevel(),
       activityType: determineActivityType(speed),
-      isMoving: speed > 1, // Moving if speed > 1 m/s
+      isMoving: motionStateRef.current.isMoving,
       timestamp: new Date(position.timestamp)
     };
   }, [getDriverId]);
@@ -240,6 +253,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const postLocation = useCallback(
     async (location: LocationUpdate): Promise<{ success: boolean; error?: string }> => {
       try {
+        // GPS fix time (not send time) — offline-replayed points keep their
+        // original timestamp because the queue stores full LocationUpdates.
+        const fixMs = new Date(location.timestamp as Date | string).getTime();
         const res = await fetch('/api/tracking/locations', {
           method: 'POST',
           credentials: 'include',
@@ -255,6 +271,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
             battery_level:
               location.batteryLevel != null ? Math.round(location.batteryLevel) : undefined,
             is_moving: location.isMoving,
+            timestamp: Number.isFinite(fixMs)
+              ? new Date(fixMs).toISOString()
+              : undefined,
           }),
         });
         if (res.status === 429) {
@@ -281,10 +300,19 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     [],
   );
 
+  // Flush coordination: never run two flushes at once (start + online event +
+  // the 2-minute interval can all fire close together), and honor the 429
+  // backoff gate before touching the queue again.
+  const flushInFlightRef = useRef(false);
+  const flushBackoffUntilRef = useRef(0);
+
   // Sync offline locations to server
   const syncOfflineLocations = useCallback(async () => {
     if (!isOnline) return;
+    if (flushInFlightRef.current) return;
+    if (Date.now() < flushBackoffUntilRef.current) return;
 
+    flushInFlightRef.current = true;
     try {
       const locationStore = locationStoreRef.current;
       const unsyncedLocations = await locationStore.getUnsyncedLocations();
@@ -297,7 +325,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       let successCount = 0;
       let failureCount = 0;
 
-      for (const storedLocation of unsyncedLocations) {
+      for (let i = 0; i < unsyncedLocations.length; i++) {
+        const storedLocation = unsyncedLocations[i]!;
         try {
           // Convert stored location back to LocationUpdate format
           const locationUpdate: LocationUpdate = {
@@ -318,6 +347,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
           if (result.success) {
             await locationStore.markAsSynced(storedLocation.id);
             successCount++;
+          } else if (result.error?.includes('Rate limit')) {
+            // 429: stop the whole flush. The item stays queued untouched (not
+            // a failure of the item itself), and the backoff gate keeps every
+            // caller away until the server has room again.
+            flushBackoffUntilRef.current = Date.now() + OFFLINE_FLUSH_429_BACKOFF_MS;
+            break;
           } else {
             await locationStore.incrementSyncAttempts(storedLocation.id);
             failureCount++;
@@ -333,6 +368,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
           await locationStore.incrementSyncAttempts(storedLocation.id);
           failureCount++;
         }
+
+        // Trickle the queue instead of bursting it into the rate limiter.
+        if (i < unsyncedLocations.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, OFFLINE_FLUSH_SPACING_MS));
+        }
       }
 
       // Update unsynced count
@@ -343,6 +383,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       await locationStore.clearOldSyncedLocations(7);
     } catch (error) {
       console.error('Error during offline sync:', error);
+    } finally {
+      flushInFlightRef.current = false;
     }
   }, [isOnline, postLocation]);
 
@@ -361,6 +403,10 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       const result = await postLocation(location);
       if (!result.success) {
         if (result.error?.includes('Rate limit')) {
+          // Close the throttle gate too: without this, every subsequent GPS
+          // tick re-POSTs immediately and keeps tripping the server limiter
+          // (the 2026-08 429 storm on the live path).
+          lastSyncTimeRef.current = now;
           return;
         }
         throw new Error(result.error || 'Failed to update location');
@@ -534,6 +580,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const stopTracking = useCallback(() => {
     setIsTracking(false);
     isTrackingRef.current = false;
+    motionStateRef.current = createMotionState();
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);

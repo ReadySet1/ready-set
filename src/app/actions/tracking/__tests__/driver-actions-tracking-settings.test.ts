@@ -92,8 +92,13 @@ function mockEndShiftQueries(blockingCount: bigint) {
     if (sql.includes("FROM driver_shifts")) {
       return Promise.resolve([{ driver_id: DRIVER_ID, status: "active" }]);
     }
-    if (sql.includes("AS n")) {
-      return Promise.resolve([{ n: blockingCount }]);
+    if (sql.includes("end-shift-blockers")) {
+      return Promise.resolve(
+        Array.from({ length: Number(blockingCount) }, (_, i) => ({
+          order_number: `ORD-${i + 1}`,
+          reason: "ACTIVE_DELIVERY",
+        })),
+      );
     }
     return Promise.resolve([]);
   });
@@ -126,7 +131,7 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.activeDeliveries).toBe(2);
 
     const blockingCall = mockQueryRaw.mock.calls.find(
-      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
     );
     expect(blockingCall).toBeDefined();
     const [sql, ...params] = blockingCall!;
@@ -155,7 +160,7 @@ describe("endDriverShift imminent-pickup guard window", () => {
     expect(res.success).toBe(true);
 
     const blockingCall = mockQueryRaw.mock.calls.find(
-      ([sql]) => typeof sql === "string" && sql.includes("AS n"),
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
     );
     const [sql, ...params] = blockingCall!;
     // No imminent-pickup branch and no dangling $2 parameter.
@@ -176,6 +181,29 @@ describe("endDriverShift imminent-pickup guard window", () => {
     const res = await endDriverShift(SHIFT_ID, endLocation);
     expect(res.success).toBe(false);
     expect(res.activeDeliveries).toBe(1);
+  });
+
+  it("excludes orders with a PENDING return request from BOTH blocking terms", async () => {
+    mockGetSettings.mockResolvedValue(TRACKING_SETTINGS_DEFAULTS);
+    // 0 blockers: the only assignment has a pending return request.
+    mockEndShiftQueries(0n);
+
+    const res = await endDriverShift(SHIFT_ID, endLocation);
+    expect(res.success).toBe(true);
+
+    const blockingCall = mockQueryRaw.mock.calls.find(
+      ([sql]) => typeof sql === "string" && sql.includes("end-shift-blockers"),
+    );
+    expect(blockingCall).toBeDefined();
+    const [sql] = blockingCall!;
+    // Both terms carry a NOT EXISTS guard against delivery_return_requests:
+    // the deliveries mirror keys on order_number, the dispatch join on the
+    // catering/on-demand order id.
+    const notExists = (sql.match(/NOT EXISTS\s*\(\s*SELECT 1 FROM delivery_return_requests/g) || []).length;
+    expect(notExists).toBe(2);
+    expect(sql).toContain('rr.order_number = deliveries.order_number');
+    expect(sql).toContain('rr.order_id = COALESCE(cr.id, od.id)');
+    expect(sql).toContain("rr.status = 'PENDING'");
   });
 });
 

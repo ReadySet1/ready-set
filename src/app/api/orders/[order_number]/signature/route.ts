@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { getRequestUser } from '@/utils/supabase/request-user';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPickupSignatureImage } from '@/utils/supabase/storage';
 import * as Sentry from '@sentry/nextjs';
@@ -23,9 +23,8 @@ export async function POST(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(

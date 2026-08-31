@@ -20,6 +20,7 @@ import {
   endShiftBreak,
 } from '@/app/actions/tracking/driver-actions';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { createClient } from '@/utils/supabase/client';
 
 const mockStartShiftBreak = startShiftBreak as jest.MockedFunction<typeof startShiftBreak>;
 const mockEndShiftBreak = endShiftBreak as jest.MockedFunction<typeof endShiftBreak>;
@@ -545,6 +546,98 @@ describe('useDriverShift', () => {
       });
 
       expect(result.current.isShiftActive).toBe(false);
+    });
+  });
+
+  describe('Bearer auth transport (2026-08 stale-cookie failure)', () => {
+    // jest.resetAllMocks wipes the global supabase browser-client mock, so
+    // each test pins the session it needs.
+    const mockBrowserSession = (token: string | null) => {
+      (createClient as jest.Mock).mockReturnValue({
+        auth: {
+          getSession: jest.fn().mockResolvedValue({
+            data: { session: token ? { access_token: token } : null },
+          }),
+        },
+      });
+    };
+
+    it('attaches the Bearer token to the active + end shift fetches when a session exists', async () => {
+      mockBrowserSession('tok-abc');
+      setActiveShift(mockShift);
+
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.currentShift).toEqual(mockShift);
+      });
+
+      let success: boolean;
+      await act(async () => {
+        success = await result.current.endShift(mockShiftId, mockLocation);
+      });
+      expect(success!).toBe(true);
+
+      const endCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/end',
+      );
+      expect(endCall![1].headers).toEqual(
+        expect.objectContaining({
+          Authorization: 'Bearer tok-abc',
+          'Content-Type': 'application/json',
+        }),
+      );
+      // Cookie fallback stays in place alongside the Bearer transport.
+      expect(endCall![1].credentials).toBe('include');
+
+      const activeCall = (global.fetch as jest.Mock).mock.calls.find(([u]) =>
+        String(u).includes('/api/tracking/shifts/active'),
+      );
+      expect(activeCall![1].headers).toEqual(
+        expect.objectContaining({ Authorization: 'Bearer tok-abc' }),
+      );
+    });
+
+    it('attaches the Bearer token to the start-shift fetch', async () => {
+      mockBrowserSession('tok-abc');
+
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      setActiveShift(null, mockShift);
+      await act(async () => {
+        await result.current.startShift(mockLocation);
+      });
+
+      const startCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/start',
+      );
+      expect(startCall![1].headers).toEqual(
+        expect.objectContaining({ Authorization: 'Bearer tok-abc' }),
+      );
+    });
+
+    it('sends no Authorization header (cookies only) when there is no session', async () => {
+      mockBrowserSession(null);
+      setActiveShift(mockShift);
+
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.currentShift).toEqual(mockShift);
+      });
+
+      let success: boolean;
+      await act(async () => {
+        success = await result.current.endShift(mockShiftId, mockLocation);
+      });
+      expect(success!).toBe(true);
+
+      const endCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/end',
+      );
+      expect(endCall![1].headers).not.toHaveProperty('Authorization');
+      expect(endCall![1].credentials).toBe('include');
     });
   });
 

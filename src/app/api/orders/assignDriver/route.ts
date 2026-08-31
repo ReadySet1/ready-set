@@ -187,9 +187,20 @@ export async function POST(request: Request) {
           deliveryDriverId = driverRecord?.id ?? null;
         }
 
+        // The update branch must fully reset the row, not just stamp
+        // assignedAt: after a return-to-dispatch the mirror sits
+        // CANCELLED + soft-deleted with the previous driver, and a
+        // re-assignment has to resurrect it or the order never reappears
+        // in the new driver's feed.
         await prisma.delivery.upsert({
           where: { orderNumber: dbOrderNumber },
-          update: { assignedAt: new Date() },
+          update: {
+            driverId: deliveryDriverId,
+            status: 'ASSIGNED',
+            deletedAt: null,
+            cancelledAt: null,
+            assignedAt: new Date(),
+          },
           create: {
             orderNumber: dbOrderNumber,
             deliveryAddress: '',

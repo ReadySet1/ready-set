@@ -55,7 +55,7 @@ This directory contains GitHub Actions workflows for automated testing and deplo
 2. **Deploy to Production**
    - Only runs for `main` branch
    - Requires all CI checks to pass
-   - Deploys via Vercel Git integration
+   - Deployment gate only; the real deploy is `build-and-push.yml` → GHCR → Dokploy auto-deploy
    - Includes post-deployment verification
 
 3. **Deploy to Development**
@@ -103,8 +103,8 @@ All test environment variables are configured in `jest.setup.ts`. No additional 
 ### Required for Deployment
 
 Configure these as GitHub Secrets:
-- `VERCEL_TOKEN` - Vercel deployment token (if using Vercel CLI)
-- Production environment variables (handled by Vercel)
+- `GITHUB_TOKEN` (built-in) - pushes the image to GHCR in `build-and-push.yml`
+- Production environment variables live in Dokploy (application → Environment)
 
 ## Local Testing
 
@@ -170,7 +170,7 @@ pnpm build
 - **Test Results:** View in GitHub Actions logs
 - **Coverage Reports:** Download from workflow artifacts
 - **Playwright Reports:** Download from workflow artifacts
-- **Deployment Status:** Check Vercel dashboard
+- **Deployment Status:** Check the Dokploy dashboard (and `/api/health` for the live version)
 
 ## Performance
 

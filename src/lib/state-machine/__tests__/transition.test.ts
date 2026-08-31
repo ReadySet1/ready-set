@@ -1,5 +1,5 @@
 import { CateringStatus, DriverStatus } from '@/types/user';
-import { transitionOrder } from '../transition';
+import { transitionOrder, returnOrderToDispatch } from '../transition';
 import { StateTransitionError } from '../types';
 
 type UpdateCall = { where: { id: string }; data: Record<string, unknown> };
@@ -221,5 +221,35 @@ describe('transitionOrder — side effects', () => {
     expect(kinds).not.toContain('notify_customer');
     expect(kinds).not.toContain('upsert_delivery_timestamp');
     expect(kinds).toContain('invalidate_cache');
+  });
+});
+
+describe('returnOrderToDispatch — sanctioned reverse move', () => {
+  it('writes ACTIVE + null driverStatus on a catering order', async () => {
+    const { tx, cateringCalls, onDemandCalls } = makeFakeTx();
+
+    await returnOrderToDispatch(tx, 'catering', 'order-r1');
+
+    expect(onDemandCalls).toHaveLength(0);
+    expect(cateringCalls).toHaveLength(1);
+    expect(cateringCalls[0]?.where).toEqual({ id: 'order-r1' });
+    expect(cateringCalls[0]?.data.status).toBe(CateringStatus.ACTIVE);
+    // driverStatus must be explicitly nulled — NOT skipped/undefined
+    // (transitionOrder's applyUpdate can never write null, which is why this
+    // helper exists).
+    expect(cateringCalls[0]?.data.driverStatus).toBeNull();
+    expect(cateringCalls[0]?.data.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it('routes to onDemand.update for on_demand orders', async () => {
+    const { tx, cateringCalls, onDemandCalls } = makeFakeTx();
+
+    await returnOrderToDispatch(tx, 'on_demand', 'order-r2');
+
+    expect(cateringCalls).toHaveLength(0);
+    expect(onDemandCalls).toHaveLength(1);
+    expect(onDemandCalls[0]?.where).toEqual({ id: 'order-r2' });
+    expect(onDemandCalls[0]?.data.status).toBe(CateringStatus.ACTIVE);
+    expect(onDemandCalls[0]?.data.driverStatus).toBeNull();
   });
 });

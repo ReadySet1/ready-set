@@ -112,6 +112,8 @@ const createMockMap = () => {
     addLayer: jest.fn().mockImplementation(function(this: any) { return this; }),
     removeLayer: jest.fn().mockImplementation(function(this: any) { return this; }),
     getLayer: jest.fn().mockReturnValue(undefined),
+    setLayoutProperty: jest.fn().mockImplementation(function(this: any) { return this; }),
+    setPaintProperty: jest.fn().mockImplementation(function(this: any) { return this; }),
 
     // Sources
     addSource: jest.fn().mockImplementation(function(this: any) { return this; }),

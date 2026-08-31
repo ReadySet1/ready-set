@@ -4,6 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { MapPin, Headset, Truck } from "lucide-react";
 import ScheduleDialog from "@/components/Logistics/Schedule";
+import { isMarketingCtaEnabled } from "@/config/marketing-cta-config";
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -46,6 +47,10 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 };
 
 const CateringFeatures: React.FC = () => {
+  const showGetStartedCta = isMarketingCtaEnabled(
+    "CATERING_FEATURES_GET_STARTED",
+  );
+
   const features = [
     {
       icon: <MapPin size={80} strokeWidth={2} />,
@@ -105,28 +110,30 @@ const CateringFeatures: React.FC = () => {
         </div>
 
         {/* Get Started Button */}
-        <motion.div
-          className="mt-16 flex justify-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          <ScheduleDialog
-            buttonText="Get Started"
-            dialogTitle="Schedule an Appointment"
-            dialogDescription="Choose a convenient time for your appointment."
-            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-            customButton={
-              <motion.button
-                className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Get Started
-              </motion.button>
-            }
-          />
-        </motion.div>
+        {showGetStartedCta && (
+          <motion.div
+            className="mt-16 flex justify-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            <ScheduleDialog
+              buttonText="Get Started"
+              dialogTitle="Schedule an Appointment"
+              dialogDescription="Choose a convenient time for your appointment."
+              calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+              customButton={
+                <motion.button
+                  className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Get Started
+                </motion.button>
+              }
+            />
+          </motion.div>
+        )}
       </div>
     </section>
   );

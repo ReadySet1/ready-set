@@ -31,9 +31,20 @@ jest.mock("@/components/Logistics/Schedule", () => {
   };
 });
 
+jest.mock("@/config/marketing-cta-config", () => ({
+  isMarketingCtaEnabled: jest.fn(),
+}));
+
+import { isMarketingCtaEnabled } from "@/config/marketing-cta-config";
+
+const mockIsMarketingCtaEnabled = isMarketingCtaEnabled as jest.MockedFunction<
+  typeof isMarketingCtaEnabled
+>;
+
 describe("CateringFeatures", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsMarketingCtaEnabled.mockReturnValue(false);
   });
 
   describe("Component Rendering", () => {
@@ -140,60 +151,81 @@ describe("CateringFeatures", () => {
   });
 
   describe("ScheduleDialog Integration", () => {
-    it("renders the Get Started button section", () => {
+    it("does not render the Get Started button when the flag is off", () => {
       render(<CateringFeatures />);
-
-      // The motion.div wraps the ScheduleDialog, we need to find it
-      const button = screen.getByRole("button", { name: "Get Started" });
-      
-      // Traverse up to find the div with mt-16 flex justify-center
-      let currentElement = button.parentElement;
-      let found = false;
-      
-      while (currentElement && !found) {
-        const classes = currentElement.className || "";
-        if (classes.includes("mt-16") && classes.includes("flex") && classes.includes("justify-center")) {
-          found = true;
-          expect(currentElement).toHaveClass("mt-16", "flex", "justify-center");
-          break;
-        }
-        currentElement = currentElement.parentElement;
-      }
-      
-      expect(found).toBe(true);
+      expect(
+        screen.queryByRole("button", { name: "Get Started" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("schedule-dialog")).not.toBeInTheDocument();
     });
 
-    it("renders the ScheduleDialog with correct props", () => {
+    it("reads the CATERING_FEATURES_GET_STARTED flag", () => {
       render(<CateringFeatures />);
-
-      const scheduleDialog = screen.getByTestId("schedule-dialog");
-      expect(scheduleDialog).toBeInTheDocument();
-
-      expect(screen.getByTestId("schedule-dialog-button-text")).toHaveTextContent("Get Started");
-      expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent("Schedule an Appointment");
-      expect(screen.getByTestId("schedule-dialog-description")).toHaveTextContent("Choose a convenient time for your appointment.");
-      expect(screen.getByTestId("schedule-dialog-calendar-url")).toHaveTextContent("https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true");
-    });
-
-    it("renders the custom button within ScheduleDialog", () => {
-      render(<CateringFeatures />);
-
-      const customButton = screen.getByTestId("schedule-dialog-custom-button");
-      expect(customButton).toBeInTheDocument();
-
-      const button = customButton.querySelector("button");
-      expect(button).toHaveTextContent("Get Started");
-      expect(button).toHaveClass(
-        "rounded-lg",
-        "bg-yellow-400",
-        "px-12",
-        "py-4",
-        "font-[Montserrat]",
-        "text-lg",
-        "font-extrabold",
-        "text-gray-800",
-        "shadow-md"
+      expect(mockIsMarketingCtaEnabled).toHaveBeenCalledWith(
+        "CATERING_FEATURES_GET_STARTED",
       );
+    });
+
+    describe("when the flag is on", () => {
+      beforeEach(() => {
+        mockIsMarketingCtaEnabled.mockReturnValue(true);
+      });
+
+      it("renders the Get Started button section", () => {
+        render(<CateringFeatures />);
+
+        // The motion.div wraps the ScheduleDialog, we need to find it
+        const button = screen.getByRole("button", { name: "Get Started" });
+
+        // Traverse up to find the div with mt-16 flex justify-center
+        let currentElement = button.parentElement;
+        let found = false;
+
+        while (currentElement && !found) {
+          const classes = currentElement.className || "";
+          if (classes.includes("mt-16") && classes.includes("flex") && classes.includes("justify-center")) {
+            found = true;
+            expect(currentElement).toHaveClass("mt-16", "flex", "justify-center");
+            break;
+          }
+          currentElement = currentElement.parentElement;
+        }
+
+        expect(found).toBe(true);
+      });
+
+      it("renders the ScheduleDialog with correct props", () => {
+        render(<CateringFeatures />);
+
+        const scheduleDialog = screen.getByTestId("schedule-dialog");
+        expect(scheduleDialog).toBeInTheDocument();
+
+        expect(screen.getByTestId("schedule-dialog-button-text")).toHaveTextContent("Get Started");
+        expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent("Schedule an Appointment");
+        expect(screen.getByTestId("schedule-dialog-description")).toHaveTextContent("Choose a convenient time for your appointment.");
+        expect(screen.getByTestId("schedule-dialog-calendar-url")).toHaveTextContent("https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true");
+      });
+
+      it("renders the custom button within ScheduleDialog", () => {
+        render(<CateringFeatures />);
+
+        const customButton = screen.getByTestId("schedule-dialog-custom-button");
+        expect(customButton).toBeInTheDocument();
+
+        const button = customButton.querySelector("button");
+        expect(button).toHaveTextContent("Get Started");
+        expect(button).toHaveClass(
+          "rounded-lg",
+          "bg-yellow-400",
+          "px-12",
+          "py-4",
+          "font-[Montserrat]",
+          "text-lg",
+          "font-extrabold",
+          "text-gray-800",
+          "shadow-md"
+        );
+      });
     });
   });
 
@@ -309,6 +341,7 @@ describe("CateringFeatures", () => {
     });
 
     it("applies motion props to Get Started button section", () => {
+      mockIsMarketingCtaEnabled.mockReturnValue(true);
       render(<CateringFeatures />);
 
       const button = screen.getByRole("button", { name: "Get Started" });

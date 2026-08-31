@@ -54,6 +54,12 @@ export interface DeliveryTracking {
   id: string;
   cateringRequestId?: string;  // Link to existing CateringRequest
   onDemandId?: string;         // Link to OnDemand orders
+  /** Human order number (SSE feed carries it) — keys order-scoped API calls
+   *  like the admin Unassign → return-to-dispatch POST. */
+  orderNumber?: string;
+  /** True when the order has a PENDING driver return request awaiting
+   *  dispatch review — such orders no longer block ending the shift. */
+  pendingReturn?: boolean;
   driverId: string;
   dispatchDriverId?: string;   // Profile ID from dispatch assignment (for legacy dispatches)
   status: DriverStatus;        // Use existing enum

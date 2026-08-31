@@ -206,7 +206,7 @@ describe('Driver Tracking Actions', () => {
         status: 'active',
       }]);
       // End-shift guard: blocking active-delivery count (none).
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
       // Mock UPDATE shift with end time
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       // Mock UPDATE shift with mileage (safety net)
@@ -248,7 +248,7 @@ describe('Driver Tracking Actions', () => {
         status: 'paused',
       }]);
       // End-shift guard: blocking active-delivery count (none).
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
       const result = await endDriverShift(validShiftId, mockLocationUpdate);
@@ -262,7 +262,7 @@ describe('Driver Tracking Actions', () => {
         status: 'active',
       }]);
       // End-shift guard: blocking active-delivery count (none).
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Database error')
       );
@@ -279,7 +279,7 @@ describe('Driver Tracking Actions', () => {
         status: 'active',
       }]);
       // End-shift guard: blocking active-delivery count (none).
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 0 }]);
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
 
       const result = await endDriverShift(validShiftId, mockLocationUpdate, 25.5);
@@ -293,12 +293,20 @@ describe('Driver Tracking Actions', () => {
         status: 'active',
       }]);
       // Blocking guard reports active deliveries → end is refused.
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ n: 2 }]);
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
+        { order_number: 'CAT-001', reason: 'ACTIVE_DELIVERY' },
+        { order_number: 'OD-002', reason: 'PICKUP_DUE' },
+      ]);
 
       const result = await endDriverShift(validShiftId, mockLocationUpdate);
 
       expect(result.success).toBe(false);
       expect(result.activeDeliveries).toBe(2);
+      // The copy must offer the driver-side escape hatch (return to dispatch),
+      // not just "ask dispatch" — see issue #508.
+      expect(result.error).toBe(
+        'Orders CAT-001 and OD-002 are still assigned to you. Complete them or return them to dispatch before ending your shift.',
+      );
       expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
     });
 

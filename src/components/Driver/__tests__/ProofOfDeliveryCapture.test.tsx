@@ -38,6 +38,7 @@ jest.mock('@/lib/utils/image-compression', () => ({
   revokeImagePreviewUrl: jest.fn(),
   formatFileSize: jest.fn((size: number) => `${(size / 1024).toFixed(1)} KB`),
   generatePODFilename: jest.fn((deliveryId: string) => `pod-${deliveryId}.jpg`),
+  POD_PHOTO_TOO_LARGE_ERROR: 'Photo too large to upload — try again',
 }));
 
 // Mock UI components
@@ -129,11 +130,14 @@ jest.mock('@/types/proof-of-delivery', () => ({
     pathPrefix: 'deliveries',
     filenamePattern: 'delivery-{deliveryId}-{timestamp}.jpg',
   },
+  // Client-side hard limit: server cap (4MB) minus safety margin (0.5MB).
+  POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES: 3.5 * 1024 * 1024,
 }));
 
 const { useCameraPermission, isMobileDevice } = require('@/hooks/useCameraPermission');
 const { usePODOfflineQueue } = require('@/hooks/tracking/usePODOfflineQueue');
 const { compressImage, createImagePreviewUrl, revokeImagePreviewUrl } = require('@/lib/utils/image-compression');
+const { createClient } = require('@/utils/supabase/client');
 
 describe('ProofOfDeliveryCapture', () => {
   const defaultProps = {
@@ -282,17 +286,43 @@ describe('ProofOfDeliveryCapture', () => {
       expect(screen.getByText('Camera not available. You can select an existing photo instead.')).toBeInTheDocument();
     });
 
-    it('should request permission when Take Photo is clicked', async () => {
-      mockRequestPermission.mockResolvedValue(true);
+  });
 
+  describe('First-Tap Capture (iOS user-activation)', () => {
+    // Field bug (order RSQA-20260818-2347, iOS WKWebView): the first tap on
+    // "Take Photo" did nothing and only the second tap opened the camera.
+    // iOS only honors a programmatic file-input click inside the tap's
+    // transient user activation; awaiting a getUserMedia permission
+    // round-trip before calling input.click() consumes that activation.
+
+    it('opens the file picker synchronously on the first tap even while permission is unresolved', () => {
+      // A pending permission request must never gate the picker.
+      mockRequestPermission.mockReturnValue(new Promise(() => {})); // never resolves
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const clickSpy = jest.spyOn(input, 'click');
+
+      const takePhotoButton = screen.getByText('Take Photo').closest('button');
+      fireEvent.click(takePhotoButton!);
+
+      // Synchronous assertion — no waitFor: the click must fire inside the
+      // gesture, not after a microtask/permission round-trip.
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not run a getUserMedia round-trip from the tap', () => {
       render(<ProofOfDeliveryCapture {...defaultProps} />);
 
       const takePhotoButton = screen.getByText('Take Photo').closest('button');
       fireEvent.click(takePhotoButton!);
 
-      await waitFor(() => {
-        expect(mockRequestPermission).toHaveBeenCalled();
-      });
+      // The capture input prompts for camera access natively; a concurrent
+      // getUserMedia while the native camera sheet opens can fail with
+      // NotReadable/NotAllowed and wrongly flip the UI into a permission
+      // error even though the picker works fine.
+      expect(mockRequestPermission).not.toHaveBeenCalled();
     });
   });
 
@@ -468,9 +498,38 @@ describe('ProofOfDeliveryCapture', () => {
       });
     });
 
-    it('should show error on upload failure', async () => {
+    it('attaches the Bearer token to the upload when a session exists (stale-cookie transport)', async () => {
+      (createClient as jest.Mock).mockReturnValueOnce({
+        auth: {
+          getSession: jest
+            .fn()
+            .mockResolvedValue({ data: { session: { access_token: 'tok-pod' } } }),
+        },
+      });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: 'https://example.com/photo.jpg' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      const init = (global.fetch as jest.Mock).mock.calls[0][1];
+      // Bearer token attached; Content-Type left to the browser so the
+      // multipart boundary stays intact.
+      expect(init.headers).toEqual({ Authorization: 'Bearer tok-pod' });
+      expect(init.method).toBe('POST');
+    });
+
+    it('should surface the HTTP status and server message on upload failure', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
         json: async () => ({ error: 'Upload failed' }),
       });
 
@@ -479,10 +538,168 @@ describe('ProofOfDeliveryCapture', () => {
       fireEvent.click(uploadButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Upload failed')).toBeInTheDocument();
+        expect(
+          screen.getByText('Failed to upload proof of delivery (500 — Upload failed)'),
+        ).toBeInTheDocument();
       });
 
-      expect(defaultProps.onError).toHaveBeenCalledWith('Upload failed');
+      expect(defaultProps.onError).toHaveBeenCalledWith(
+        'Failed to upload proof of delivery (500 — Upload failed)',
+      );
+    });
+
+    it('distinguishes a 429 and logs the full detail to the console', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: async () => ({ error: 'Too many requests' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to upload proof of delivery (429 — Too many requests)'),
+        ).toBeInTheDocument();
+      });
+
+      // The field failure left zero client-side trace — the full detail must
+      // reach the console for remote debugging.
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('falls back to the status text when the error body is not JSON', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 413,
+        statusText: 'Payload Too Large',
+        json: async () => {
+          throw new Error('not json');
+        },
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to upload proof of delivery (413 — Payload Too Large)'),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('queues the photo for background sync when fetch fails at the network level', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      // Safari reports network failures as TypeError('Load failed') — no
+      // "fetch" in the message — and Chrome as TypeError('Failed to fetch').
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Load failed'));
+      mockQueuePODUpload.mockResolvedValueOnce(true);
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      // Network error → offline queue; the queued UI tells the driver it
+      // retries when back online.
+      await waitFor(() => {
+        expect(mockQueuePODUpload).toHaveBeenCalled();
+      });
+      expect(screen.getByText('Photo Queued')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Oversized Compressed Photo Guard', () => {
+    const TOO_LARGE_ERROR = 'Photo too large to upload — try again';
+
+    /** A File whose reported size exceeds the 3.5MB client-side limit. */
+    const makeOversizedFile = (): File => {
+      const file = new File(['x'], 'big.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
+      return file;
+    };
+
+    const selectFileAndGetUploadButton = async (): Promise<HTMLButtonElement> => {
+      const input = document.querySelector('input[type="file"]');
+      const file = new File(['test image'], 'test.jpg', { type: 'image/jpeg' });
+      fireEvent.change(input!, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Retake')).toBeInTheDocument();
+      });
+
+      const buttons = screen.getAllByTestId('button');
+      const uploadButton = buttons.find(
+        btn => btn.textContent?.includes('Upload') && btn.getAttribute('data-variant') !== 'outline'
+      );
+      return uploadButton as HTMLButtonElement;
+    };
+
+    it('never reaches fetch when the compressed result is still over the cap', async () => {
+      compressImage.mockResolvedValueOnce({
+        file: makeOversizedFile(),
+        originalSize: 9 * 1024 * 1024,
+        compressedSize: 5 * 1024 * 1024,
+        compressionRatio: 1.8,
+        wasCompressed: true,
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(TOO_LARGE_ERROR)).toBeInTheDocument();
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockQueuePODUpload).not.toHaveBeenCalled();
+      expect(defaultProps.onError).toHaveBeenCalledWith(TOO_LARGE_ERROR);
+    });
+
+    it('does not offer "Complete anyway" for a photo the server would always reject', async () => {
+      compressImage.mockResolvedValueOnce({
+        file: makeOversizedFile(),
+        originalSize: 9 * 1024 * 1024,
+        compressedSize: 5 * 1024 * 1024,
+        compressionRatio: 1.8,
+        wasCompressed: true,
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(TOO_LARGE_ERROR)).toBeInTheDocument();
+      });
+
+      // Queueing a >cap file would replay a doomed POST forever.
+      expect(screen.queryByText(/Complete anyway/)).not.toBeInTheDocument();
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
+    });
+
+    it('uploads normally when the compressed result is within the cap', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: 'https://example.com/photo.jpg' }),
+      });
+
+      render(<ProofOfDeliveryCapture {...defaultProps} />);
+      const uploadButton = await selectFileAndGetUploadButton();
+      fireEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      expect(defaultProps.onError).not.toHaveBeenCalled();
     });
   });
 

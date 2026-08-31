@@ -26,14 +26,17 @@ import {
   revokeImagePreviewUrl,
   formatFileSize,
   generatePODFilename,
+  POD_PHOTO_TOO_LARGE_ERROR,
 } from '@/lib/utils/image-compression';
 import {
   ProofOfDeliveryCaptureProps,
   PODCaptureState,
   PODMetadata,
   POD_STORAGE_CONFIG,
+  POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES,
 } from '@/types/proof-of-delivery';
 import { usePODOfflineQueue } from '@/hooks/tracking/usePODOfflineQueue';
+import { withBearerAuth } from '@/lib/auth/bearer-session';
 import { Badge } from '@/components/ui/badge';
 
 /**
@@ -61,7 +64,7 @@ export function ProofOfDeliveryCapture({
   hideTitle = false,
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { permission, requestPermission, error: permissionError, isCameraSupported } = useCameraPermission();
+  const { permission, error: permissionError, isCameraSupported } = useCameraPermission();
   const { offlineStatus, queuePODUpload, syncPendingUploads } = usePODOfflineQueue();
 
   const [state, setState] = useState<PODCaptureState>({
@@ -121,17 +124,20 @@ export function ProofOfDeliveryCapture({
   }, [onError]);
 
   /**
-   * Trigger the file input click
+   * Trigger the file input click.
+   *
+   * Must stay fully synchronous: iOS WKWebView only honors a programmatic
+   * file-input click inside the tap's transient user activation. The previous
+   * `await requestPermission()` (a getUserMedia round-trip) consumed it, so
+   * the first tap silently did nothing and only the second tap opened the
+   * camera (2026-08 field failure). The capture input prompts for camera
+   * access natively, so no getUserMedia pre-flight is needed — and running
+   * one while the native camera sheet opens can fail with
+   * NotReadable/NotAllowed and wrongly flip the UI into a permission error.
    */
-  const handleCaptureClick = useCallback(async () => {
-    // Request permission if needed (this will trigger browser dialog)
-    if (permission === 'prompt' || permission === 'denied') {
-      await requestPermission();
-    }
-
-    // Open file picker / camera
+  const handleCaptureClick = useCallback(() => {
     fileInputRef.current?.click();
-  }, [permission, requestPermission]);
+  }, []);
 
   /**
    * Handle retake - clear current preview
@@ -196,6 +202,23 @@ export function ProofOfDeliveryCapture({
       return;
     }
 
+    // Belt-and-suspenders size guard: never send (or queue) a file the server
+    // would always reject — surface a clear error before any doomed POST.
+    if (state.file.size > POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES) {
+      if (state.previewUrl) {
+        revokeImagePreviewUrl(state.previewUrl);
+      }
+      setState({
+        status: 'error',
+        previewUrl: null,
+        uploadProgress: 0,
+        error: POD_PHOTO_TOO_LARGE_ERROR,
+        file: null, // no "Complete anyway" — queueing it would replay a doomed upload
+      });
+      onError?.(POD_PHOTO_TOO_LARGE_ERROR);
+      return;
+    }
+
     const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
 
     // Offline → queue for later and let completion proceed.
@@ -218,15 +241,26 @@ export function ProofOfDeliveryCapture({
       formData.append('file', state.file, filename);
       formData.append('deliveryId', deliveryId);
 
-      // Upload to API
+      // Upload to API. Bearer token survives stale auth cookies (2026-08
+      // field failure); no manual Content-Type — the browser must set the
+      // multipart boundary.
       const response = await fetch(apiEndpoint, {
         method: 'POST',
+        headers: await withBearerAuth(),
         body: formData,
       });
 
       if (!response.ok) {
+        // Surface the HTTP status + server message: the field failure showed
+        // only "Failed to upload proof of delivery" with no way to tell
+        // 401/403/413/429 apart, client- or server-side.
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Upload failed');
+        const serverMessage =
+          errorData.error || errorData.message || response.statusText || '';
+        console.error('POD upload failed:', response.status, errorData);
+        throw new Error(
+          `Failed to upload proof of delivery (${response.status}${serverMessage ? ` — ${serverMessage}` : ''})`,
+        );
       }
 
       const result = await response.json();
@@ -250,8 +284,13 @@ export function ProofOfDeliveryCapture({
       // Notify parent of successful upload
       onUploadComplete(result.url, metadata);
     } catch (err) {
-      // Network error → queue silently for background sync and complete.
-      if (!navigator.onLine || (err instanceof TypeError && err.message.includes('fetch'))) {
+      // Always leave a console trace — the field failure was undebuggable.
+      console.error('POD upload error:', err);
+
+      // Network-level failure (fetch rejects with TypeError: Chrome "Failed to
+      // fetch", Safari "Load failed") → queue for background sync and complete;
+      // the queued UI tells the driver it retries when back online.
+      if (!navigator.onLine || err instanceof TypeError) {
         await queueForLater();
         return;
       }
@@ -266,7 +305,7 @@ export function ProofOfDeliveryCapture({
       }));
       onError?.(errorMessage);
     }
-  }, [state.file, deliveryId, uploadEndpoint, offlineStatus.isOnline, queueForLater, onUploadComplete, onError]);
+  }, [state.file, state.previewUrl, deliveryId, uploadEndpoint, offlineStatus.isOnline, queueForLater, onUploadComplete, onError]);
 
   /**
    * Render camera permission error state

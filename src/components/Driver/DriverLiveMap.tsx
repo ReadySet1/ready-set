@@ -30,6 +30,14 @@ interface DriverLiveMapProps {
 /** Hard cap on trail vertices kept in memory / handed to Mapbox. */
 const MAX_TRAIL_POINTS = 1000;
 
+/** One breadcrumb of the on-map trail: coordinate + fix time (ms epoch). The
+ *  fix time keeps the line drawable in capture order even when the seed fetch
+ *  and live GPS interleave or the server returns out-of-order rows. */
+export interface TrailEntry {
+  coord: [number, number];
+  t: number;
+}
+
 /** Ungeocoded addresses come through as the [0, 0] fallback from
  *  useDriverDeliveries.toCoords — never plot those (Gulf of Guinea). */
 function isValidCoords(c: unknown): c is [number, number] {
@@ -101,11 +109,38 @@ function createPickupMarkerElement(): HTMLDivElement {
  *  (drop every other point) instead of shifting points off the head — the old
  *  `length > 200 → shift()` behavior made the beginning of the route visibly
  *  disappear ~20 min into a shift. */
-function capTrail(trail: [number, number][]): [number, number][] {
+function capTrail(trail: TrailEntry[]): TrailEntry[] {
   if (trail.length <= MAX_TRAIL_POINTS) return trail;
   const half = Math.floor(trail.length / 2);
   const olderThinned = trail.slice(0, half).filter((_, i) => i % 2 === 0);
   return [...olderThinned, ...trail.slice(half)];
+}
+
+/** Merge server-seeded history with live-accumulated entries: drop invalid
+ *  coordinates and times, order by fix time, collapse consecutive duplicates
+ *  (the history/live seam repeats points), and cap to the point budget. */
+export function mergeTrailSeed(
+  seed: TrailEntry[],
+  live: TrailEntry[],
+): TrailEntry[] {
+  const merged = [...seed, ...live]
+    .filter((e) => isValidCoords(e.coord) && Number.isFinite(e.t))
+    .sort((a, b) => a.t - b.t);
+  const deduped: TrailEntry[] = [];
+  for (const entry of merged) {
+    const prev = deduped[deduped.length - 1];
+    if (prev && prev.coord[0] === entry.coord[0] && prev.coord[1] === entry.coord[1]) {
+      continue;
+    }
+    deduped.push(entry);
+  }
+  // capTrail is single-pass (sized for one-point-at-a-time growth); a bulk
+  // seed can overshoot the budget, so thin until it fits.
+  let capped = deduped;
+  while (capped.length > MAX_TRAIL_POINTS) {
+    capped = capTrail(capped);
+  }
+  return capped;
 }
 
 /**
@@ -133,7 +168,7 @@ export default function DriverLiveMap({
   const [mapError, setMapError] = useState<string | null>(null);
 
   // Maintain an in-memory trail of recent coordinates for the session
-  const trailRef = useRef<[number, number][]>([]);
+  const trailRef = useRef<TrailEntry[]>([]);
   // Track last centered position to detect large jumps
   const lastCenteredRef = useRef<{ lng: number; lat: number } | null>(null);
   // Which shift the trail was last seeded from (guards against re-fetching).
@@ -170,24 +205,27 @@ export default function DriverLiveMap({
         );
         if (!res.ok) return; // best-effort: live accumulation still works
         const data = await res.json();
-        const history: [number, number][] = (data?.data ?? [])
-          .filter((l: any) => new Date(l.recorded_at).getTime() >= startMs)
-          .reverse() // API returns DESC; the trail wants oldest -> newest
-          .map((l: any) => l?.location?.coordinates)
-          .filter(
-            (c: unknown): c is [number, number] =>
-              Array.isArray(c) && c.length === 2,
-          );
+        // mergeTrailSeed sorts by fix time (the API's DESC order and any
+        // out-of-order rows both come out right) and validates coordinates.
+        const history: TrailEntry[] = (data?.data ?? [])
+          .map((l: any) => ({
+            coord: l?.location?.coordinates as [number, number],
+            t: new Date(l?.recorded_at).getTime(),
+          }))
+          .filter((e: TrailEntry) => Number.isFinite(e.t) && e.t >= startMs);
         if (history.length === 0) return;
-        // History first, then whatever live points arrived while fetching.
-        trailRef.current = capTrail([...history, ...trailRef.current]);
+        // Merge with whatever live points arrived while fetching.
+        trailRef.current = mergeTrailSeed(history, trailRef.current);
         const source = mapRef.current?.getSource('driver-trail') as
           | mapboxgl.GeoJSONSource
           | undefined;
         source?.setData({
           type: 'Feature',
           properties: {},
-          geometry: { type: 'LineString', coordinates: trailRef.current },
+          geometry: {
+            type: 'LineString',
+            coordinates: trailRef.current.map((e) => e.coord),
+          },
         });
       } catch (error) {
         if ((error as Error)?.name !== 'AbortError') {
@@ -328,8 +366,11 @@ export default function DriverLiveMap({
           .addTo(mapRef.current);
       }
 
-      // Update the in-memory trail (thinned, never truncated from the head)
-      trailRef.current.push([lng, lat]);
+      // Update the in-memory trail (thinned, never truncated from the head),
+      // stamping each entry with the GPS fix time so seed merges stay ordered.
+      const fixMs = new Date(currentLocation.timestamp as Date | string).getTime();
+      const t = Number.isFinite(fixMs) ? fixMs : Date.now();
+      trailRef.current.push({ coord: [lng, lat], t });
       trailRef.current = capTrail(trailRef.current);
 
       const source = mapRef.current.getSource('driver-trail') as mapboxgl.GeoJSONSource | undefined;
@@ -339,7 +380,7 @@ export default function DriverLiveMap({
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: trailRef.current,
+            coordinates: trailRef.current.map((e) => e.coord),
           },
         });
       }
@@ -376,7 +417,7 @@ export default function DriverLiveMap({
         lastCenteredRef.current = { lng, lat };
         // Clear the trail when position jumps significantly (it's not a continuous path)
         if (trailRef.current.length > 1) {
-          trailRef.current = [[lng, lat]];
+          trailRef.current = [{ coord: [lng, lat], t }];
         }
       }
     } catch (error) {

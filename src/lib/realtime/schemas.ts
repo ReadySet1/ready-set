@@ -6,7 +6,9 @@
  */
 
 import { z } from 'zod';
-import { InputSanitizer } from '@/lib/validation';
+// IMPORTANT: keep this module free of @/lib/validation — that module pulls in
+// isomorphic-dompurify/jsdom, which breaks /driver SSR (ERR_REQUIRE_ESM).
+import { sanitizePlainText } from './sanitize-text';
 import { REALTIME_EVENTS } from './types';
 import { PAYLOAD_CONFIG } from '@/constants/realtime-config';
 
@@ -44,7 +46,7 @@ const LocationSchema = CoordinateSchema.extend({
     .string()
     .min(1, 'Address is required')
     .max(PAYLOAD_CONFIG.MAX_ADDRESS_LENGTH, `Address must not exceed ${PAYLOAD_CONFIG.MAX_ADDRESS_LENGTH} characters`)
-    .transform((val) => InputSanitizer.sanitizeText(val)),
+    .transform((val) => sanitizePlainText(val)),
 });
 
 /**
@@ -70,7 +72,7 @@ const SanitizedStringSchema = (maxLength: number = PAYLOAD_CONFIG.MAX_STRING_LEN
     .string()
     .min(1, 'String cannot be empty')
     .max(maxLength, `String must not exceed ${maxLength} characters`)
-    .transform((val) => InputSanitizer.sanitizeText(val));
+    .transform((val) => sanitizePlainText(val));
 
 // ============================================================================
 // Driver Location Schemas
@@ -182,6 +184,8 @@ export const DeliveryTrackingStatusSchema = z.enum([
   'EN_ROUTE_TO_CLIENT',
   'ARRIVED_TO_CLIENT',
   'COMPLETED',
+  // Dispatch cancelled the order — tells the assigned driver to stop.
+  'CANCELLED',
 ]);
 
 export const OrderTypeSchema = z.enum(['catering', 'on_demand']);

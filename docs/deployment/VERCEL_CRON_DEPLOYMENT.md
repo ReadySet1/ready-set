@@ -1,9 +1,12 @@
 # Vercel Cron Jobs - Deployment Guide
 
+> **Superseded (2026-08-18).** Ready Set no longer runs on Vercel and `vercel.json` has been removed.
+> The current schedules and the VPS crontab live in [CRON_JOBS.md](./CRON_JOBS.md). This file is kept for history only.
+
 **Project:** Ready Set
 **Feature:** Automated Quarantine Cleanup
 **Generated:** 2025-10-29
-**Status:** Production Ready
+**Status:** Historical (Vercel era)
 
 ---
 

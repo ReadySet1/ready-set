@@ -89,7 +89,11 @@ export type DeliveryStatusEvent =
   | "driver:arrived"
   | "delivery:completed"
   | "delivery:delayed"
-  | "delivery:failed";
+  | "delivery:failed"
+  // Driver return-request lifecycle (helpdesk approval flow):
+  | "delivery:return_requested"
+  | "delivery:return_approved"
+  | "delivery:return_rejected";
 
 export interface PushNotificationPayload {
   token: string;
@@ -123,6 +127,8 @@ export function mapDispatchStatusToPushEvent(status: string): DeliveryStatusEven
       return "delivery:delayed";
     case "FAILED":
       return "delivery:failed";
+    case "RETURN_REQUESTED":
+      return "delivery:return_requested";
     default:
       return null;
   }
@@ -161,6 +167,24 @@ export function buildDeliveryStatusMessage(
       return {
         title: "Delivery could not be completed",
         body: "We were unable to complete your delivery. Please check your order status for details.",
+      };
+    case "delivery:return_requested":
+      // Sent to dispatch (ADMIN/SUPER_ADMIN/HELPDESK) — action required.
+      return {
+        title: "Return Requested - Action Required",
+        body: "A driver has requested to return a delivery to dispatch. Review the request in the tracking dashboard.",
+      };
+    case "delivery:return_approved":
+      // Sent to the requesting driver on approval.
+      return {
+        title: "Return approved",
+        body: "Dispatch approved your return request. The delivery is back with dispatch and no longer assigned to you.",
+      };
+    case "delivery:return_rejected":
+      // Sent to the requesting driver on rejection.
+      return {
+        title: "Return request declined",
+        body: "Dispatch declined your return request. The delivery is still assigned to you.",
       };
     default: {
       const exhaustiveCheck: never = event;

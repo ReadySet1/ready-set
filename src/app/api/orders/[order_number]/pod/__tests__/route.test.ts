@@ -28,8 +28,8 @@ const mockedSentry = Sentry as unknown as { captureException: jest.Mock };
 
 const PHOTO_URL = 'https://cdn.example.com/pod/photo.jpg';
 
-const makeFile = () =>
-  ({ name: 'pod.jpg', type: 'image/jpeg', size: 1024 } as unknown as File);
+const makeFile = (size = 1024) =>
+  ({ name: 'pod.jpg', type: 'image/jpeg', size } as unknown as File);
 
 const createPostRequest = (orderNumber = 'CAT-001', file: File | null = makeFile()) => {
   const req = new NextRequest(`http://localhost:3000/api/orders/${orderNumber}/pod`, {
@@ -107,6 +107,99 @@ describe('POD POST — deliveries mirror regression', () => {
     expect(data.url).toBe(PHOTO_URL);
     // Failure is reported to Sentry, not surfaced to the client.
     expect(mockedSentry.captureException).toHaveBeenCalled();
+  });
+
+  describe('upload size gate (4MB boundary)', () => {
+    // Field bug 2026-08-11: client compression is best-effort, so a phone photo
+    // "compressed to about 2MB" straddled the old exact 2MB cap. The server cap
+    // is now 4MB (safe under Vercel's ~4.5MB body limit) as the suspenders to
+    // the client's tighter compression belt.
+    const FOUR_MB = 4 * 1024 * 1024;
+
+    it('accepts a file just under the 4MB cap', async () => {
+      const { POST } = await importRoute();
+
+      const res = await POST(createPostRequest('CAT-001', makeFile(FOUR_MB - 1)), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockedUpload).toHaveBeenCalled();
+    });
+
+    it('rejects a file over the 4MB cap without touching storage', async () => {
+      const { POST } = await importRoute();
+
+      const res = await POST(createPostRequest('CAT-001', makeFile(FOUR_MB + 1)), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('4MB');
+      expect(mockedUpload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Bearer token identity (stale-cookie transport)', () => {
+    // 2026-08 field failure: iOS Safari let the auth cookies go stale while
+    // the JS session stayed valid — the route must accept the Bearer token
+    // even when cookie auth resolves no user.
+    const bearerOnlyGetUser = () =>
+      jest.fn(async (token?: string) =>
+        token === 'tok-123'
+          ? { data: { user: { id: 'user-1' } }, error: null }
+          : { data: { user: null }, error: { message: 'no cookie session' } },
+      );
+
+    it('POST resolves the user from the Authorization header when cookies are stale', async () => {
+      const getUser = bearerOnlyGetUser();
+      mockedCreateClient.mockResolvedValue({ auth: { getUser } } as any);
+
+      const req = new NextRequest('http://localhost:3000/api/orders/CAT-001/pod', {
+        method: 'POST',
+        headers: { authorization: 'Bearer tok-123' },
+      });
+      (req as any).formData = jest.fn().mockResolvedValue({
+        get: (k: string) => (k === 'file' ? makeFile() : null),
+      });
+
+      const { POST } = await importRoute();
+      const res = await POST(req, { params: Promise.resolve({ order_number: 'CAT-001' }) });
+
+      expect(res.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith('tok-123');
+    });
+
+    it('GET resolves the user from the Authorization header when cookies are stale', async () => {
+      const getUser = bearerOnlyGetUser();
+      mockedCreateClient.mockResolvedValue({ auth: { getUser } } as any);
+      (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
+        id: 'order-123',
+        orderNumber: 'CAT-001',
+        fileUploads: [],
+      });
+
+      const req = new NextRequest('http://localhost:3000/api/orders/CAT-001/pod', {
+        method: 'GET',
+        headers: { authorization: 'Bearer tok-123' },
+      });
+
+      const { GET } = await importRoute();
+      const res = await GET(req, { params: Promise.resolve({ order_number: 'CAT-001' }) });
+
+      expect(res.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith('tok-123');
+    });
+
+    it('POST still authenticates via cookies when no Authorization header is sent', async () => {
+      const { POST } = await importRoute();
+      const res = await POST(createPostRequest('CAT-001'), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+      expect(res.status).toBe(200);
+    });
   });
 
   it('does not run the mirror when the upload itself fails', async () => {

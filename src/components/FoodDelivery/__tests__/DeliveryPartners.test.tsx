@@ -134,6 +134,8 @@ describe("DeliveryPartners", () => {
         "La BBQ logo",
         "CaterCow logo",
         "FreshRoll Vietnamese Rolls & Bowls logo",
+        "Donaji logo",
+        "Componere Culinary and Events logo",
       ];
 
       expectedPartners.forEach((altText) => {
@@ -157,6 +159,8 @@ describe("DeliveryPartners", () => {
         "/images/food/partners/labbq",
         "/images/food/partners/catercow",
         "/images/food/partners/freshroll",
+        "/images/food/partners/donaji",
+        "/images/food/partners/componere",
       ];
 
       expectedPaths.forEach((path) => {
@@ -169,8 +173,8 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const hoverContainers = document.querySelectorAll(".hover\\:scale-105");
-      // 8 in grid + 4 overflow = 12 total
-      expect(hoverContainers).toHaveLength(12);
+      // 8 in grid + 6 overflow = 14 total
+      expect(hoverContainers).toHaveLength(14);
     });
   });
 
@@ -183,7 +187,7 @@ describe("DeliveryPartners", () => {
       expect(overflowContainer).toHaveClass("mt-8", "flex", "flex-wrap", "justify-center", "md:mt-10");
     });
 
-    it("renders all overflow partner images (Food.ee, La BBQ, CaterCow, FreshRoll)", () => {
+    it("renders all overflow partner images (Food.ee, La BBQ, CaterCow, FreshRoll, Donaji, Componere)", () => {
       render(<DeliveryPartners />);
 
       const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
@@ -206,14 +210,22 @@ describe("DeliveryPartners", () => {
       const freshrollImage = overflow.getByAltText("FreshRoll Vietnamese Rolls & Bowls logo");
       expect(freshrollImage).toBeInTheDocument();
       expect(freshrollImage).toHaveAttribute("src", "/images/food/partners/freshroll");
+
+      const donajiImage = overflow.getByAltText("Donaji logo");
+      expect(donajiImage).toBeInTheDocument();
+      expect(donajiImage).toHaveAttribute("src", "/images/food/partners/donaji");
+
+      const componereImage = overflow.getByAltText("Componere Culinary and Events logo");
+      expect(componereImage).toBeInTheDocument();
+      expect(componereImage).toHaveAttribute("src", "/images/food/partners/componere");
     });
 
-    it("renders exactly 4 images in the overflow section", () => {
+    it("renders exactly 6 images in the overflow section", () => {
       render(<DeliveryPartners />);
 
       const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
       const overflowImages = overflowContainer?.querySelectorAll("img");
-      expect(overflowImages).toHaveLength(4);
+      expect(overflowImages).toHaveLength(6);
     });
 
     it("applies correct styling to overflow partner links", () => {
@@ -222,7 +234,7 @@ describe("DeliveryPartners", () => {
       const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
       const innerLinks = overflowContainer?.querySelectorAll("a.relative.h-24");
 
-      expect(innerLinks).toHaveLength(4);
+      expect(innerLinks).toHaveLength(6);
       innerLinks?.forEach((link) => {
         expect(link).toHaveClass(
           "relative",
@@ -239,11 +251,11 @@ describe("DeliveryPartners", () => {
   });
 
   describe("Conditional Rendering", () => {
-    it("renders all 12 partners total", () => {
+    it("renders all 14 partners total", () => {
       render(<DeliveryPartners />);
 
       const allImages = screen.getAllByRole("img");
-      expect(allImages).toHaveLength(12);
+      expect(allImages).toHaveLength(14);
     });
 
     it("renders the correct number of partners in each section", () => {
@@ -254,10 +266,10 @@ describe("DeliveryPartners", () => {
       const gridImages = grid?.querySelectorAll("img");
       expect(gridImages).toHaveLength(8);
 
-      // Overflow section should have 4 partners
+      // Overflow section should have 6 partners
       const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
       const overflowImages = overflowContainer?.querySelectorAll("img");
-      expect(overflowImages).toHaveLength(4);
+      expect(overflowImages).toHaveLength(6);
     });
   });
 
@@ -275,7 +287,7 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const links = screen.getAllByRole("link");
-      expect(links).toHaveLength(12);
+      expect(links).toHaveLength(14);
 
       links.forEach((link) => {
         expect(link).toHaveClass(
@@ -434,13 +446,19 @@ describe("DeliveryPartners", () => {
         url: "https://freshroll.square.site/",
         alt: "FreshRoll Vietnamese Rolls & Bowls logo",
       },
+      { name: "Donaji", url: "https://www.donajisf.com/" },
+      {
+        name: "Componere",
+        url: "https://www.componere.co/",
+        alt: "Componere Culinary and Events logo",
+      },
     ];
 
     it("renders all partner logos as clickable links", () => {
       render(<DeliveryPartners />);
 
       const links = screen.getAllByRole("link");
-      expect(links).toHaveLength(12);
+      expect(links).toHaveLength(14);
     });
 
     it("renders partner links with correct href URLs", () => {
@@ -581,7 +599,7 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const images = screen.getAllByRole("img");
-      expect(images).toHaveLength(12);
+      expect(images).toHaveLength(14);
     });
   });
 });

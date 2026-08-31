@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
+import { notifyDriverOrderCancelled } from "@/services/notifications/driver-cancellation";
 import { DriverStatus } from "@/types/user";
 import { REALTIME_CHANNELS, REALTIME_EVENTS } from "@/lib/realtime/types";
 import type { DeliveryStatusUpdatedPayload } from "@/lib/realtime/schemas";
@@ -30,6 +31,11 @@ import {
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
+import { resolveActiveShiftIdForDriver } from '@/services/tracking/active-shift';
+import {
+  POST_PICKUP_DRIVER_STATUSES,
+  voidPendingReturnRequests,
+} from '@/lib/services/return-requests';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -43,6 +49,49 @@ const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
 
 // Driver→Order status mapping is owned by the state machine; see
 // src/lib/state-machine/driver-state.ts (deriveOrderStatusFromDriver).
+
+// Terminal `deliveries` mirror statuses — the cancel cascade leaves these alone.
+const TERMINAL_DELIVERY_STATUSES = ['COMPLETED', 'CANCELLED', 'DELIVERED'] as const;
+
+/**
+ * Broadcast one delivery-status event on the `driver-status` channel through
+ * the Supabase admin client (subscribe → send → always release the channel).
+ * Shared by the driver-status progression broadcast and the cancellation
+ * alert; callers defer it with runAfterResponse so it never blocks or fails
+ * the PATCH.
+ */
+async function broadcastDeliveryStatus(payload: DeliveryStatusUpdatedPayload): Promise<void> {
+  const adminSupabase = await createAdminClient();
+  const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
+
+  try {
+    // Subscribe first (required to send)
+    await new Promise<void>((resolve, reject) => {
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          resolve();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          reject(new Error(`Channel subscription failed: ${status}`));
+        }
+      });
+    });
+
+    const result = await channel.send({
+      type: 'broadcast',
+      event: REALTIME_EVENTS.DELIVERY_STATUS_UPDATED,
+      payload,
+    });
+
+    if (result !== 'ok') {
+      console.warn('Delivery status broadcast returned non-ok result:', result);
+    }
+  } finally {
+    // Always release the channel, even on subscribe/send failure
+    await adminSupabase.removeChannel(channel).catch((cleanupErr) => {
+      console.warn('Failed to remove realtime channel during cleanup:', cleanupErr);
+    });
+  }
+}
 
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
@@ -663,7 +712,13 @@ export async function PATCH(
     // here (from existingOrder — the update never changes dispatch).
     const dbOrderNumber = (existingOrder as any).orderNumber as string;
     let mirror:
-      | { field: string; now: Date; driverId: string | null; deliveryAddress: string }
+      | {
+          field: string;
+          now: Date;
+          driverId: string | null;
+          shiftId: string | null;
+          deliveryAddress: string;
+        }
       | null = null;
     if (driverStatus) {
       const timestampField = getDeliveryTimestampField(driverStatus);
@@ -680,10 +735,16 @@ export async function PATCH(
           });
           deliveryDriverId = driverRecord?.id ?? null;
         }
+        // Stamp the driver's ACTIVE shift on the mirror so the
+        // delivery-count trigger can attribute the delivery to the shift.
+        // driver_shifts.driver_id references drivers.id (same as
+        // deliveries.driver_id), NOT the dispatch's profile id.
+        const deliveryShiftId = await resolveActiveShiftIdForDriver(deliveryDriverId);
         mirror = {
           field: timestampField,
           now,
           driverId: deliveryDriverId,
+          shiftId: deliveryShiftId,
           deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',
         };
         justSetTimestamp = { field: timestampField, value: now };
@@ -694,6 +755,11 @@ export async function PATCH(
     // mirror upsert throws, the whole transaction rolls back (a retryable 500 via
     // the outer catch) instead of silently stranding a terminal order.
     let updatedOrder: Order | null = null;
+    // Captured before the transaction: the cancel cascade below deletes the
+    // order's dispatches, so after commit `updatedOrder.dispatches` is empty
+    // and the driver who must be told about the cancellation is gone.
+    const cancelledDriver: { id: string; name?: string | null; contactNumber?: string | null } | null =
+      (existingOrder as any).dispatches?.[0]?.driver ?? null;
     const updatedRaw: any = await prisma.$transaction(async (tx) => {
       let updated: any;
       if (orderType === 'catering') {
@@ -730,6 +796,29 @@ export async function PATCH(
         });
       }
 
+      // Cancel cascade (2026-08-21 drive finding #8): an admin cancel used to
+      // leave the driver-side rows alive — `dispatches` kept, `deliveries`
+      // mirror still ASSIGNED — so the end-shift guard deadlocked the driver.
+      // Same transaction: drop the dispatch rows and close the live mirror
+      // rows. The order row itself keeps driverStatus as-is (the enum has no
+      // CANCELLED value); every consumer checks `status` first.
+      if (updateData.status === 'CANCELLED') {
+        await tx.dispatch.deleteMany({
+          where:
+            orderType === 'catering'
+              ? { cateringRequestId: updated.id }
+              : { onDemandId: updated.id },
+        });
+        await tx.delivery.updateMany({
+          where: {
+            orderNumber: dbOrderNumber,
+            deletedAt: null,
+            status: { notIn: [...TERMINAL_DELIVERY_STATUSES] },
+          },
+          data: { status: 'CANCELLED', cancelledAt: new Date() },
+        });
+      }
+
       if (mirror) {
         await tx.delivery.upsert({
           where: { orderNumber: dbOrderNumber },
@@ -740,11 +829,15 @@ export async function PATCH(
             [mirror.field]: mirror.now,
             status: driverStatus,
             ...(mirror.driverId ? { driverId: mirror.driverId } : {}),
+            // Only stamp the shift when resolved — never clear an existing
+            // linkage on a later transition where the shift already ended.
+            ...(mirror.shiftId ? { shiftId: mirror.shiftId } : {}),
           },
           create: {
             orderNumber: dbOrderNumber,
             deliveryAddress: mirror.deliveryAddress,
             driverId: mirror.driverId,
+            shiftId: mirror.shiftId,
             status: driverStatus,
             [mirror.field]: mirror.now,
           },
@@ -755,7 +848,53 @@ export async function PATCH(
     });
     updatedOrder = { ...updatedRaw, order_type: orderType } as Order;
 
+    // Advancing to PICKED_UP (or beyond) means the driver kept working the
+    // delivery, so any PENDING return request no longer applies — auto-void
+    // it server-side. Non-fatal: the status update already committed.
+    if (
+      driverStatus &&
+      POST_PICKUP_DRIVER_STATUSES.includes(String(driverStatus))
+    ) {
+      try {
+        await voidPendingReturnRequests((updatedRaw as any).id);
+      } catch (voidErr) {
+        console.warn('Failed to auto-void pending return requests:', voidErr);
+      }
+    }
+
     if (updatedOrder) {
+      // Dispatch cancelled an order that had a driver: tell the driver on both
+      // channels (SMS + in-app realtime alert) so they stop working it
+      // (2026-08-22 product decision). Both legs are deferred past the
+      // response and never fail the PATCH.
+      if (updateData.status === 'CANCELLED' && cancelledDriver) {
+        const cancelledOrderNumber: string = (updatedOrder as any).orderNumber ?? order_number;
+        const cancelledOrderId: string = (updatedOrder as any).id;
+
+        runAfterResponse('Failed to SMS driver about cancellation:', () =>
+          notifyDriverOrderCancelled({
+            driverProfileId: cancelledDriver.id,
+            driverName: cancelledDriver.name,
+            phone: cancelledDriver.contactNumber,
+            orderNumber: cancelledOrderNumber,
+            orderType,
+          }),
+        );
+
+        const cancelPayload: DeliveryStatusUpdatedPayload = {
+          orderId: cancelledOrderId,
+          orderNumber: cancelledOrderNumber,
+          orderType,
+          driverId: cancelledDriver.id,
+          status: 'CANCELLED',
+          previousStatus: (existingOrder as any)?.driverStatus || undefined,
+          driverName: cancelledDriver.name || undefined,
+          timestamp: new Date().toISOString(),
+        };
+        runAfterResponse('Failed to broadcast order cancellation to driver:', () =>
+          broadcastDeliveryStatus(cancelPayload),
+        );
+      }
 
       // Send notifications for driver status updates (non-blocking)
       if (driverStatus) {
@@ -793,8 +932,7 @@ export async function PATCH(
 
         // Broadcast real-time delivery status update (non-blocking)
         // This allows helpdesk, vendor, and client users to see status changes instantly
-        const broadcastDeliveryStatus = async () => {
-          const adminSupabase = await createAdminClient();
+        const broadcastDriverStatusUpdate = async () => {
           const dispatch = (updatedOrder as any).dispatches?.[0];
           const driverId = dispatch?.driver?.id;
           const driverName = dispatch?.driver?.name;
@@ -809,48 +947,19 @@ export async function PATCH(
             orderNumber: (updatedOrder as any).orderNumber,
             orderType: orderType,
             driverId: driverId,
-            status: driverStatus as 'ASSIGNED' | 'EN_ROUTE_TO_VENDOR' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
+            status: driverStatus as DeliveryStatusUpdatedPayload['status'],
             previousStatus: (existingOrder as any)?.driverStatus || undefined,
             driverName: driverName || undefined,
             timestamp: new Date().toISOString(),
           };
 
-          const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
-
-          try {
-            // Subscribe first (required to send)
-            await new Promise<void>((resolve, reject) => {
-              channel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                  resolve();
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                  reject(new Error(`Channel subscription failed: ${status}`));
-                }
-              });
-            });
-
-            // Send the broadcast
-            const result = await channel.send({
-              type: 'broadcast',
-              event: REALTIME_EVENTS.DELIVERY_STATUS_UPDATED,
-              payload,
-            });
-
-            if (result !== 'ok') {
-              console.warn('Delivery status broadcast returned non-ok result:', result);
-            }
-          } finally {
-            // Always release the channel, even on subscribe/send failure
-            await adminSupabase.removeChannel(channel).catch((cleanupErr) => {
-              console.warn('Failed to remove realtime channel during cleanup:', cleanupErr);
-            });
-          }
+          await broadcastDeliveryStatus(payload);
         };
 
         // Deferred past the response with after() (via runAfterResponse) so the
         // broadcast isn't dropped when Vercel freezes the function — previously a
         // bare dangling promise, so live-tracking updates were lost ~half the time.
-        runAfterResponse('Failed to broadcast delivery status update:', broadcastDeliveryStatus);
+        runAfterResponse('Failed to broadcast delivery status update:', broadcastDriverStatusUpdate);
 
         // Registry-driven partner status webhook (e.g. CaterCow). The driver
         // app advances order status through THIS route, so the outbound

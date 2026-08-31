@@ -88,7 +88,12 @@ jest.mock('@/hooks/tracking/useAdminRealtimeTracking', () => ({
 // Mock dynamic imports
 jest.mock('next/dynamic', () => () => {
   const MockLiveDriverMap = ({ drivers, deliveries, recentLocations, compact }: any) => (
-    <div data-testid="live-driver-map" data-compact={compact}>
+    <div
+      data-testid="live-driver-map"
+      data-compact={compact}
+      data-driver-ids={drivers.map((d: any) => d.id).join(',')}
+      data-location-count={recentLocations.length}
+    >
       Mock Map - {drivers.length} drivers
     </div>
   );
@@ -188,6 +193,13 @@ jest.mock('../DeliveryAssignmentPanel', () => {
         {deliveries.length} deliveries
       </div>
     );
+  };
+});
+
+// Return-requests panel fetches its own data — covered by its own suite.
+jest.mock('../ReturnRequestsPanel', () => {
+  return function MockReturnRequestsPanel() {
+    return <div data-testid="return-requests-panel">0 return requests</div>;
   };
 });
 
@@ -611,6 +623,21 @@ describe('AdminTrackingDashboard', () => {
 
       expect(screen.getByTestId('delivery-assignment-panel')).toBeInTheDocument();
     });
+
+    it('should surface the pending return-requests panel above the assignment list', () => {
+      render(<AdminTrackingDashboard />);
+
+      fireEvent.click(screen.getByTestId('tab-deliveries'));
+
+      const returnPanel = screen.getByTestId('return-requests-panel');
+      const assignmentPanel = screen.getByTestId('delivery-assignment-panel');
+      expect(returnPanel).toBeInTheDocument();
+      // Requests need a dispatcher decision — they render before assignments.
+      expect(
+        returnPanel.compareDocumentPosition(assignmentPanel) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
   });
 
   describe('Export Functionality', () => {
@@ -643,6 +670,62 @@ describe('AdminTrackingDashboard', () => {
       render(<AdminTrackingDashboard />);
 
       expect(screen.getByText(/Last update:/)).toBeInTheDocument();
+    });
+
+    it('derives the header time from the hook lastUpdatedAt, not from list lengths', () => {
+      const { useAdminRealtimeTracking } = require('@/hooks/tracking/useAdminRealtimeTracking');
+      const first = new Date('2026-08-21T18:48:43');
+      const second = new Date('2026-08-21T19:02:10');
+      const base = useAdminRealtimeTracking();
+
+      useAdminRealtimeTracking.mockReturnValue({ ...base, lastUpdatedAt: first });
+      const { rerender } = render(<AdminTrackingDashboard />);
+      expect(screen.getByText(/Last update:/)).toHaveTextContent(first.toLocaleTimeString());
+
+      // Same driver count, newer ping: the header must move
+      useAdminRealtimeTracking.mockReturnValue({ ...base, lastUpdatedAt: second });
+      rerender(<AdminTrackingDashboard />);
+      expect(screen.getByText(/Last update:/)).toHaveTextContent(second.toLocaleTimeString());
+    });
+  });
+
+  describe('Shared driver state', () => {
+    it('feeds the Overview mini-map and the Live Map the same driver list', () => {
+      render(<AdminTrackingDashboard />);
+
+      const overviewMap = screen.getByTestId('live-driver-map');
+      const overviewIds = overviewMap.getAttribute('data-driver-ids');
+      const overviewLocations = overviewMap.getAttribute('data-location-count');
+      expect(overviewIds).toBe('driver-1,driver-2');
+
+      fireEvent.click(screen.getByTestId('tab-map'));
+
+      const fullMap = screen.getByTestId('live-driver-map');
+      expect(fullMap).toHaveAttribute('data-compact', 'false');
+      expect(fullMap.getAttribute('data-driver-ids')).toBe(overviewIds);
+      expect(fullMap.getAttribute('data-location-count')).toBe(overviewLocations);
+    });
+
+    it('counts every GPS update and sums miles from the shared driver list', () => {
+      const { useAdminRealtimeTracking } = require('@/hooks/tracking/useAdminRealtimeTracking');
+      const base = useAdminRealtimeTracking();
+      useAdminRealtimeTracking.mockReturnValue({
+        ...base,
+        activeDrivers: [
+          { ...mockDriver, totalDistanceMiles: 1.4 },
+          { ...mockOffDutyDriver, totalDistanceMiles: 2.2 },
+        ],
+        recentLocations: [
+          mockLocationData,
+          { ...mockLocationData, recordedAt: '2025-01-01T10:00:10Z' },
+          { ...mockLocationData, recordedAt: '2025-01-01T10:00:20Z' },
+        ],
+      });
+
+      render(<AdminTrackingDashboard />);
+
+      expect(screen.getByText('GPS Updates').previousSibling).toHaveTextContent('3');
+      expect(screen.getByText('Total Miles').previousSibling).toHaveTextContent('4');
     });
   });
 

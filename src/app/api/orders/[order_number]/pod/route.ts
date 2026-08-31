@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { getRequestUser } from '@/utils/supabase/request-user';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
+import {
+  POD_MAX_UPLOAD_SIZE_BYTES,
+  POD_MAX_UPLOAD_SIZE_MB,
+} from '@/types/proof-of-delivery';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -18,9 +22,8 @@ export async function POST(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(
@@ -130,11 +133,14 @@ export async function POST(
       );
     }
 
-    // Validate file size (max 2MB - should be compressed client-side)
-    const maxSize = 2 * 1024 * 1024;
-    if (file.size > maxSize) {
+    // Validate file size — shared cap (client compresses well under this, but
+    // compression is best-effort so the server allows generous headroom).
+    if (file.size > POD_MAX_UPLOAD_SIZE_BYTES) {
       return NextResponse.json(
-        { success: false, error: 'File too large. Maximum size is 2MB.' },
+        {
+          success: false,
+          error: `File too large. Maximum size is ${POD_MAX_UPLOAD_SIZE_MB}MB.`,
+        },
         { status: 400 }
       );
     }
@@ -229,9 +235,8 @@ export async function GET(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(
@@ -329,9 +334,8 @@ export async function DELETE(
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
 
-    // Authenticate user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Authenticate user (Bearer token first, cookie session fallback)
+    const user = await getRequestUser(request);
 
     if (!user?.id) {
       return NextResponse.json(

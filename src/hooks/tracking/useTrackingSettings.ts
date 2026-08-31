@@ -10,11 +10,18 @@
  * values actually came from the server. An editor must never seed its form
  * from the fail-open defaults — saving that form would silently reset every
  * customized setting fleet-wide.
+ *
+ * AUTH: the settings endpoint requires an authenticated caller, so the query
+ * sends the Supabase session's bearer token (plus cookies) and is gated on a
+ * session being present — an unauthenticated page must not poll the endpoint
+ * every minute just to collect 401s.
  */
 
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { createClient } from '@/utils/supabase/client';
 import {
   TRACKING_SETTINGS_DEFAULTS,
   TrackingSettingsPartialSchema,
@@ -27,9 +34,22 @@ interface TrackingSettingsResult {
   fromServer: boolean;
 }
 
-async function fetchTrackingSettings(): Promise<TrackingSettingsResult> {
+type SupabaseBrowserClient = ReturnType<typeof createClient>;
+
+async function fetchTrackingSettings(
+  supabase: SupabaseBrowserClient,
+): Promise<TrackingSettingsResult> {
   try {
-    const response = await fetch('/api/tracking/settings');
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return { settings: TRACKING_SETTINGS_DEFAULTS, fromServer: false };
+    }
+    const response = await fetch('/api/tracking/settings', {
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     if (!response.ok) {
       return { settings: TRACKING_SETTINGS_DEFAULTS, fromServer: false };
     }
@@ -60,9 +80,36 @@ export function useTrackingSettings(): {
   /** True only when the current values were fetched and validated from the server. */
   isServerData: boolean;
 } {
+  const supabase = useMemo(() => createClient(), []);
+
+  // Gate the query (and its 60s polling) on an actual session — an
+  // unauthenticated visitor gets the fail-open defaults with zero requests.
+  const [hasSession, setHasSession] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!cancelled) setHasSession(!!session);
+      })
+      .catch(() => {
+        if (!cancelled) setHasSession(false);
+      });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setHasSession(!!session);
+      },
+    );
+    return () => {
+      cancelled = true;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, [supabase]);
+
   const { data, isFetched } = useQuery({
     queryKey: TRACKING_SETTINGS_QUERY_KEY,
-    queryFn: fetchTrackingSettings,
+    queryFn: () => fetchTrackingSettings(supabase),
+    enabled: hasSession,
     staleTime: 60 * 1000,
     // Long-lived screens (driver portal mid-shift) must converge on admin
     // changes without a remount — matches the server's 60s resolver TTL and

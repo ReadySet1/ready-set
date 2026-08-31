@@ -81,6 +81,20 @@ export const MILEAGE_CONFIG = {
    * Default: 30 seconds
    */
   OUTLIER_MIN_TIME_DELTA_SECONDS: Number(process.env.MILEAGE_OUTLIER_TIME_DELTA) || 30,
+
+  /**
+   * Minimum anchor displacement in meters for the anchor-based odometer.
+   * Distance only accumulates when a point moves at least this far from the
+   * current anchor; smaller displacements are treated as GPS jitter and
+   * ignored (the anchor does not advance).
+   *
+   * Chosen ≥ ~p95 urban-canyon jitter at 14m median accuracy: a walking fix
+   * every ~5s moves ~6m, so consecutive pairs are jitter-dominated, but a 15m
+   * hop from a fixed anchor is real movement. Undercount is bounded by one
+   * threshold per anchor hop.
+   * Default: 15m
+   */
+  MIN_DISPLACEMENT_M: Number(process.env.MILEAGE_MIN_DISPLACEMENT_M) || 15,
 } as const;
 
 /**

@@ -5,7 +5,24 @@ import {
   ImageCompressionOptions,
   DEFAULT_POD_COMPRESSION_OPTIONS,
   POD_VALIDATION_CONSTRAINTS,
+  POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES,
 } from '@/types/proof-of-delivery';
+
+/**
+ * User-facing error when a photo cannot be compressed under the upload cap.
+ * Surfaced client-side BEFORE any upload attempt — never as a failed POST.
+ */
+export const POD_PHOTO_TOO_LARGE_ERROR = 'Photo too large to upload — try again';
+
+/**
+ * Bounded re-compression attempts after the initial pass. browser-image-compression's
+ * maxSizeMB is best-effort, so each retry lowers quality and dimensions further.
+ */
+const MAX_COMPRESSION_RETRIES = 3;
+const RETRY_QUALITY_FACTOR = 0.7;
+const RETRY_DIMENSION_FACTOR = 0.75;
+const MIN_RETRY_QUALITY = 0.3;
+const MIN_RETRY_DIMENSION = 800;
 
 /**
  * Validation error for image files
@@ -123,14 +140,44 @@ export async function compressImage(
   }
 
   try {
-    // Compress the image
-    const compressedFile = await imageCompression(file, {
+    // Initial compression pass with the configured targets
+    let quality = compressionOptions.quality;
+    let maxDimension = compressionOptions.maxWidthOrHeight;
+
+    let compressedFile = await imageCompression(file, {
       maxSizeMB: compressionOptions.maxSizeMB,
-      maxWidthOrHeight: compressionOptions.maxWidthOrHeight,
+      maxWidthOrHeight: maxDimension,
       useWebWorker: compressionOptions.useWebWorker,
       fileType: compressionOptions.fileType,
-      initialQuality: compressionOptions.quality,
+      initialQuality: quality,
     });
+
+    // Guarantee loop: maxSizeMB is best-effort, so if the output is still over
+    // the client-side hard limit, retry with progressively lower quality and
+    // dimensions (bounded — never an infinite loop).
+    let retries = 0;
+    while (
+      compressedFile.size > POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES &&
+      retries < MAX_COMPRESSION_RETRIES
+    ) {
+      retries++;
+      quality = Math.max(MIN_RETRY_QUALITY, quality * RETRY_QUALITY_FACTOR);
+      maxDimension = Math.max(MIN_RETRY_DIMENSION, Math.round(maxDimension * RETRY_DIMENSION_FACTOR));
+
+      compressedFile = await imageCompression(file, {
+        maxSizeMB: compressionOptions.maxSizeMB,
+        maxWidthOrHeight: maxDimension,
+        useWebWorker: compressionOptions.useWebWorker,
+        fileType: compressionOptions.fileType,
+        initialQuality: quality,
+      });
+    }
+
+    // Still over the hard limit → surface a clear error before any upload
+    // attempt instead of letting a doomed POST reach the server.
+    if (compressedFile.size > POD_CLIENT_MAX_COMPRESSED_SIZE_BYTES) {
+      throw new ImageValidationError(POD_PHOTO_TOO_LARGE_ERROR, 'SIZE_TOO_LARGE');
+    }
 
     // Ensure the file has proper extension
     const filename = generateCompressedFilename(file.name);
@@ -146,6 +193,10 @@ export async function compressImage(
       wasCompressed: true,
     };
   } catch (error) {
+    // Preserve the typed too-large error for the capture UI
+    if (error instanceof ImageValidationError) {
+      throw error;
+    }
     // Re-throw with more context
     const message = error instanceof Error ? error.message : 'Unknown compression error';
     throw new Error(`Failed to compress image: ${message}`);

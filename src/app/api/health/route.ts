@@ -36,27 +36,34 @@ interface ServiceHealth {
   details?: Record<string, any>;
 }
 
+// The app runs on a Hetzner (EU) VPS against a us-east-1 database, so a single
+// round trip has a ~90ms floor and the four sub-checks land around 500-700ms
+// when run concurrently. Thresholds sized for that baseline, not co-location.
+const DB_HEALTHY_THRESHOLD_MS = 1000;
+const DB_DEGRADED_THRESHOLD_MS = 3000;
+
 /**
  * Test database connectivity and performance
  */
 async function checkDatabaseHealth(): Promise<ServiceHealth> {
   const start = performance.now();
-  
+
   try {
-    // Test basic connectivity
-    await prismaPooled.$queryRaw`SELECT 1 as test`;
-    
-    // Test a more complex query
-    const userCount = Number(await prismaPooled.profile.count());
-    
-    // Get connection info and debug prepared statements
-    const connectionInfo = await healthCheck.getConnectionInfo();
-    const preparedStatements = await healthCheck.debugPreparedStatements();
-    
+    // All four sub-checks are independent reads; run them concurrently so the
+    // reported latency reflects one round trip, not the sum of four
+    const [, rawUserCount, connectionInfo, preparedStatements] = await Promise.all([
+      prismaPooled.$queryRaw`SELECT 1 as test`,
+      prismaPooled.profile.count(),
+      healthCheck.getConnectionInfo(),
+      healthCheck.debugPreparedStatements()
+    ]);
+
+    const userCount = Number(rawUserCount);
+
     const responseTime = performance.now() - start;
-    
+
     return {
-      status: responseTime < 100 ? 'healthy' : responseTime < 500 ? 'degraded' : 'unhealthy',
+      status: responseTime < DB_HEALTHY_THRESHOLD_MS ? 'healthy' : responseTime < DB_DEGRADED_THRESHOLD_MS ? 'degraded' : 'unhealthy',
       responseTime,
       message: 'Database connection successful',
       details: {
@@ -192,10 +199,11 @@ async function checkExternalAPIsHealth(): Promise<ServiceHealth> {
   const start = performance.now();
   
   try {
+    // Stripe is intentionally not checked: payments are unused and the app
+    // never configures Stripe keys, so including it kept monitoring degraded
     const externalServices = {
       googleMapsConfigured: !!process.env.GOOGLE_MAPS_API_KEY,
       mapboxConfigured: !!process.env.MAPBOX_ACCESS_TOKEN,
-      stripeConfigured: !!(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && process.env.STRIPE_SECRET_KEY),
     };
 
     const configuredServices = Object.values(externalServices).filter(Boolean).length;

@@ -52,15 +52,109 @@ function assertUuid(id: string, field: 'shiftId' | 'driverId'): void {
 }
 
 /**
+ * Minimal GPS point shape fetched for the anchor-based odometer.
+ * The table also stores a PostGIS `location` geography column, but the plain
+ * lat/lng float columns are simplest to consume in TypeScript.
+ */
+export interface OdometerPoint {
+  latitude: number;
+  longitude: number;
+  recorded_at: Date;
+}
+
+/** Mean Earth radius in meters, used for haversine distance. */
+const EARTH_RADIUS_M = 6371000;
+
+/**
+ * Great-circle (haversine) distance in meters between two lat/lng points.
+ */
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const toRad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toRad;
+  const dLng = (lng2 - lng1) * toRad;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * Anchor-based odometer over an ordered GPS trail.
+ *
+ * Instead of summing every consecutive-pair distance (which lets per-fix GPS
+ * jitter dominate true displacement at walking pace), this walks an anchor
+ * through the trail: displacement only accumulates when a point moves at
+ * least MIN_DISPLACEMENT_M from the current anchor, at which point the anchor
+ * advances to that point. Jitter around a stationary or slow-moving anchor
+ * therefore sums to ~zero, while genuine movement accumulates in
+ * >= threshold steps (undercount bounded by one threshold per anchor hop).
+ *
+ * Glitch gates mirror the previous per-segment SQL filters, applied per
+ * candidate anchor hop:
+ * - Non-positive time deltas are skipped
+ * - Hops longer than MAX_SEGMENT_DISTANCE_MILES over a short time are dropped
+ * - Hops whose effective speed exceeds the admin max speed are dropped
+ */
+export function computeAnchorDistanceMeters(
+  points: OdometerPoint[],
+  maxSpeedMs: number,
+  maxSegmentMeters: number
+): number {
+  let anchor = points[0];
+  if (!anchor) {
+    return 0;
+  }
+
+  let totalMeters = 0;
+  for (let i = 1; i < points.length; i++) {
+    const current = points[i]!;
+    const displacementM = haversineMeters(
+      anchor.latitude,
+      anchor.longitude,
+      current.latitude,
+      current.longitude
+    );
+    const dtSeconds =
+      (current.recorded_at.getTime() - anchor.recorded_at.getTime()) / 1000;
+
+    // Ensure positive time delta (duplicate / out-of-order timestamps)
+    if (dtSeconds <= 0) {
+      continue;
+    }
+    // Drop obvious outliers: large jumps within short time
+    if (
+      displacementM > maxSegmentMeters &&
+      dtSeconds < MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS
+    ) {
+      continue;
+    }
+    // Cap effective speed to filter GPS glitches
+    if (displacementM / Math.max(dtSeconds, 1) > maxSpeedMs) {
+      continue;
+    }
+
+    if (displacementM >= MILEAGE_CONFIG.MIN_DISPLACEMENT_M) {
+      totalMeters += displacementM;
+      anchor = current;
+    }
+  }
+
+  return totalMeters;
+}
+
+/**
  * Core helper to calculate distance (in miles) for a driver within a specific
  * time window based on the GPS trail stored in driver_locations.
  *
- * This uses PostGIS ST_Distance over consecutive points ordered by recorded_at,
- * with several quality and safety filters:
- * - Filters out low-accuracy points (accuracy > configured threshold)
- * - Filters out stationary points (speed < configured minimum)
- * - Caps effective segment speed to filter GPS glitches
- * - Drops outlier segments (unrealistic jumps over short time deltas)
+ * Point selection happens in SQL (window bounds, soft-delete, accuracy gate);
+ * distance accumulation happens in TypeScript via the anchor-based odometer
+ * (see computeAnchorDistanceMeters), which suppresses stationary GPS jitter
+ * that a raw consecutive-pair sum would inflate into phantom mileage.
  */
 async function calculateWindowDistanceMiles(
   driverId: string,
@@ -120,70 +214,37 @@ async function calculateWindowDistanceMiles(
     });
   }
 
-  // Convert config values for SQL query
-  const maxSpeedMsForQuery = mphToMs(settings.mileageMaxSpeedMph);
+  // Convert config values for the anchor walk
+  const maxSpeedMs = mphToMs(settings.mileageMaxSpeedMph);
   const maxSegmentMeters = milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES);
 
-  const rows = await prisma.$queryRawUnsafe<{ total_miles: number | null }[]>(`
-    WITH ordered_points AS (
-      SELECT
-        location,
-        accuracy,
-        speed,
-        recorded_at,
-        LAG(location) OVER (ORDER BY recorded_at) AS prev_location,
-        LAG(recorded_at) OVER (ORDER BY recorded_at) AS prev_recorded_at
-      FROM driver_locations
-      WHERE driver_id = $1::uuid
-        AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
-        AND deleted_at IS NULL
-        -- Accuracy filter: keep only reasonably accurate points
-        AND (accuracy IS NULL OR accuracy <= $4)
-    ),
-    segments AS (
-      SELECT
-        ST_Distance(
-          location::geography,
-          prev_location::geography
-        ) AS segment_distance_m,
-        EXTRACT(EPOCH FROM (recorded_at - prev_recorded_at)) AS dt_seconds,
-        speed
-      FROM ordered_points
-      WHERE prev_location IS NOT NULL
-    )
+  // Fetch the ordered, admissible trail; accumulation happens in TypeScript.
+  // NOTE: the previous per-segment stationary-speed gate (speed >= minimum)
+  // is intentionally gone — it failed open on iOS Safari web geolocation
+  // (speed reports null) and the anchor odometer subsumes it: stationary
+  // jitter never reaches MIN_DISPLACEMENT_M from the anchor.
+  const points = await prisma.$queryRawUnsafe<OdometerPoint[]>(`
     SELECT
-      COALESCE(SUM(segment_distance_m), 0) * $8::float AS total_miles
-    FROM segments
-    WHERE
-      segment_distance_m IS NOT NULL
-      -- Filter out stationary points: require speed >= minimum when available
-      AND (speed IS NULL OR speed >= $5)
-      -- Ensure positive time delta when available
-      AND (dt_seconds IS NULL OR dt_seconds > 0)
-      -- Drop obvious outliers: large jumps within short time
-      AND (
-        dt_seconds IS NULL
-        OR segment_distance_m <= $6
-        OR dt_seconds >= $7
-      )
-      -- Cap effective speed to filter GPS glitches
-      AND (
-        dt_seconds IS NULL
-        OR (segment_distance_m / GREATEST(dt_seconds, 1)) <= $9::float
-      );
+      latitude,
+      longitude,
+      recorded_at
+    FROM driver_locations
+    WHERE driver_id = $1::uuid
+      AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
+      AND deleted_at IS NULL
+      -- Accuracy filter: keep only reasonably accurate points
+      AND (accuracy IS NULL OR accuracy <= $4)
+    ORDER BY recorded_at ASC
   `,
     driverId,
     startTime,
     endTime,
-    settings.mileageGpsAccuracyThresholdM,
-    MILEAGE_CONFIG.MIN_MOVING_SPEED_MS,
-    maxSegmentMeters,
-    MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS,
-    METERS_TO_MILES,
-    maxSpeedMsForQuery
+    settings.mileageGpsAccuracyThresholdM
   );
 
-  const totalMiles = rows[0]?.total_miles ?? 0;
+  const totalMiles =
+    computeAnchorDistanceMeters(points, maxSpeedMs, maxSegmentMeters) *
+    METERS_TO_MILES;
   // Guard against NaN or negative values from unexpected database behavior
   if (!Number.isFinite(totalMiles) || totalMiles < 0) {
     return { miles: 0, warnings };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { useUser } from "@/contexts/UserContext";
 import { DriverStatus } from "@/types/user";
 import DriverLiveMap from "@/components/Driver/DriverLiveMap";
 import {
@@ -32,6 +33,7 @@ import {
   getStatusProgress,
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
+import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import {
@@ -40,7 +42,21 @@ import {
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import {
+  useDeliveryStatusRealtime,
+  type DeliveryStatusUpdatedPayload,
+} from "@/hooks/tracking/useDeliveryStatusRealtime";
+import {
+  CANCELLED_ORDER_ALERT_DURATION_MS,
+  createCancelledOrderAlertHandler,
+} from "@/lib/driver/cancelled-order-alert";
 import type { DeliveryTracking } from "@/types/tracking";
+import {
+  END_SHIFT_STALE_PICKUP_HOURS,
+  formatBlockingOrdersMessage,
+  isPickupInsideEndShiftWindow,
+  type BlockingOrder,
+} from "@/lib/driver/end-shift-blockers";
 
 /** Movement stages: the delivery has been started and MUST block ending the
  *  shift. Mirrors the server-side guard in endDriverShift. */
@@ -53,15 +69,19 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 ];
 
 /** True when this delivery should block ending the shift: it's mid-flight, or
- *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
+ *  it's ASSIGNED with a pickup inside the guard window — imminent (within
+ *  `guardMs`) or overdue by less than END_SHIFT_STALE_PICKUP_HOURS. Older
+ *  assignments are stale dispatch data and never trap the driver.
  *  Mirrors the server guard so the button state matches what the API will say.
- *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks). */
+ *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks).
+ *  A PENDING return request never blocks — the driver already asked dispatch
+ *  to take the order back (server guard excludes these the same way). */
 function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
+  if (delivery.pendingReturn) return false;
   if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
-  if (guardMs <= 0) return false;
   if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
     const pickup = new Date(delivery.scheduledPickupAt).getTime();
-    return pickup <= Date.now() + guardMs;
+    return isPickupInsideEndShiftWindow(pickup, guardMs);
   }
   return false;
 }
@@ -95,6 +115,8 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  /** Order number of the delivery being handed back to dispatch (issue #508). */
+  const [returnTarget, setReturnTarget] = useState<string | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
   // confusing — filter by scheduled pickup date. `null` = no explicit choice,
   // in which case we default to Today whenever today has at least one.
@@ -122,12 +144,37 @@ export default function DriverTrackingPortal() {
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
+    refreshDeliveries,
     isOnline,
     queuedItems,
   } = useDriverTracking();
 
   const { settings } = useTrackingSettings();
   const endShiftGuardMs = settings.endShiftPickupGuardMinutes * 60_000;
+
+  // In-app cancellation alert: dispatch cancelling one of this driver's orders
+  // broadcasts a CANCELLED delivery-status event (orders PATCH route). Toast
+  // it loudly and refresh the feed so the order drops off right away; the 60s
+  // poll stays as the fallback when realtime is down. The callback must stay
+  // referentially stable — the hook resubscribes whenever it changes.
+  const { user } = useUser();
+  const driverProfileId = user?.id ?? null;
+  const handleCancelledOrder = useCallback(
+    (payload: DeliveryStatusUpdatedPayload) => {
+      createCancelledOrderAlertHandler({
+        driverProfileId,
+        notify: (message) =>
+          toast.error(message, { duration: CANCELLED_ORDER_ALERT_DURATION_MS }),
+        refresh: refreshDeliveries,
+      })(payload);
+    },
+    [driverProfileId, refreshDeliveries],
+  );
+  useDeliveryStatusRealtime({
+    enabled: Boolean(driverProfileId),
+    showNotifications: false,
+    onStatusUpdate: handleCancelledOrder,
+  });
 
   // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
@@ -188,17 +235,39 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
-  const endShiftBlockers = activeDeliveries.filter((d) =>
-    blocksEndShift(d, endShiftGuardMs),
-  ).length;
+  // Blocking deliveries, keyed by order number (cateringRequestId /
+  // onDemandId carry it; id is the deliveries-row fallback). Named in the
+  // blocked-state hint and the backstop toast (finding #8, 2026-08-21).
+  const blockingOrders: BlockingOrder[] = activeDeliveries
+    .filter((d) => blocksEndShift(d, endShiftGuardMs))
+    .map((d) => ({
+      orderNumber: d.cateringRequestId || d.onDemandId || d.id,
+      reason: "ACTIVE_DELIVERY",
+    }));
+  const endShiftBlockers = blockingOrders.length;
+  // First blocking delivery — the one the "Return a delivery" escape hatch
+  // targets.
+  const firstBlockerOrderNumber = blockingOrders[0]?.orderNumber ?? null;
+
+  const onReturnComplete = async () => {
+    setReturnTarget(null);
+    // Re-sync the feed so the End-shift button unblocks without a reload.
+    await refreshDeliveries().catch(() => {
+      /* best-effort — the next poll will still correct it */
+    });
+  };
 
   const handleEndShift = async () => {
     if (!currentShift?.id) return;
-    // Backstop for the disabled button (mirrors the server guard).
+    // Backstop for the blocked button (mirrors the server guard). The button
+    // stays tappable (aria-disabled, not `disabled`) so a stale client can
+    // self-heal: explain the block AND re-check the server feed — a delivery
+    // completed on another screen unblocks this button without a reload.
     if (endShiftBlockers > 0) {
-      toast.error(
-        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} before ending your shift.`,
-      );
+      toast.error(formatBlockingOrdersMessage(blockingOrders));
+      void refreshDeliveries().catch(() => {
+        /* best-effort re-check — the next poll will still correct it */
+      });
       return;
     }
     let location = currentLocation;
@@ -277,17 +346,21 @@ export default function DriverTrackingPortal() {
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    // Keep the POD sheet open on failure so the driver can retry instead of
-    // having to re-capture the proof after only seeing the error toast.
-    const ok = await advanceStatus(podTarget.deliveryId, DriverStatus.COMPLETED);
-    if (ok) setPodTarget(null);
+    const { deliveryId } = podTarget;
+    // The upload already succeeded (and toasted) — close the sheet NOW instead
+    // of holding it open across the status PATCH + deliveries refetch (2-5s on
+    // LTE reads as a hang). A failed advance is surfaced by advanceStatus's
+    // toast and retried from the delivery card. Mirrors DriverDeliveryDetail.
+    setPodTarget(null);
+    await advanceStatus(deliveryId, DriverStatus.COMPLETED);
   };
 
   const onSignatureComplete = async () => {
     if (!sigTarget) return;
-    // Same retry semantics as POD: keep the sheet open if the advance fails.
-    const ok = await advanceStatus(sigTarget.deliveryId, DriverStatus.PICKED_UP);
-    if (ok) setSigTarget(null);
+    const { deliveryId } = sigTarget;
+    // Same close-first semantics as POD.
+    setSigTarget(null);
+    await advanceStatus(deliveryId, DriverStatus.PICKED_UP);
   };
 
   const isPickupToday = (d?: Date) =>
@@ -409,38 +482,61 @@ export default function DriverTrackingPortal() {
             </DriverCard>
 
             {/* Shift control bar */}
-            <DriverCard className="flex items-center justify-between">
-              <div>
-                <div className="text-[13px] font-semibold text-driver-text">
-                  On shift
-                </div>
-                <div className="text-[11.5px] font-semibold text-driver-muted">
-                  Since{" "}
-                  {currentShift
-                    ? new Date(currentShift.startTime).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                    : ""}
-                </div>
-                {endShiftBlockers > 0 ? (
-                  <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
-                    {endShiftBlockers === 1
-                      ? "1 delivery to finish first"
-                      : `${endShiftBlockers} deliveries to finish first`}
+            <DriverCard className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[13px] font-semibold text-driver-text">
+                    On shift
                   </div>
-                ) : null}
+                  <div className="text-[11.5px] font-semibold text-driver-muted">
+                    Since{" "}
+                    {currentShift
+                      ? new Date(currentShift.startTime).toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : ""}
+                  </div>
+                  {endShiftBlockers > 0 ? (
+                    <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                      {endShiftBlockers === 1
+                        ? `Order ${firstBlockerOrderNumber} to finish or return first`
+                        : `${endShiftBlockers} deliveries to finish or return first`}
+                    </div>
+                  ) : null}
+                </div>
+                {/* Blocked via aria-disabled (not `disabled`) so a tap still
+                    reaches handleEndShift, which explains the block and
+                    refreshes the feed — a stale count heals itself on tap. */}
+                <DriverButton
+                  variant="danger"
+                  size="md"
+                  onClick={handleEndShift}
+                  loading={shiftLoading}
+                  aria-disabled={endShiftBlockers > 0}
+                  className={
+                    endShiftBlockers > 0
+                      ? "cursor-not-allowed opacity-50"
+                      : undefined
+                  }
+                >
+                  <Square className="h-4 w-4" />
+                  End shift
+                </DriverButton>
               </div>
-              <DriverButton
-                variant="danger"
-                size="md"
-                onClick={handleEndShift}
-                loading={shiftLoading}
-                disabled={endShiftBlockers > 0}
-              >
-                <Square className="h-4 w-4" />
-                End shift
-              </DriverButton>
+              {/* Issue #508 escape hatch: a driver who can't start a blocking
+                  assignment requests a return instead of being stuck on shift.
+                  Once the request is PENDING the order stops blocking. */}
+              {endShiftBlockers > 0 && firstBlockerOrderNumber ? (
+                <DriverButton
+                  variant="outline"
+                  full
+                  size="md"
+                  onClick={() => setReturnTarget(firstBlockerOrderNumber)}
+                >
+                  Request a return to dispatch
+                </DriverButton>
+              ) : null}
             </DriverCard>
 
             {/* Active deliveries */}
@@ -664,6 +760,15 @@ export default function DriverTrackingPortal() {
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {returnTarget ? (
+        <DriverReturnSheet
+          open={!!returnTarget}
+          onOpenChange={(o) => !o && setReturnTarget(null)}
+          orderNumber={returnTarget}
+          onComplete={() => void onReturnComplete()}
         />
       ) : null}
     </DriverScreen>

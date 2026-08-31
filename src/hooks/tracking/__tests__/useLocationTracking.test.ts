@@ -348,6 +348,27 @@ describe('useLocationTracking', () => {
       });
     });
 
+    it('includes the GPS fix timestamp in the POST body', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+
+      await waitFor(() => {
+        expect(locationPostCalls().length).toBeGreaterThan(0);
+      });
+
+      // The body carries the fix time from the geolocation position, not the
+      // send time — offline-replayed points then keep their original time.
+      const body = JSON.parse(locationPostCalls().pop()![1].body);
+      expect(body.timestamp).toBe(new Date(mockPosition.timestamp).toISOString());
+    });
+
     it('should trigger offline sync when starting tracking', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
@@ -677,6 +698,8 @@ describe('useLocationTracking', () => {
       expect(body.driver_id).toBe(mockDriverId);
       expect(body.latitude).toBe(unsyncedLocation.coordinates.lat);
       expect(body.longitude).toBe(unsyncedLocation.coordinates.lng);
+      // Replayed points carry their ORIGINAL fix time, not the replay time.
+      expect(body.timestamp).toBe(unsyncedLocation.timestamp);
       expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
     });
 
@@ -758,6 +781,90 @@ describe('useLocationTracking', () => {
       });
 
       expect(mockLocationStore.getUnsyncedLocations).not.toHaveBeenCalled();
+    });
+
+    describe('burst protection (2026-08 field 429 storm)', () => {
+      const makeUnsynced = (id: string) => ({
+        id,
+        driverId: mockDriverId,
+        coordinates: { lat: 37.7749, lng: -122.4194 },
+        accuracy: 10,
+        speed: 5,
+        heading: 180,
+        altitude: 50,
+        activityType: 'driving' as const,
+        isMoving: true,
+        timestamp: new Date().toISOString(),
+        synced: false,
+        syncAttempts: 0,
+      });
+
+      it('spaces queued posts out instead of dumping the queue in one burst', async () => {
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+          makeUnsynced('loc-2'),
+        ]);
+
+        const { result } = renderHook(() => useLocationTracking());
+
+        let syncPromise: Promise<void> = Promise.resolve();
+        await act(async () => {
+          syncPromise = result.current.syncOfflineLocations();
+          // Let the first post settle; the flush is now waiting on the
+          // spacing timer before the second post.
+          await Promise.resolve();
+        });
+
+        expect(locationPostCalls()).toHaveLength(1);
+
+        await act(async () => {
+          jest.advanceTimersByTime(300);
+          await syncPromise;
+        });
+
+        expect(locationPostCalls()).toHaveLength(2);
+      });
+
+      it('stops the flush on 429, keeps the queue intact, and backs off ~30s', async () => {
+        postLocationHandler = () => okJson({ error: 'Rate limit exceeded' }, 429);
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+          makeUnsynced('loc-2'),
+        ]);
+
+        const { result } = renderHook(() => useLocationTracking());
+
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+
+        // The first 429 stops the flush: no second POST, and the rate-limited
+        // item is neither marked synced nor penalized (it stays queued as-is).
+        expect(locationPostCalls()).toHaveLength(1);
+        expect(mockLocationStore.markAsSynced).not.toHaveBeenCalled();
+        expect(mockLocationStore.incrementSyncAttempts).not.toHaveBeenCalled();
+        expect(mockLocationStore.deleteLocation).not.toHaveBeenCalled();
+
+        // Inside the backoff window the flush is a no-op.
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+        expect(locationPostCalls()).toHaveLength(1);
+
+        // After the backoff elapses the flush retries the queue.
+        postLocationHandler = () => okJson({ success: true }, 201);
+        mockLocationStore.getUnsyncedLocations.mockResolvedValue([
+          makeUnsynced('loc-1'),
+        ]);
+        await act(async () => {
+          jest.advanceTimersByTime(30_000);
+        });
+        await act(async () => {
+          await result.current.syncOfflineLocations();
+        });
+        expect(locationPostCalls()).toHaveLength(2);
+        expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
+      });
     });
 
     it('should clean up old synced locations after sync', async () => {
@@ -963,22 +1070,70 @@ describe('useLocationTracking', () => {
       });
     });
 
-    it('should set isMoving based on speed', async () => {
-      // Test moving (speed > 1)
+    it('should set isMoving after two consecutive vehicle-speed samples (hysteresis)', async () => {
       const movingPosition = {
         ...mockPosition,
         coords: { ...mockPosition.coords, speed: 5 },
       };
 
+      // The mount effect may request more than one fix, so count samples
+      // instead of assuming the first render saw exactly one.
+      let samples = 0;
       (navigator.geolocation.getCurrentPosition as jest.Mock).mockImplementation(
-        (success: PositionCallback) => success(movingPosition as GeolocationPosition)
+        (success: PositionCallback) => {
+          samples += 1;
+          success(movingPosition as GeolocationPosition);
+        }
       );
 
       const { result } = renderHook(() => useLocationTracking());
 
       await waitFor(() => {
+        expect(result.current.currentLocation).not.toBe(null);
+      });
+      // The 2-sample rule: "moving" only once two vehicle-speed fixes landed.
+      expect(result.current.currentLocation?.isMoving).toBe(samples >= 2);
+
+      while (samples < 2) {
+        await act(async () => {
+          await result.current.updateLocationManually();
+        });
+      }
+      await waitFor(() => {
         expect(result.current.currentLocation?.isMoving).toBe(true);
       });
+    });
+
+    it('should not flicker isMoving at walking pace', async () => {
+      const speeds = [0.9, 1.1, 0.9, 1.2, 0.8, 0.4, 0.3];
+      let call = 0;
+      (navigator.geolocation.getCurrentPosition as jest.Mock).mockImplementation(
+        (success: PositionCallback) => {
+          const speed = speeds[Math.min(call, speeds.length - 1)];
+          call += 1;
+          success({
+            ...mockPosition,
+            coords: { ...mockPosition.coords, speed },
+          } as GeolocationPosition);
+        }
+      );
+
+      const { result } = renderHook(() => useLocationTracking());
+      await waitFor(() => {
+        expect(result.current.currentLocation).not.toBe(null);
+      });
+
+      const seen: boolean[] = [result.current.currentLocation!.isMoving];
+      while (call < speeds.length) {
+        await act(async () => {
+          await result.current.updateLocationManually();
+        });
+        seen.push(result.current.currentLocation!.isMoving);
+      }
+
+      const flips = seen.filter((v, i) => i > 0 && v !== seen[i - 1]).length;
+      expect(flips).toBeLessThanOrEqual(1);
+      expect(seen.at(-1)).toBe(false);
     });
   });
 

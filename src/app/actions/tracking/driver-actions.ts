@@ -22,6 +22,11 @@ import {
 } from '@/services/tracking/mileage';
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import {
+  END_SHIFT_STALE_PICKUP_HOURS,
+  formatBlockingOrdersMessage,
+  type BlockingOrder,
+} from '@/lib/driver/end-shift-blockers';
 
 /**
  * Start a new driver shift
@@ -121,7 +126,14 @@ export async function endDriverShift(
   endLocation: LocationUpdate,
   finalMileage?: number,
   metadata: Record<string, any> = {}
-): Promise<{ success: boolean; error?: string; activeDeliveries?: number }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  /** Number of blocking orders (kept for older clients). */
+  activeDeliveries?: number;
+  /** The orders keeping the shift open, so the UI can name them. */
+  blockingOrders?: BlockingOrder[];
+}> {
   try {
     // Get shift info and ensure it is active before proceeding
     const shiftInfo = await prisma.$queryRawUnsafe<{
@@ -148,71 +160,161 @@ export async function endDriverShift(
 
     // Guard: a driver may not end a shift while they still have active
     // deliveries — doing so would strand an in-progress order. Admins may
-    // override by passing metadata.force. "Active" = a non-terminal row in the
-    // `deliveries` table (what the live portal shows), a catering/on-demand
-    // order the driver has actually started (driverStatus in a movement stage),
-    // or — 2026-07-09 drive-test feedback — an ASSIGNED order whose pickup is
-    // imminent (within the admin-configured window) or overdue. Future-dated
-    // assignments don't trap the driver. A window of 0 disables the
-    // imminent-pickup branch entirely (in-flight orders always block).
+    // override by passing metadata.force. Two kinds of work count:
+    //  - STARTED work always blocks: a `deliveries` row (what the live portal
+    //    shows) in a non-terminal status outside the not-started set, or a
+    //    catering/on-demand order whose driverStatus is a movement stage.
+    //  - NOT-STARTED work (deliveries status ASSIGNED/PENDING, dispatch
+    //    driverStatus ASSIGNED) blocks only when its pickup time falls inside
+    //    [NOW() - END_SHIFT_STALE_PICKUP_HOURS, NOW() + guard window]:
+    //    imminent (2026-07-09 drive-test feedback) or recently overdue.
+    //    Future-dated assignments don't trap the driver, and neither do
+    //    stale rows from days ago (2026-08-26 incident: two Aug-23 ASSIGNED
+    //    deliveries rows deadlocked a driver's end-shift). NULL pickup
+    //    times never block. A window of 0 disables the not-started branch
+    //    entirely on both tables (started work still blocks).
+    // Orders with a PENDING return request (delivery_return_requests) never
+    // block: the driver has already asked dispatch to take the order back,
+    // so the shift can end while the request awaits review.
     // Mirrored client-side by blocksEndShift in DriverTrackingPortal.
     const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
     if (!force) {
       const settings = await getTrackingSettings();
       const guardMinutes = settings.endShiftPickupGuardMinutes;
-      // The pickup window is bound as a parameter (never interpolated); the
-      // alias is a compile-time constant, one fragment builder for both tables.
+      // The pickup window's upper bound is bound as a parameter (never
+      // interpolated); the lower bound is a compile-time constant. Aliases
+      // are compile-time constants too — one fragment builder per table.
+      const staleBound = `NOW() - interval '${END_SHIFT_STALE_PICKUP_HOURS} hours'`;
       const imminentPickup = (alias: 'cr' | 'od') =>
         guardMinutes > 0
           ? `OR (${alias}."driverStatus" = 'ASSIGNED'
                       AND ${alias}."pickupDateTime" IS NOT NULL
+                      AND ${alias}."pickupDateTime" >= ${staleBound}
                       AND ${alias}."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
           : '';
       const imminentPickupCr = imminentPickup('cr');
       const imminentPickupOd = imminentPickup('od');
+      // Same window for not-started mirror rows. The mirror is written as
+      // 'ASSIGNED' (assignDriver / createDelivery) and defaults to 'pending'.
+      const notStartedDelivery = `UPPER(deliveries.status) IN ('ASSIGNED','PENDING')`;
+      const imminentPickupDelivery = guardMinutes > 0
+        ? `OR (${notStartedDelivery}
+                      AND deliveries.estimated_pickup_time IS NOT NULL
+                      AND deliveries.estimated_pickup_time >= ${staleBound}
+                      AND deliveries.estimated_pickup_time <= NOW() + make_interval(mins => $2::int))`
+        : '';
       const guardParams: unknown[] = guardMinutes > 0
         ? [shift?.driver_id, guardMinutes]
         : [shift?.driver_id];
-      const blocking = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`
-        SELECT
-          (
-            SELECT COUNT(*) FROM deliveries
-            WHERE driver_id = $1::uuid
-              AND deleted_at IS NULL
-              AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+      // Returns one row per blocking reason (an order hit by both branches
+      // appears twice; deduped below). Cancelled orders never block: the
+      // dispatch branch checks the order's status, and the deliveries branch
+      // ignores mirror rows whose parent order is CANCELLED — legacy rows
+      // written before the cancel cascade (2026-08-21 finding #8).
+      const blockingRows = await prisma.$queryRawUnsafe<
+        { order_number: string | null; reason: string }[]
+      >(`
+        -- end-shift-blockers
+        SELECT deliveries.order_number, 'ACTIVE_DELIVERY' AS reason
+        FROM deliveries
+        WHERE driver_id = $1::uuid
+          AND deleted_at IS NULL
+          AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+          AND (
+            UPPER(deliveries.status) NOT IN ('ASSIGNED','PENDING')
+            ${imminentPickupDelivery}
           )
-          +
-          (
-            SELECT COUNT(*)
-            FROM dispatches di
-            LEFT JOIN catering_requests cr ON cr.id = di."cateringRequestId"
-            LEFT JOIN on_demand_requests od ON od.id = di."onDemandId"
-            WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_return_requests rr
+            WHERE rr.order_number = deliveries.order_number
+              AND rr.status = 'PENDING'
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM catering_requests xc
+            WHERE xc."orderNumber" = deliveries.order_number
+              AND xc.status = 'CANCELLED'
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM on_demand_requests xo
+            WHERE xo."orderNumber" = deliveries.order_number
+              AND xo.status = 'CANCELLED'
+          )
+        UNION ALL
+        SELECT
+          COALESCE(cr."orderNumber", od."orderNumber") AS order_number,
+          CASE
+            WHEN COALESCE(cr."driverStatus", od."driverStatus") = 'ASSIGNED' THEN 'PICKUP_DUE'
+            ELSE 'IN_PROGRESS'
+          END AS reason
+        FROM dispatches di
+        LEFT JOIN catering_requests cr ON cr.id = di."cateringRequestId"
+        LEFT JOIN on_demand_requests od ON od.id = di."onDemandId"
+        WHERE di."driverId" = (SELECT profile_id FROM drivers WHERE id = $1::uuid)
+          AND (
+            (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
+              AND cr.status <> 'CANCELLED'
               AND (
-                (cr.id IS NOT NULL AND cr."deletedAt" IS NULL
-                  AND (
-                    cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    ${imminentPickupCr}
-                  ))
-                OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
-                  AND (
-                    od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
-                    ${imminentPickupOd}
-                  ))
-              )
-          ) AS n
+                cr."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                ${imminentPickupCr}
+              ))
+            OR (od.id IS NOT NULL AND od."deletedAt" IS NULL
+              AND od.status <> 'CANCELLED'
+              AND (
+                od."driverStatus" IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')
+                ${imminentPickupOd}
+              ))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_return_requests rr
+            WHERE rr.order_id = COALESCE(cr.id, od.id)
+              AND rr.status = 'PENDING'
+          )
       `, ...guardParams);
 
-      const activeCount = Number(blocking[0]?.n ?? 0);
-      if (activeCount > 0) {
+      if (blockingRows.length > 0) {
+        // Dedupe by order number (first reason wins); rows with no order
+        // number still count toward the total but can't be named.
+        const seen = new Set<string>();
+        const blockingOrders: BlockingOrder[] = [];
+        let unnamed = 0;
+        for (const row of blockingRows) {
+          if (!row.order_number) {
+            unnamed += 1;
+            continue;
+          }
+          if (seen.has(row.order_number)) continue;
+          seen.add(row.order_number);
+          blockingOrders.push({ orderNumber: row.order_number, reason: row.reason });
+        }
         return {
           success: false,
-          error: `You still have ${activeCount} active or due ${activeCount === 1 ? 'delivery' : 'deliveries'}. Complete ${activeCount === 1 ? 'it' : 'them'} (or ask dispatch to reassign) before ending your shift.`,
-          activeDeliveries: activeCount,
+          error: formatBlockingOrdersMessage(blockingOrders),
+          activeDeliveries: blockingOrders.length + unnamed,
+          blockingOrders,
         };
       }
     }
+
+    // Recompute delivery_count from the deliveries table before closing. The
+    // AFTER trigger on `deliveries` only fires on delivery writes, so rows
+    // mirrored before shift linkage existed — or with the uppercase status
+    // casing the orders PATCH writes (e.g. 'COMPLETED') — would otherwise
+    // close the shift with a stale count. Case-insensitive, and both
+    // 'delivered' and 'completed' count as a completed delivery.
+    await prisma.$executeRawUnsafe(`
+      UPDATE driver_shifts
+      SET
+        delivery_count = (
+          SELECT COUNT(*)
+          FROM deliveries
+          WHERE shift_id = $1::uuid
+            AND LOWER(status) IN ('delivered','completed')
+            AND deleted_at IS NULL
+        ),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+    `, shiftId);
 
     // Always record the end location in the database first so that the
     // mileage calculation window has a proper closing point.

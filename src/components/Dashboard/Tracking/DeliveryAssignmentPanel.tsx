@@ -80,14 +80,14 @@ export default function DeliveryAssignmentPanel({
     driver.isOnDuty && (driver.activeDeliveries || 0) < 3 // Max 3 deliveries per driver
   );
 
-  // Handle delivery assignment (or unassignment when driverId is empty)
+  // Handle delivery assignment
   const handleAssignDelivery = async (deliveryId: string, driverId: string) => {
     if (!deliveryId) return;
 
     setAssignmentLoading(true);
     try {
       const result = await assignDeliveryToDriver(deliveryId, driverId);
-      
+
       if (result.success) {
         setSelectedDelivery(null);
         // Show success notification
@@ -96,6 +96,43 @@ export default function DeliveryAssignmentPanel({
       }
     } catch (error) {
       console.error('Error assigning delivery:', error);
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
+  // Unassign routes through the driver-return mechanism (the previous
+  // assignDeliveryToDriver(id, '') call was a silently-broken no-op): the
+  // dispatch rows are deleted, the mirror row is tombstoned, and the order
+  // goes back to the unassigned pool. Admin session cookie authenticates.
+  const handleUnassignDelivery = async (delivery: DeliveryTracking) => {
+    if (!delivery.orderNumber) return;
+
+    setAssignmentLoading(true);
+    try {
+      const res = await fetch(
+        `/api/orders/${encodeURIComponent(delivery.orderNumber)}/return`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'ADMIN_UNASSIGNED' }),
+        },
+      );
+      if (res.ok) {
+        setSelectedDelivery(null);
+      } else {
+        let detail = '';
+        try {
+          const body = await res.json();
+          detail = body.error || '';
+        } catch {
+          /* ignore */
+        }
+        console.error('Failed to unassign delivery:', detail || res.statusText);
+      }
+    } catch (error) {
+      console.error('Error unassigning delivery:', error);
     } finally {
       setAssignmentLoading(false);
     }
@@ -246,11 +283,13 @@ export default function DeliveryAssignmentPanel({
                         </div>
                       </div>
                     </div>
-                    {assignedDriver && (
+                    {/* Unassign needs the order number to hit the return
+                        endpoint — legacy rows without one can't offer it. */}
+                    {assignedDriver && delivery.orderNumber && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleAssignDelivery(delivery.id, '')}
+                        onClick={() => handleUnassignDelivery(delivery)}
                         disabled={assignmentLoading}
                       >
                         Unassign

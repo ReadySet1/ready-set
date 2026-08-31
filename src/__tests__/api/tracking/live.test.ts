@@ -22,6 +22,12 @@ jest.mock('@/lib/monitoring/sentry', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
+jest.mock('@/services/tracking/tracking-settings', () => ({
+  getTrackingSettings: jest.fn().mockResolvedValue({
+    mileageGpsAccuracyThresholdM: 100,
+    mileageMaxSpeedMph: 95,
+  }),
+}));
 
 // Helper to create a request with a mock abort signal for SSE tests
 const createSSERequest = (url: string) => {
@@ -461,6 +467,129 @@ describe('/api/tracking/live SSE Endpoint', () => {
       // Cleanup
       abortController.abort();
       reader.releaseLock();
+    });
+  });
+
+  /**
+   * Drive one SSE tick and return the parsed `driver_update` payload.
+   * Query order: activeDrivers, recentLocations, activeDeliveries,
+   * legacyDispatches, shiftTrailPoints.
+   */
+  async function readDriverUpdate(queryResults: unknown[][]) {
+    (withAuth as jest.Mock).mockResolvedValue({
+      success: true,
+      context: { user: { id: 'admin-123', type: 'ADMIN' } },
+    });
+    const mock = prisma.$queryRawUnsafe as jest.Mock;
+    mock.mockReset();
+    for (const result of queryResults) mock.mockResolvedValueOnce(result);
+    mock.mockResolvedValue([]);
+
+    const { request, abortController } = createSSERequest(
+      'http://localhost:3000/api/tracking/live'
+    );
+    const response = await GET(request);
+    const reader = response.body!.getReader();
+    await reader.read(); // connection message
+    // Fire the 5 s tick and let its awaited queries settle before reading.
+    await jest.advanceTimersByTimeAsync(5000);
+    const { value } = await reader.read();
+    abortController.abort();
+    reader.releaseLock();
+
+    const message = new TextDecoder().decode(value);
+    const dataMatch = message.match(/data: (.+)\n\n/);
+    const data = JSON.parse(dataMatch![1]!);
+    expect(data.type).toBe('driver_update');
+    return { data: data.data, calls: mock.mock.calls as string[][] };
+  }
+
+  describe('Active deliveries scope (finding #2)', () => {
+    it('only counts non-terminal deliveries of on-shift drivers or assigned today', async () => {
+      const { calls } = await readDriverUpdate([[], [], [], [], []]);
+
+      const deliveriesQuery = calls.find(
+        (call) => call[0]!.includes('FROM deliveries d') && call[0]!.includes('d.order_number')
+      );
+      expect(deliveriesQuery).toBeDefined();
+      const sql = deliveriesQuery![0]!;
+
+      // Status casing is mixed in the DB ('CANCELLED', 'completed', 'DELIVERED')
+      expect(sql).toMatch(/LOWER\(d\.status\) NOT IN \('delivered',\s*'cancelled',\s*'completed'\)/);
+      // Scoped to the driver's current active shift or to deliveries assigned today
+      expect(sql).toContain('driver_shifts');
+      expect(sql).toMatch(/d\.assigned_at >= CURRENT_DATE/);
+      expect(sql).toContain('d.deleted_at IS NULL');
+    });
+
+    it('scopes the per-driver activeDeliveries counter the same way', async () => {
+      const { calls } = await readDriverUpdate([[], [], [], [], []]);
+      const driversQuery = calls.find((call) => call[0]!.includes('FROM drivers d'));
+      const sql = driversQuery![0]!;
+
+      expect(sql).toMatch(/LOWER\(del\.status\) NOT IN \('delivered',\s*'cancelled',\s*'completed'\)/);
+      expect(sql).toMatch(/del\.assigned_at >= /);
+    });
+  });
+
+  describe('Driver shift stats (finding #3)', () => {
+    const baseRow = {
+      id: 'driver-123',
+      user_id: 'user-456',
+      employee_id: 'EMP001',
+      driver_name: 'Fernando',
+      vehicle_number: null,
+      phone_number: null,
+      is_on_duty: true,
+      shift_start_time: new Date('2026-08-21T18:40:00Z'),
+      current_shift_id: 'shift-5bae9262',
+      last_known_location_geojson: JSON.stringify({ type: 'Point', coordinates: [-101.68, 21.12] }),
+      last_location_update: new Date('2026-08-21T19:17:00Z'),
+      shift_status: 'active',
+      shift_start: new Date('2026-08-21T18:40:00Z'),
+      total_distance: null,
+      total_distance_miles: null,
+      gps_distance_miles: null,
+      delivery_count: 0,
+      active_deliveries: 1,
+    };
+
+    // ~1 km walk north at 10 s cadence, 100 m per ping
+    const trail = Array.from({ length: 11 }, (_, i) => ({
+      driver_id: 'driver-123',
+      latitude: 21.12 + i * 0.0009,
+      longitude: -101.68,
+      recorded_at: new Date(Date.UTC(2026, 7, 21, 18, 50, i * 10)),
+    }));
+
+    it('derives totalDistanceMiles from the live GPS trail while the shift is open', async () => {
+      const { data } = await readDriverUpdate([[baseRow], [], [], [], trail]);
+
+      const driver = data.activeDrivers[0];
+      expect(driver.totalDistanceMiles).toBeGreaterThan(0.55);
+      expect(driver.totalDistanceMiles).toBeLessThan(0.7);
+    });
+
+    it('queries the trail only for active shifts with the accuracy gate and soft-delete filter', async () => {
+      const { calls } = await readDriverUpdate([[baseRow], [], [], [], trail]);
+      const trailQuery = calls.find((call) => call[0]!.includes('JOIN driver_locations dl') && call[0]!.includes('dl.latitude'));
+      expect(trailQuery).toBeDefined();
+      const sql = trailQuery![0]!;
+      expect(sql).toContain('dl.deleted_at IS NULL');
+      expect(sql).toMatch(/ds\.status IN \('active',\s*'paused'\)/);
+      expect(sql).toMatch(/dl\.accuracy <= /);
+    });
+
+    it('prefers the stored shift miles once the shift is closed', async () => {
+      const closed = { ...baseRow, shift_status: 'completed', total_distance_miles: 3.2 };
+      const { data } = await readDriverUpdate([[closed], [], [], [], trail]);
+      expect(data.activeDrivers[0].totalDistanceMiles).toBe(3.2);
+    });
+
+    it('counts in-progress deliveries in deliveryCount so a driver mid-delivery is not at 0', async () => {
+      const { data } = await readDriverUpdate([[{ ...baseRow, delivery_count: 2, active_deliveries: '1' }], [], [], [], []]);
+      expect(data.activeDrivers[0].deliveryCount).toBe(3);
+      expect(data.activeDrivers[0].activeDeliveries).toBe(1);
     });
   });
 });

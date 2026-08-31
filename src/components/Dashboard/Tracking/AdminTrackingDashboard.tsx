@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
+import ReturnRequestsPanel from './ReturnRequestsPanel';
 import TrackingSettingsTab from './TrackingSettingsTab';
 import { useAdminRealtimeTracking } from '@/hooks/tracking/useAdminRealtimeTracking';
 import { useUser } from '@/contexts/UserContext';
@@ -49,7 +50,8 @@ interface AdminTrackingDashboardProps {
 export default function AdminTrackingDashboard({ className }: AdminTrackingDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  // Manual refresh timestamp; the live value comes from the hook (below).
+  const [manualRefreshAt, setManualRefreshAt] = useState<Date | null>(null);
 
   // Settings are editable by admins only (the API enforces this server-side;
   // hiding the tab keeps HELPDESK's dashboard uncluttered).
@@ -57,10 +59,14 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
   const canEditSettings =
     userRole === UserType.ADMIN || userRole === UserType.SUPER_ADMIN;
 
+  // One merged driver/location list (SSE roster + Realtime overlay) feeds the
+  // header, the stats cards, the status list and both map instances, so the
+  // Overview can never lag behind the Live Map tab.
   const {
     activeDrivers,
     recentLocations,
     activeDeliveries,
+    lastUpdatedAt,
     isConnected,
     isLoading,
     isRealtimeConnected,
@@ -82,12 +88,13 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
     totalDistance: activeDrivers.reduce((sum, driver) => sum + (driver.totalDistanceMiles || 0), 0)
   };
 
-  // Update last refresh time when data changes
-  useEffect(() => {
-    if (activeDrivers.length > 0 || activeDeliveries.length > 0) {
-      setLastUpdate(new Date());
-    }
-  }, [activeDrivers.length, activeDeliveries.length]);
+  // "Last update" follows the newest of: data received (any source) or a
+  // manual refresh. Previously it only moved when list *lengths* changed, so
+  // it froze on the first ping of a shift.
+  const lastUpdate =
+    lastUpdatedAt && manualRefreshAt
+      ? (lastUpdatedAt > manualRefreshAt ? lastUpdatedAt : manualRefreshAt)
+      : lastUpdatedAt ?? manualRefreshAt;
 
   // Auto-refresh toggle
   const toggleAutoRefresh = () => {
@@ -97,7 +104,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
   // Manual refresh
   const handleManualRefresh = () => {
     reconnect();
-    setLastUpdate(new Date());
+    setManualRefreshAt(new Date());
   };
 
   // Export data
@@ -155,7 +162,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
           </div>
 
           <div className="text-sm text-muted-foreground">
-            Last update: {lastUpdate.toLocaleTimeString()}
+            Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : '—'}
           </div>
         </div>
 
@@ -454,7 +461,10 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <span>Delivery Management</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Driver return requests need a dispatcher decision — surface
+                  them above the assignment list so they aren't missed. */}
+              <ReturnRequestsPanel />
               <DeliveryAssignmentPanel
                 drivers={activeDrivers}
                 deliveries={activeDeliveries}

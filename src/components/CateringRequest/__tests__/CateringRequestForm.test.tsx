@@ -597,3 +597,389 @@ describe("CateringRequestForm", () => {
     }, { timeout: 5000 });
   });
 });
+
+describe("CateringRequestForm — headcount / orderTotal at-least-one rule", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPush.mockClear();
+    mockOrderConfirmationModal.mockClear();
+    addressCallbacks.pickup = undefined;
+    addressCallbacks.delivery = undefined;
+
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
+    });
+
+    mockFetch.mockImplementation(
+      async (
+        url: RequestInfo | URL,
+        options?: RequestInit,
+      ): Promise<Response> => {
+        if (
+          url.toString().includes("/api/catering-requests") &&
+          options?.method === "POST"
+        ) {
+          return new Response(
+            JSON.stringify({
+              message: "Catering request created successfully",
+              orderId: "test-order-id",
+            }),
+            {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        return new Response(JSON.stringify({ message: "Not Found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    );
+  });
+
+  /** Fill all fields EXCEPT headcount and orderTotal */
+  const fillBaseFields = async (user: ReturnType<typeof userEvent.setup>) => {
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "Ez Cater");
+    await user.type(screen.getByLabelText(/order number/i), "TEST-99999");
+
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+    await user.type(screen.getByLabelText(/client.*attention/i), "Jane Doe");
+
+    const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+    await user.click(hostNoRadio);
+
+    // Simulate address selection
+    await act(async () => {
+      mockHandleAddressSelect({
+        id: "1",
+        street1: "123 Test St",
+        street2: null,
+        city: "Test City",
+        state: "TS",
+        zip: "12345",
+      });
+    });
+  };
+
+  it("submits successfully with headcount only (no orderTotal)", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/headcount/i), "50");
+    // orderTotal left blank
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+  });
+
+  it("submits successfully with orderTotal only (no headcount)", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/order total/i), "500");
+    // headcount left blank
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+  });
+
+  it("blocks submit when both headcount and orderTotal are blank", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    // Both headcount and orderTotal left blank
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Should NOT call fetch — validation blocks submission
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    // Should show error message
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/provide at least one: headcount or order total/i).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it("blocks submit and shows error when headcount is 0", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/headcount/i), "0");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("blocks submit and shows error when headcount is negative", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    // type "-5" into headcount — clear first in case default is present
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.clear(headcountInput);
+    await user.type(headcountInput, "-5");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("blocks submit and shows error when orderTotal is 0", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/order total/i), "0");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Order total must be positive"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("REGRESSION: headcount filled with orderTotal blank still submits", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText(/headcount/i), "25");
+    // orderTotal deliberately left blank
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+  });
+
+  it("filling headcount clears the stale error on orderTotal", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    // Submit with both blank to trigger errors
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Errors should be visible on both fields
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/provide at least one: headcount or order total/i).length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+
+    // Fill headcount — should clear the error on orderTotal via trigger
+    await user.type(screen.getByLabelText(/headcount/i), "25");
+
+    await waitFor(() => {
+      // After filling headcount, the error messages should disappear
+      expect(
+        screen.queryAllByText(/provide at least one: headcount or order total/i),
+      ).toHaveLength(0);
+    }, { timeout: 3000 });
+  });
+
+  // --- B1: Number() + Number.isInteger() for headcount ---
+
+  it("submits '1e3' as headcount 1000 without error", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "1e3");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/catering-requests",
+        expect.objectContaining({ method: "POST" }),
+      );
+    }, { timeout: 5000 });
+
+    // HTML number input normalizes "1e3" to "1000"; validator accepts it
+    const callBody = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+    );
+    expect(Number(callBody.headcount)).toBe(1000);
+  });
+
+  it("blocks submit when headcount is '5.9' (not an integer)", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "5.9");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount must be a positive integer"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // --- B3: headcount ceiling on client ---
+
+  it("blocks submit when headcount exceeds INT4 ceiling", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+    await waitForInit();
+    await waitForInit();
+
+    await fillBaseFields(user);
+    const headcountInput = screen.getByLabelText(/headcount/i);
+    await user.type(headcountInput, "2147483648");
+
+    const form = screen.getByRole("button", { name: /submit catering request/i }).closest("form");
+    await act(async () => {
+      if (form) fireEvent.submit(form);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        screen.getByText("Headcount is too large"),
+      ).toBeInTheDocument();
+    });
+  });
+});

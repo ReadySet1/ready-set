@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import DriverTrackingPortal from "../DriverTrackingPortal";
 import { DriverThemeProvider } from "@/components/Driver/ui/DriverThemeProvider";
@@ -55,6 +55,14 @@ jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
   ),
 }));
 
+// Bearer transport for the return sheet's POST (cookie fallback stays on).
+jest.mock("@/lib/auth/bearer-session", () => ({
+  withBearerAuth: jest.fn(async (base: Record<string, string> = {}) => ({
+    ...base,
+    Authorization: "Bearer test-token",
+  })),
+}));
+
 jest.mock("@/components/Driver/SignatureCapture", () => ({
   SignatureCapture: ({ onUploadComplete }: any) => (
     <div data-testid="signature-capture">
@@ -75,6 +83,7 @@ const requestLocationPermission = jest.fn().mockResolvedValue(true);
 const startShift = jest.fn().mockResolvedValue(true);
 const endShift = jest.fn().mockResolvedValue(true);
 const updateDeliveryStatus = jest.fn().mockResolvedValue(true);
+const refreshDeliveries = jest.fn().mockResolvedValue(undefined);
 
 const sampleLocation = {
   driverId: "driver-1",
@@ -112,6 +121,7 @@ function baseCtx(overrides: Record<string, unknown> = {}) {
     deliveriesLoading: false,
     deliveriesError: null,
     updateDeliveryStatus,
+    refreshDeliveries,
     isOnline: true,
     queuedItems: 0,
     ...overrides,
@@ -266,7 +276,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getAllByText(/^access denied$/i)).toHaveLength(2);
   });
 
-  it("keeps the POD sheet open when completing the delivery fails", async () => {
+  it("closes the POD sheet immediately and toasts when completing the delivery fails", async () => {
     updateDeliveryStatus.mockResolvedValueOnce(false);
     mockUseDriverTracking.mockReturnValue(
       baseCtx({
@@ -292,6 +302,12 @@ describe("DriverTrackingPortal (redesigned)", () => {
 
     // Drive the capture flow to completion; the status update fails.
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+
+    // The upload already succeeded — the sheet closes right away and the
+    // failed advance is surfaced via toast (retry from the delivery card).
+    await waitFor(() =>
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+    );
     await waitFor(() =>
       expect(updateDeliveryStatus).toHaveBeenCalledWith(
         "del-1",
@@ -304,9 +320,90 @@ describe("DriverTrackingPortal (redesigned)", () => {
         expect.stringMatching(/couldn't update the delivery status/i),
       ),
     );
-    // podTarget is only cleared on success — the sheet must stay open so the
-    // driver can retry without re-capturing the proof.
-    expect(screen.getByTestId("pod-capture")).toBeInTheDocument();
+  });
+
+  it("closes the POD sheet before the status update resolves", async () => {
+    let resolveAdvance: (ok: boolean) => void = () => {};
+    updateDeliveryStatus.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveAdvance = resolve)),
+    );
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_TO_CLIENT,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/complete delivery/i));
+    expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+
+    // The sheet must close while the PATCH + refetch are still in flight —
+    // on LTE they take seconds and an open sheet reads as a hang.
+    await waitFor(() =>
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+    );
+    expect(updateDeliveryStatus).toHaveBeenCalledWith(
+      "del-1",
+      DriverStatus.COMPLETED,
+      sampleLocation,
+    );
+
+    await act(async () => resolveAdvance(true));
+  });
+
+  it("closes the signature sheet before the status update resolves", async () => {
+    let resolveAdvance: (ok: boolean) => void = () => {};
+    updateDeliveryStatus.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveAdvance = resolve)),
+    );
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_AT_VENDOR,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/picked up the order/i));
+    expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /finish signature upload/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
+    );
+    expect(updateDeliveryStatus).toHaveBeenCalledWith(
+      "del-1",
+      DriverStatus.PICKED_UP,
+      sampleLocation,
+    );
+
+    await act(async () => resolveAdvance(true));
   });
 
   it("filters Active deliveries by scheduled pickup date via the Today/All chips", () => {
@@ -416,19 +513,94 @@ describe("DriverTrackingPortal (redesigned)", () => {
         ],
       });
 
-    it("disables End shift while a delivery is mid-flight", () => {
+    it("blocks End shift while a delivery is mid-flight", () => {
       mockUseDriverTracking.mockReturnValue(
         withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
       );
       renderPortal();
+      // aria-disabled (not the disabled attribute) so a tap on a stale client
+      // can still trigger the self-heal path instead of being swallowed.
       expect(
         screen.getByRole("button", { name: /end shift/i }),
-      ).toBeDisabled();
-      expect(screen.getByText(/1 delivery to finish first/i)).toBeInTheDocument();
+      ).toHaveAttribute("aria-disabled", "true");
+      expect(
+        screen.getByText(/order cr-1 to finish or return first/i),
+      ).toBeInTheDocument();
       expect(endShift).not.toHaveBeenCalled();
     });
 
-    it("disables End shift for an ASSIGNED delivery whose pickup is overdue", () => {
+    it("offers a return-request escape hatch while blocked", async () => {
+      // Issue #508: a driver stuck with an unstartable assignment could never
+      // end their shift — the blocked state must offer the hand-back path
+      // (now a request that dispatch reviews).
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.ASSIGNED, scheduledPickupAt: new Date(Date.now() - 3600_000) }),
+      );
+      renderPortal();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /request a return to dispatch/i }),
+      );
+
+      // The return sheet opens for the blocking delivery.
+      expect(await screen.findByText(/^request a return$/i)).toBeInTheDocument();
+
+      // Drive the sheet to completion against the return endpoint (202 =
+      // request filed for dispatch review).
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 202,
+          json: () =>
+            Promise.resolve({ success: true, status: "PENDING_APPROVAL" }),
+        }),
+      ) as unknown as typeof fetch;
+      fireEvent.click(screen.getByRole("button", { name: /vehicle issue/i }));
+      fireEvent.click(screen.getByRole("button", { name: /request return/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          "/api/orders/cr-1/return",
+          expect.objectContaining({ method: "POST" }),
+        );
+      });
+      // The feed re-syncs so the End-shift button unblocks without a reload
+      // (the feed now flags the order pendingReturn).
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+    });
+
+    it("does not offer the return button when nothing blocks the shift", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.ASSIGNED,
+          scheduledPickupAt: new Date(Date.now() + 26 * 60 * 60 * 1000),
+        }),
+      );
+      renderPortal();
+      expect(
+        screen.queryByRole("button", { name: /request a return to dispatch/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("stops counting a delivery as a blocker once its return request is pending", () => {
+      // Server parity: the end-shift guard excludes orders with a PENDING
+      // return request, so the client mirror must not contradict it.
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({
+          status: DriverStatus.EN_ROUTE_TO_CLIENT,
+          pendingReturn: true,
+        }),
+      );
+      renderPortal();
+      expect(
+        screen.getByRole("button", { name: /end shift/i }),
+      ).not.toHaveAttribute("aria-disabled", "true");
+      expect(
+        screen.queryByRole("button", { name: /request a return to dispatch/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("blocks End shift for an ASSIGNED delivery whose pickup is overdue", () => {
       mockUseDriverTracking.mockReturnValue(
         withDelivery({
           status: DriverStatus.ASSIGNED,
@@ -438,7 +610,57 @@ describe("DriverTrackingPortal (redesigned)", () => {
       renderPortal();
       expect(
         screen.getByRole("button", { name: /end shift/i }),
-      ).toBeDisabled();
+      ).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("self-heals on tap while blocked: refreshes the feed, explains, and does not end the shift", async () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+
+      // The button is blocked but still tappable (aria-disabled, no disabled
+      // attribute) — a stale client heals itself instead of ignoring the tap.
+      fireEvent.click(screen.getByRole("button", { name: /end shift/i }));
+
+      // Finding #8 (2026-08-21): the block names the order so the driver
+      // knows which delivery to finish or return.
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Order cr-1 is still assigned to you. Complete it or return it to dispatch before ending your shift.",
+        ),
+      );
+      await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
+      expect(endShift).not.toHaveBeenCalled();
+    });
+
+    it("names the blocking order in the blocked-state hint", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+      expect(screen.getByText(/order cr-1/i)).toBeInTheDocument();
+    });
+
+    it("surfaces the server guard error verbatim when the feed shows no blocker", async () => {
+      // A stale/legacy row can block server-side while the client feed is
+      // empty; the server names the order and the portal must show it.
+      mockUseDriverTracking.mockReturnValue(
+        baseCtx({
+          isShiftActive: true,
+          currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+          currentLocation: sampleLocation,
+          activeDeliveries: [],
+          shiftError:
+            "Order Test 0821261 is still assigned to you. Complete it or return it to dispatch before ending your shift.",
+        }),
+      );
+      renderPortal();
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringMatching(/Order Test 0821261 is still assigned to you/),
+        ),
+      );
     });
 
     it("allows End shift when the only assignment is well in the future", async () => {
@@ -481,6 +703,42 @@ describe("DriverTrackingPortal (redesigned)", () => {
         ).toBeEnabled();
       });
 
+      it("does not block for a stale ASSIGNED pickup more than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+          }),
+        );
+        renderPortal();
+        // The button is aria-disabled (not `disabled`), so toBeEnabled() would
+        // pass vacuously — assert on the attribute the guard actually sets.
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).not.toHaveAttribute("aria-disabled", "true");
+      });
+
+      it("still blocks an overdue ASSIGNED pickup less than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6h overdue
+          }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toHaveAttribute("aria-disabled", "true");
+      });
+
       it("still blocks a mid-flight delivery when the guard is disabled (0)", () => {
         mockTrackingSettingsOverride.current = {
           ...TRACKING_SETTINGS_DEFAULTS,
@@ -492,7 +750,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
         renderPortal();
         expect(
           screen.getByRole("button", { name: /end shift/i }),
-        ).toBeDisabled();
+        ).toHaveAttribute("aria-disabled", "true");
       });
 
       it("honors a shortened guard window from settings", () => {
@@ -523,7 +781,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
         renderPortal();
         expect(
           screen.getByRole("button", { name: /end shift/i }),
-        ).toBeDisabled();
+        ).toHaveAttribute("aria-disabled", "true");
       });
     });
   });

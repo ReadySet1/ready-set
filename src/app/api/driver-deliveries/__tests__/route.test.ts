@@ -47,6 +47,12 @@ jest.mock("@/utils/prismaDB", () => ({
     address: {
       findMany: jest.fn(),
     },
+    delivery: {
+      findMany: jest.fn(),
+    },
+    deliveryReturnRequest: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
@@ -122,6 +128,8 @@ describe("/api/driver-deliveries", () => {
     mockPrisma.cateringRequest.findMany.mockResolvedValue([]);
     mockPrisma.onDemand.findMany.mockResolvedValue([]);
     mockPrisma.address.findMany.mockResolvedValue([]);
+    mockPrisma.delivery.findMany.mockResolvedValue([]);
+    mockPrisma.deliveryReturnRequest.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/driver-deliveries", () => {
@@ -179,6 +187,30 @@ describe("/api/driver-deliveries", () => {
         id: mockCateringDelivery.id,
         orderNumber: mockCateringDelivery.orderNumber,
         delivery_type: "catering",
+        // No PENDING return request → the flag is explicitly false.
+        pendingReturn: false,
+      });
+    });
+
+    it("flags orders that have a PENDING return request (pendingReturn)", async () => {
+      mockPrisma.dispatch.findMany.mockResolvedValue([mockCateringDispatch]);
+      mockPrisma.cateringRequest.findMany.mockResolvedValue([mockCateringDelivery]);
+      mockPrisma.deliveryReturnRequest.findMany.mockResolvedValue([
+        { orderId: mockCateringDelivery.id },
+      ]);
+
+      const request = createGetRequest("http://localhost:3000/api/driver-deliveries");
+      const response = await GET(request);
+
+      const data = await expectSuccessResponse(response, 200);
+      expect(data.deliveries[0].pendingReturn).toBe(true);
+      // Only PENDING requests for the fetched orders are considered.
+      expect(mockPrisma.deliveryReturnRequest.findMany).toHaveBeenCalledWith({
+        where: {
+          orderId: { in: [mockCateringDelivery.id] },
+          status: "PENDING",
+        },
+        select: { orderId: true },
       });
     });
 
