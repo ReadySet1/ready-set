@@ -5,8 +5,8 @@
     {
       "version": "2.6.0",
       "date": "2026-08-31",
-      "title": "Release 2.6.0",
-      "summary": "",
+      "title": "Smoother driver shifts, live admin tracking",
+      "summary": "This release focuses on the driver experience: shifts end cleanly, deliveries can be returned to dispatch, cancellations notify drivers instantly, and the admin tracking map got a major upgrade.",
       "changes": [
         {
           "text": "Drivers are no longer stuck on shift because of an old delivery that was assigned but never started.",
@@ -23,14 +23,6 @@
         {
           "text": "The admin live map now shows each driver's travelled trail, planned route, and links to their order.",
           "type": "new"
-        },
-        {
-          "text": "Cancelled orders no longer keep drivers from ending their shift.",
-          "type": "fixed"
-        },
-        {
-          "text": "Cancelled orders no longer keep drivers from ending their shift.",
-          "type": "fixed"
         },
         {
           "text": "Cancelled orders no longer keep drivers from ending their shift.",
