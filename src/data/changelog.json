@@ -3,6 +3,114 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.6.0",
+      "date": "2026-08-31",
+      "title": "Release 2.6.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Drivers are no longer stuck on shift because of an old delivery that was assigned but never started.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers now get a text message and an in-app alert the moment dispatch cancels one of their orders.",
+          "type": "new"
+        },
+        {
+          "text": "The admin tracking overview now updates live and shows accurate delivery and mileage counts.",
+          "type": "fixed"
+        },
+        {
+          "text": "The admin live map now shows each driver's travelled trail, planned route, and links to their order.",
+          "type": "new"
+        },
+        {
+          "text": "Cancelled orders no longer keep drivers from ending their shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "Cancelled orders no longer keep drivers from ending their shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "Cancelled orders no longer keep drivers from ending their shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver status no longer flickers between moving and stopped at walking pace.",
+          "type": "fixed"
+        },
+        {
+          "text": "The delivery photo camera now opens on the first tap.",
+          "type": "fixed"
+        },
+        {
+          "text": "The keyboard no longer covers the pickup confirmation form.",
+          "type": "fixed"
+        },
+        {
+          "text": "Pickup signatures are no longer distorted when drawn in full-screen mode.",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver requests to return a delivery now go to dispatch for review instead of unassigning immediately.",
+          "type": "improved"
+        },
+        {
+          "text": "Drivers can now return a delivery to dispatch when they can't complete it, instead of being stuck unable to end their shift.",
+          "type": "new"
+        },
+        {
+          "text": "A finished delivery now shows its Delivered step with a green check instead of \"In progress now\".",
+          "type": "fixed"
+        },
+        {
+          "text": "Delivery photo uploads and ending your shift no longer fail late in a shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "Confirming a pickup or delivery now closes the window right away instead of freezing for a few seconds.",
+          "type": "improved"
+        },
+        {
+          "text": "Signatures drawn in the fullscreen pad are no longer lost when you return to the smaller view.",
+          "type": "fixed"
+        },
+        {
+          "text": "The route line on the live map no longer turns into a scribble after switching tabs and coming back.",
+          "type": "fixed"
+        },
+        {
+          "text": "Delivery photos now upload reliably from modern phone cameras.",
+          "type": "fixed"
+        },
+        {
+          "text": "Shift mileage no longer overcounts when GPS signal wobbles.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver home screen loads faster without the stats section.",
+          "type": "improved"
+        },
+        {
+          "text": "Finishing a delivery now immediately unlocks the End shift button.",
+          "type": "fixed"
+        },
+        {
+          "text": "Fixed the driver app's bottom bar showing page content through it on iPhone.",
+          "type": "fixed"
+        },
+        {
+          "text": "Delivery photos and pickup signatures now display correctly in order files.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.6.0"
+      }
+    },
+    {
       "version": "2.5.0",
       "date": "2026-08-06",
       "title": "Smarter tracking, smoother pickups",
