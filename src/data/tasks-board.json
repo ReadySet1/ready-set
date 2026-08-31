@@ -12,7 +12,8 @@
     "meetings/shared/2026-06-08-dev-team-meeting.md",
     "meetings/shared/2026-06-22-dev-team-meeting.md",
     "meetings/shared/2026-06-29-dev-team-meeting.md",
-    "meetings/shared/2026-07-13-dev-team-meeting.md"
+    "meetings/shared/2026-07-13-dev-team-meeting.md",
+    "aug31"
   ],
   "columns": [
     {
@@ -63,7 +64,8 @@
     "aug18walk": "Drive Test 8/18",
     "aug20": "Aug 20 session",
     "aug20walk": "Drive Test 8/20",
-    "aug21": "Drive Test 8/21"
+    "aug21": "Drive Test 8/21",
+    "aug31": "Aug 31"
   },
   "tasks": [
     {
@@ -1274,7 +1276,7 @@
     },
     {
       "id": "enable-vps-crons",
-      "status": "new",
+      "status": "done",
       "title": "Scheduled jobs not running since the Dokploy cutover",
       "owner": "emmanuel",
       "source": "aug20walk",
@@ -1357,6 +1359,136 @@
       "status": "open",
       "title": "Device re-walk on rs-dev: cancel an assigned order, then End Shift; compare live vs closed-shift miles",
       "description": "Verification pass for the 2026-08-21 fixes once <code>development</code> is deployed on rs-dev. Start a shift on <code>fernando.driver@readysetllc.com</code>, get an order assigned, cancel it from admin, and confirm <strong>End Shift succeeds</strong> without DB surgery (#525). During the walk, compare the live miles shown on the admin Overview / popup (#527) against the closed-shift mileage on the driver History and shift record; note any gap. Also eyeball the trail and planned route layers (#526) and the status pill stability (#524)."
+    },
+    {
+      "id": "merge-pr532-v260",
+      "status": "open",
+      "title": "Merge #532 dev→main from the ReadySet1 account (unblocks v2.6.0)",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "sourceRef": "#532",
+      "description": "Promotion PR staged since 08-22, CI fully green, prod migration <code>delivery_return_requests</code> already applied+verified. Merge-commit (never squash) from the ReadySet1 login (main-protect ruleset), then merge the release-please PR so the apex flips to 2.6.0."
+    },
+    {
+      "id": "pr534-blockers-rereview",
+      "status": "open",
+      "title": "#534 admin order email — Fernando fixes 3 blockers, then re-review",
+      "owner": "fernando",
+      "source": "aug31",
+      "sourceRef": "#534",
+      "tags": [
+        "bug"
+      ],
+      "description": "Changes Requested 08-25: NODE_ENV guard dead in Docker (rs-dev would email info@/austin@), invalid recipient list bypasses <code>ORDER_NOTIFICATIONS_ENABLED</code>, HTML injection from customer notes. Emmanuel re-reviews on his fix push."
+    },
+    {
+      "id": "review-pr-522",
+      "status": "open",
+      "title": "Review PR #522 (stale, unreviewed)",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "sourceRef": "#522",
+      "description": "Open since mid-August with no review pass. Review or close."
+    },
+    {
+      "id": "catercow-prod-golive",
+      "status": "open",
+      "title": "CaterCow production go-live (waiting on Nate sign-off)",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "description": "Staging verified + signing secret sent 06-29. On Nate's sign-off: issue prod key, register prod webhook, go live. Gary decision owed: straight to prod or demo first."
+    },
+    {
+      "id": "native-walk-locked-screen",
+      "status": "open",
+      "title": "Locked-screen background-GPS walk — last native-app gate",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "tags": [
+        "critical"
+      ],
+      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again."
+    },
+    {
+      "id": "api-health-unhealthy-check",
+      "status": "open",
+      "title": "/api/health reports unhealthy on dev+prod — fix the check, not the app",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "tags": [
+        "bug"
+      ],
+      "description": "Since the VPS move: <code>checkDatabaseHealth</code> runs 4 sequential Supabase round trips against 100/500ms thresholds (EU→us-east-1), so dev (~3.3s) and prod (~2.2s) always read unhealthy. Parallelize/re-threshold, and drop the dead Stripe check (<code>PaymentForm.tsx</code> is orphaned) so monitoring isn't permanently degraded."
+    },
+    {
+      "id": "glitchtip-review-0827",
+      "status": "done",
+      "title": "GlitchTip: review rs-dev errors around the 08-27 drive window",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "description": "rs-dev error reporting goes to GlitchTip (project 1), not Sentry. Check 21:31–21:41 UTC 08-27 via <code>secure/glitchtip-admin.txt</code>; wire Resend SMTP for alert emails while in there."
+    },
+    {
+      "id": "rotate-supabase-pat",
+      "status": "open",
+      "title": "Rotate the plaintext Supabase PAT in .mcp.json",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "description": "Personal access token sits inline in <code>repos/ready-set/.mcp.json</code> (gitignored, never committed — verified). Issue a new PAT, delete the old, move it to a <code>SUPABASE_ACCESS_TOKEN</code> env var."
+    },
+    {
+      "id": "verify-vercel-github-app",
+      "status": "done",
+      "title": "Verify the Vercel GitHub app is uninstalled",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "description": "Last Vercel-removal loose end: confirm the GitHub app integration is gone from the ReadySet1 account/repos."
+    },
+    {
+      "id": "vps-backups-uptime-monitoring",
+      "status": "open",
+      "title": "Off-host backups + uptime monitoring for the ready-set VPS",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "tags": [
+        "critical"
+      ],
+      "description": "Single-box SPOF since the 08-18 cutover (P0.3, never done; box has a 2026-06-01 unpaid-bill null-route history). Restic → Hetzner Storage Box for backups + external uptime monitoring."
+    },
+    {
+      "id": "destino-backup-secrets",
+      "status": "open",
+      "title": "destino-sf: weekly DB backup has NO secrets — only backup on a free plan",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "tags": [
+        "critical"
+      ],
+      "description": "<code>weekly-backup.yml</code> has failed every Sunday since 08-09: secrets <code>SUPABASE_DIRECT_URL</code> + <code>SUPABASE_SERVICE_ROLE_KEY</code> never created. Bucket <code>db-backups</code> + <code>SUPABASE_URL</code> done 08-26. Free-plan Supabase = no platform backups; this workflow is the only backup."
+    },
+    {
+      "id": "destino-readyset1-admin-chores",
+      "status": "open",
+      "title": "destino-sf: ReadySet1-login admin batch (Actions toggle, CF 404 TTL, delete Vercel)",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "description": "One sitting from the ReadySet1 login: (1) Settings → Actions → allow GitHub Actions to create PRs (release-please fails on every <code>main</code> push until then); (2) Cloudflare <code>next-image-cache</code> rule: 404 status TTL 0; (3) delete the Vercel project after <code>vercel env pull</code>."
+    },
+    {
+      "id": "destino-fernando-qa-results",
+      "status": "open",
+      "title": "destino-sf: chase Fernando's post-cutover QA results",
+      "owner": "fernando",
+      "source": "aug31",
+      "description": "QA matrix (60 rows, P0/P1/P2) sent 08-24; P0 due same day, rest by Wed 08-26 — nothing logged as of 08-31."
+    },
+    {
+      "id": "destino-maintenance-tier",
+      "status": "open",
+      "title": "destino-sf: maintenance-plan tier decision + freeze window",
+      "owner": "gary",
+      "source": "aug31",
+      "description": "Pick Minimal ~24h / Standard ~64h (recommended) / Full ~96h from the 08-24 post-migration maintenance plan, plus confirm the Nov 20 → Dec 1 freeze and Fernando QA involvement."
     }
   ]
 }

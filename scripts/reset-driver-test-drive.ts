@@ -31,6 +31,7 @@
  *   --leg am|pm         Which route leg to seed (default: picked by local time)
  *   --run-id <id>       Order-number suffix (default: UTC timestamp)
  *   --lead <minutes>    Minutes from now until the scheduled pickup (default 30)
+ *   --window <minutes>  Minutes allowed between pickup and arrival (default 30)
  *   --no-seed           Clean up only, do not create a new order
  *   --force             Also clear orders that are NOT recognisably synthetic
  *   --apply             Perform the writes (otherwise dry run)
@@ -67,6 +68,7 @@ interface Args {
   runId?: string;
   pickupDistanceM?: number;
   leadMinutes?: number;
+  windowMinutes?: number;
   dropoffDistanceM?: number;
   noSeed: boolean;
   force: boolean;
@@ -120,6 +122,10 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--lead':
         args.leadMinutes = Number(value);
+        i += 1;
+        break;
+      case '--window':
+        args.windowMinutes = Number(value);
         i += 1;
         break;
       case '--no-seed':
@@ -398,6 +404,7 @@ async function main() {
       now,
       ...(args.leg ? { leg: args.leg } : {}),
       ...(Number.isFinite(args.leadMinutes) ? { leadMinutes: args.leadMinutes } : {}),
+      ...(Number.isFinite(args.windowMinutes) ? { windowMinutes: args.windowMinutes } : {}),
     });
     seed = {
       orderNumber: plan.orderNumber,
@@ -418,6 +425,7 @@ async function main() {
       now,
       ...(Number.isFinite(args.pickupDistanceM) ? { pickupDistanceM: args.pickupDistanceM } : {}),
       ...(Number.isFinite(args.leadMinutes) ? { leadMinutes: args.leadMinutes } : {}),
+      ...(Number.isFinite(args.windowMinutes) ? { windowMinutes: args.windowMinutes } : {}),
       ...(Number.isFinite(args.dropoffDistanceM)
         ? { dropoffDistanceM: args.dropoffDistanceM }
         : {}),
