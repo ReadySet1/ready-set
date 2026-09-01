@@ -1099,11 +1099,12 @@
     },
     {
       "id": "add-tx-ga-counties-order-creation",
-      "status": "new",
+      "status": "progress",
       "title": "Add TX and GA counties to order creation",
       "owner": "fernando",
       "source": "aug10",
-      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific."
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific.<br><br><strong>2026-09-01:</strong> PR #522 reviewed, changes requested: swap Houston for Austin/Travis and store county names (<code>Dallas</code>, <code>Travis</code>, <code>Fulton</code>) instead of city names.",
+      "sourceRef": "#522"
     },
     {
       "id": "order-created-inbox-notification",
@@ -1411,14 +1412,15 @@
     },
     {
       "id": "api-health-unhealthy-check",
-      "status": "open",
+      "status": "progress",
       "title": "/api/health reports unhealthy on dev+prod — fix the check, not the app",
       "owner": "emmanuel",
       "source": "aug31",
       "tags": [
         "bug"
       ],
-      "description": "Since the VPS move: <code>checkDatabaseHealth</code> runs 4 sequential Supabase round trips against 100/500ms thresholds (EU→us-east-1), so dev (~3.3s) and prod (~2.2s) always read unhealthy. Parallelize/re-threshold, and drop the dead Stripe check (<code>PaymentForm.tsx</code> is orphaned) so monitoring isn't permanently degraded."
+      "description": "Since the VPS move: <code>checkDatabaseHealth</code> runs 4 sequential Supabase round trips against 100/500ms thresholds (EU→us-east-1), so dev (~3.3s) and prod (~2.2s) always read unhealthy. Parallelize/re-threshold, and drop the dead Stripe check (<code>PaymentForm.tsx</code> is orphaned) so monitoring isn't permanently degraded.",
+      "sourceRef": "#537"
     },
     {
       "id": "glitchtip-review-0827",
@@ -1489,6 +1491,17 @@
       "owner": "gary",
       "source": "aug31",
       "description": "Pick Minimal ~24h / Standard ~64h (recommended) / Full ~96h from the 08-24 post-migration maintenance plan, plus confirm the Nov 20 → Dec 1 freeze and Fernando QA involvement."
+    },
+    {
+      "id": "driver-page-hydration-418",
+      "status": "open",
+      "title": "Fix React #418 hydration mismatch on /driver (Mobile Safari)",
+      "owner": "emmanuel",
+      "source": "aug31",
+      "tags": [
+        "bug"
+      ],
+      "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load."
     }
   ]
 }
