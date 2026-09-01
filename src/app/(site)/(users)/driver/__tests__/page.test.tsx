@@ -2,13 +2,17 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
 import DriverPage from '../page';
 import {
   renderPage,
   mockAuthenticatedUser,
   createMockApiResponse,
+  createTestQueryClient,
   resetAllPageMocks,
+  PageTestWrapper,
 } from '@/__tests__/utils/page-test-utils';
 import { UserType } from '@/types/user';
 
@@ -220,6 +224,49 @@ describe('DriverPage (redesigned home)', () => {
       });
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('SSR hydration', () => {
+    // Regression for GlitchTip READY-SET-WEB-3 (React #418 on /driver): the
+    // server renders in UTC, the driver's phone in Pacific time, so the
+    // time-of-day greeting differed between the server HTML and the client's
+    // first render and React threw a text-content mismatch on every page load.
+    it('hydrates without a mismatch when the server clock is in a different time-of-day bucket', async () => {
+      const tree = (
+        <PageTestWrapper
+          userContext={mockAuthenticatedUser({ role: UserType.DRIVER, name: 'John Driver' })}
+          queryClient={createTestQueryClient()}
+        >
+          <DriverPage />
+        </PageTestWrapper>
+      );
+
+      // Server: 21:31 falls in the "evening" bucket.
+      jest.setSystemTime(new Date('2024-06-15T21:31:00'));
+      const serverHtml = renderToString(tree);
+
+      const container = document.createElement('div');
+      container.innerHTML = serverHtml;
+      document.body.appendChild(container);
+
+      // Client: 14:31 falls in the "afternoon" bucket.
+      jest.setSystemTime(new Date('2024-06-15T14:31:00'));
+      const onRecoverableError = jest.fn();
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+      await act(async () => {
+        root = hydrateRoot(container, tree, { onRecoverableError });
+      });
+
+      expect(onRecoverableError).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(container.querySelector('h1')).toHaveTextContent('Good afternoon');
+      });
+
+      await act(async () => {
+        root?.unmount();
+      });
+      container.remove();
     });
   });
 });
