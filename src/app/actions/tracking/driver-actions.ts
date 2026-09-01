@@ -23,6 +23,7 @@ import {
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 import {
+  END_SHIFT_STALE_PICKUP_HOURS,
   formatBlockingOrdersMessage,
   type BlockingOrder,
 } from '@/lib/driver/end-shift-blockers';
@@ -159,13 +160,19 @@ export async function endDriverShift(
 
     // Guard: a driver may not end a shift while they still have active
     // deliveries — doing so would strand an in-progress order. Admins may
-    // override by passing metadata.force. "Active" = a non-terminal row in the
-    // `deliveries` table (what the live portal shows), a catering/on-demand
-    // order the driver has actually started (driverStatus in a movement stage),
-    // or — 2026-07-09 drive-test feedback — an ASSIGNED order whose pickup is
-    // imminent (within the admin-configured window) or overdue. Future-dated
-    // assignments don't trap the driver. A window of 0 disables the
-    // imminent-pickup branch entirely (in-flight orders always block).
+    // override by passing metadata.force. Two kinds of work count:
+    //  - STARTED work always blocks: a `deliveries` row (what the live portal
+    //    shows) in a non-terminal status outside the not-started set, or a
+    //    catering/on-demand order whose driverStatus is a movement stage.
+    //  - NOT-STARTED work (deliveries status ASSIGNED/PENDING, dispatch
+    //    driverStatus ASSIGNED) blocks only when its pickup time falls inside
+    //    [NOW() - END_SHIFT_STALE_PICKUP_HOURS, NOW() + guard window]:
+    //    imminent (2026-07-09 drive-test feedback) or recently overdue.
+    //    Future-dated assignments don't trap the driver, and neither do
+    //    stale rows from days ago (2026-08-26 incident: two Aug-23 ASSIGNED
+    //    deliveries rows deadlocked a driver's end-shift). NULL pickup
+    //    times never block. A window of 0 disables the not-started branch
+    //    entirely on both tables (started work still blocks).
     // Orders with a PENDING return request (delivery_return_requests) never
     // block: the driver has already asked dispatch to take the order back,
     // so the shift can end while the request awaits review.
@@ -175,16 +182,28 @@ export async function endDriverShift(
     if (!force) {
       const settings = await getTrackingSettings();
       const guardMinutes = settings.endShiftPickupGuardMinutes;
-      // The pickup window is bound as a parameter (never interpolated); the
-      // alias is a compile-time constant, one fragment builder for both tables.
+      // The pickup window's upper bound is bound as a parameter (never
+      // interpolated); the lower bound is a compile-time constant. Aliases
+      // are compile-time constants too — one fragment builder per table.
+      const staleBound = `NOW() - interval '${END_SHIFT_STALE_PICKUP_HOURS} hours'`;
       const imminentPickup = (alias: 'cr' | 'od') =>
         guardMinutes > 0
           ? `OR (${alias}."driverStatus" = 'ASSIGNED'
                       AND ${alias}."pickupDateTime" IS NOT NULL
+                      AND ${alias}."pickupDateTime" >= ${staleBound}
                       AND ${alias}."pickupDateTime" <= NOW() + make_interval(mins => $2::int))`
           : '';
       const imminentPickupCr = imminentPickup('cr');
       const imminentPickupOd = imminentPickup('od');
+      // Same window for not-started mirror rows. The mirror is written as
+      // 'ASSIGNED' (assignDriver / createDelivery) and defaults to 'pending'.
+      const notStartedDelivery = `UPPER(deliveries.status) IN ('ASSIGNED','PENDING')`;
+      const imminentPickupDelivery = guardMinutes > 0
+        ? `OR (${notStartedDelivery}
+                      AND deliveries.estimated_pickup_time IS NOT NULL
+                      AND deliveries.estimated_pickup_time >= ${staleBound}
+                      AND deliveries.estimated_pickup_time <= NOW() + make_interval(mins => $2::int))`
+        : '';
       const guardParams: unknown[] = guardMinutes > 0
         ? [shift?.driver_id, guardMinutes]
         : [shift?.driver_id];
@@ -202,6 +221,10 @@ export async function endDriverShift(
         WHERE driver_id = $1::uuid
           AND deleted_at IS NULL
           AND status NOT IN ('COMPLETED','CANCELLED','DELIVERED')
+          AND (
+            UPPER(deliveries.status) NOT IN ('ASSIGNED','PENDING')
+            ${imminentPickupDelivery}
+          )
           AND NOT EXISTS (
             SELECT 1 FROM delivery_return_requests rr
             WHERE rr.order_number = deliveries.order_number

@@ -40,8 +40,6 @@ describe('GET /api/health - System Health Check', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
     process.env.GOOGLE_MAPS_API_KEY = 'test-google-key';
     process.env.MAPBOX_ACCESS_TOKEN = 'test-mapbox-token';
-    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_123';
-    process.env.STRIPE_SECRET_KEY = 'sk_test_123';
     process.env.NODE_ENV = 'test';
 
     // Default successful mocks
@@ -67,8 +65,6 @@ describe('GET /api/health - System Health Check', () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.GOOGLE_MAPS_API_KEY;
     delete process.env.MAPBOX_ACCESS_TOKEN;
-    delete process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    delete process.env.STRIPE_SECRET_KEY;
   });
 
   describe('✅ Healthy System', () => {
@@ -125,6 +121,41 @@ describe('GET /api/health - System Health Check', () => {
       expect(data.errors.criticalErrorCount).toBe(1);
     });
 
+    it('should run the database sub-checks in parallel, not sequentially', async () => {
+      // Each of the 4 DB round trips takes 300ms. Sequential execution would
+      // total ~1200ms (degraded); parallel execution stays around ~300ms.
+      const delayed = <T,>(value: T) =>
+        new Promise<T>((resolve) => setTimeout(() => resolve(value), 300));
+
+      (prismaPooled.$queryRaw as jest.Mock).mockImplementation(() => delayed([{ test: 1 }]));
+      (prismaPooled.profile.count as jest.Mock).mockImplementation(() => delayed(100));
+      (healthCheck.getConnectionInfo as jest.Mock).mockImplementation(() =>
+        delayed({
+          serverless: false,
+          preparedStatementsDisabled: true,
+          activeConnections: BigInt(5),
+        })
+      );
+      (healthCheck.debugPreparedStatements as jest.Mock).mockImplementation(() => delayed([]));
+
+      const request = createGetRequest('http://localhost:3000/api/health');
+      const response = await GET(request);
+      const data = await expectSuccessResponse(response, 200);
+
+      expect(data.services.database.status).toBe('healthy');
+      expect(data.services.database.responseTime).toBeLessThan(1000);
+    });
+
+    it('should not report Stripe in external services (payments unused)', async () => {
+      const request = createGetRequest('http://localhost:3000/api/health');
+      const response = await GET(request);
+      const data = await expectSuccessResponse(response, 200);
+
+      expect(data.services.externalAPIs.status).toBe('healthy');
+      expect(data.services.externalAPIs.details).not.toHaveProperty('stripeConfigured');
+      expect(data.services.externalAPIs.message).toBe('2/2 external services configured');
+    });
+
     it('should include database connection details', async () => {
       const request = createGetRequest('http://localhost:3000/api/health');
       const response = await GET(request);
@@ -148,9 +179,10 @@ describe('GET /api/health - System Health Check', () => {
 
   describe('⚠️ Degraded System', () => {
     it('should return degraded status when database is slow', async () => {
-      // Simulate slow database
+      // Simulate slow database: above the 1s healthy threshold, below the 3s
+      // unhealthy threshold (VPS-to-us-east-1 baseline is ~90ms per round trip)
       (prismaPooled.$queryRaw as jest.Mock).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve([{ test: 1 }]), 150))
+        () => new Promise((resolve) => setTimeout(() => resolve([{ test: 1 }]), 1100))
       );
 
       const request = createGetRequest('http://localhost:3000/api/health');
@@ -328,7 +360,7 @@ describe('GET /api/health - System Health Check', () => {
       expect(data.errors.errorRate).toBe(0);
     });
 
-    it('should handle very slow database (> 500ms)', async () => {
+    it('should stay healthy at the cross-region baseline (~600ms round trip)', async () => {
       (prismaPooled.$queryRaw as jest.Mock).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve([{ test: 1 }]), 600))
       );
@@ -337,9 +369,21 @@ describe('GET /api/health - System Health Check', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(data.services.database.status).toBe('unhealthy');
-      expect(data.services.database.responseTime).toBeGreaterThan(500);
+      expect(data.services.database.status).toBe('healthy');
     });
+
+    it('should report unhealthy above the 3s threshold', async () => {
+      (prismaPooled.$queryRaw as jest.Mock).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve([{ test: 1 }]), 3100))
+      );
+
+      const request = createGetRequest('http://localhost:3000/api/health');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.services.database.status).toBe('unhealthy');
+      expect(data.services.database.responseTime).toBeGreaterThan(3000);
+    }, 10000);
 
     it('should include environment information in database details', async () => {
       process.env.VERCEL = '1';

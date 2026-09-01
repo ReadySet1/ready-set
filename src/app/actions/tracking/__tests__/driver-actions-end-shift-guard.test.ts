@@ -50,6 +50,7 @@ import { callerMayActOnDriver, getActionCaller } from "@/lib/auth/driver-ownersh
 import { getTrackingSettings } from "@/services/tracking/tracking-settings";
 import { calculateShiftMileage } from "@/services/tracking/mileage";
 import { TRACKING_SETTINGS_DEFAULTS } from "@/types/tracking-settings";
+import { END_SHIFT_STALE_PICKUP_HOURS } from "@/lib/driver/end-shift-blockers";
 
 const mockQueryRaw = prisma.$queryRawUnsafe as jest.Mock;
 const mockExecuteRaw = prisma.$executeRawUnsafe as jest.Mock;
@@ -187,5 +188,63 @@ describe("endDriverShift guard names the blocking order", () => {
     expect(res.activeDeliveries).toBe(1);
     expect(res.blockingOrders).toEqual([]);
     expect(res.error).toContain("active or due delivery");
+  });
+});
+
+describe("endDriverShift guard ignores stale not-started work (2026-08-26 deadlock)", () => {
+  const LOWER_BOUND = `NOW() - interval '${END_SHIFT_STALE_PICKUP_HOURS} hours'`;
+
+  it("gates not-started deliveries rows on an estimated_pickup_time window instead of blocking unconditionally", async () => {
+    mockEndShiftQueries([]);
+
+    await endDriverShift(SHIFT_ID, endLocation);
+
+    const [sql, ...params] = mockQueryRaw.mock.calls.find(
+      ([q]) => typeof q === "string" && q.includes("end-shift-blockers"),
+    )!;
+    // Started rows (any non-terminal status outside the not-started set) still block.
+    expect(sql).toContain("UPPER(deliveries.status) NOT IN ('ASSIGNED','PENDING')");
+    // Not-started rows block only inside [NOW()-24h, NOW()+guard].
+    expect(sql).toMatch(
+      /UPPER\(deliveries\.status\) IN \('ASSIGNED','PENDING'\)\s+AND deliveries\.estimated_pickup_time IS NOT NULL\s+AND deliveries\.estimated_pickup_time >= NOW\(\) - interval '24 hours'\s+AND deliveries\.estimated_pickup_time <= NOW\(\) \+ make_interval\(mins => \$2::int\)/,
+    );
+    expect(params).toEqual([DRIVER_ID, TRACKING_SETTINGS_DEFAULTS.endShiftPickupGuardMinutes]);
+  });
+
+  it("applies the 24h lower bound to both branches", async () => {
+    mockEndShiftQueries([]);
+
+    await endDriverShift(SHIFT_ID, endLocation);
+
+    const sql = findGuardSql();
+    expect(END_SHIFT_STALE_PICKUP_HOURS).toBe(24);
+    expect(sql).toContain(`deliveries.estimated_pickup_time >= ${LOWER_BOUND}`);
+    expect(sql).toContain(`cr."pickupDateTime" >= ${LOWER_BOUND}`);
+    expect(sql).toContain(`od."pickupDateTime" >= ${LOWER_BOUND}`);
+    // The window bounds are never built from user input.
+    expect(sql).not.toMatch(/interval '\$\d/);
+  });
+
+  it("excludes not-started rows entirely when the guard window is 0", async () => {
+    (getTrackingSettings as jest.Mock).mockResolvedValue({
+      ...TRACKING_SETTINGS_DEFAULTS,
+      endShiftPickupGuardMinutes: 0,
+    });
+    mockEndShiftQueries([]);
+
+    const res = await endDriverShift(SHIFT_ID, endLocation);
+    expect(res.success).toBe(true);
+
+    const [sql, ...params] = mockQueryRaw.mock.calls.find(
+      ([q]) => typeof q === "string" && q.includes("end-shift-blockers"),
+    )!;
+    expect(sql).not.toContain("estimated_pickup_time");
+    expect(sql).not.toContain("pickupDateTime");
+    expect(sql).not.toContain("make_interval");
+    expect(sql).not.toContain("$2");
+    expect(params).toEqual([DRIVER_ID]);
+    // Started rows still block on both branches.
+    expect(sql).toContain("UPPER(deliveries.status) NOT IN ('ASSIGNED','PENDING')");
+    expect(sql).toContain("EN_ROUTE_TO_VENDOR");
   });
 });
