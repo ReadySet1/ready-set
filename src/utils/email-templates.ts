@@ -4,6 +4,7 @@ import {
   UserRegistrationData,
   QuoteRequestData,
 } from "../types/email";
+import { escapeHtml } from "@/lib/utils/escape-html";
 
 /**
  * Ready Set Brand Colors - Comprehensive Design System
@@ -231,8 +232,8 @@ export const generateInfoBox = (
 export const generateDetailsTable = (details: Array<{ label: string; value: string }>) => {
   const rows = details.map(({ label, value }) => `
     <tr>
-      <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_COLORS.mediumGray}; width: 40%;">${label}:</td>
-      <td style="padding: 10px 0; color: ${BRAND_COLORS.dark};">${value}</td>
+      <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_COLORS.mediumGray}; width: 40%;">${escapeHtml(label)}:</td>
+      <td style="padding: 10px 0; color: ${BRAND_COLORS.dark};">${escapeHtml(value)}</td>
     </tr>
   `).join('');
 

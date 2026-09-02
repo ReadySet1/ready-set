@@ -437,6 +437,35 @@ describe("Email Notification Service - Admin Notifications", () => {
       });
     });
 
+    describe("XSS Prevention", () => {
+      it("should escape <script>alert(1)</script> in specialNotes", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          specialNotes: '<script>alert(1)</script>',
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+        expect(lastCall.html).not.toContain('<script>alert(1)</script>');
+      });
+
+      it("should escape HTML in pickupNotes", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          pickupNotes: '<img src=x onerror=alert(1)>',
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).not.toContain('<img src=x onerror=alert(1)>');
+      });
+    });
+
     describe("Order Total Formatting", () => {
       it("should format numeric order total", async () => {
         const orderData = {

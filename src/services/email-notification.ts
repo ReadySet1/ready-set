@@ -23,6 +23,7 @@ import {
   generateInfoBox,
   BRAND_COLORS
 } from "@/utils/email-templates";
+import { escapeHtml } from "@/lib/utils/escape-html";
 import { getOrderNotificationConfig } from "@/config/order-notifications";
 
 // Lazy initialization to avoid build-time errors when API key is not set
@@ -143,7 +144,7 @@ function formatVendorAddress(address: VendorRegistrationDetails['address']): str
     address.street2,
     `${address.city}, ${address.state} ${address.zip}`
   ].filter(Boolean);
-  return parts.join('<br>');
+  return parts.join(', ');
 }
 
 /**
@@ -442,14 +443,14 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
     ${data.pickupNotes ? `
       <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">Pickup Notes</h3>
       <p style="font-size: 16px; color: ${BRAND_COLORS.text.primary}; background: ${BRAND_COLORS.background.secondary}; padding: 15px; border-radius: 6px;">
-        ${data.pickupNotes}
+        ${escapeHtml(data.pickupNotes)}
       </p>
     ` : ''}
 
     ${data.specialNotes ? `
       <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">Special Notes</h3>
       <p style="font-size: 16px; color: ${BRAND_COLORS.text.primary}; background: ${BRAND_COLORS.background.secondary}; padding: 15px; border-radius: 6px;">
-        ${data.specialNotes}
+        ${escapeHtml(data.specialNotes)}
       </p>
     ` : ''}
   `;

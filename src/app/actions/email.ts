@@ -252,21 +252,7 @@ const parseDelivery = (message: string) => {
   return sections;
 };
 
-/**
- * Escape HTML special characters to prevent XSS attacks in email templates
- * This is critical for security when inserting user input into HTML emails
- */
-function escapeHtml(unsafe: string | null | undefined): string {
-  if (!unsafe) return '';
-
-  return unsafe
-    .toString()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+import { escapeHtml } from '@/lib/utils/escape-html';
 
 // HTML templates with XSS protection
 const createRegistrationHTML = (data: any) => `
