@@ -1,6 +1,6 @@
 {
   "name": "ready-set-nextjs",
-  "version": "2.4.0",
+  "version": "2.6.0",
   "private": true,
   "engines": {
     "node": ">=20.0.0 <23.0.0",
@@ -145,7 +145,7 @@
     "date-fns-tz": "^3.2.0",
     "debug": "^4.4.0",
     "decimal.js": "^10.6.0",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.13",
     "dotenv": "^17.3.1",
     "dotenv-cli": "^10.0.0",
     "embla-carousel-autoplay": "^8.6.0",
