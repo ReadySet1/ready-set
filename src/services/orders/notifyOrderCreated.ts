@@ -125,6 +125,23 @@ export function buildOrderNotificationData(
 }
 
 // ---------------------------------------------------------------------------
+// Sentry context helper — DRY up the repeated tags/extra blocks.
+// orderId goes in `extra`, never `tags` — tags are indexed and a unique
+// value per event blows up Sentry's tag cardinality limits.
+// ---------------------------------------------------------------------------
+
+function sentryContext(input: NotifyOrderCreatedInput) {
+  return {
+    tags: {
+      operation: "notifyOrderCreated" as const,
+      orderType: input.orderType,
+      source: input.source,
+    },
+    extra: { orderId: input.orderId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher — the awaitable form (use when you need the result)
 // ---------------------------------------------------------------------------
 
@@ -152,12 +169,7 @@ export async function notifyOrderCreated(
       );
       Sentry.captureMessage("Order notification: order not found", {
         level: "warning",
-        tags: {
-          operation: "notifyOrderCreated",
-          orderType: input.orderType,
-          source: input.source,
-        },
-        extra: { orderId: input.orderId },
+        ...sentryContext(input),
       });
       return { sent: false, reason: "order_not_found" };
     }
@@ -176,12 +188,7 @@ export async function notifyOrderCreated(
       );
       Sentry.captureMessage("Order notification send failed", {
         level: "warning",
-        tags: {
-          operation: "notifyOrderCreated",
-          orderType: input.orderType,
-          source: input.source,
-        },
-        extra: { orderId: input.orderId },
+        ...sentryContext(input),
       });
       return { sent: false, reason: "send_failed" };
     }

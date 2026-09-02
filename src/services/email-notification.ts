@@ -316,10 +316,10 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
  * Send order notification to admin when new order is created
  */
 export async function sendOrderNotificationToAdmin(data: OrderNotificationData): Promise<boolean> {
-  const { recipients } = getOrderNotificationConfig();
+  const { recipients, enabled } = getOrderNotificationConfig();
 
-  if (recipients.length === 0) {
-    console.warn("[sendOrderNotificationToAdmin] No recipients configured; skipping");
+  if (!enabled || recipients.length === 0) {
+    console.warn("[sendOrderNotificationToAdmin] Notifications disabled or no recipients configured; skipping");
     return false;
   }
 
