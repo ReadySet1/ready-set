@@ -1494,14 +1494,14 @@
     },
     {
       "id": "driver-page-hydration-418",
-      "status": "progress",
+      "status": "done",
       "title": "Fix React #418 hydration mismatch on /driver (Mobile Safari)",
       "owner": "emmanuel",
       "source": "aug31",
       "tags": [
         "bug"
       ],
-      "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load.<br><br><strong>2026-09-01:</strong> Root cause: greeting computed from the server clock (UTC) during SSR; the device (PDT) rendered a different time-of-day bucket. Fixed in PR #539 with a hydration regression test.",
+      "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load.<br><br><strong>2026-09-01:</strong> Root cause: greeting computed from the server clock (UTC) during SSR; the device (PDT) rendered a different time-of-day bucket. Fixed in PR #539 with a hydration regression test. Merged to development 2026-09-01 (d8390493).",
       "sourceRef": "#539"
     }
   ]
