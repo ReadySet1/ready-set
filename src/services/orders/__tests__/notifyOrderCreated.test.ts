@@ -1,6 +1,5 @@
 import {
   notifyOrderCreated,
-  notifyOrderCreatedSafe,
   buildOrderNotificationData,
 } from "../notifyOrderCreated";
 
@@ -446,28 +445,46 @@ describe("buildOrderNotificationData", () => {
 });
 
 // ---------------------------------------------------------------------------
-// notifyOrderCreatedSafe (fire-and-forget)
+// runAfterResponse error path
 // ---------------------------------------------------------------------------
 
-describe("notifyOrderCreatedSafe", () => {
+describe("runAfterResponse error handling", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConfig.mockReturnValue({ recipients: ["admin@test.com"], enabled: true });
   });
 
-  it("does not throw even if the underlying promise rejects", async () => {
-    mockPrisma.cateringRequest.findUnique.mockRejectedValue(new Error("DB down"));
+  it("logs the error and does not throw when notifyOrderCreated rejects inside runAfterResponse", async () => {
+    // Import the real runAfterResponse — outside a request scope it falls
+    // back to inline execution, so the catch handler fires synchronously.
+    const { runAfterResponse } = jest.requireActual<
+      typeof import("@/lib/api/after-response")
+    >("@/lib/api/after-response");
+
+    // Make getOrderNotificationConfig throw synchronously (sits outside
+    // the try block inside notifyOrderCreated).
+    mockConfig.mockImplementation(() => {
+      throw new Error("config exploded");
+    });
+
+    const errorSpy = jest.spyOn(console, "error").mockImplementation();
 
     // Should not throw
-    expect(() =>
-      notifyOrderCreatedSafe({
+    runAfterResponse("admin-order-notification", () =>
+      notifyOrderCreated({
         orderId: "any",
         orderType: "catering",
         source: "orders_api",
       }),
-    ).not.toThrow();
+    );
 
-    // Give the microtask queue time to settle
+    // Flush microtask queue so the inline promise resolves
     await new Promise((r) => setTimeout(r, 50));
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "admin-order-notification",
+      expect.any(Error),
+    );
+
+    errorSpy.mockRestore();
   });
 });

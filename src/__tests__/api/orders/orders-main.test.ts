@@ -3,7 +3,7 @@
 import { GET, POST } from '@/app/api/orders/route';
 import { validateApiAuth } from '@/utils/api-auth';
 import { prisma } from '@/utils/prismaDB';
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import {
   createGetRequest,
   createPostRequest,
@@ -35,6 +35,9 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(async () => ({})),
 }));
 jest.mock('@/services/orders/notifyOrderCreated');
+jest.mock('@/lib/api/after-response', () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => { void work(); }),
+}));
 jest.mock('@/app/actions/email', () => ({
   sendOrderConfirmationEmail: jest.fn(),
   sendOrderNotificationEmail: jest.fn(),
@@ -627,7 +630,7 @@ describe('/api/orders API - Main Endpoint', () => {
       deliveryAddress: { id: 'addr-2', street1: '456 Client Ave' },
     };
 
-    it('should call notifyOrderCreatedSafe with source "orders_api" after transaction commits', async () => {
+    it('should call notifyOrderCreated with source "orders_api" after transaction commits', async () => {
       (validateApiAuth as jest.Mock).mockResolvedValue({
         isValid: true,
         user: { id: 'user-123', email: 'john@example.com', type: 'CLIENT' },
@@ -648,7 +651,7 @@ describe('/api/orders API - Main Endpoint', () => {
       expect(data.type).toBe('catering');
 
       // Admin notification dispatched after the transaction with correct source
-      expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+      expect(notifyOrderCreated).toHaveBeenCalledWith({
         orderId: CATERING_ORDER_ID,
         orderType: 'catering',
         source: 'orders_api',
@@ -676,7 +679,7 @@ describe('/api/orders API - Main Endpoint', () => {
       const response = await POST(request);
       await expectSuccessResponse(response, 200);
 
-      expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+      expect(notifyOrderCreated).toHaveBeenCalledWith({
         orderId: 'ondemand-new-1',
         orderType: 'on_demand',
         source: 'orders_api',

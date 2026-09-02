@@ -57,7 +57,10 @@ jest.mock("@/lib/soft-delete-handlers", () => ({
 }));
 
 jest.mock("@/services/orders/notifyOrderCreated");
-import { notifyOrderCreatedSafe } from "@/services/orders/notifyOrderCreated";
+import { notifyOrderCreated } from "@/services/orders/notifyOrderCreated";
+jest.mock("@/lib/api/after-response", () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => { void work(); }),
+}));
 
 jest.mock("resend", () => ({
   Resend: jest.fn().mockImplementation(() => ({
@@ -609,7 +612,7 @@ describe("/api/catering-requests", () => {
       expect(data).toHaveProperty("emailSent");
 
       // Admin notification dispatched with correct source
-      expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+      expect(notifyOrderCreated).toHaveBeenCalledWith({
         orderId: mockCateringRequest.id,
         orderType: "catering",
         source: "customer_portal",

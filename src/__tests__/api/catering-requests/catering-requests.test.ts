@@ -12,7 +12,7 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -37,6 +37,9 @@ jest.mock('@/lib/db/prisma', () => ({
 jest.mock('@/lib/soft-delete-handlers');
 jest.mock('resend');
 jest.mock('@/services/orders/notifyOrderCreated');
+jest.mock('@/lib/api/after-response', () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => { void work(); }),
+}));
 
 describe('/api/catering-requests API', () => {
   const mockSupabaseClient = {
@@ -652,7 +655,7 @@ describe('/api/catering-requests API', () => {
         expect(response.status).toBe(201);
 
         // Admin notification dispatched with correct source
-        expect(notifyOrderCreatedSafe).toHaveBeenCalledWith({
+        expect(notifyOrderCreated).toHaveBeenCalledWith({
           orderId: ORDER_ID,
           orderType: 'catering',
           source: 'customer_portal',

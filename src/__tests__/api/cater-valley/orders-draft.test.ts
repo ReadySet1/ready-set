@@ -2,7 +2,7 @@
 
 import { POST } from '@/app/api/cater-valley/orders/draft/route';
 import { prisma } from '@/lib/db/prisma';
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import {
@@ -177,7 +177,7 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
       expect(data.breakdown).toBeDefined();
 
       // Drafts must NOT trigger admin notification (only confirm does)
-      expect(notifyOrderCreatedSafe).not.toHaveBeenCalled();
+      expect(notifyOrderCreated).not.toHaveBeenCalled();
     });
 
     it('should create system user if not exists', async () => {

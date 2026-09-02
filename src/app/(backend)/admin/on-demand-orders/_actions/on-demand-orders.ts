@@ -7,7 +7,8 @@ import { Prisma } from '@prisma/client';
 // PrismaClientKnownRequestError is now at Prisma.PrismaClientKnownRequestError in Prisma 7
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/utils/supabase/server';
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
+import { runAfterResponse } from '@/lib/api/after-response';
 import {
   ClientListItem,
   ActionError,
@@ -311,11 +312,13 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
     });
 
     // Admin order notification
-    notifyOrderCreatedSafe({
-      orderId: newOrder.id,
-      orderType: "on_demand",
-      source: "admin_dashboard",
-    });
+    runAfterResponse("admin-order-notification", () =>
+      notifyOrderCreated({
+        orderId: newOrder.id,
+        orderType: "on_demand",
+        source: "admin_dashboard",
+      }),
+    );
 
     // 3. Update any temporary file associations
     if (tempEntityId && user) {

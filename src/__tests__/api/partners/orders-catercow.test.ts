@@ -7,7 +7,7 @@
 
 import { POST as draftPOST } from '@/app/api/partners/orders/draft/route';
 import { prisma } from '@/lib/db/prisma';
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import { expectSuccessResponse, expectErrorResponse } from '@/__tests__/helpers/api-test-helpers';
@@ -174,7 +174,7 @@ describe('POST /api/partners/orders/draft (CaterCow)', () => {
     expect(upsertCall.create.companyName).toBe('CaterCow');
 
     // Drafts must NOT trigger admin notification (only confirm does)
-    expect(notifyOrderCreatedSafe).not.toHaveBeenCalled();
+    expect(notifyOrderCreated).not.toHaveBeenCalled();
   });
 
   it('rejects a CaterCow request that uses CaterValley\'s key', async () => {

@@ -14,7 +14,8 @@ import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
 import { sendDeliveryNotifications } from '@/app/actions/email';
 import { invalidateVendorCacheOnOrderCreate } from '@/lib/cache/cache-invalidation';
-import { notifyOrderCreatedSafe } from '@/services/orders/notifyOrderCreated';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
+import { runAfterResponse } from '@/lib/api/after-response';
 
 import { prisma as prismaClient } from "@/utils/prismaDB";
 
@@ -357,21 +358,21 @@ export async function POST(req: NextRequest) {
 
     // Notifications moved outside transaction — an email failure must never
     // roll back a successful order create.
-    try {
-      await sendDeliveryNotifications({
+    runAfterResponse("delivery-notifications", () =>
+      sendDeliveryNotifications({
         orderId: result.order.id,
         customerEmail: result.order.user.email,
-      });
-    } catch (notificationError) {
-      console.error('Failed to send notifications:', notificationError);
-    }
+      }),
+    );
 
     // Admin order notification
-    notifyOrderCreatedSafe({
-      orderId: result.order.id,
-      orderType: result.type === "catering" ? "catering" : "on_demand",
-      source: "orders_api",
-    });
+    runAfterResponse("admin-order-notification", () =>
+      notifyOrderCreated({
+        orderId: result.order.id,
+        orderType: result.type === "catering" ? "catering" : "on_demand",
+        source: "orders_api",
+      }),
+    );
 
     // Invalidate vendor cache since new order affects metrics and order lists
     invalidateVendorCacheOnOrderCreate(authValidation.user!.id, result.order.id);

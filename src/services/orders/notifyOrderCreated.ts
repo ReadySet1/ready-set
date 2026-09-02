@@ -189,27 +189,8 @@ export async function notifyOrderCreated(
     return { sent: true };
   } catch (error) {
     console.error("[notifyOrderCreated] Unexpected failure:", error);
-    // orderId goes in `extra`, never `tags` — tags are indexed and a unique
-    // value per event blows up Sentry's tag cardinality limits.
-    Sentry.captureException(error, {
-      tags: {
-        operation: "notifyOrderCreated",
-        orderType: input.orderType,
-        source: input.source,
-      },
-      extra: { orderId: input.orderId },
-    });
+    Sentry.captureException(error, sentryContext(input));
     return { sent: false, reason: "send_failed" };
   }
 }
 
-// ---------------------------------------------------------------------------
-// Fire-and-forget helper — recommended default at every call site.
-// An email failure must never turn a successful 201 into a 500.
-// ---------------------------------------------------------------------------
-
-export function notifyOrderCreatedSafe(input: NotifyOrderCreatedInput): void {
-  void notifyOrderCreated(input).catch((error: unknown) => {
-    console.error("[notifyOrderCreated] Unhandled rejection:", error);
-  });
-}
