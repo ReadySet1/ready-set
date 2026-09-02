@@ -1,10 +1,12 @@
 // src/__tests__/api/orders/orders-main.test.ts
 
-import { GET } from '@/app/api/orders/route';
+import { GET, POST } from '@/app/api/orders/route';
 import { validateApiAuth } from '@/utils/api-auth';
 import { prisma } from '@/utils/prismaDB';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import {
   createGetRequest,
+  createPostRequest,
   expectSuccessResponse,
   expectUnauthorized,
   expectErrorResponse,
@@ -15,22 +17,56 @@ jest.setTimeout(10000);
 
 // Mock dependencies
 jest.mock('@/utils/api-auth');
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
+jest.mock('@/utils/prismaDB', () => {
+  const mockPrisma: any = {
     cateringRequest: {
       findMany: jest.fn(),
+      create: jest.fn(),
     },
     onDemand: {
       findMany: jest.fn(),
+      create: jest.fn(),
     },
-  },
-}));
+  };
+  mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
+  return { prisma: mockPrisma };
+});
 jest.mock('next/headers', () => ({
   cookies: jest.fn(async () => ({})),
+}));
+jest.mock('@/services/orders/notifyOrderCreated');
+jest.mock('@/lib/api/after-response', () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => { void work(); }),
 }));
 jest.mock('@/app/actions/email', () => ({
   sendOrderConfirmationEmail: jest.fn(),
   sendOrderNotificationEmail: jest.fn(),
+  sendDeliveryNotifications: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('@/utils/field-validation', () => ({
+  validateRequiredFields: jest.fn(() => ({ isValid: true, missingFields: [] })),
+}));
+jest.mock('@/utils/order-number', () => ({
+  generateOrderNumber: jest.fn(() => 'ORD-TEST-001'),
+}));
+jest.mock('@/lib/cache/cache-invalidation', () => ({
+  invalidateVendorCacheOnOrderCreate: jest.fn(),
+}));
+jest.mock('@/lib/db/prisma', () => ({
+  prisma: {},
+}));
+jest.mock('@/utils/supabase/server', () => ({
+  createClient: jest.fn(),
+}));
+jest.mock('@/utils/distance', () => ({
+  getCenterCoordinate: jest.fn(),
+  calculateDistance: jest.fn(),
+}));
+jest.mock('@/utils/addresses', () => ({
+  getAddressInfo: jest.fn(),
+}));
+jest.mock('@/lib/utils/timezone', () => ({
+  localTimeToUtc: jest.fn(),
 }));
 
 describe('/api/orders API - Main Endpoint', () => {
@@ -574,6 +610,79 @@ describe('/api/orders API - Main Endpoint', () => {
         // Verify orders are sorted by createdAt desc (newest first)
         expect(data.orders[0].id).toBe('ondemand-1'); // Newer order first
         expect(data.orders[1].id).toBe('catering-1'); // Older order second
+      });
+    });
+  });
+
+  describe('POST /api/orders - Create Order', () => {
+    const CATERING_ORDER_ID = 'catering-new-1';
+
+    const mockCreatedOrder = {
+      id: CATERING_ORDER_ID,
+      orderNumber: 'ORD-TEST-001',
+      status: 'PENDING',
+      user: {
+        id: 'user-123',
+        name: 'John Doe',
+        email: 'john@example.com',
+      },
+      pickupAddress: { id: 'addr-1', street1: '123 Vendor St' },
+      deliveryAddress: { id: 'addr-2', street1: '456 Client Ave' },
+    };
+
+    it('should call notifyOrderCreated with source "orders_api" after transaction commits', async () => {
+      (validateApiAuth as jest.Mock).mockResolvedValue({
+        isValid: true,
+        user: { id: 'user-123', email: 'john@example.com', type: 'CLIENT' },
+      });
+
+      (prisma.cateringRequest.create as jest.Mock).mockResolvedValue(mockCreatedOrder);
+
+      const request = createPostRequest('http://localhost:3000/api/orders', {
+        type: 'catering',
+        pickupAddressId: 'addr-1',
+        deliveryAddressId: 'addr-2',
+      });
+
+      const response = await POST(request);
+      const data = await expectSuccessResponse(response, 200);
+
+      expect(data.success).toBe(true);
+      expect(data.type).toBe('catering');
+
+      // Admin notification dispatched after the transaction with correct source
+      expect(notifyOrderCreated).toHaveBeenCalledWith({
+        orderId: CATERING_ORDER_ID,
+        orderType: 'catering',
+        source: 'orders_api',
+      });
+    });
+
+    it('should map on-demand type to "on_demand" in the notification', async () => {
+      (validateApiAuth as jest.Mock).mockResolvedValue({
+        isValid: true,
+        user: { id: 'user-123', email: 'john@example.com', type: 'CLIENT' },
+      });
+
+      const mockOnDemandOrder = {
+        ...mockCreatedOrder,
+        id: 'ondemand-new-1',
+      };
+      (prisma.onDemand.create as jest.Mock).mockResolvedValue(mockOnDemandOrder);
+
+      const request = createPostRequest('http://localhost:3000/api/orders', {
+        type: 'ondemand',
+        pickupAddressId: 'addr-1',
+        deliveryAddressId: 'addr-2',
+      });
+
+      const response = await POST(request);
+      await expectSuccessResponse(response, 200);
+
+      expect(notifyOrderCreated).toHaveBeenCalledWith({
+        orderId: 'ondemand-new-1',
+        orderType: 'on_demand',
+        source: 'orders_api',
       });
     });
   });

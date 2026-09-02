@@ -65,6 +65,7 @@
     "env:list": "tsx scripts/list-coolify-resources.ts",
     "env:sync": "tsx scripts/sync-env.ts",
     "test:address": "tsx scripts/test-address-creation.ts",
+    "test:order-notification": "dotenv -e .env.local -- tsx scripts/test-order-notification.ts",
     "test:forms": "tsx scripts/test-nested-forms.ts",
     "calculator:migrate": "tsx scripts/apply-calculator-migration.ts",
     "calculator:migrate:force": "tsx scripts/apply-calculator-migration.ts --force",

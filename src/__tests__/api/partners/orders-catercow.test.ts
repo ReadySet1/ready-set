@@ -7,6 +7,7 @@
 
 import { POST as draftPOST } from '@/app/api/partners/orders/draft/route';
 import { prisma } from '@/lib/db/prisma';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import { expectSuccessResponse, expectErrorResponse } from '@/__tests__/helpers/api-test-helpers';
@@ -36,6 +37,8 @@ jest.mock('@/lib/utils/timezone', () => ({
 
 // Registry mock returns the right partner for the (slug, key) tuple.
 // CaterCow uses CC- prefix and "CaterCow" display name.
+jest.mock('@/services/orders/notifyOrderCreated');
+
 jest.mock('@/lib/services/partner-registry', () => ({
   authenticatePartner: jest.fn(async (req: Request) => {
     const slug = req.headers.get('partner');
@@ -169,6 +172,9 @@ describe('POST /api/partners/orders/draft (CaterCow)', () => {
     const upsertCall = (prisma.profile.upsert as jest.Mock).mock.calls[0][0];
     expect(upsertCall.where.email).toBe('system@catercow.com');
     expect(upsertCall.create.companyName).toBe('CaterCow');
+
+    // Drafts must NOT trigger admin notification (only confirm does)
+    expect(notifyOrderCreated).not.toHaveBeenCalled();
   });
 
   it('rejects a CaterCow request that uses CaterValley\'s key', async () => {

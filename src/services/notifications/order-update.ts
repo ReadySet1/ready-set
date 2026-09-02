@@ -18,6 +18,7 @@ import {
   generateInfoBox,
   BRAND_COLORS
 } from "@/utils/email-templates";
+import { escapeHtml } from "@/lib/utils/escape-html";
 import type { FieldChange } from "@/app/api/orders/[order_number]/schemas";
 
 // Lazy initialization to avoid build-time errors when API key is not set
@@ -129,14 +130,31 @@ function generateChangesSummary(changes: FieldChange[]): string {
     return '';
   }
 
-  const changeRows = significantChanges.map(change => ({
-    label: FIELD_LABELS[change.field] || change.field,
-    value: `<span style="text-decoration: line-through; color: ${BRAND_COLORS.text.secondary};">${formatValue(change.field, change.oldValue)}</span>
-            <br>
-            <span style="color: ${BRAND_COLORS.primary}; font-weight: 600;">${formatValue(change.field, change.newValue)}</span>`,
-  }));
+  // Build the table directly instead of going through generateDetailsTable,
+  // because the cell values contain intentional styled HTML (strikethrough
+  // old → bold new).  The individual values are escaped before wrapping.
+  const rows = significantChanges.map(change => {
+    const label = escapeHtml(FIELD_LABELS[change.field] || change.field);
+    const oldVal = escapeHtml(formatValue(change.field, change.oldValue));
+    const newVal = escapeHtml(formatValue(change.field, change.newValue));
+    return `
+    <tr>
+      <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_COLORS.mediumGray}; width: 40%;">${label}:</td>
+      <td style="padding: 10px 0; color: ${BRAND_COLORS.dark};">
+        <span style="text-decoration: line-through; color: ${BRAND_COLORS.text.secondary};">${oldVal}</span>
+        <br>
+        <span style="color: ${BRAND_COLORS.primary}; font-weight: 600;">${newVal}</span>
+      </td>
+    </tr>`;
+  }).join('');
 
-  return generateDetailsTable(changeRows);
+  return `
+    <div style="background: ${BRAND_COLORS.lightGray}; padding: 20px; border-left: 4px solid ${BRAND_COLORS.primary}; border-radius: 6px; margin: 20px 0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        ${rows}
+      </table>
+    </div>
+  `;
 }
 
 /**

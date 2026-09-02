@@ -379,6 +379,7 @@ export const setupEmailTestEnv = () => {
   process.env.EMAIL_FROM = "solutions@updates.readysetllc.com";
   process.env.ADMIN_EMAIL = "admin@test.com";
   process.env.NOTIFICATION_RECIPIENT = "admin@test.com";
+  process.env.ORDER_NOTIFICATION_RECIPIENTS = "admin@test.com";
 
   // Reset circuit breaker to ensure clean test state
   try {
@@ -399,6 +400,7 @@ export const clearEmailTestEnv = () => {
   delete process.env.EMAIL_FROM;
   delete process.env.ADMIN_EMAIL;
   delete process.env.NOTIFICATION_RECIPIENT;
+  delete process.env.ORDER_NOTIFICATION_RECIPIENTS;
 };
 
 /**

@@ -590,11 +590,6 @@ jest.mock('@/utils/prismaDB', () => ({
   disconnectPrisma: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock email sender
-jest.mock('@/utils/emailSender', () => ({
-  sendOrderEmail: jest.fn(),
-}));
-
 // Mock fetch
 global.fetch = jest.fn();
 
