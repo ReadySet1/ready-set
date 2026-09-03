@@ -40,8 +40,8 @@ async function fetchAllowedCountiesForUser(userId: string): Promise<string[]> {
     'Santa Clara',
     'Solano',
     'Sonoma',
-    'Atlanta',
     'Dallas',
-    'Houston',
+    'Fulton',
+    'Travis',
   ];
 }
