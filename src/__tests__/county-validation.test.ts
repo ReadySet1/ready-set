@@ -2,11 +2,11 @@ import { vendorSchema, clientSchema } from "@/components/Auth/SignUp/FormSchemas
 import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";
 
 /**
- * Validates that new service-area counties (Dallas, Houston, Atlanta)
+ * Validates that new service-area counties (Dallas, Travis, Fulton)
  * are accepted by the signup Zod schemas that enum-constrain countiesServed.
  */
 describe("County validation for new service areas", () => {
-  const newCounties = ["Dallas", "Houston", "Atlanta"];
+  const newCounties = ["Dallas", "Travis", "Fulton"];
 
   it("COUNTIES constant includes the three new areas", () => {
     const values = COUNTIES.map((c) => c.value);
