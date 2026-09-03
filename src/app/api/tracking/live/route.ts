@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { captureException, captureMessage } from '@/lib/monitoring/sentry';
+import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import {
+  computeAnchorDistanceMeters,
+  type OdometerPoint,
+} from '@/services/tracking/mileage';
+import { METERS_TO_MILES, MILEAGE_CONFIG, milesToMeters, mphToMs } from '@/config/mileage-config';
 
 // This route returns a long-lived SSE stream. Pin the Node.js runtime (Prisma
 // requires it) and raise the function ceiling. The stream self-terminates
@@ -34,8 +40,58 @@ interface ActiveDriverRow {
   shift_start: Date | null;
   total_distance: number | null;
   total_distance_miles: number | null;
+  gps_distance_miles: number | null;
   delivery_count: number | null;
   active_deliveries: number | string;
+}
+
+/**
+ * Typed result row for the active-shift GPS trail query (one row per
+ * admissible ping, across every driver currently on shift).
+ */
+interface ShiftTrailRow extends OdometerPoint {
+  driver_id: string;
+}
+
+/** Delivery statuses that mean the row is no longer live work (any casing). */
+const TERMINAL_DELIVERY_STATUSES = `('delivered', 'cancelled', 'completed')`;
+
+/** Shift statuses during which a driver counts as on shift. */
+const OPEN_SHIFT_STATUSES = `('active', 'paused')`;
+
+function toCount(raw: number | string | null | undefined): number {
+  const count = typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? ''), 10);
+  return Number.isNaN(count) ? 0 : count;
+}
+
+/**
+ * Live miles per driver for every open shift, computed from the shift's
+ * driver_locations with the same anchor odometer the mileage service uses at
+ * shift end (services/tracking/mileage.ts), so the dashboard number converges
+ * on the stored `gps_distance_miles` once the shift closes.
+ */
+function liveShiftMilesByDriver(
+  rows: ShiftTrailRow[] | null | undefined,
+  maxSpeedMs: number,
+  maxSegmentMeters: number,
+): Map<string, number> {
+  const pointsByDriver = new Map<string, OdometerPoint[]>();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const list = pointsByDriver.get(row.driver_id) ?? [];
+    list.push({
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      recorded_at: new Date(row.recorded_at),
+    });
+    pointsByDriver.set(row.driver_id, list);
+  }
+
+  const miles = new Map<string, number>();
+  pointsByDriver.forEach((points, driverId) => {
+    const value = computeAnchorDistanceMeters(points, maxSpeedMs, maxSegmentMeters) * METERS_TO_MILES;
+    miles.set(driverId, Number.isFinite(value) && value > 0 ? value : 0);
+  });
+  return miles;
 }
 
 /**
@@ -197,11 +253,18 @@ export async function GET(request: NextRequest) {
                 ds.shift_start,
                 ds.total_distance,
                 ds.total_distance_miles,
+                ds.gps_distance_miles,
                 ds.delivery_count,
-                COUNT(CASE WHEN del.status NOT IN ('delivered', 'cancelled') THEN 1 END) as active_deliveries
+                -- Live work only: non-terminal rows (any casing) assigned during the
+                -- current shift, or today when the driver is off shift. Without the
+                -- scope every stale test-drive row in history inflated this counter.
+                COUNT(CASE
+                  WHEN LOWER(del.status) NOT IN ${TERMINAL_DELIVERY_STATUSES}
+                   AND del.assigned_at >= COALESCE(ds.shift_start, CURRENT_DATE)
+                  THEN 1 END) as active_deliveries
               FROM drivers d
               LEFT JOIN profiles p ON d.profile_id = p.id
-              LEFT JOIN driver_shifts ds ON d.current_shift_id = ds.id
+              LEFT JOIN driver_shifts ds ON d.current_shift_id = ds.id AND ds.deleted_at IS NULL
               LEFT JOIN deliveries del ON d.id = del.driver_id AND del.deleted_at IS NULL
               WHERE d.is_active = true AND d.deleted_at IS NULL
               GROUP BY d.id, p.name, ds.id
@@ -252,9 +315,16 @@ export async function GET(request: NextRequest) {
                 d.priority,
                 d.delivery_instructions
               FROM deliveries d
-              WHERE d.status NOT IN ('delivered', 'cancelled')
+              LEFT JOIN drivers drv ON drv.id = d.driver_id AND drv.deleted_at IS NULL
+              LEFT JOIN driver_shifts ds ON ds.id = drv.current_shift_id
+                AND ds.status IN ${OPEN_SHIFT_STATUSES}
+                AND ds.deleted_at IS NULL
+              WHERE LOWER(d.status) NOT IN ${TERMINAL_DELIVERY_STATUSES}
               AND d.driver_id IS NOT NULL
               AND d.deleted_at IS NULL
+              -- Only live work: the driver is on shift right now, or the row was
+              -- assigned today. History (48 stale rows on 08-21) stays out.
+              AND (ds.id IS NOT NULL OR d.assigned_at >= CURRENT_DATE)
               ORDER BY d.assigned_at DESC
             `);
 
@@ -339,40 +409,75 @@ export async function GET(request: NextRequest) {
               ORDER BY created_at DESC
             `);
 
+            // GPS trail of every open shift, gated like the mileage service
+            // (accuracy threshold from admin tracking settings, soft-delete).
+            const settings = await getTrackingSettings();
+            const shiftTrail = await prisma.$queryRawUnsafe<ShiftTrailRow[]>(`
+              SELECT
+                ds.driver_id,
+                dl.latitude,
+                dl.longitude,
+                dl.recorded_at
+              FROM driver_shifts ds
+              INNER JOIN drivers d ON d.current_shift_id = ds.id AND d.deleted_at IS NULL
+              INNER JOIN driver_locations dl
+                ON dl.driver_id = ds.driver_id
+               AND dl.recorded_at >= ds.shift_start
+               AND dl.deleted_at IS NULL
+               AND (dl.accuracy IS NULL OR dl.accuracy <= $1)
+              WHERE ds.status IN ${OPEN_SHIFT_STATUSES}
+              AND ds.deleted_at IS NULL
+              ORDER BY ds.driver_id, dl.recorded_at ASC
+            `, settings.mileageGpsAccuracyThresholdM);
+
+            const liveMiles = liveShiftMilesByDriver(
+              shiftTrail,
+              mphToMs(settings.mileageMaxSpeedMph),
+              milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES),
+            );
+
             // Format the data for SSE
             const updateData = {
               type: 'driver_update',
               timestamp: new Date().toISOString(),
               data: {
-                activeDrivers: activeDrivers.map(driver => ({
-                  id: driver.id,
-                  userId: driver.user_id,
-                  employeeId: driver.employee_id,
-                  name: driver.driver_name,
-                  vehicleNumber: driver.vehicle_number,
-                  phoneNumber: driver.phone_number,
-                  isOnDuty: driver.current_shift_id !== null && driver.shift_status === 'active',
-                  shiftStartTime: driver.shift_start_time,
-                  currentShiftId: driver.current_shift_id,
-                  lastKnownLocation: driver.last_known_location_geojson ?
-                    JSON.parse(driver.last_known_location_geojson) : null,
-                  lastLocationUpdate: driver.last_location_update,
-                  shiftStatus: driver.shift_status,
-                  shiftStart: driver.shift_start,
-                  totalDistance: driver.total_distance || 0,
-                  // Primary miles column written by the mileage service at shift end
-                  // (services/tracking/mileage.ts). Consumed by the Drivers tab + map popup.
-                  totalDistanceMiles: driver.total_distance_miles || 0,
-                  // Per-shift completed-delivery counter, incremented on delivery completion
-                  // (api/tracking/deliveries/[id]/route.ts).
-                  deliveryCount: driver.delivery_count || 0,
-                  activeDeliveries: (() => {
-                    const raw = driver.active_deliveries;
-                    const count =
-                      typeof raw === 'number' ? raw : Number.parseInt(raw, 10);
-                    return Number.isNaN(count) ? 0 : count;
-                  })()
-                })),
+                activeDrivers: activeDrivers.map(driver => {
+                  const shiftIsOpen =
+                    driver.current_shift_id !== null &&
+                    (driver.shift_status === 'active' || driver.shift_status === 'paused');
+                  const activeDeliveryCount = toCount(driver.active_deliveries);
+                  // Open shift: live odometer over the trail so far. Closed shift:
+                  // the miles the mileage service stored at shift end.
+                  const totalDistanceMiles = shiftIsOpen
+                    ? (liveMiles.get(driver.id) ?? driver.gps_distance_miles ?? driver.total_distance_miles ?? 0)
+                    : (driver.total_distance_miles ?? driver.gps_distance_miles ?? 0);
+
+                  return {
+                    id: driver.id,
+                    userId: driver.user_id,
+                    employeeId: driver.employee_id,
+                    name: driver.driver_name,
+                    vehicleNumber: driver.vehicle_number,
+                    phoneNumber: driver.phone_number,
+                    isOnDuty: driver.current_shift_id !== null && driver.shift_status === 'active',
+                    shiftStartTime: driver.shift_start_time,
+                    currentShiftId: driver.current_shift_id,
+                    lastKnownLocation: driver.last_known_location_geojson ?
+                      JSON.parse(driver.last_known_location_geojson) : null,
+                    lastLocationUpdate: driver.last_location_update,
+                    shiftStatus: driver.shift_status,
+                    shiftStart: driver.shift_start,
+                    totalDistance: driver.total_distance || 0,
+                    // Miles this shift (imperial — product rule). Consumed by the
+                    // "Total Miles today" card, the Drivers tab and the map popup.
+                    totalDistanceMiles: Math.round(totalDistanceMiles * 100) / 100,
+                    // Deliveries this shift: completed (driver_shifts.delivery_count,
+                    // bumped on completion) plus the ones in progress right now, so a
+                    // driver mid-delivery never reads "Deliveries: 0".
+                    deliveryCount: (driver.delivery_count || 0) + activeDeliveryCount,
+                    activeDeliveries: activeDeliveryCount,
+                  };
+                }),
                 recentLocations: recentLocations.map(loc => ({
                   driverId: loc.driver_id,
                   location: JSON.parse(loc.location_geojson),

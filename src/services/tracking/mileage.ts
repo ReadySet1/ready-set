@@ -56,7 +56,7 @@ function assertUuid(id: string, field: 'shiftId' | 'driverId'): void {
  * The table also stores a PostGIS `location` geography column, but the plain
  * lat/lng float columns are simplest to consume in TypeScript.
  */
-interface OdometerPoint {
+export interface OdometerPoint {
   latitude: number;
   longitude: number;
   recorded_at: Date;
@@ -100,7 +100,7 @@ function haversineMeters(
  * - Hops longer than MAX_SEGMENT_DISTANCE_MILES over a short time are dropped
  * - Hops whose effective speed exceeds the admin max speed are dropped
  */
-function computeAnchorDistanceMeters(
+export function computeAnchorDistanceMeters(
   points: OdometerPoint[],
   maxSpeedMs: number,
   maxSegmentMeters: number

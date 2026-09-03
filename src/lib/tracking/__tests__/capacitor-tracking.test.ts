@@ -50,9 +50,9 @@ describe('capacitor-tracking', () => {
   }
 
   /** Fire one watcher fix with the 5s post throttle already cleared. */
-  async function emitFix() {
+  async function emitFix(overrides: Record<string, unknown> = {}) {
     nowMs += 5_001;
-    await watcherCallback(fix, undefined);
+    await watcherCallback({ ...fix, ...overrides }, undefined);
   }
 
   function postedBody(callIndex = 0): Record<string, unknown> {
@@ -140,5 +140,40 @@ describe('capacitor-tracking', () => {
     await bridge.startNativeShiftTracking(s2);
     await emitFix();
     expect(postedBody().driver_id).toBe('driver-2');
+  });
+
+  describe('is_moving hysteresis (finding #5)', () => {
+    async function isMovingAfter(speeds: Array<number | null>) {
+      await bridge.startNativeShiftTracking(session());
+      for (const speed of speeds) await emitFix({ speed });
+      return fetchMock.mock.calls.map((_, i) => postedBody(i).is_moving);
+    }
+
+    it('flags moving only after two consecutive vehicle-speed fixes', async () => {
+      expect(await isMovingAfter([10, 10, 10])).toEqual([false, true, true]);
+    });
+
+    it('does not flicker at walking pace', async () => {
+      const out = await isMovingAfter([0.9, 1.1, 0.9, 1.2, 0.8, 0.4, 0.3]);
+      const flips = out.filter((v, i) => i > 0 && v !== out[i - 1]).length;
+      expect(flips).toBeLessThanOrEqual(1);
+      expect(out.at(-1)).toBe(false);
+    });
+
+    it('treats a null speed as 0 m/s', async () => {
+      expect(await isMovingAfter([10, 10, null, null])).toEqual([false, true, true, false]);
+    });
+
+    it('resets the motion state on stop', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ speed: 10 });
+      await emitFix({ speed: 10 });
+      expect(postedBody(1).is_moving).toBe(true);
+
+      await bridge.stopNativeShiftTracking();
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ speed: 10 });
+      expect(postedBody(2).is_moving).toBe(false);
+    });
   });
 });

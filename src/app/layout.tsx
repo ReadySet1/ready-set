@@ -1,6 +1,5 @@
 // src/app/layout.tsx
 import { Montserrat } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
 import Script from "next/script";
 import ClientLayout from "@/components/Clients/ClientLayout";
 import "../styles/index.css";
@@ -125,7 +124,6 @@ export default function RootLayout({
         </GlobalErrorBoundary>
         <Toaster />
         {/* {process.env.NODE_ENV === "development" && <VercelToolbar />} */}
-        <Analytics />
         <UmamiAnalytics />
 
         {/* Perception Company Analytics Script */}

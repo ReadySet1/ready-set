@@ -524,7 +524,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
         screen.getByRole("button", { name: /end shift/i }),
       ).toHaveAttribute("aria-disabled", "true");
       expect(
-        screen.getByText(/1 delivery to finish or return first/i),
+        screen.getByText(/order cr-1 to finish or return first/i),
       ).toBeInTheDocument();
       expect(endShift).not.toHaveBeenCalled();
     });
@@ -623,13 +623,44 @@ describe("DriverTrackingPortal (redesigned)", () => {
       // attribute) — a stale client heals itself instead of ignoring the tap.
       fireEvent.click(screen.getByRole("button", { name: /end shift/i }));
 
+      // Finding #8 (2026-08-21): the block names the order so the driver
+      // knows which delivery to finish or return.
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
-          expect.stringMatching(/you still have 1 active or due delivery/i),
+          "Order cr-1 is still assigned to you. Complete it or return it to dispatch before ending your shift.",
         ),
       );
       await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
       expect(endShift).not.toHaveBeenCalled();
+    });
+
+    it("names the blocking order in the blocked-state hint", () => {
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+      expect(screen.getByText(/order cr-1/i)).toBeInTheDocument();
+    });
+
+    it("surfaces the server guard error verbatim when the feed shows no blocker", async () => {
+      // A stale/legacy row can block server-side while the client feed is
+      // empty; the server names the order and the portal must show it.
+      mockUseDriverTracking.mockReturnValue(
+        baseCtx({
+          isShiftActive: true,
+          currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+          currentLocation: sampleLocation,
+          activeDeliveries: [],
+          shiftError:
+            "Order Test 0821261 is still assigned to you. Complete it or return it to dispatch before ending your shift.",
+        }),
+      );
+      renderPortal();
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringMatching(/Order Test 0821261 is still assigned to you/),
+        ),
+      );
     });
 
     it("allows End shift when the only assignment is well in the future", async () => {
@@ -670,6 +701,42 @@ describe("DriverTrackingPortal (redesigned)", () => {
         expect(
           screen.getByRole("button", { name: /end shift/i }),
         ).toBeEnabled();
+      });
+
+      it("does not block for a stale ASSIGNED pickup more than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+          }),
+        );
+        renderPortal();
+        // The button is aria-disabled (not `disabled`), so toBeEnabled() would
+        // pass vacuously — assert on the attribute the guard actually sets.
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).not.toHaveAttribute("aria-disabled", "true");
+      });
+
+      it("still blocks an overdue ASSIGNED pickup less than 24h old", () => {
+        mockTrackingSettingsOverride.current = {
+          ...TRACKING_SETTINGS_DEFAULTS,
+          endShiftPickupGuardMinutes: 120,
+        };
+        mockUseDriverTracking.mockReturnValue(
+          withDelivery({
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6h overdue
+          }),
+        );
+        renderPortal();
+        expect(
+          screen.getByRole("button", { name: /end shift/i }),
+        ).toHaveAttribute("aria-disabled", "true");
       });
 
       it("still blocks a mid-flight delivery when the guard is disabled (0)", () => {

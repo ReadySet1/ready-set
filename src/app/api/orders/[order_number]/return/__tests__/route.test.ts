@@ -121,10 +121,14 @@ const setupMocks = (opts: SetupOpts = {}) => {
     user ? { id: user.id, type: role } : null,
   );
   (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(
-    orderType === 'catering' ? { id: ORDER_ID, orderNumber: 'CAT-001' } : null,
+    orderType === 'catering'
+      ? { id: ORDER_ID, orderNumber: 'CAT-001', status: order.status }
+      : null,
   );
   (mockedPrisma.onDemand.findFirst as jest.Mock).mockResolvedValue(
-    orderType === 'on_demand' ? { id: ORDER_ID, orderNumber: 'OD-001' } : null,
+    orderType === 'on_demand'
+      ? { id: ORDER_ID, orderNumber: 'OD-001', status: order.status }
+      : null,
   );
   (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(null);
 
@@ -403,7 +407,7 @@ describe('return-to-dispatch POST', () => {
   });
 
   it('returns 409 for a terminal order on the driver request path too', async () => {
-    setupMocks({ orderStatus: 'CANCELLED', driverStatus: null });
+    setupMocks({ orderStatus: 'COMPLETED', driverStatus: 'COMPLETED' });
     const { POST } = await importRoute();
     const res = await POST(createPostRequest(), params('CAT-001'));
 
@@ -411,6 +415,65 @@ describe('return-to-dispatch POST', () => {
     const data = await res.json();
     expect(data.code).toBe('TERMINAL');
     expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+  });
+
+  // 2026-08-21 drive finding #8: a driver stuck on a cancelled order must
+  // never be told "already cancelled and cannot be returned". Returning a
+  // cancelled order is a no-op success that also clears any stale
+  // driver-side rows so the end-shift guard lets go.
+  describe('cancelled order (finding #8)', () => {
+    it('driver path: responds success/no-op and clears stale driver rows', async () => {
+      setupMocks({ orderStatus: 'CANCELLED', driverStatus: 'ASSIGNED' });
+      const { POST } = await importRoute();
+      const res = await POST(createPostRequest(), params('CAT-001'));
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.status).toBe('CANCELLED');
+      expect(data.noop).toBe(true);
+      expect(data.orderNumber).toBe('CAT-001');
+
+      // Stale mirror + dispatch rows are cleared; the order itself is left
+      // CANCELLED (never put back in the pool).
+      expect(tx.delivery.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ orderNumber: 'CAT-001', deletedAt: null }),
+          data: expect.objectContaining({ status: 'CANCELLED' }),
+        }),
+      );
+      expect(tx.dispatch.deleteMany).toHaveBeenCalledWith({
+        where: { cateringRequestId: ORDER_ID },
+      });
+      expect(tx.cateringRequest.update).not.toHaveBeenCalled();
+      expect(tx.deliveryReturnRequest.create).not.toHaveBeenCalled();
+      expect(mockedNotify).not.toHaveBeenCalled();
+    });
+
+    it('privileged path: responds success/no-op instead of 409', async () => {
+      setupMocks({ role: 'ADMIN', orderStatus: 'CANCELLED', driverStatus: null });
+      const { POST } = await importRoute();
+      const res = await POST(createPostRequest(), params('CAT-001'));
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.noop).toBe(true);
+      expect(tx.cateringRequest.update).not.toHaveBeenCalled();
+      expect(tx.orderStatusHistory.create).not.toHaveBeenCalled();
+    });
+
+    it('on-demand: clears the on-demand dispatch rows', async () => {
+      setupMocks({ orderType: 'on_demand', orderStatus: 'CANCELLED', driverStatus: 'ASSIGNED' });
+      const { POST } = await importRoute();
+      const res = await POST(createPostRequest('OD-001'), params('OD-001'));
+
+      expect(res.status).toBe(200);
+      expect(tx.dispatch.deleteMany).toHaveBeenCalledWith({
+        where: { onDemandId: ORDER_ID },
+      });
+      expect(tx.onDemand.update).not.toHaveBeenCalled();
+    });
   });
 
   it('returns 409 NOT_ASSIGNED for an admin when no dispatch rows exist', async () => {

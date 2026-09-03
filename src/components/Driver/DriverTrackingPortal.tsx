@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { useUser } from "@/contexts/UserContext";
 import { DriverStatus } from "@/types/user";
 import DriverLiveMap from "@/components/Driver/DriverLiveMap";
 import {
@@ -41,7 +42,21 @@ import {
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import {
+  useDeliveryStatusRealtime,
+  type DeliveryStatusUpdatedPayload,
+} from "@/hooks/tracking/useDeliveryStatusRealtime";
+import {
+  CANCELLED_ORDER_ALERT_DURATION_MS,
+  createCancelledOrderAlertHandler,
+} from "@/lib/driver/cancelled-order-alert";
 import type { DeliveryTracking } from "@/types/tracking";
+import {
+  END_SHIFT_STALE_PICKUP_HOURS,
+  formatBlockingOrdersMessage,
+  isPickupInsideEndShiftWindow,
+  type BlockingOrder,
+} from "@/lib/driver/end-shift-blockers";
 
 /** Movement stages: the delivery has been started and MUST block ending the
  *  shift. Mirrors the server-side guard in endDriverShift. */
@@ -54,7 +69,9 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 ];
 
 /** True when this delivery should block ending the shift: it's mid-flight, or
- *  it's ASSIGNED with a pickup that is imminent (within `guardMs`) or overdue.
+ *  it's ASSIGNED with a pickup inside the guard window — imminent (within
+ *  `guardMs`) or overdue by less than END_SHIFT_STALE_PICKUP_HOURS. Older
+ *  assignments are stale dispatch data and never trap the driver.
  *  Mirrors the server guard so the button state matches what the API will say.
  *  A guardMs of 0 disables the pickup guard entirely (in-flight still blocks).
  *  A PENDING return request never blocks — the driver already asked dispatch
@@ -62,10 +79,9 @@ const IN_FLIGHT_STATUSES: DriverStatus[] = [
 function blocksEndShift(delivery: DeliveryTracking, guardMs: number): boolean {
   if (delivery.pendingReturn) return false;
   if (IN_FLIGHT_STATUSES.includes(delivery.status)) return true;
-  if (guardMs <= 0) return false;
   if (delivery.status === DriverStatus.ASSIGNED && delivery.scheduledPickupAt) {
     const pickup = new Date(delivery.scheduledPickupAt).getTime();
-    return pickup <= Date.now() + guardMs;
+    return isPickupInsideEndShiftWindow(pickup, guardMs);
   }
   return false;
 }
@@ -136,6 +152,30 @@ export default function DriverTrackingPortal() {
   const { settings } = useTrackingSettings();
   const endShiftGuardMs = settings.endShiftPickupGuardMinutes * 60_000;
 
+  // In-app cancellation alert: dispatch cancelling one of this driver's orders
+  // broadcasts a CANCELLED delivery-status event (orders PATCH route). Toast
+  // it loudly and refresh the feed so the order drops off right away; the 60s
+  // poll stays as the fallback when realtime is down. The callback must stay
+  // referentially stable — the hook resubscribes whenever it changes.
+  const { user } = useUser();
+  const driverProfileId = user?.id ?? null;
+  const handleCancelledOrder = useCallback(
+    (payload: DeliveryStatusUpdatedPayload) => {
+      createCancelledOrderAlertHandler({
+        driverProfileId,
+        notify: (message) =>
+          toast.error(message, { duration: CANCELLED_ORDER_ALERT_DURATION_MS }),
+        refresh: refreshDeliveries,
+      })(payload);
+    },
+    [driverProfileId, refreshDeliveries],
+  );
+  useDeliveryStatusRealtime({
+    enabled: Boolean(driverProfileId),
+    showNotifications: false,
+    onStatusUpdate: handleCancelledOrder,
+  });
+
   // Battery monitoring (best-effort; unsupported on many browsers).
   useEffect(() => {
     setMounted(true);
@@ -195,18 +235,19 @@ export default function DriverTrackingPortal() {
     if (ok) startTracking();
   };
 
-  const endShiftBlockers = activeDeliveries.filter((d) =>
-    blocksEndShift(d, endShiftGuardMs),
-  ).length;
+  // Blocking deliveries, keyed by order number (cateringRequestId /
+  // onDemandId carry it; id is the deliveries-row fallback). Named in the
+  // blocked-state hint and the backstop toast (finding #8, 2026-08-21).
+  const blockingOrders: BlockingOrder[] = activeDeliveries
+    .filter((d) => blocksEndShift(d, endShiftGuardMs))
+    .map((d) => ({
+      orderNumber: d.cateringRequestId || d.onDemandId || d.id,
+      reason: "ACTIVE_DELIVERY",
+    }));
+  const endShiftBlockers = blockingOrders.length;
   // First blocking delivery — the one the "Return a delivery" escape hatch
-  // targets. The feed keys these by order number (cateringRequestId /
-  // onDemandId carry it; id is the deliveries-row fallback).
-  const firstBlocker = activeDeliveries.find((d) =>
-    blocksEndShift(d, endShiftGuardMs),
-  );
-  const firstBlockerOrderNumber = firstBlocker
-    ? firstBlocker.cateringRequestId || firstBlocker.onDemandId || firstBlocker.id
-    : null;
+  // targets.
+  const firstBlockerOrderNumber = blockingOrders[0]?.orderNumber ?? null;
 
   const onReturnComplete = async () => {
     setReturnTarget(null);
@@ -223,9 +264,7 @@ export default function DriverTrackingPortal() {
     // self-heal: explain the block AND re-check the server feed — a delivery
     // completed on another screen unblocks this button without a reload.
     if (endShiftBlockers > 0) {
-      toast.error(
-        `You still have ${endShiftBlockers} active or due ${endShiftBlockers === 1 ? "delivery" : "deliveries"}. Complete ${endShiftBlockers === 1 ? "it" : "them"} or return ${endShiftBlockers === 1 ? "it" : "them"} to dispatch before ending your shift.`,
-      );
+      toast.error(formatBlockingOrdersMessage(blockingOrders));
       void refreshDeliveries().catch(() => {
         /* best-effort re-check — the next poll will still correct it */
       });
@@ -461,7 +500,7 @@ export default function DriverTrackingPortal() {
                   {endShiftBlockers > 0 ? (
                     <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
                       {endShiftBlockers === 1
-                        ? "1 delivery to finish or return first"
+                        ? `Order ${firstBlockerOrderNumber} to finish or return first`
                         : `${endShiftBlockers} deliveries to finish or return first`}
                     </div>
                   ) : null}

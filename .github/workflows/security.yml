@@ -55,7 +55,6 @@ jobs:
           fi
 
           # Threshold accounts for known transitive dependency false positives:
-          # - 3x undici@7.22.0 (vercel > @vercel/node > undici) — overridden to 7.24.4 but audit reads specifier
           # - 4x node-forge (firebase-admin > node-forge <1.4.0) — upstream hasn't updated
           # - 2x picomatch (jest > micromatch/picomatch) — dev dependency, not in production
           # - 1x path-to-regexp (sanity > path-to-regexp) — transitive, waiting on sanity update

@@ -1,7 +1,7 @@
 import twilio from "twilio";
 import type { SmsProvider, SmsResult } from "./types";
 
-function normalizePhoneNumber(phone: string): string {
+export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, "");
 
   if (digits.startsWith("+")) {

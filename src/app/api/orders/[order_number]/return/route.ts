@@ -9,6 +9,7 @@ import {
   createReturnRequest,
   executeReturnToDispatch,
   loadReturnableOrder,
+  releaseCancelledOrder,
   type ReturnOrderType,
   type ReturnReason,
 } from '@/lib/services/return-requests';
@@ -100,29 +101,35 @@ export async function POST(
     // Locate the order (catering first, then on-demand)
     let orderId: string | null = null;
     let orderType: ReturnOrderType | null = null;
+    let dbOrderNumber: string | null = null;
+    let orderStatus: string | null = null;
 
     const cateringRequest = await prisma.cateringRequest.findFirst({
       where: {
         orderNumber: { equals: orderNumber, mode: 'insensitive' },
         deletedAt: null,
       },
-      select: { id: true, orderNumber: true },
+      select: { id: true, orderNumber: true, status: true },
     });
 
     if (cateringRequest) {
       orderId = cateringRequest.id;
       orderType = 'catering';
+      dbOrderNumber = cateringRequest.orderNumber;
+      orderStatus = String(cateringRequest.status);
     } else {
       const onDemandOrder = await prisma.onDemand.findFirst({
         where: {
           orderNumber: { equals: orderNumber, mode: 'insensitive' },
           deletedAt: null,
         },
-        select: { id: true, orderNumber: true },
+        select: { id: true, orderNumber: true, status: true },
       });
       if (onDemandOrder) {
         orderId = onDemandOrder.id;
         orderType = 'on_demand';
+        dbOrderNumber = onDemandOrder.orderNumber;
+        orderStatus = String(onDemandOrder.status);
       }
     }
 
@@ -134,8 +141,32 @@ export async function POST(
     }
 
     // ------------------------------------------------------------------
-    // DRIVER path: file a return request for dispatch review (202).
+    // Already CANCELLED (2026-08-21 finding #8): never reject with "already
+    // cancelled" — that trapped a driver whose order was cancelled from admin
+    // before the cancel cascade existed. Treat as a no-op success and clear
+    // any stale driver-side rows so the end-shift guard lets go. The order
+    // itself stays CANCELLED. Same behaviour for drivers and admins.
     // ------------------------------------------------------------------
+    if (orderStatus === 'CANCELLED') {
+      const releaseOrderId = orderId;
+      const releaseOrderType = orderType;
+      const releaseOrderNumber = dbOrderNumber ?? orderNumber;
+      await prisma.$transaction((tx) =>
+        releaseCancelledOrder(tx, {
+          orderType: releaseOrderType,
+          orderId: releaseOrderId,
+          dbOrderNumber: releaseOrderNumber,
+        }),
+      );
+      return NextResponse.json({
+        success: true,
+        noop: true,
+        orderNumber: releaseOrderNumber,
+        status: 'CANCELLED',
+        message: 'This order was already cancelled. Nothing to return.',
+      });
+    }
+
     if (!isPrivileged) {
       let requestResult;
       try {

@@ -588,8 +588,9 @@ describe('useAdminRealtimeTracking', () => {
 
       // Heuristic should NOT apply because "Test Driver" exists in SSE driver names
       // So driver-123 should keep its SSE name "Elena Martinez"
-      expect(result.current.activeDrivers).toHaveLength(1);
-      expect(result.current.activeDrivers[0].name).toBe('Elena Martinez');
+      expect(result.current.activeDrivers).toHaveLength(2);
+      const elena = result.current.activeDrivers.find((d) => d.id === 'driver-123');
+      expect(elena?.name).toBe('Elena Martinez');
     });
 
     it('should reject invalid coordinates', async () => {
@@ -812,9 +813,12 @@ describe('useAdminRealtimeTracking', () => {
         });
       });
 
-      // Should use Realtime data, not SSE
-      expect(result.current.activeDrivers).toHaveLength(1);
-      expect(result.current.activeDrivers[0].id).toBe('realtime-driver');
+      // Realtime-only drivers are appended to the SSE roster, never replace it
+      expect(result.current.activeDrivers).toHaveLength(2);
+      expect(result.current.activeDrivers.map((d) => d.id)).toEqual([
+        'sse-driver',
+        'realtime-driver',
+      ]);
     });
 
     it('should fallback to SSE data when Realtime disconnected', async () => {
@@ -1058,6 +1062,193 @@ describe('useAdminRealtimeTracking', () => {
         'Processed locations size-based cleanup performed',
         expect.any(Object)
       );
+    });
+  });
+
+  describe('merged driver state (Overview cards + map share one list)', () => {
+    const sseDriver = {
+      id: 'driver-123',
+      employeeId: 'EMP001',
+      name: 'Fernando',
+      isOnDuty: true,
+      lastKnownLocation: { coordinates: [-101.68, 21.12] as [number, number] },
+      lastLocationUpdate: new Date('2026-08-21T18:48:43Z'),
+      currentShiftId: 'shift-1',
+      deliveryCount: 1,
+      totalDistanceMiles: 0.6,
+      activeDeliveries: 1,
+    };
+
+    it('overlays the realtime position onto the SSE driver and keeps shift stats', async () => {
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        activeDrivers: [sseDriver],
+        isConnected: true,
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // SSE roster is visible before any realtime ping arrives
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].lastKnownLocation?.coordinates).toEqual([-101.68, 21.12]);
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.13,
+          lng: -101.67,
+          timestamp: '2026-08-21T18:58:00Z',
+        });
+      });
+
+      expect(result.current.activeDrivers).toHaveLength(1);
+      const merged = result.current.activeDrivers[0];
+      expect(merged.lastKnownLocation?.coordinates).toEqual([-101.67, 21.13]);
+      expect(merged.lastLocationUpdate).toEqual(new Date('2026-08-21T18:58:00Z'));
+      expect(merged.deliveryCount).toBe(1);
+      expect(merged.totalDistanceMiles).toBe(0.6);
+      expect(merged.activeDeliveries).toBe(1);
+      expect(merged.name).toBe('Fernando');
+    });
+
+    it('keeps the newer SSE position when a stale realtime ping arrives', async () => {
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        activeDrivers: [{ ...sseDriver, lastLocationUpdate: new Date('2026-08-21T19:10:00Z') }],
+        isConnected: true,
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 0,
+          lng: 0,
+          timestamp: '2026-08-21T18:00:00Z',
+        });
+      });
+
+      expect(result.current.activeDrivers[0].lastKnownLocation?.coordinates).toEqual([-101.68, 21.12]);
+    });
+
+    it('accumulates every realtime ping in recentLocations, deduped against SSE rows', async () => {
+      const ssePing = {
+        driverId: 'driver-123',
+        location: { type: 'Point', coordinates: [-101.68, 21.12] },
+        accuracy: 5,
+        speed: 1,
+        heading: 0,
+        isMoving: true,
+        activityType: 'walking',
+        recordedAt: '2026-08-21T18:58:00Z',
+      };
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        activeDrivers: [sseDriver],
+        recentLocations: [ssePing],
+        isConnected: true,
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Same ping broadcast over realtime: must not double count
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.12,
+          lng: -101.68,
+          timestamp: '2026-08-21T18:58:00Z',
+        });
+      });
+      expect(result.current.recentLocations).toHaveLength(1);
+
+      // Two more pings from the same driver: both count as GPS updates
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.121,
+          lng: -101.681,
+          timestamp: '2026-08-21T18:58:10Z',
+        });
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.122,
+          lng: -101.682,
+          timestamp: '2026-08-21T18:58:20Z',
+        });
+      });
+
+      expect(result.current.recentLocations).toHaveLength(3);
+      // Newest first
+      expect(result.current.recentLocations[0].recordedAt).toBe('2026-08-21T18:58:20Z');
+    });
+
+    it('advances lastUpdatedAt on every realtime ping', async () => {
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.12,
+          lng: -101.68,
+          timestamp: '2026-08-21T18:48:43Z',
+        });
+      });
+      const first = result.current.lastUpdatedAt;
+      expect(first).toBeInstanceOf(Date);
+
+      jest.advanceTimersByTime(10_000);
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 21.121,
+          lng: -101.681,
+          timestamp: '2026-08-21T19:02:00Z',
+        });
+      });
+
+      expect(result.current.lastUpdatedAt).not.toEqual(first);
+      expect(result.current.lastUpdatedAt!.getTime()).toBeGreaterThan(first!.getTime());
+    });
+
+    it('advances lastUpdatedAt when a new SSE snapshot arrives', async () => {
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        activeDrivers: [sseDriver],
+        isConnected: true,
+      });
+      (isFeatureEnabled as jest.Mock).mockReturnValue(false);
+
+      const { result, rerender } = renderHook(() => useAdminRealtimeTracking());
+      const first = result.current.lastUpdatedAt;
+      expect(first).toBeInstanceOf(Date);
+
+      jest.advanceTimersByTime(5000);
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        activeDrivers: [{ ...sseDriver, lastLocationUpdate: new Date('2026-08-21T19:10:00Z') }],
+        isConnected: true,
+      });
+      rerender();
+
+      expect(result.current.lastUpdatedAt!.getTime()).toBeGreaterThan(first!.getTime());
     });
   });
 });
