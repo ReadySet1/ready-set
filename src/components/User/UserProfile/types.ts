@@ -110,6 +110,9 @@ export interface User {
     "Santa Cruz",
     "Solano",
     "Sonoma",
+    "Dallas",
+    "Fulton",
+    "Travis",
   ];
   
   export const TIME_NEEDED = ["Breakfast", "Lunch", "Dinner", "All Day"];
