@@ -29,14 +29,55 @@ import {
 } from '@/lib/driver/end-shift-blockers';
 
 /**
+ * The driver's current open shift, if any. "Open" matches what
+ * `getActiveShift` treats as the current shift: active or paused, not
+ * soft-deleted. Mirrors the partial unique index
+ * `driver_shifts_one_open_per_driver_idx` (see migration
+ * `20260906000000_driver_shifts_single_active`).
+ */
+async function findOpenShiftId(driverId: string): Promise<string | undefined> {
+  const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(`
+    SELECT id FROM driver_shifts
+    WHERE driver_id = $1::uuid
+    AND status IN ('active', 'paused')
+    AND deleted_at IS NULL
+    ORDER BY shift_start DESC
+    LIMIT 1
+  `, driverId);
+  return rows[0]?.id;
+}
+
+/**
+ * Did this error come from the one-open-shift-per-driver unique index?
+ * Raw queries surface Postgres 23505 as Prisma P2010 with `meta.code`;
+ * P2002 and the bare driver message are accepted for robustness.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, meta, message } = error as {
+    code?: string;
+    meta?: { code?: string };
+    message?: string;
+  };
+  if (code === 'P2002') return true;
+  if (code === 'P2010' && meta?.code === '23505') return true;
+  return typeof message === 'string' && /23505|duplicate key value violates unique constraint/i.test(message);
+}
+
+/**
  * Start a new driver shift
- * Creates a new shift record and updates driver status
+ * Creates a new shift record and updates driver status.
+ *
+ * Idempotent: if the driver already has an open shift (second device, double
+ * tap, retried POST) that shift is returned with `resumed: true` instead of
+ * creating a duplicate. The DB enforces the same rule with a partial unique
+ * index, so a race between two callers resolves to the same single shift.
  */
 export async function startDriverShift(
   driverId: string,
   startLocation: LocationUpdate,
   metadata: Record<string, any> = {}
-): Promise<{ success: boolean; shiftId?: string; error?: string }> {
+): Promise<{ success: boolean; shiftId?: string; resumed?: boolean; error?: string }> {
   try {
     if (!z.string().uuid().safeParse(driverId).success) {
       return { success: false, error: 'Invalid driverId' };
@@ -47,27 +88,46 @@ export async function startDriverShift(
       return { success: false, error: 'Access denied' };
     }
 
+    // Application guard: resume an open shift instead of starting a second one.
+    const openShiftId = await findOpenShiftId(driverId);
+    if (openShiftId) {
+      return { success: true, shiftId: openShiftId, resumed: true };
+    }
+
     // Use raw SQL for PostGIS operations since Prisma doesn't support geography types well
-    const result = await prisma.$executeRawUnsafe(`
-      INSERT INTO driver_shifts (
-        driver_id,
-        shift_start,
-        start_location,
-        status,
-        notes
-      ) VALUES (
-        $1::uuid,
-        NOW(),
-        ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        'active',
-        $4
-      ) RETURNING id
-    `,
-      driverId,
-      startLocation.coordinates.lng,
-      startLocation.coordinates.lat,
-      metadata.notes || null
-    );
+    try {
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO driver_shifts (
+          driver_id,
+          shift_start,
+          start_location,
+          status,
+          notes
+        ) VALUES (
+          $1::uuid,
+          NOW(),
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+          'active',
+          $4
+        ) RETURNING id
+      `,
+        driverId,
+        startLocation.coordinates.lng,
+        startLocation.coordinates.lat,
+        metadata.notes || null
+      );
+    } catch (insertError) {
+      if (!isUniqueViolation(insertError)) throw insertError;
+      // DB guard: another caller won the race between our pre-check and the
+      // INSERT. That caller already flipped the driver row; just resume theirs.
+      const winnerShiftId = await findOpenShiftId(driverId);
+      if (!winnerShiftId) throw insertError;
+      console.warn('startDriverShift: lost start race, resuming existing shift', {
+        driverId,
+        shiftId: winnerShiftId,
+      });
+      return { success: true, shiftId: winnerShiftId, resumed: true };
+    }
 
     // Update driver status
     await prisma.$executeRawUnsafe(`
@@ -106,7 +166,8 @@ export async function startDriverShift(
 
     return {
       success: true,
-      shiftId: shiftRecord[0]?.id
+      shiftId: shiftRecord[0]?.id,
+      resumed: false,
     };
   } catch (error) {
     console.error('Error starting driver shift:', error);
