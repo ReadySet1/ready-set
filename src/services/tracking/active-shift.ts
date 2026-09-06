@@ -13,11 +13,14 @@
  */
 
 import { prisma } from '@/utils/prismaDB';
+import { getDriverForUser } from '@/lib/auth/driver-ownership';
 
 /**
  * Resolve the most recent ACTIVE shift for a driver (`drivers.id`).
- * Fails open to null — a shift-lookup hiccup must never block a status
- * update; the mirror row simply stays unattributed like before the fix.
+ * Fails open to null on a lookup error so the deliveries mirror simply stays
+ * unattributed. NOTE: for the driver movement gate (`resolveActiveShiftIdForUser`)
+ * null is a *block* — a shift-lookup error therefore surfaces as
+ * SHIFT_REQUIRED rather than a 500, which is the safer failure for GPS coverage.
  */
 export async function resolveActiveShiftIdForDriver(
   driverId: string | null | undefined,
@@ -34,4 +37,18 @@ export async function resolveActiveShiftIdForDriver(
     console.error('Failed to resolve active shift for driver:', error);
     return null;
   }
+}
+
+/**
+ * Resolve the active shift for an authenticated user — the caller of a driver
+ * status PATCH. Goes through driver-ownership so both link columns
+ * (`profile_id` / legacy `user_id`) resolve to the `drivers` row. Null means
+ * "no drivers row or no active shift"; the orders PATCH turns that into
+ * 422 SHIFT_REQUIRED when a DRIVER tries to enter a movement status.
+ */
+export async function resolveActiveShiftIdForUser(
+  authUserId: string,
+): Promise<string | null> {
+  const driver = await getDriverForUser(authUserId);
+  return resolveActiveShiftIdForDriver(driver?.id ?? null);
 }

@@ -31,7 +31,11 @@ import {
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
-import { resolveActiveShiftIdForDriver } from '@/services/tracking/active-shift';
+import {
+  resolveActiveShiftIdForDriver,
+  resolveActiveShiftIdForUser,
+} from '@/services/tracking/active-shift';
+import { requiresActiveShift } from '@/lib/state-machine/driver-state';
 import {
   POST_PICKUP_DRIVER_STATUSES,
   voidPendingReturnRequests,
@@ -578,6 +582,28 @@ export async function PATCH(
         },
         { status: 422 },
       );
+    }
+    // A driver must be on an active shift to work a delivery: without one no
+    // GPS is recorded and dispatch never sees the delivery moving (reproduced
+    // in the field 2026-09-02). Admin/helpdesk repairs are exempt, and so are
+    // non-movement transitions (re-affirming ASSIGNED, cancel/return flows).
+    // The client mirrors this gate; this is the authoritative check.
+    if (
+      driverStatus &&
+      driverStatus !== currentDriverStatus &&
+      !callerIsPrivileged &&
+      requiresActiveShift(driverStatus)
+    ) {
+      const callerShiftId = await resolveActiveShiftIdForUser(user.id);
+      if (!callerShiftId) {
+        return NextResponse.json(
+          {
+            error: 'SHIFT_REQUIRED',
+            message: 'Start your shift before working a delivery.',
+          },
+          { status: 422 },
+        );
+      }
     }
     // Pickup confirmation is mandatory (2026-07-09 policy: receiver NAME is the
     // required artifact, signature optional — supersedes the 2026-06-22

@@ -100,3 +100,24 @@ export function shouldNotifyCustomer(status: DriverStatus): boolean {
 export function shouldNotifyAdmin(status: DriverStatus): boolean {
   return ADMIN_NOTIFY_STATUSES.has(status);
 }
+
+/**
+ * Driver statuses that mean the driver is physically working the delivery —
+ * on the road, at a stop, or handing over. A DRIVER may only enter them during
+ * an active shift: without one no GPS is recorded and dispatch never sees the
+ * delivery moving (reproduced in the field 2026-09-02). Everything in the graph
+ * after ASSIGNED qualifies; acknowledging ASSIGNED is not road work.
+ */
+export const SHIFT_REQUIRED_DRIVER_STATUSES: ReadonlySet<DriverStatus> = new Set([
+  DriverStatus.EN_ROUTE_TO_VENDOR,
+  DriverStatus.ARRIVED_AT_VENDOR,
+  DriverStatus.PICKED_UP,
+  DriverStatus.EN_ROUTE_TO_CLIENT,
+  DriverStatus.ARRIVED_TO_CLIENT,
+  DriverStatus.COMPLETED,
+]);
+
+/** True when entering `status` requires the driver to be on an active shift. */
+export function requiresActiveShift(status: string | null | undefined): boolean {
+  return status != null && SHIFT_REQUIRED_DRIVER_STATUSES.has(status as DriverStatus);
+}

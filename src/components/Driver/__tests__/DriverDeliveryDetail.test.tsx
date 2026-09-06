@@ -139,11 +139,20 @@ beforeEach(() => {
   jest.clearAllMocks();
   currentOrder = makeOrder();
   installFetch();
+  // Default: the driver is on an active shift, so the shift gate is open.
   mockUseDriverTracking.mockReturnValue({
     currentLocation: null,
     refreshDeliveries,
+    isShiftActive: true,
+    shiftLoading: false,
   } as any);
 });
+
+/** Render the JSX/string a toast mock received so its copy can be asserted. */
+function renderToastMessage(call: unknown[]) {
+  const [message] = call as [React.ReactNode];
+  return render(<div data-testid="toast-body">{message}</div>);
+}
 
 describe("DriverDeliveryDetail", () => {
   it("fetches and renders the delivery details", async () => {
@@ -364,5 +373,84 @@ describe("DriverDeliveryDetail", () => {
 
     renderDetail();
     expect(await screen.findByText("Delivery not found")).toBeInTheDocument();
+  });
+  describe("shift gate (delivery-advance-without-shift)", () => {
+    it("blocks the Next-Action with a 'Start your shift first' toast and sends no PATCH when the shift is inactive", async () => {
+      mockUseDriverTracking.mockReturnValue({
+        currentLocation: null,
+        refreshDeliveries,
+        isShiftActive: false,
+        shiftLoading: false,
+      } as any);
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("On my way to vendor"));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+      const patched = (global.fetch as jest.Mock).mock.calls.some(
+        ([, init]: [string, RequestInit | undefined]) => init?.method === "PATCH",
+      );
+      expect(patched).toBe(false);
+      expect(toast.success).not.toHaveBeenCalled();
+
+      renderToastMessage((toast.error as jest.Mock).mock.calls[0]!);
+      const body = screen.getByTestId("toast-body");
+      expect(body).toHaveTextContent(/start your shift first/i);
+      const link = screen.getByRole("link", { name: /shift/i });
+      expect(link).toHaveAttribute("href", "/driver/tracking");
+    });
+
+    it("does not block while the shift state is still loading", async () => {
+      mockUseDriverTracking.mockReturnValue({
+        currentLocation: null,
+        refreshDeliveries,
+        isShiftActive: false,
+        shiftLoading: true,
+      } as any);
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("On my way to vendor"));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({ method: "PATCH" }),
+        );
+      });
+    });
+
+    it("shows the same toast when the server answers 422 SHIFT_REQUIRED (client state was stale)", async () => {
+      installFetch();
+      const base = global.fetch as jest.Mock;
+      global.fetch = jest.fn((url: string, init?: RequestInit) => {
+        if (init?.method === "PATCH") {
+          return Promise.resolve({
+            ok: false,
+            status: 422,
+            statusText: "Unprocessable Entity",
+            json: () =>
+              Promise.resolve({
+                error: "SHIFT_REQUIRED",
+                message: "Start your shift before working a delivery.",
+              }),
+          });
+        }
+        return base(url, init);
+      }) as unknown as typeof fetch;
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("On my way to vendor"));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+      // The raw error code must never leak into the toast.
+      expect(toast.error).not.toHaveBeenCalledWith("SHIFT_REQUIRED");
+      renderToastMessage((toast.error as jest.Mock).mock.calls[0]!);
+      expect(screen.getByTestId("toast-body")).toHaveTextContent(/start your shift first/i);
+      expect(screen.getByRole("link", { name: /shift/i })).toHaveAttribute(
+        "href",
+        "/driver/tracking",
+      );
+      expect(toast.success).not.toHaveBeenCalled();
+    });
   });
 });

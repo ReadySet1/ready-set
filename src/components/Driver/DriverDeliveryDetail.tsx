@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
@@ -36,6 +37,7 @@ import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureShee
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
+import { requiresActiveShift } from "@/lib/state-machine/driver-state";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 
 /**
@@ -148,6 +150,21 @@ function addressQuery(addr?: AddressLike | null): string | null {
   return q || null;
 }
 
+/** Shift gate toast: a delivery worked off-shift leaves no GPS trail, so send
+ *  the driver to the tracking screen where shifts start. Keyed so repeated
+ *  taps don't stack. */
+function showShiftRequiredToast() {
+  toast.error(
+    <span>
+      Start your shift first.{" "}
+      <Link href="/driver/tracking" className="font-semibold underline">
+        Go to shift
+      </Link>
+    </span>,
+    { id: "shift-required" },
+  );
+}
+
 interface DriverDeliveryDetailProps {
   orderNumber: string;
 }
@@ -159,7 +176,9 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   // `refreshDeliveries` syncs the provider's shared deliveries feed after a
   // status change here, so /driver/tracking (End-shift guard, active list)
   // updates immediately instead of waiting on its 60s poll.
-  const { currentLocation, refreshDeliveries } = useDriverTracking();
+  // `isShiftActive` / `shiftLoading` drive the shift gate on the Next-Action.
+  const { currentLocation, refreshDeliveries, isShiftActive, shiftLoading } =
+    useDriverTracking();
   const { settings } = useTrackingSettings();
   const geofenceRadiusM = settings.arrivalGeofenceRadiusM;
   const supabase = useMemo(() => createClient(), []);
@@ -295,11 +314,19 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         );
         if (!res.ok) {
           let detail = "";
+          let code = "";
           try {
             const body = await res.json();
+            code = typeof body.error === "string" ? body.error : "";
             detail = body.error || body.message || "";
           } catch {
             /* ignore */
+          }
+          // Server-side shift gate (authoritative) — the client check above
+          // can be stale, e.g. the shift ended in another tab.
+          if (code === "SHIFT_REQUIRED") {
+            showShiftRequiredToast();
+            return;
           }
           throw new Error(detail || res.statusText);
         }
@@ -365,6 +392,13 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     const current = order.driverStatus as DriverStatus | undefined;
     const next = current ? getNextStatus(current) : DriverStatus.ASSIGNED;
     if (!next) return;
+    // Shift gate: no shift means no GPS trail, so the driver must start one
+    // before working the delivery. Fails open while the shift state is still
+    // loading — the server enforces the same rule (422 SHIFT_REQUIRED).
+    if (!shiftLoading && !isShiftActive && requiresActiveShift(next)) {
+      showShiftRequiredToast();
+      return;
+    }
     // Arrival geofence backstop (fail-open on unknown GPS/coords): never mark
     // "arrived" while demonstrably far from the stop.
     const arrivalTarget =
@@ -395,7 +429,14 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       return;
     }
     void advanceStatus(next);
-  }, [order, advanceStatus, currentLocation, geofenceRadiusM]);
+  }, [
+    order,
+    advanceStatus,
+    currentLocation,
+    geofenceRadiusM,
+    isShiftActive,
+    shiftLoading,
+  ]);
 
   const onSignatureComplete = useCallback(async () => {
     setSignatureOpen(false);

@@ -55,6 +55,13 @@ jest.mock('@/utils/supabase/server', () => ({
   }),
 }));
 
+// The orders PATCH gates driver movement statuses on an active shift; these
+// tests model an on-shift driver so the behaviour under test is reachable.
+jest.mock('@/services/tracking/active-shift', () => ({
+  resolveActiveShiftIdForDriver: jest.fn().mockResolvedValue(null),
+  resolveActiveShiftIdForUser: jest.fn().mockResolvedValue('shift-1'),
+}));
+
 jest.mock('@/services/notifications/delivery-status', () => ({
   sendDispatchStatusNotification: jest.fn().mockResolvedValue(undefined),
 }));
