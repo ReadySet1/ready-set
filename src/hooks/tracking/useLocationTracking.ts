@@ -552,6 +552,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       return;
     }
 
+    // Idempotent: the provider's auto-resume effect and explicit callers
+    // (Start-shift flow) can both fire; a second start would open another
+    // watchPosition and leak the first watch id. Use reArmWatch() to restart.
+    if (isTrackingRef.current) return;
+
     setIsTracking(true);
     isTrackingRef.current = true;
     setError(null);
