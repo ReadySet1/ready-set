@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PricingService } from '@/services/pricing/pricing.service';
 import type { PricingTier, PricingTierUpdateInput, PricingApiResponse } from '@/types/pricing';
+import { withAuth } from '@/lib/auth-middleware';
+
+/** Middleware does not run for /api/*; tier writes are admin-only. */
+async function requireAdmin(request: NextRequest): Promise<NextResponse | null> {
+  const auth = await withAuth(request, { allowedRoles: ['ADMIN', 'SUPER_ADMIN'], requireAuth: true });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+  return null;
+}
 
 interface RouteParams {
   params: Promise<{
@@ -67,6 +77,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * Update an existing pricing tier
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     
@@ -174,6 +187,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  * Delete (deactivate) a pricing tier
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     

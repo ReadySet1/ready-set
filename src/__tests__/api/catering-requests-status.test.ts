@@ -44,6 +44,32 @@ import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('/api/catering-requests/[orderId]/status API', () => {
   const mockOrder = {
     id: 'order-123',
@@ -534,5 +560,90 @@ describe('/api/catering-requests/[orderId]/status API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Internal server error - failed to update order status');
     });
+  });
+});
+
+describe('/api/catering-requests/[orderId]/status - auth', () => {
+  beforeEach(() => jest.clearAllMocks());
+  const context = { params: Promise.resolve({ orderId: 'order-123' }) };
+  const order = {
+    id: 'order-123',
+    orderNumber: 'CV-1',
+    status: 'ACTIVE',
+    driverStatus: null,
+    userId: 'client-1',
+    user: { email: 'c@example.com', name: 'C' },
+    pickupAddress: null,
+    deliveryAddress: null,
+    dispatches: [{ id: 'd-1', driverId: 'driver-1', driver: { id: 'driver-1', name: 'D', contactNumber: '555' } }],
+  };
+  const patchRequest = () =>
+    createPatchRequest('http://localhost:3000/api/catering-requests/order-123/status', {
+      driverStatus: 'ASSIGNED',
+    });
+  const getRequest = () => createGetRequest('http://localhost:3000/api/catering-requests/order-123/status');
+
+  beforeEach(() => {
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(order);
+    (prisma.cateringRequest.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      ...order,
+      driverStatus: 'ASSIGNED',
+      updatedAt: new Date(),
+    });
+    (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({ ...order, driverStatus: 'ASSIGNED', updatedAt: new Date() });
+  });
+
+  it('PATCH returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await PATCH(patchRequest(), context);
+    expect(res.status).toBe(401);
+    expect(prisma.cateringRequest.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('PATCH returns 403 for roles outside staff + driver', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await PATCH(patchRequest(), context);
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'DRIVER'] }),
+    );
+  });
+
+  it('PATCH returns 403 for a driver not assigned to the order', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-2'));
+    const res = await PATCH(patchRequest(), context);
+    expect(res.status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('PATCH lets the assigned driver update', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
+    const res = await PATCH(patchRequest(), context);
+    expect(res.status).toBe(200);
+  });
+
+  it('PATCH lets helpdesk update', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
+    const res = await PATCH(patchRequest(), context);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await GET(getRequest(), context);
+    expect(res.status).toBe(401);
+  });
+
+  it('GET returns 403 for a driver not assigned to the order', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-2'));
+    const res = await GET(getRequest(), context);
+    expect(res.status).toBe(403);
+  });
+
+  it('GET returns the order to the assigned driver', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
+    const res = await GET(getRequest(), context);
+    expect(res.status).toBe(200);
   });
 });

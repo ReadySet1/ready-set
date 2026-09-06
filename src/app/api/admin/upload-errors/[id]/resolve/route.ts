@@ -1,11 +1,21 @@
 // src/app/api/admin/upload-errors/[id]/resolve/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
+import { withAuth } from "@/lib/auth-middleware";
 
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  // Middleware does not run for /api/*; matches the other /api/admin routes.
+  const auth = await withAuth(request, {
+    allowedRoles: ["ADMIN", "SUPER_ADMIN", "HELPDESK"],
+    requireAuth: true,
+  });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const params = await context.params;
     const errorId = params.id;

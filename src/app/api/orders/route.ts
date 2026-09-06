@@ -13,7 +13,7 @@ import { validateRequiredFields } from '@/utils/field-validation';
 import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
-import { sendDeliveryNotifications } from '@/app/actions/email';
+import { sendDeliveryNotifications } from '@/services/notifications/delivery-notifications';
 import { invalidateVendorCacheOnOrderCreate } from '@/lib/cache/cache-invalidation';
 
 import { prisma as prismaClient } from "@/utils/prismaDB";
