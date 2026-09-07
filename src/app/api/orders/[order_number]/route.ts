@@ -32,8 +32,8 @@ import {
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
 import {
-  resolveActiveShiftIdForDriver,
-  resolveActiveShiftIdForUser,
+  resolveOpenShiftIdForDriver,
+  resolveOpenShiftIdForUser,
 } from '@/services/tracking/active-shift';
 import { requiresActiveShift } from '@/lib/state-machine/driver-state';
 import {
@@ -583,9 +583,10 @@ export async function PATCH(
         { status: 422 },
       );
     }
-    // A driver must be on an active shift to work a delivery: without one no
-    // GPS is recorded and dispatch never sees the delivery moving (reproduced
-    // in the field 2026-09-02). Admin/helpdesk repairs are exempt, and so are
+    // A driver must be on an open shift (active or paused: a break keeps GPS
+    // flowing) to work a delivery. Without one no GPS is recorded and dispatch
+    // never sees the delivery moving (reproduced in the field 2026-09-02).
+    // Admin/helpdesk repairs are exempt, and so are
     // non-movement transitions (re-affirming ASSIGNED, cancel/return flows).
     // The client mirrors this gate; this is the authoritative check.
     if (
@@ -594,7 +595,7 @@ export async function PATCH(
       !callerIsPrivileged &&
       requiresActiveShift(driverStatus)
     ) {
-      const callerShiftId = await resolveActiveShiftIdForUser(user.id);
+      const callerShiftId = await resolveOpenShiftIdForUser(user.id);
       if (!callerShiftId) {
         return NextResponse.json(
           {
@@ -761,11 +762,11 @@ export async function PATCH(
           });
           deliveryDriverId = driverRecord?.id ?? null;
         }
-        // Stamp the driver's ACTIVE shift on the mirror so the
+        // Stamp the driver's OPEN (active or paused) shift on the mirror so the
         // delivery-count trigger can attribute the delivery to the shift.
         // driver_shifts.driver_id references drivers.id (same as
         // deliveries.driver_id), NOT the dispatch's profile id.
-        const deliveryShiftId = await resolveActiveShiftIdForDriver(deliveryDriverId);
+        const deliveryShiftId = await resolveOpenShiftIdForDriver(deliveryDriverId);
         mirror = {
           field: timestampField,
           now,

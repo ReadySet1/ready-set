@@ -375,6 +375,30 @@ describe("DriverDeliveryDetail", () => {
     expect(await screen.findByText("Delivery not found")).toBeInTheDocument();
   });
   describe("shift gate (delivery-advance-without-shift)", () => {
+    it("does not block a driver whose shift is PAUSED (on break): the context reports it active and the PATCH goes out", async () => {
+      // Client and server agree: an open shift is active OR paused
+      // (useDriverShift.isShiftActive). The component must rely on that flag,
+      // never on its own `status === 'active'` check.
+      mockUseDriverTracking.mockReturnValue({
+        currentLocation: null,
+        refreshDeliveries,
+        currentShift: { id: "shift-1", status: "paused" },
+        isShiftActive: true,
+        shiftLoading: false,
+      } as any);
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("On my way to vendor"));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({ method: "PATCH" }),
+        );
+      });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it("blocks the Next-Action with a 'Start your shift first' toast and sends no PATCH when the shift is inactive", async () => {
       mockUseDriverTracking.mockReturnValue({
         currentLocation: null,

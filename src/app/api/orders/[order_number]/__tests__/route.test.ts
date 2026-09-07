@@ -36,9 +36,11 @@ jest.mock('@/lib/services/partnerWebhookService', () => ({
 
 // Shift lookups: the mirror stamp (per drivers.id) stays unattributed by
 // default; the driver gate (per auth user) is controlled per test below.
+// Both resolve an OPEN shift (active OR paused) — the route must never import
+// an active-only variant, or a driver on break gets SHIFT_REQUIRED.
 jest.mock('@/services/tracking/active-shift', () => ({
-  resolveActiveShiftIdForDriver: jest.fn().mockResolvedValue(null),
-  resolveActiveShiftIdForUser: jest.fn().mockResolvedValue(null),
+  resolveOpenShiftIdForDriver: jest.fn().mockResolvedValue(null),
+  resolveOpenShiftIdForUser: jest.fn().mockResolvedValue(null),
 }));
 
 import { NextRequest } from 'next/server';
@@ -48,7 +50,7 @@ import { prisma } from '@/utils/prismaDB';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { sendDispatchStatusNotification } from '@/services/notifications/delivery-status';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
-import { resolveActiveShiftIdForUser } from '@/services/tracking/active-shift';
+import { resolveOpenShiftIdForUser } from '@/services/tracking/active-shift';
 
 // Get mocked versions
 const mockedPrisma = jest.mocked(prisma);
@@ -56,7 +58,7 @@ const mockedCreateClient = jest.mocked(createClient);
 const mockedCreateAdminClient = jest.mocked(createAdminClient);
 const mockedSendDispatchStatusNotification = jest.mocked(sendDispatchStatusNotification);
 const mockedRecordLifecycle = jest.mocked(recordAndDispatchLifecycleEvent);
-const mockedResolveActiveShiftIdForUser = jest.mocked(resolveActiveShiftIdForUser);
+const mockedResolveOpenShiftIdForUser = jest.mocked(resolveOpenShiftIdForUser);
 
 // Track calls to channel methods
 let channelSendCalls: any[] = [];
@@ -561,7 +563,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     // The shift gate runs ahead of pickup confirmation: these fixtures model
     // a driver who is on shift so the confirmation rule is what gets exercised.
     beforeEach(() => {
-      mockedResolveActiveShiftIdForUser.mockResolvedValue('shift-1');
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
     });
 
     it('rejects a driver PICKED_UP with 422 when neither a signature nor a receiver name exists', async () => {
@@ -684,7 +686,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     };
 
     beforeEach(() => {
-      mockedResolveActiveShiftIdForUser.mockResolvedValue(null);
+      mockedResolveOpenShiftIdForUser.mockResolvedValue(null);
     });
 
     it('rejects a DRIVER entering a movement status with 422 SHIFT_REQUIRED when they have no active shift', async () => {
@@ -700,7 +702,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       const body = await response.json();
       expect(body.error).toBe('SHIFT_REQUIRED');
       expect(body.message).toBe('Start your shift before working a delivery.');
-      expect(mockedResolveActiveShiftIdForUser).toHaveBeenCalledWith('driver-456');
+      expect(mockedResolveOpenShiftIdForUser).toHaveBeenCalledWith('driver-456');
       expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
       expect(channelSendCalls).toHaveLength(0);
     });
@@ -708,7 +710,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     it('lets the assigned DRIVER advance once they have an active shift', async () => {
       setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
       mockCaller('driver-456', 'DRIVER');
-      mockedResolveActiveShiftIdForUser.mockResolvedValue('shift-1');
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
 
       const { PATCH } = await importRoute();
       const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
@@ -716,6 +718,23 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       });
 
       expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('lets the assigned DRIVER advance while their shift is PAUSED (on break, GPS still flowing)', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      mockCaller('driver-456', 'DRIVER');
+      // The open-shift resolver returns the paused shift's id — same contract
+      // as the client's isShiftActive, which is true for a paused shift.
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-paused');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveOpenShiftIdForUser).toHaveBeenCalledWith('driver-456');
       expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
     });
 
@@ -729,7 +748,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(mockedResolveActiveShiftIdForUser).not.toHaveBeenCalled();
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
     });
 
     it('does not gate a non-movement transition (acknowledging ASSIGNED) for a DRIVER with no shift', async () => {
@@ -744,7 +763,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(mockedResolveActiveShiftIdForUser).not.toHaveBeenCalled();
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
     });
 
     it('keeps the transition graph ahead of the gate — an illegal move is still the graph 422', async () => {
@@ -760,7 +779,7 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       const body = await response.json();
       expect(body.error).toBeUndefined();
       expect(body.message).toMatch(/Cannot transition driverStatus/);
-      expect(mockedResolveActiveShiftIdForUser).not.toHaveBeenCalled();
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
     });
   });
 });
