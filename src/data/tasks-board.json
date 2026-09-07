@@ -65,7 +65,8 @@
     "aug20": "Aug 20 session",
     "aug20walk": "Drive Test 8/20",
     "aug21": "Drive Test 8/21",
-    "aug31": "Aug 31"
+    "aug31": "Aug 31",
+    "sep7": "Sep 7"
   },
   "tasks": [
     {
@@ -1503,6 +1504,72 @@
       ],
       "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load.<br><br><strong>2026-09-01:</strong> Root cause: greeting computed from the server clock (UTC) during SSR; the device (PDT) rendered a different time-of-day bucket. Fixed in PR #539 with a hydration regression test. Merged to development 2026-09-01 (d8390493).",
       "sourceRef": "#539"
+    },
+    {
+      "id": "delivery-finalize-multi-photo",
+      "status": "new",
+      "title": "Allow up to 3 photos when driver finalizes delivery",
+      "owner": "gary",
+      "source": "sep7",
+      "description": "Requested by Gary. The delivery-completion flow should accept a maximum of 3 photos (currently limited to one). Update the finalize-delivery UI and API to support multi-photo upload with a cap of three."
+    },
+    {
+      "id": "catering-order-address-not-editable",
+      "status": "new",
+      "title": "Address cannot be edited during new catering order creation",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug"
+      ],
+      "description": "The address field on the new catering order flow does not allow editing an existing address. Users must clear and re-enter the full address instead of correcting it in place."
+    },
+    {
+      "id": "post-qr-scan-role-modal",
+      "status": "new",
+      "title": "Post-QR-scan role modal (Driver / Client / Vendor)",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "After scanning the QR code, show a modal with three options: Driver routes to the driver application; Client and Vendor route to sign-up to create a new account."
+    },
+    {
+      "id": "pr-followup-fulton-counties-typing",
+      "status": "new",
+      "title": "PR follow-up — Fulton in CountiesSelection.tsx + counties strict typing",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types."
+    },
+    {
+      "id": "notify-order-created-findunique-bug",
+      "status": "new",
+      "title": "notifyOrderCreated uses findUnique instead of findFirst",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug"
+      ],
+      "description": "Switch to <code>findFirst</code> so the query can include <code>deletedAt: null</code> — <code>findUnique</code> cannot filter on non-unique fields, so soft-deleted records are not excluded."
+    },
+    {
+      "id": "harness-docblock-stale-guard-mention",
+      "status": "new",
+      "title": "Update harness docblock — remove NODE_ENV guard mention",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "The docblock still references a <code>NODE_ENV</code> guard that no longer exists. Remove the stale reference so the documentation matches the current implementation."
+    },
+    {
+      "id": "tasks-board-desktop-layout-bugs",
+      "status": "new",
+      "title": "Tasks Board renders incorrectly on desktop",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Two layout defects at wide viewports on <code>/admin/tasks-board</code>. (a) The left sidebar paints on top of the DONE column — nav labels overlap the first column's cards and make several unreadable. (b) The board overflows to the right with no horizontal scroll: the NEW column is clipped at the viewport edge and the header subtitle is cut mid-sentence."
     }
   ]
 }
