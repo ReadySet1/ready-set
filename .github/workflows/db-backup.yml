@@ -1,0 +1,248 @@
+name: Database Backup
+
+# Nightly `pg_dump` of the production Supabase Postgres, copied to a PRIVATE
+# Supabase Storage bucket that lives in a DIFFERENT Supabase project than the
+# one being dumped (so the copy survives loss of the production project).
+#
+# Runbook (secrets, restore procedure, rehearsal checklist):
+#   docs/deployment/BACKUPS.md
+#
+# Required repository secrets (names only — values are documented in the runbook):
+#   PROD_BACKUP_DATABASE_URL          session-mode pooler URL (port 5432) of ready-set-web
+#   DEV_BACKUP_DATABASE_URL           same shape for rs-dev; only used by manual runs
+#   BACKUP_SUPABASE_URL               https://<ref>.supabase.co of the project that HOLDS the dumps
+#   BACKUP_SUPABASE_SERVICE_ROLE_KEY  service-role key of that same project
+#
+# This repository is public. Dumps are never uploaded as workflow artifacts and
+# never printed to the log; only file names, sizes and checksums are.
+
+on:
+  schedule:
+    # Daily at 09:00 UTC (02:00 PT) — before business hours on the West Coast.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which database to dump
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+          - development
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup-${{ inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+env:
+  # pg_dump must be >= the server major. Prod (ready-set-web) is Postgres 15,
+  # dev (rs-dev) is Postgres 17, so the 17 client covers both.
+  PG_CLIENT_MAJOR: '17'
+  BACKUP_BUCKET: db-backups
+  RETENTION_DAYS: '30'
+
+jobs:
+  backup:
+    name: pg_dump ${{ inputs.environment || 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_ENV: ${{ inputs.environment || 'production' }}
+      BACKUP_PREFIX: ready-set/${{ inputs.environment || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            scripts/db-backup-storage.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Install PostgreSQL ${{ env.PG_CLIENT_MAJOR }} client
+        run: |
+          set -euo pipefail
+          sudo install -d -m 0755 /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-${PG_CLIENT_MAJOR}"
+          pg_dump --version
+          pg_restore --version
+
+      - name: Resolve environment and validate secrets
+        env:
+          PROD_URL: ${{ secrets.PROD_BACKUP_DATABASE_URL }}
+          DEV_URL: ${{ secrets.DEV_BACKUP_DATABASE_URL }}
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          case "$TARGET_ENV" in
+            production)  DB_URL="$PROD_URL"; SECRET_NAME=PROD_BACKUP_DATABASE_URL ;;
+            development) DB_URL="$DEV_URL";  SECRET_NAME=DEV_BACKUP_DATABASE_URL ;;
+            *) echo "::error::Unknown environment '$TARGET_ENV'"; exit 1 ;;
+          esac
+
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Secret $SECRET_NAME is not set. See docs/deployment/BACKUPS.md."
+            exit 1
+          fi
+          if [ -z "$BACKUP_SUPABASE_URL" ] || [ -z "$BACKUP_SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::BACKUP_SUPABASE_URL / BACKUP_SUPABASE_SERVICE_ROLE_KEY are not set. See docs/deployment/BACKUPS.md."
+            exit 1
+          fi
+
+          # pg_dump needs a real session: the transaction-mode pooler (port 6543)
+          # and Prisma's ?pgbouncer=true flag both break it. Fail early, loudly.
+          case "$DB_URL" in
+            *:6543/*)     echo "::error::$SECRET_NAME points at the transaction pooler (port 6543). Use the SESSION pooler on port 5432."; exit 1 ;;
+            *pgbouncer=*) echo "::error::$SECRET_NAME contains ?pgbouncer=... — libpq rejects unknown URI parameters. Remove it."; exit 1 ;;
+            *connection_limit=*) echo "::error::$SECRET_NAME contains ?connection_limit=... — libpq rejects unknown URI parameters. Remove it."; exit 1 ;;
+          esac
+          case "$DB_URL" in
+            *@db.*.supabase.co:*)
+              echo "::warning::$SECRET_NAME uses the direct host (db.<ref>.supabase.co), which is IPv6-only on the free plan. GitHub runners are IPv4-only; prefer the session pooler host." ;;
+          esac
+
+          # Hand the resolved URL to later steps without ever printing it.
+          echo "::add-mask::$DB_URL"
+          echo "DB_URL=$DB_URL" >> "$GITHUB_ENV"
+          echo "DUMP_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+          echo "WORK_DIR=$RUNNER_TEMP/db-backup" >> "$GITHUB_ENV"
+
+      - name: Dump database
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORK_DIR"
+          BASE="ready-set-${TARGET_ENV}-${DUMP_DATE}"
+          APP_DUMP="$WORK_DIR/${BASE}.dump"
+          AUTH_DUMP="$WORK_DIR/${BASE}.auth.dump"
+
+          # 1) Application data: everything Prisma manages lives in `public`.
+          #    Custom format (-Fc) is compressed and lets pg_restore pick
+          #    schemas/tables selectively at restore time.
+          echo "Dumping schema public -> $(basename "$APP_DUMP")"
+          pg_dump "$DB_URL" \
+            --format=custom --compress=6 \
+            --no-owner --no-privileges \
+            --schema=public \
+            --file="$APP_DUMP"
+
+          # 2) Auth identities: profiles.id == auth.users.id, so a restore
+          #    without these rows would orphan every profile. Only the durable
+          #    tables — sessions, refresh tokens and audit log are transient.
+          echo "Dumping auth identity tables -> $(basename "$AUTH_DUMP")"
+          pg_dump "$DB_URL" \
+            --format=custom --compress=6 \
+            --no-owner --no-privileges \
+            --table=auth.users \
+            --table=auth.identities \
+            --table=auth.mfa_factors \
+            --file="$AUTH_DUMP"
+
+          echo "BASE=$BASE" >> "$GITHUB_ENV"
+          echo "APP_DUMP=$APP_DUMP" >> "$GITHUB_ENV"
+          echo "AUTH_DUMP=$AUTH_DUMP" >> "$GITHUB_ENV"
+
+      - name: Verify dumps (offline)
+        run: |
+          set -euo pipefail
+          cd "$WORK_DIR"
+
+          # pg_restore --list reads the TOC without touching any database.
+          for f in "$APP_DUMP" "$AUTH_DUMP"; do
+            pg_restore --list "$f" > "$f.toc"
+          done
+
+          TABLE_COUNT=$(grep -c 'TABLE DATA' "$APP_DUMP.toc" || true)
+          echo "public tables with data entries: $TABLE_COUNT"
+          for required in profiles catering_requests driver_shifts; do
+            if ! grep -q "TABLE DATA public ${required} " "$APP_DUMP.toc"; then
+              echo "::error::Dump is missing public.${required} — wrong database or incomplete dump."
+              exit 1
+            fi
+          done
+          if ! grep -q 'TABLE DATA auth users ' "$AUTH_DUMP.toc"; then
+            echo "::error::Auth dump is missing auth.users."
+            exit 1
+          fi
+
+          APP_BYTES=$(stat -c %s "$APP_DUMP")
+          AUTH_BYTES=$(stat -c %s "$AUTH_DUMP")
+          if [ "$APP_BYTES" -lt 1024 ]; then
+            echo "::error::Application dump is under 1 KB ($APP_BYTES bytes) — refusing to upload."
+            exit 1
+          fi
+          # Supabase Storage on the free plan caps uploads at 50 MB per object.
+          if [ "$APP_BYTES" -gt 47185920 ]; then
+            echo "::warning::Application dump is $((APP_BYTES / 1048576)) MB — close to or above the 50 MB free-plan upload cap. See BACKUPS.md → Retention & cost."
+          fi
+
+          sha256sum "$(basename "$APP_DUMP")" "$(basename "$AUTH_DUMP")" > "${BASE}.sha256"
+          rm -f "$APP_DUMP.toc" "$AUTH_DUMP.toc"
+
+          {
+            echo "### Database backup — ${TARGET_ENV} — ${DUMP_DATE}"
+            echo
+            echo "| File | Size |"
+            echo "|---|---|"
+            echo "| ${BASE}.dump | $((APP_BYTES / 1024)) KB |"
+            echo "| ${BASE}.auth.dump | $((AUTH_BYTES / 1024)) KB |"
+            echo
+            echo "public tables with data: ${TABLE_COUNT}"
+            echo
+            echo '```'
+            cat "${BASE}.sha256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to private Supabase Storage bucket
+        env:
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          cd "$WORK_DIR"
+          for f in "${BASE}.dump" "${BASE}.auth.dump" "${BASE}.sha256"; do
+            echo "Uploading $f -> ${BACKUP_BUCKET}/${BACKUP_PREFIX}/$f"
+            curl --fail-with-body -sS --retry 3 --retry-delay 5 -X POST \
+              "${BACKUP_SUPABASE_URL}/storage/v1/object/${BACKUP_BUCKET}/${BACKUP_PREFIX}/${f}" \
+              -H "Authorization: Bearer ${BACKUP_SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "apikey: ${BACKUP_SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/octet-stream" \
+              -H "x-upsert: true" \
+              --data-binary @"$f"
+            echo
+          done
+
+      - name: Verify upload and rotate (${{ env.RETENTION_DAYS }}-day retention)
+        env:
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/db-backup-storage.mjs verify \
+            "${BASE}.dump" "${BASE}.auth.dump" "${BASE}.sha256"
+          node scripts/db-backup-storage.mjs rotate
+
+      - name: Scrub runner
+        if: always()
+        run: rm -rf "${WORK_DIR:-$RUNNER_TEMP/db-backup}"
+
+      # No Slack/Discord/Resend action exists in this repository's workflows, so
+      # failures rely on GitHub's own workflow-failure email. For scheduled runs
+      # GitHub emails the user who last modified the `cron:` line above — keep
+      # that person someone who reads ops mail. See BACKUPS.md → Alerting.
+      - name: Failure summary
+        if: failure()
+        run: |
+          {
+            echo "### Database backup FAILED — ${TARGET_ENV} — $(date -u +%Y-%m-%d)"
+            echo
+            echo "Check the step logs above. Common causes and fixes: docs/deployment/BACKUPS.md → Troubleshooting."
+          } >> "$GITHUB_STEP_SUMMARY"
