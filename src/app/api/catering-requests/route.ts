@@ -9,6 +9,8 @@ import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
 import { randomUUID } from "crypto";
 import { Resend } from "resend";
 import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
+import { notifyOrderCreated } from "@/services/orders/notifyOrderCreated";
+import { runAfterResponse } from "@/lib/api/after-response";
 
 // Column-limit ceilings (from prisma/schema.prisma)
 const MAX_HEADCOUNT = 2147483647; // INT4 ceiling
@@ -424,6 +426,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📧 Order created successfully. Confirmation email sent: ${emailSent}`);
+
+    // Admin order notification
+    runAfterResponse("admin-order-notification", () =>
+      notifyOrderCreated({
+        orderId: cateringRequest.id,
+        orderType: "catering",
+        source: "customer_portal",
+      }),
+    );
 
     return NextResponse.json({
       message: "Catering request created successfully",

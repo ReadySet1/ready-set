@@ -2,6 +2,7 @@
 
 import { POST } from '@/app/api/cater-valley/orders/draft/route';
 import { prisma } from '@/lib/db/prisma';
+import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import {
@@ -39,6 +40,8 @@ jest.mock('@/lib/services/pricingService', () => ({
 jest.mock('@/app/api/cater-valley/_lib/pricing-helper', () => ({
   calculateCaterValleyPricing: jest.fn(),
 }));
+
+jest.mock('@/services/orders/notifyOrderCreated');
 
 jest.mock('@/lib/utils/timezone', () => ({
   localTimeToUtc: jest.fn((date: string, time: string) => `${date}T${time}:00Z`),
@@ -172,6 +175,9 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
       expect(data.totalPrice).toBe(815.00); // 750 + 65
       expect(data.estimatedPickupTime).toBe('2025-10-25T13:15:00Z');
       expect(data.breakdown).toBeDefined();
+
+      // Drafts must NOT trigger admin notification (only confirm does)
+      expect(notifyOrderCreated).not.toHaveBeenCalled();
     });
 
     it('should create system user if not exists', async () => {
