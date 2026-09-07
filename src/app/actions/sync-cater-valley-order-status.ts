@@ -13,6 +13,10 @@
  * signing on the server where the secret exists.
  *
  * See PR #402 pre-landing review #1.
+ *
+ * Server actions are plain POST endpoints: nothing upstream authenticates
+ * them. Only staff (the roles that can change order status in the admin
+ * UI) may trigger a partner sync.
  */
 
 import {
@@ -20,10 +24,23 @@ import {
   type OrderStatus as CaterValleyOrderStatus,
   type CaterValleyUpdateResult,
 } from '@/services/caterValleyService';
+import { getActionCaller } from '@/lib/auth/driver-ownership';
+import { getUserRole } from '@/lib/auth';
+
+async function callerIsStaff(): Promise<boolean> {
+  const caller = await getActionCaller();
+  if (!caller) return false;
+  if (caller.isPrivileged) return true;
+  const role = (await getUserRole(caller.userId))?.toUpperCase();
+  return role === 'HELPDESK';
+}
 
 export async function syncCaterValleyOrderStatusAction(
   orderNumber: string,
   status: CaterValleyOrderStatus
 ): Promise<CaterValleyUpdateResult> {
+  if (!(await callerIsStaff())) {
+    return { success: false, orderFound: false, error: 'Unauthorized', statusCode: 403 };
+  }
   return updateCaterValleyOrderStatus(orderNumber, status);
 }

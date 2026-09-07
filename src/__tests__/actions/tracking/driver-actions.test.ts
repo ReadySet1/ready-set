@@ -103,6 +103,11 @@ const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockCallerMayActOnDriver = callerMayActOnDriver as jest.Mock;
 const mockGetActionCaller = getActionCaller as jest.Mock;
 
+// startDriverShift now runs an "open shift?" lookup before inserting; these
+// tests model a driver with no open shift so the INSERT path is exercised.
+const primeNoOpenShift = () =>
+  (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
+
 describe('Driver Tracking Actions', () => {
   const validDriverId = '550e8400-e29b-41d4-a716-446655440000';
   const validShiftId = '660e8400-e29b-41d4-a716-446655440001';
@@ -133,6 +138,7 @@ describe('Driver Tracking Actions', () => {
 
   describe('startDriverShift', () => {
     it('starts a driver shift successfully', async () => {
+      primeNoOpenShift();
       // Mock the INSERT for shift creation
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       // Mock the UPDATE for driver status
@@ -145,12 +151,13 @@ describe('Driver Tracking Actions', () => {
       expect(result.success).toBe(true);
       expect(result.shiftId).toBe(validShiftId);
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
-      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2); // open-shift lookup + id fetch
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tracking');
       expect(revalidatePath).toHaveBeenCalledWith('/driver');
     });
 
     it('accepts metadata parameter', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
@@ -170,6 +177,7 @@ describe('Driver Tracking Actions', () => {
     });
 
     it('handles database errors gracefully', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Database connection failed')
       );
@@ -181,6 +189,7 @@ describe('Driver Tracking Actions', () => {
     });
 
     it('handles empty query result when getting shift ID', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
@@ -720,6 +729,7 @@ describe('Driver Tracking Actions', () => {
 
   describe('Error Handling', () => {
     it('handles network/database errors gracefully in startDriverShift', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Network error')
       );
@@ -731,6 +741,7 @@ describe('Driver Tracking Actions', () => {
     });
 
     it('handles unexpected errors with generic message', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce('String error');
 
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
@@ -795,6 +806,7 @@ describe('Driver Tracking Actions', () => {
 
   describe('Data Validation', () => {
     it('passes location coordinates to PostGIS correctly', async () => {
+      primeNoOpenShift();
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
 

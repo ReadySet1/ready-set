@@ -6,6 +6,9 @@
 
 import type { DeliveryTracking, TrackedDriver } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS } from '@/constants/tracking-colors';
+import { escapeHtml } from '@/lib/utils/escape-html';
+
+export { escapeHtml };
 
 export interface PopupBattery {
   level?: number;
@@ -19,15 +22,6 @@ export interface DriverPopupInput {
   activeDelivery?: DeliveryTracking;
   /** Length of the travelled trail drawn on the map, in miles. */
   trailMiles?: number;
-}
-
-export function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 const roundTenth = (value: number): number => Math.round(value * 10) / 10;

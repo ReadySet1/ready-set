@@ -19,6 +19,32 @@ jest.mock('@/lib/db/prisma', () => ({
   },
 }));
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('GET /api/admin/job-applications/stats - Get Job Application Statistics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -333,4 +359,35 @@ describe('GET /api/admin/job-applications/stats - Get Job Application Statistics
       expect(data.recentApplications[0].hasResume).toBe(false);
     });
   });
+});
+
+describe('GET /api/admin/job-applications/stats - auth', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/job-applications/stats'));
+    expect(res.status).toBe(401);
+    expect(prisma.jobApplication.count).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for non-staff roles', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/job-applications/stats'));
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'] }),
+    );
+  });
+
+  it('returns stats for helpdesk', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
+    (prisma.jobApplication.count as jest.Mock).mockResolvedValue(0);
+    (prisma.jobApplication.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.jobApplication.findMany as jest.Mock).mockResolvedValue([]);
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/job-applications/stats'));
+    expect(res.status).toBe(200);
+  });
+
 });

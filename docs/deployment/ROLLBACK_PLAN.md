@@ -4,6 +4,12 @@
 **Generated:** 2025-10-03
 **Purpose:** Procedures to safely revert production deployment if critical issues arise
 
+> **2026-09 note:** the app now runs on the VPS via Dokploy (GHCR image), not Vercel, and the
+> Supabase project is on the free plan — the "Supabase Dashboard → Database → Backups" steps below
+> no longer apply. Nightly `pg_dump` backups and the tested restore procedure live in
+> [BACKUPS.md](./BACKUPS.md); use that for any "Type 3: Full Database Restore". The rest of this
+> document is kept as-is for the decision matrix and communication templates.
+
 ---
 
 ## 🚨 WHEN TO INITIATE ROLLBACK

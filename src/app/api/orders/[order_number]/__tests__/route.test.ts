@@ -34,6 +34,15 @@ jest.mock('@/lib/services/partnerWebhookService', () => ({
   },
 }));
 
+// Shift lookups: the mirror stamp (per drivers.id) stays unattributed by
+// default; the driver gate (per auth user) is controlled per test below.
+// Both resolve an OPEN shift (active OR paused) — the route must never import
+// an active-only variant, or a driver on break gets SHIFT_REQUIRED.
+jest.mock('@/services/tracking/active-shift', () => ({
+  resolveOpenShiftIdForDriver: jest.fn().mockResolvedValue(null),
+  resolveOpenShiftIdForUser: jest.fn().mockResolvedValue(null),
+}));
+
 import { NextRequest } from 'next/server';
 
 // Import after mocks
@@ -41,6 +50,7 @@ import { prisma } from '@/utils/prismaDB';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { sendDispatchStatusNotification } from '@/services/notifications/delivery-status';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
+import { resolveOpenShiftIdForUser } from '@/services/tracking/active-shift';
 
 // Get mocked versions
 const mockedPrisma = jest.mocked(prisma);
@@ -48,6 +58,7 @@ const mockedCreateClient = jest.mocked(createClient);
 const mockedCreateAdminClient = jest.mocked(createAdminClient);
 const mockedSendDispatchStatusNotification = jest.mocked(sendDispatchStatusNotification);
 const mockedRecordLifecycle = jest.mocked(recordAndDispatchLifecycleEvent);
+const mockedResolveOpenShiftIdForUser = jest.mocked(resolveOpenShiftIdForUser);
 
 // Track calls to channel methods
 let channelSendCalls: any[] = [];
@@ -549,6 +560,12 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       } as any);
     };
 
+    // The shift gate runs ahead of pickup confirmation: these fixtures model
+    // a driver who is on shift so the confirmation rule is what gets exercised.
+    beforeEach(() => {
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
+    });
+
     it('rejects a driver PICKED_UP with 422 when neither a signature nor a receiver name exists', async () => {
       // The Jul-3 walk-test bug: the Live-Tracking tab advanced
       // ARRIVED_AT_VENDOR -> PICKED_UP without the signature sheet. The server
@@ -645,6 +662,124 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
 
       expect(response.status).toBe(200);
       expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+  });
+  describe('Active-shift gate on driver movement statuses (2026-09-02 field bug)', () => {
+    // Same caller-mock shape as the blocks above.
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    beforeEach(() => {
+      mockedResolveOpenShiftIdForUser.mockResolvedValue(null);
+    });
+
+    it('rejects a DRIVER entering a movement status with 422 SHIFT_REQUIRED when they have no active shift', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      mockCaller('driver-456', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBe('SHIFT_REQUIRED');
+      expect(body.message).toBe('Start your shift before working a delivery.');
+      expect(mockedResolveOpenShiftIdForUser).toHaveBeenCalledWith('driver-456');
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+      expect(channelSendCalls).toHaveLength(0);
+    });
+
+    it('lets the assigned DRIVER advance once they have an active shift', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      mockCaller('driver-456', 'DRIVER');
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('lets the assigned DRIVER advance while their shift is PAUSED (on break, GPS still flowing)', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      mockCaller('driver-456', 'DRIVER');
+      // The open-shift resolver returns the paused shift's id — same contract
+      // as the client's isShiftActive, which is true for a paused shift.
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-paused');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveOpenShiftIdForUser).toHaveBeenCalledWith('driver-456');
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('never gates ADMIN repairs — privileged callers move driverStatus with no shift', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      mockCaller('admin-1', 'ADMIN');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
+    });
+
+    it('does not gate a non-movement transition (acknowledging ASSIGNED) for a DRIVER with no shift', async () => {
+      // Legacy row: driverStatus null but a dispatch exists — the route treats
+      // it as ASSIGNED, and re-affirming ASSIGNED is not road work.
+      setupMocks({ status: 'ASSIGNED', driverStatus: null });
+      mockCaller('driver-456', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'ASSIGNED' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
+    });
+
+    it('keeps the transition graph ahead of the gate — an illegal move is still the graph 422', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' });
+      mockCaller('driver-456', 'DRIVER');
+
+      const { PATCH } = await importRoute();
+      const response = await PATCH(createPatchRequest({ driverStatus: 'ASSIGNED' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBeUndefined();
+      expect(body.message).toMatch(/Cannot transition driverStatus/);
+      expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
     });
   });
 });

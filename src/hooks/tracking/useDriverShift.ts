@@ -136,9 +136,11 @@ export function useDriverShift(): UseDriverShiftReturn {
         throw new Error(result.error || 'Failed to start shift');
       }
 
-      // Reload the shift data
+      // Reload the shift data. When the server reports `resumed: true` it
+      // found an open shift (other device / retried POST) and returned that
+      // instead of creating a duplicate; the reload picks it up.
       await loadActiveShift();
-      addSentryBreadcrumb('Driver shift started', {
+      addSentryBreadcrumb(result.resumed ? 'Driver shift resumed' : 'Driver shift started', {
         driverId,
         shiftId: result.shiftId ?? undefined,
       });

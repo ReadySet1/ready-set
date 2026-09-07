@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  ReactNode,
+} from 'react';
 import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
@@ -111,6 +118,52 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     if (isShiftActive) void startNativeShiftTrackingForDriver();
     else void stopNativeShiftTrackingForDriver();
   }, [isShiftActive]);
+
+  // Auto-resume the foreground web tracker whenever a shift is active but the
+  // watcher is not running. Lives in the provider (mounted by the /driver
+  // layout) rather than the tracking portal so a reload, tab purge, or phone
+  // restart that lands on /driver or a delivery page still resumes GPS pings —
+  // previously only /driver/tracking re-armed it. Runs on every platform: in
+  // the native shell the background watcher above supplements this foreground
+  // tracker (it feeds the UI's currentLocation), it does not replace it.
+  // The in-flight ref keeps the effect from re-entering while the permission
+  // prompt is pending; startTracking() itself is idempotent, so an explicit
+  // start (e.g. the portal's Start-shift flow) racing this effect is harmless.
+  const autoResumeInFlightRef = useRef(false);
+  useEffect(() => {
+    if (
+      !isShiftActive ||
+      shiftLoading ||
+      isTracking ||
+      isRequestingPermission ||
+      autoResumeInFlightRef.current
+    ) {
+      return;
+    }
+
+    autoResumeInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (permissionState !== 'granted') {
+          const granted = await requestLocationPermission();
+          if (!granted) return;
+        }
+        startTracking();
+      } catch {
+        /* permission prompt failed — the next state change retries */
+      } finally {
+        autoResumeInFlightRef.current = false;
+      }
+    })();
+  }, [
+    isShiftActive,
+    shiftLoading,
+    isTracking,
+    isRequestingPermission,
+    permissionState,
+    requestLocationPermission,
+    startTracking,
+  ]);
 
   // Flush any queued GPS points before ending the shift, so the server-side
   // shift mileage (summed from driver_locations) reflects the full trail rather

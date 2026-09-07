@@ -382,6 +382,90 @@ describe("Email Notification Service - Admin Notifications", () => {
       });
     });
 
+    describe("Recipients", () => {
+      it("should send to the configured ORDER_NOTIFICATION_RECIPIENTS", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.to).toEqual(["admin@test.com"]);
+      });
+    });
+
+    describe("Source Field", () => {
+      it("should include source label when source is provided", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          source: "admin_dashboard",
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        expectEmailContains(mockResendClient.emails.send, ["Admin Dashboard"]);
+      });
+
+      it("should format multi-word source labels correctly", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          source: "customer_portal",
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        expectEmailContains(mockResendClient.emails.send, ["Customer Portal"]);
+      });
+
+      it("should not include source row when source is absent", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          // no source field
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        // The source label formatting would produce "Source" as a table label;
+        // without a source, that label should not appear in the details section.
+        expect(lastCall.html).not.toMatch(/Admin Dashboard|Customer Portal|Orders Api|Partner Api/);
+      });
+    });
+
+    describe("XSS Prevention", () => {
+      it("should escape <script>alert(1)</script> in specialNotes", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          specialNotes: '<script>alert(1)</script>',
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+        expect(lastCall.html).not.toContain('<script>alert(1)</script>');
+      });
+
+      it("should escape HTML in pickupNotes", async () => {
+        const orderData = {
+          ...baseOrderData,
+          orderType: "catering" as const,
+          pickupNotes: '<img src=x onerror=alert(1)>',
+        };
+
+        await sendOrderNotificationToAdmin(orderData);
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).not.toContain('<img src=x onerror=alert(1)>');
+      });
+    });
+
     describe("Order Total Formatting", () => {
       it("should format numeric order total", async () => {
         const orderData = {

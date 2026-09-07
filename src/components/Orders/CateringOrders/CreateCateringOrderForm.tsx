@@ -75,19 +75,6 @@ interface CreateCateringOrderFormProps {
   clients: ClientListItem[];
 }
 
-// Define Bay Area counties
-const bayAreaCountyValues = [
-  "Alameda",
-  "Contra Costa",
-  "Marin",
-  "Napa",
-  "San Francisco",
-  "San Mateo",
-  "Santa Clara",
-  "Solano",
-  "Sonoma",
-];
-
 // Define brokerage options to match user form
 const BROKERAGE_OPTIONS = [
   { value: "Foodee", label: "Foodee" },

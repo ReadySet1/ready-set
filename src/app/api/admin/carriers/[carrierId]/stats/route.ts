@@ -2,8 +2,8 @@
  * Carrier Statistics API
  * Provides order statistics and webhook performance metrics for carriers
  *
- * Authentication: Protected by API middleware (admin routes)
- * Authorization: Admin access required
+ * Authentication: withAuth (middleware does not run for /api/*)
+ * Authorization: ADMIN / SUPER_ADMIN / HELPDESK
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,6 +12,18 @@ import { CarrierService } from '@/lib/services/carrierService';
 import { webhookLogger } from '@/lib/services/webhook-logger';
 import { carrierLogger } from '@/utils/logger';
 import { startOfDay, endOfDay } from 'date-fns';
+import { withAuth } from '@/lib/auth-middleware';
+
+async function requireStaff(request: NextRequest): Promise<NextResponse | null> {
+  const auth = await withAuth(request, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+    requireAuth: true,
+  });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return null;
+}
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -34,6 +46,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const denied = await requireStaff(request);
+  if (denied) return denied;
+
   const { carrierId } = await context.params;
 
   try {
@@ -149,6 +164,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const denied = await requireStaff(request);
+  if (denied) return denied;
+
   const { carrierId } = await context.params;
 
   try {

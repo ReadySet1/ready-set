@@ -61,12 +61,17 @@ export default function DriverHomePage() {
     })();
   }, []);
 
+  // Time-of-day text must not be rendered on the server: the server clock
+  // (UTC) and the driver's device can land in different buckets, which
+  // produced a hydration text mismatch (React #418) on every page load.
+  // Stay neutral until mounted, then switch to the device-local greeting.
   const greeting = useMemo(() => {
+    if (!mounted) return "Hello";
     const h = now.getHours();
     if (h < 12) return "Good morning";
     if (h < 17) return "Good afternoon";
     return "Good evening";
-  }, [now]);
+  }, [mounted, now]);
 
   const dateLabel = now.toLocaleDateString("en-US", {
     weekday: "long",

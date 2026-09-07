@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CONSTANTS } from '@/constants';
 import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
+import { withAuth } from '@/lib/auth-middleware';
 
 /**
  * Test API route to verify Umami self-hosted instance connectivity
@@ -8,6 +9,11 @@ import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
 export async function GET(request: NextRequest) {
   const blocked = devOnlyGuard();
   if (blocked) return blocked;
+
+  const auth = await withAuth(request, { allowedRoles: ['SUPER_ADMIN'], requireAuth: true });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
     const testResults = {

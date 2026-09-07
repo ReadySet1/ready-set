@@ -21,6 +21,32 @@ jest.mock('@/utils/prismaDB', () => ({
   },
 }));
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('GET /api/dispatch/[orderId]', () => {
   const mockCateringDispatch = {
     id: 'dispatch-1',
@@ -400,5 +426,61 @@ describe('GET /api/dispatch/[orderId]', () => {
       expect(data.order).toHaveProperty('status');
       expect(Object.keys(data.order)).toHaveLength(4);
     });
+  });
+});
+
+describe('GET /api/dispatch/[orderId] - auth', () => {
+  beforeEach(() => jest.clearAllMocks());
+  const dispatch = {
+    id: 'dispatch-1',
+    cateringRequestId: 'order-1',
+    onDemandId: null,
+    driverId: 'driver-1',
+    driver: { id: 'driver-1', name: 'D', email: 'd@rs.com', contactNumber: '555' },
+    cateringRequest: { id: 'order-1', orderNumber: 'CAT-1', pickupDateTime: new Date(), status: 'ACTIVE' },
+    onDemand: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const request = () => new (require('next/server').NextRequest)('http://localhost:3000/api/dispatch/order-1');
+  const context = { params: Promise.resolve({ orderId: 'order-1' }) };
+
+  beforeEach(() => {
+    (prisma.dispatch.findFirst as jest.Mock).mockResolvedValue(dispatch);
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await GET(request(), context);
+    expect(res.status).toBe(401);
+    expect(prisma.dispatch.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for roles outside staff + driver', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await GET(request(), context);
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'DRIVER'] }),
+    );
+  });
+
+  it('returns 403 for a driver not assigned to the order', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-2'));
+    const res = await GET(request(), context);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns the dispatch to the assigned driver', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
+    const res = await GET(request(), context);
+    expect(res.status).toBe(200);
+  });
+
+  it.each(['ADMIN', 'SUPER_ADMIN', 'HELPDESK'])('returns the dispatch to %s', async (type) => {
+    mockedWithAuth.mockResolvedValue(authAs(type));
+    const res = await GET(request(), context);
+    expect(res.status).toBe(200);
   });
 });

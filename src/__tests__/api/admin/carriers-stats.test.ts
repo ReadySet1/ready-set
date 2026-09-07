@@ -33,6 +33,32 @@ jest.mock('@/lib/services/webhook-logger', () => ({
   },
 }));
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -384,4 +410,49 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
       });
     });
   });
+});
+
+describe('/api/admin/carriers/[carrierId]/stats - auth', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const context = { params: Promise.resolve({ carrierId: 'catervalley' }) };
+
+  it('GET returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/carriers/catervalley/stats'), context);
+    expect(res.status).toBe(401);
+    expect(CarrierService.getCarrier).not.toHaveBeenCalled();
+  });
+
+  it('GET returns 403 for non-staff roles', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/carriers/catervalley/stats'), context);
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'] }),
+    );
+  });
+
+  // The GET happy path is skipped above (REA-211: date-fns interop under
+  // jest), so pass-through is proven on POST, which shares the same gate.
+  it('POST returns metrics for helpdesk', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
+    (CarrierService.getCarrier as jest.Mock).mockReturnValue({ id: 'catervalley', orderPrefix: 'CV-' });
+    const res = await POST(
+      createPostRequest('http://localhost:3000/api/admin/carriers/catervalley/stats', { dateRange: '7d' }),
+      context,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('POST returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await POST(
+      createPostRequest('http://localhost:3000/api/admin/carriers/catervalley/stats', { dateRange: '7d' }),
+      context,
+    );
+    expect(res.status).toBe(401);
+  });
+
 });

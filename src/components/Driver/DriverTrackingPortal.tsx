@@ -124,7 +124,6 @@ export default function DriverTrackingPortal() {
 
   const {
     currentLocation,
-    isTracking,
     accuracy,
     locationError,
     isRealtimeConnected,
@@ -202,26 +201,8 @@ export default function DriverTrackingPortal() {
     return () => clearInterval(id);
   }, [isShiftActive, currentShift?.startTime]);
 
-  // Auto-resume GPS when a shift is active but tracking isn't running.
-  useEffect(() => {
-    if (mounted && isShiftActive && !isTracking && !isRequestingPermission) {
-      (async () => {
-        if (permissionState !== "granted") {
-          const granted = await requestLocationPermission();
-          if (!granted) return;
-        }
-        startTracking();
-      })();
-    }
-  }, [
-    mounted,
-    isShiftActive,
-    isTracking,
-    isRequestingPermission,
-    permissionState,
-    requestLocationPermission,
-    startTracking,
-  ]);
+  // GPS auto-resume for an active shift lives in DriverTrackingProvider (the
+  // /driver layout), so it fires on every driver page, not only this portal.
 
   const handleStartShift = async () => {
     let location = currentLocation;
