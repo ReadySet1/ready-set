@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PricingService } from '@/services/pricing/pricing.service';
 import type { PricingTier, PricingTierCreateInput, PricingApiResponse } from '@/types/pricing';
+import { withAuth } from '@/lib/auth-middleware';
 
 /**
  * GET /api/pricing/tiers
@@ -39,6 +40,12 @@ export async function GET() {
  * Create a new pricing tier
  */
 export async function POST(request: NextRequest) {
+  // Middleware does not run for /api/*; tier writes are admin-only.
+  const auth = await withAuth(request, { allowedRoles: ['ADMIN', 'SUPER_ADMIN'], requireAuth: true });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body: PricingTierCreateInput = await request.json();
     

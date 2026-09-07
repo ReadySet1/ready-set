@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth-middleware";
+
+const STAFF_ROLES = ["ADMIN", "SUPER_ADMIN", "HELPDESK"];
 
 export async function GET(request: NextRequest, props: { params: Promise<{ orderId: string }> }) {
+  // Middleware does not run for /api/*: staff may read any dispatch, a
+  // driver only the one assigned to them (dispatch.driverId is a profile id).
+  const auth = await withAuth(request, {
+    allowedRoles: [...STAFF_ROLES, "DRIVER"],
+    requireAuth: true,
+  });
+  if (!auth.success || !auth.context.user) {
+    return auth.response ?? NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+  const caller = auth.context.user;
+  const callerIsStaff = STAFF_ROLES.includes(caller.type?.toUpperCase());
+
   const params = await props.params;
   const { orderId } = params;
 
@@ -31,6 +46,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ order
 
     if (!dispatch) {
       return NextResponse.json({ error: "Dispatch not found" }, { status: 404 });
+    }
+
+    if (!callerIsStaff && dispatch.driverId !== caller.id) {
+      return NextResponse.json({ error: "You are not assigned to this order" }, { status: 403 });
     }
 
     // Determine which type of order it is

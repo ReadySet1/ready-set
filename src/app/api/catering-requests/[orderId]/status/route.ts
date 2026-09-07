@@ -22,6 +22,36 @@ import {
   StateTransitionError,
 } from '@/lib/state-machine/transition';
 import type { OrderStatus } from '@/lib/state-machine/transition';
+import { withAuth, type AuthContext } from '@/lib/auth-middleware';
+
+const STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
+
+/**
+ * Middleware does not run for /api/*. Staff may act on any order; a driver
+ * only on an order they are dispatched to. Returns the caller on success or
+ * a ready-made 401/403 response.
+ */
+async function authorize(
+  request: NextRequest
+): Promise<{ caller: AuthContext['user']; isStaff: boolean } | NextResponse> {
+  const auth = await withAuth(request, {
+    allowedRoles: [...STAFF_ROLES, 'DRIVER'],
+    requireAuth: true,
+  });
+  if (!auth.success || !auth.context.user) {
+    return auth.response ?? NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  const caller = auth.context.user;
+  return { caller, isStaff: STAFF_ROLES.includes(caller.type?.toUpperCase()) };
+}
+
+/** Check every dispatch row, not just the latest — ordering is not guaranteed. */
+function isAssignedDriver(
+  dispatches: Array<{ driverId: string | null }> | undefined,
+  userId: string
+): boolean {
+  return Array.isArray(dispatches) && dispatches.some((d) => d?.driverId === userId);
+}
 
 // Validation schema for status update request
 const StatusUpdateSchema = z.object({
@@ -73,6 +103,10 @@ export async function PATCH(
   context: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    const authz = await authorize(request);
+    if (authz instanceof NextResponse) return authz;
+    const { caller, isStaff } = authz;
+
     const { orderId } = await context.params;
 
     // 1. Validate request body
@@ -117,7 +151,6 @@ export async function PATCH(
             },
           },
           orderBy: { createdAt: 'desc' },
-          take: 1,
         },
       },
     });
@@ -126,6 +159,13 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
+      );
+    }
+
+    if (!isStaff && !isAssignedDriver(order.dispatches, caller.id)) {
+      return NextResponse.json(
+        { error: 'You are not assigned to this order' },
+        { status: 403 }
       );
     }
 
@@ -379,6 +419,10 @@ export async function GET(
   context: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    const authz = await authorize(request);
+    if (authz instanceof NextResponse) return authz;
+    const { caller, isStaff } = authz;
+
     const { orderId } = await context.params;
 
     const order = await prisma.cateringRequest.findUnique({
@@ -413,6 +457,13 @@ export async function GET(
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
+      );
+    }
+
+    if (!isStaff && !isAssignedDriver(order.dispatches, caller.id)) {
+      return NextResponse.json(
+        { error: 'You are not assigned to this order' },
+        { status: 403 }
       );
     }
 

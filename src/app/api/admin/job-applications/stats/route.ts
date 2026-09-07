@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { JobApplication } from '@/types/prisma';
+import { withAuth } from '@/lib/auth-middleware';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  // Middleware does not run for /api/*; same roles as /api/admin/job-applications.
+  const auth = await withAuth(request, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+    requireAuth: true,
+  });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     // Check if Prisma client is properly initialized
     if (!prisma || typeof prisma.jobApplication === 'undefined') {

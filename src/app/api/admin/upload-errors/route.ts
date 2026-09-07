@@ -1,8 +1,19 @@
 // src/app/api/admin/upload-errors/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
+import { withAuth } from "@/lib/auth-middleware";
 
+// Middleware does not run for /api/*. Reads match the other /api/admin
+// routes (helpdesk included); deleting error records is admin-only.
 export async function GET(request: NextRequest) {
+  const auth = await withAuth(request, {
+    allowedRoles: ["ADMIN", "SUPER_ADMIN", "HELPDESK"],
+    requireAuth: true,
+  });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const errorType = searchParams.get("errorType");
@@ -93,6 +104,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await withAuth(request, {
+    allowedRoles: ["ADMIN", "SUPER_ADMIN"],
+    requireAuth: true,
+  });
+  if (!auth.success || auth.response) {
+    return auth.response ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const errorId = searchParams.get("errorId");

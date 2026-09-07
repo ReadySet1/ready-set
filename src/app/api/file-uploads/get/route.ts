@@ -1,7 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
+import { withAuth } from "@/lib/auth-middleware";
+
+const STAFF_ROLES = ["ADMIN", "SUPER_ADMIN", "HELPDESK"];
+
+/**
+ * Ownership check for non-staff callers, keyed on the entity the where
+ * clause targets. Job application files are staff-only (applicants upload
+ * anonymously and never list existing files).
+ */
+async function callerOwnsEntity(
+  whereClause: {
+    userId?: string;
+    cateringRequestId?: string;
+    onDemandId?: string;
+    jobApplicationId?: string;
+  },
+  userId: string
+): Promise<boolean> {
+  if (whereClause.userId) {
+    return whereClause.userId === userId;
+  }
+  if (whereClause.cateringRequestId) {
+    const order = await prisma.cateringRequest.findFirst({
+      where: { id: whereClause.cateringRequestId, userId, deletedAt: null },
+      select: { id: true },
+    });
+    return order !== null;
+  }
+  if (whereClause.onDemandId) {
+    const order = await prisma.onDemand.findFirst({
+      where: { id: whereClause.onDemandId, userId, deletedAt: null },
+      select: { id: true },
+    });
+    return order !== null;
+  }
+  return false;
+}
 
 export async function GET(request: NextRequest) {
+  // Middleware does not run for /api/*. File records carry signed URLs, so
+  // callers may only list entities they own; staff may list anything.
+  const auth = await withAuth(request, { requireAuth: true });
+  if (!auth.success || !auth.context.user) {
+    return auth.response ?? NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+  const caller = auth.context.user;
+  const callerIsStaff = STAFF_ROLES.includes(caller.type?.toUpperCase());
+
   try {
     const { searchParams } = new URL(request.url);
     const entityId = searchParams.get("entityId");
@@ -72,7 +118,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    
+
+    if (!callerIsStaff) {
+      const owned = await callerOwnsEntity(whereClause, caller.id);
+      if (!owned) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const files = await prisma.fileUpload.findMany({
       where: whereClause,
       orderBy: {

@@ -17,6 +17,32 @@ jest.mock('@/utils/prismaDB', () => ({
   },
 }));
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('GET /api/dispatch/[orderId] - Get Dispatch by Order ID', () => {
   beforeEach(() => {
     jest.clearAllMocks();

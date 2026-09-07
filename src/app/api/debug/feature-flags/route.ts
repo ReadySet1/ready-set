@@ -10,17 +10,14 @@ import {
   getAllFeatureConfigs,
 } from '@/lib/feature-flags';
 import { withAuth } from '@/lib/auth-middleware';
+import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   // Disable in production for security
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Debug endpoint not available in production' },
-      { status: 404 }
-    );
-  }
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
 
   // Require admin authentication
   const authResult = await withAuth(request, {

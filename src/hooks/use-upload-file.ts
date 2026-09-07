@@ -98,6 +98,9 @@ export function useUploadFile({
   // Fetch existing files
   const fetchExistingFiles = useCallback(async () => {
     if (!entityId) return;
+    // Job applicants are anonymous and start from a fresh temp id, and
+    // /api/file-uploads/get now requires a session — nothing to fetch.
+    if (entityType === "job_application") return;
 
     try {
       const params = new URLSearchParams({

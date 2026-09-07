@@ -21,6 +21,32 @@ jest.mock('@/utils/prismaDB', () => ({
   },
 }));
 
+// Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
+// it says otherwise.
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+import { NextResponse as AuthNextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+
+const mockedWithAuth = withAuth as jest.Mock;
+const authAs = (type: string, id = 'staff-1') => ({
+  success: true,
+  context: { user: { id, email: 'staff@rs.com', type } },
+});
+const authUnauthenticated = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Authentication required' }, { status: 401 }),
+  context: {},
+});
+const authForbidden = () => ({
+  success: false,
+  response: AuthNextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  context: {},
+});
+
+beforeEach(() => {
+  mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+});
+
 describe('GET/DELETE /api/admin/upload-errors - Upload Error Management', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -381,4 +407,58 @@ describe('GET/DELETE /api/admin/upload-errors - Upload Error Management', () => 
       });
     });
   });
+});
+
+describe('/api/admin/upload-errors - auth', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('GET returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/upload-errors'));
+    expect(res.status).toBe(401);
+    expect(prisma.uploadError.findMany).not.toHaveBeenCalled();
+  });
+
+  it('GET returns 403 for non-staff roles', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/upload-errors'));
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'] }),
+    );
+  });
+
+  it('GET lists errors for helpdesk', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
+    (prisma.uploadError.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.uploadError.count as jest.Mock).mockResolvedValue(0);
+    const res = await GET(createGetRequest('http://localhost:3000/api/admin/upload-errors'));
+    expect(res.status).toBe(200);
+  });
+
+  it('DELETE returns 401 when unauthenticated', async () => {
+    mockedWithAuth.mockResolvedValue(authUnauthenticated());
+    const res = await DELETE(createDeleteRequest('http://localhost:3000/api/admin/upload-errors?allResolved=true'));
+    expect(res.status).toBe(401);
+    expect(prisma.uploadError.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('DELETE is admin-only (no helpdesk)', async () => {
+    mockedWithAuth.mockResolvedValue(authForbidden());
+    const res = await DELETE(createDeleteRequest('http://localhost:3000/api/admin/upload-errors?allResolved=true'));
+    expect(res.status).toBe(403);
+    expect(mockedWithAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowedRoles: ['ADMIN', 'SUPER_ADMIN'] }),
+    );
+  });
+
+  it('DELETE works for admins', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    (prisma.uploadError.deleteMany as jest.Mock).mockResolvedValue({ count: 2 });
+    const res = await DELETE(createDeleteRequest('http://localhost:3000/api/admin/upload-errors?allResolved=true'));
+    expect(res.status).toBe(200);
+  });
+
 });

@@ -17,7 +17,7 @@ import { NextRequest } from "next/server";
 import { GET, POST } from "../route";
 import { validateApiAuth } from "@/utils/api-auth";
 import { prisma } from "@/utils/prismaDB";
-import { sendDeliveryNotifications } from "@/app/actions/email";
+import { sendDeliveryNotifications } from "@/services/notifications/delivery-notifications";
 import { invalidateVendorCacheOnOrderCreate } from "@/lib/cache/cache-invalidation";
 import {
   createPostRequest,
@@ -50,7 +50,7 @@ jest.mock("@/utils/prismaDB", () => ({
   },
 }));
 
-jest.mock("@/app/actions/email", () => ({
+jest.mock("@/services/notifications/delivery-notifications", () => ({
   sendDeliveryNotifications: jest.fn(),
 }));
 
