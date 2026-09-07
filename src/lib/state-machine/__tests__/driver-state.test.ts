@@ -7,6 +7,8 @@ import {
   deriveOrderStatusFromDriver,
   shouldNotifyAdmin,
   shouldNotifyCustomer,
+  requiresActiveShift,
+  SHIFT_REQUIRED_DRIVER_STATUSES,
 } from '../driver-state';
 import { StateTransitionError } from '../types';
 
@@ -109,5 +111,37 @@ describe('graph snapshots', () => {
 
   it('DRIVER_TO_ORDER matches expected shape', () => {
     expect(DRIVER_TO_ORDER).toMatchSnapshot();
+  });
+});
+
+describe('requiresActiveShift', () => {
+  it('is false for ASSIGNED — acknowledging an assignment is not road work', () => {
+    expect(requiresActiveShift(DriverStatus.ASSIGNED)).toBe(false);
+  });
+
+  it('is true for every status after ASSIGNED (the driver is physically working the delivery)', () => {
+    const onTheRoad = [
+      DriverStatus.EN_ROUTE_TO_VENDOR,
+      DriverStatus.ARRIVED_AT_VENDOR,
+      DriverStatus.PICKED_UP,
+      DriverStatus.EN_ROUTE_TO_CLIENT,
+      DriverStatus.ARRIVED_TO_CLIENT,
+      DriverStatus.COMPLETED,
+    ];
+    for (const status of onTheRoad) {
+      expect(requiresActiveShift(status)).toBe(true);
+    }
+  });
+
+  it('covers exactly the graph minus ASSIGNED, so a new status cannot silently bypass the gate', () => {
+    const everyStatus = Object.values(DriverStatus);
+    const expected = everyStatus.filter((s) => s !== DriverStatus.ASSIGNED);
+    expect([...SHIFT_REQUIRED_DRIVER_STATUSES].sort()).toEqual(expected.sort());
+  });
+
+  it('tolerates unknown/legacy strings by treating them as not gated', () => {
+    expect(requiresActiveShift('NOT_A_STATUS')).toBe(false);
+    expect(requiresActiveShift(null)).toBe(false);
+    expect(requiresActiveShift(undefined)).toBe(false);
   });
 });
