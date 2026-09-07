@@ -300,6 +300,20 @@ describe('useLocationTracking', () => {
       expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
     });
 
+    it('is idempotent: a second startTracking while already tracking does not open another watch', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      expect(result.current.isTracking).toBe(true);
+      expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(1);
+    });
+
     it('sets up continuous tracking + the periodic offline sync', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
