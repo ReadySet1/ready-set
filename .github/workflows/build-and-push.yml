@@ -31,7 +31,8 @@ name: Build & Push Image
 #     DOKPLOY_PROD_DEPLOY_WEBHOOK     (optional: prod app's deploy webhook, same shape)
 #     DEV_NEXT_PUBLIC_SUPABASE_ANON_KEY / DEV_BUILD_DATABASE_URL / DEV_BUILD_DIRECT_URL
 #       — rs-dev counterparts used for non-main builds (see the DEV_ vars too:
-#       DEV_NEXT_PUBLIC_SUPABASE_URL, DEV_NEXT_PUBLIC_SENTRY_ENVIRONMENT).
+#       DEV_NEXT_PUBLIC_SUPABASE_URL, DEV_NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+#       DEV_NEXT_PUBLIC_SITE_URL).
 #       main builds a production-flavored client bundle; development builds a
 #       dev-flavored one (rs-dev Supabase + Sentry env=development).
 #
@@ -116,7 +117,7 @@ jobs:
             NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ github.ref == 'refs/heads/main' && vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT || vars.DEV_NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
             NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ vars.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
             NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${{ vars.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
-            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+            NEXT_PUBLIC_SITE_URL=${{ github.ref == 'refs/heads/main' && vars.NEXT_PUBLIC_SITE_URL || vars.DEV_NEXT_PUBLIC_SITE_URL }}
             NEXT_PUBLIC_FF_USE_REALTIME_TRACKING=${{ vars.NEXT_PUBLIC_FF_USE_REALTIME_TRACKING }}
             NEXT_PUBLIC_CATER_VALLEY_API_URL=${{ vars.NEXT_PUBLIC_CATER_VALLEY_API_URL }}
             NEXT_PUBLIC_CATER_VALLEY_PARTNER_HEADER=${{ vars.NEXT_PUBLIC_CATER_VALLEY_PARTNER_HEADER }}
