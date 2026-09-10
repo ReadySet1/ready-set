@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getUserRole } from '@/lib/auth';
+import { allowedOrigins, normalizeOrigin } from '@/lib/site-url';
 
 export interface AuthContext {
   user: {
@@ -38,21 +39,27 @@ export function validateCSRFToken(request: NextRequest): boolean {
     return true; // No CSRF validation needed for read operations
   }
 
-  const csrfHeader = request.headers.get('X-CSRF-Token');
-  
   // For now, implement a simple header-based CSRF protection
   // In production, you should implement proper CSRF tokens
-  const expectedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const origin = request.headers.get('origin');
+  //
+  // Both sides are reduced to a bare origin before comparing. The configured
+  // site URL is typed by hand and often carries a trailing slash, while a
+  // browser `Origin` header never does — comparing the raw strings rejected
+  // every mutating request whenever the two disagreed. Comparing origins also
+  // closes the hole in the old `referer.startsWith(...)` check, which accepted
+  // hosts like `readysetllc.com.evil.test`.
+  const expectedOrigins = allowedOrigins();
+  const origin = normalizeOrigin(request.headers.get('origin'));
   const referer = request.headers.get('referer');
 
   // Validate origin or referer matches expected domain
-  if (origin && origin !== expectedOrigin) {
-    return false;
+  if (origin) {
+    return expectedOrigins.includes(origin);
   }
-  
-  if (!origin && referer && !referer.startsWith(expectedOrigin)) {
-    return false;
+
+  if (referer) {
+    const refererOrigin = normalizeOrigin(referer);
+    return refererOrigin !== null && expectedOrigins.includes(refererOrigin);
   }
 
   return true;
