@@ -777,6 +777,63 @@ describe('Security Edge Cases', () => {
 
       expect(isValid).toBe(false);
     });
+
+    describe('origin normalisation', () => {
+      // Browsers never send a trailing slash or a path in `Origin`, but the
+      // configured site URL is typed by hand and routinely carries one. A
+      // literal string comparison rejects every mutating request in that case.
+      it('accepts the browser origin when the configured site URL has a trailing slash', () => {
+        process.env.NEXT_PUBLIC_SITE_URL = 'https://readysetllc.com/';
+
+        const request = new NextRequest(new URL('https://readysetllc.com/api/test'), {
+          method: 'POST',
+          headers: { origin: 'https://readysetllc.com' },
+        });
+
+        expect(validateCSRFToken(request)).toBe(true);
+
+        process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+      });
+
+      it('treats the apex and www hosts as the same site', () => {
+        process.env.NEXT_PUBLIC_SITE_URL = 'https://readysetllc.com';
+
+        const request = new NextRequest(new URL('https://readysetllc.com/api/test'), {
+          method: 'POST',
+          headers: { origin: 'https://www.readysetllc.com' },
+        });
+
+        expect(validateCSRFToken(request)).toBe(true);
+
+        process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+      });
+
+      it('still rejects a foreign origin that merely starts with the site URL', () => {
+        process.env.NEXT_PUBLIC_SITE_URL = 'https://readysetllc.com';
+
+        const request = new NextRequest(new URL('https://readysetllc.com/api/test'), {
+          method: 'POST',
+          headers: { origin: 'https://readysetllc.com.evil.test' },
+        });
+
+        expect(validateCSRFToken(request)).toBe(false);
+
+        process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+      });
+
+      it('rejects a referer whose origin only prefix-matches the site URL', () => {
+        process.env.NEXT_PUBLIC_SITE_URL = 'https://readysetllc.com';
+
+        const request = new NextRequest(new URL('https://readysetllc.com/api/test'), {
+          method: 'POST',
+          headers: { referer: 'https://readysetllc.com.evil.test/some-page' },
+        });
+
+        expect(validateCSRFToken(request)).toBe(false);
+
+        process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+      });
+    });
   });
 
   describe('Privilege Escalation Prevention', () => {

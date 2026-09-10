@@ -53,6 +53,13 @@ export async function POST(req: Request) {
     });
 
         
+    // The submission itself is already safe in the database, so a failed
+    // notification must not turn into an error for the visitor. It does have to
+    // be visible to us though: for a long time this path swallowed the failure
+    // entirely, so a quote form that sent no email still reported success and
+    // nobody found out until the lead was missed.
+    let emailDelivered = true;
+
     try {
             await EmailService.sendFormSubmissionNotification({
         formType,
@@ -60,13 +67,17 @@ export async function POST(req: Request) {
         submissionId: submission.id
       });
     } catch (emailError) {
-      console.error('Email sending failed (non-critical):', emailError);
-      // Continue even if email fails
+      emailDelivered = false;
+      console.error(
+        `[form-submissions] NOTIFICATION EMAIL FAILED for submission ${submission.id} (formType=${formType}) - the submission was saved but nobody was notified:`,
+        emailError,
+      );
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      data: submission 
+    return NextResponse.json({
+      success: true,
+      data: submission,
+      emailDelivered
     });
 
   } catch (error) {

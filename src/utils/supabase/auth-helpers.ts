@@ -1,28 +1,25 @@
 // utils/supabase/auth-helpers.ts
 
+import { siteUrl } from '@/lib/site-url';
+
 /**
  * Gets the appropriate redirect URL based on the current environment
  * Works in both client and server contexts
+ *
+ * The app no longer runs on Vercel, so the former `VERCEL_URL` branch has been
+ * removed — it could only ever resolve to a host that is now dead.
  */
 export function getRedirectUrl(): string {
   // Make sure we always include the /auth/callback path
   const callbackPath = '/auth/callback';
-  
-  // For client-side
+
+  // For client-side, the live origin is always the most accurate answer
   if (typeof window !== 'undefined') {
     return `${window.location.origin}${callbackPath}`;
   }
-  
-  // For server-side
-  // First check for Vercel-specific environment variables
-  if (process.env.VERCEL_URL) {
-    // Vercel provides this for all deployments including previews
-    return `https://${process.env.VERCEL_URL}${callbackPath}`;
-  }
-  
-  // Fall back to the configured site URL or localhost
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  return `${baseUrl}${callbackPath}`;
+
+  // For server-side, fall back to the configured site origin
+  return siteUrl(callbackPath);
 }
 
 /**

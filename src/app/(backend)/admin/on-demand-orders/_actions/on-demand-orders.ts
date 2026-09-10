@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/utils/supabase/server';
 import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
+import { siteOrigin } from '@/lib/site-url';
 import { runAfterResponse } from '@/lib/api/after-response';
 import {
   ClientListItem,
@@ -324,7 +325,7 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
     if (tempEntityId && user) {
       try {
         // Call the API to update file associations
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ready-set.vercel.app';
+        const baseUrl = siteOrigin();
         const updateUrl = `${baseUrl}/api/file-uploads/update-entity`;
 
         const updateData = {

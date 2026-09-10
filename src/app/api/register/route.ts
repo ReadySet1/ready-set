@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
 import { randomUUID } from 'crypto';
 import { sendUserWelcomeEmail } from "@/services/email-notification";
+import { siteUrl } from "@/lib/site-url";
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -165,7 +166,7 @@ export async function POST(request: Request) {
         email: email.toLowerCase(),
         password: password,
         options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          emailRedirectTo: siteUrl('/auth/callback'),
           data: {
             userType: userTypeMap[userType] || 'VENDOR',
             name: userType === "driver" || userType === "helpdesk"
