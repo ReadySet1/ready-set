@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0](https://github.com/ReadySet1/ready-set/compare/v2.6.0...v2.7.0) (2026-09-11)
+
+
+### Added
+
+* add Dallas, Fulton, Travis service areas to county dropdown ([26d644d](https://github.com/ReadySet1/ready-set/commit/26d644d88b9e6e1e40288f261e9813a6d707b77b))
+* **orders:** admin email notification on every order created ([a734584](https://github.com/ReadySet1/ready-set/commit/a7345845a18284636ef1575c3892024cc6aa5704))
+
+
+### Fixed
+
+* **driver:** auto-resume web GPS tracking on any page while a shift is active ([9fb2049](https://github.com/ReadySet1/ready-set/commit/9fb204962a9f622045079ab3384e80e98084a310))
+* **driver:** require an active shift before advancing a delivery ([55220ee](https://github.com/ReadySet1/ready-set/commit/55220eead99162e965d6a650d40981acc7a0ef0f))
+* **driver:** treat a paused shift consistently in the delivery shift gate ([1450fb1](https://github.com/ReadySet1/ready-set/commit/1450fb1298c07298c83e9a867716a8534eff829c))
+* **forms:** centralise site origin and surface silent email failures ([c98eba2](https://github.com/ReadySet1/ready-set/commit/c98eba21b3a1296aabb06cccb124a6813e26252f))
+* **tracking:** make shift start idempotent and enforce one active shift per driver ([752318d](https://github.com/ReadySet1/ready-set/commit/752318d6d3410f92f9598098bbfe8da4912fa429))
+
+
+### Security
+
+* **api:** remove unauthenticated /api/download path traversal route ([8bd1ad6](https://github.com/ReadySet1/ready-set/commit/8bd1ad60c2242e731f5f23990581022648b8a858))
+* **api:** require auth on dispatch, pricing, upload and admin routes ([8ded4e0](https://github.com/ReadySet1/ready-set/commit/8ded4e042c2722cfeed882f9f75a22ae7814bc12))
+* **deps:** patch two critical Next.js advisories ([0f76cac](https://github.com/ReadySet1/ready-set/commit/0f76cac6d8e6dc9311e6493f9f95163f6f3d0b42))
+
+
+### Documentation
+
+* **deployment:** backup and restore runbook ([688241a](https://github.com/ReadySet1/ready-set/commit/688241a8ccbb5c2abc513b39a1d5d73ca0604fce))
+
 ## [2.6.0](https://github.com/ReadySet1/ready-set/compare/v2.5.0...v2.6.0) (2026-08-31)
 
 
