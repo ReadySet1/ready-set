@@ -15,6 +15,7 @@ import {
 } from './schemas';
 import { createClient } from '@/utils/supabase/server';
 import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
+import { siteOrigin } from '@/lib/site-url';
 import { runAfterResponse } from '@/lib/api/after-response';
 
 // Define UserType enum locally to match schema
@@ -165,7 +166,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
       try {
                 
         // Call the API to update file associations
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ready-set.vercel.app';
+        const baseUrl = siteOrigin();
         const updateUrl = `${baseUrl}/api/file-uploads/update-entity`;
                 
         const updateData = {
