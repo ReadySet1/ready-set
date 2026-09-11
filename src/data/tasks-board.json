@@ -65,7 +65,9 @@
     "aug20": "Aug 20 session",
     "aug20walk": "Drive Test 8/20",
     "aug21": "Drive Test 8/21",
-    "aug31": "Aug 31"
+    "aug31": "Aug 31",
+    "pilot": "Pilot readiness 9/6",
+    "sep7": "Sep 7"
   },
   "tasks": [
     {
@@ -595,11 +597,11 @@
     },
     {
       "id": "android-test-coverage",
-      "status": "open",
+      "status": "done",
       "title": "Android test coverage for the native wrapper",
       "owner": "emmanuel",
       "source": "aug17",
-      "description": "The Android APK with the zero-redirect entry fix (prerelease <code>native-walk-test-apk-2026-08-13</code>) is <strong>device-unverified</strong> — nobody on the team currently has an Android device (Fernando is on an iPhone X).<br><br><strong>Plan, cheapest first:</strong> (1) emulator smoke test of the <code>/native-launch</code> entry + sign-in flow with mocked GPS — verifies the entry fix, <em>not</em> the background walk; (2) ask Aziel to sideload the APK on the Redmi (installs from the file, no adb needed) to verify the entry fix on real hardware; (3) ask <strong>Mark</strong> whether he has an Android phone to borrow for the locked-screen background-GPS walk; (4) if Robert's hire is un-gated (<code>hire-robert-qa</code>), fold the Android walk into his onboarding; (5) consider buying a ~$100 test device (Moto G / Redmi) as permanent team hardware.<br><br><strong>Pass bar for the walk</strong> (same as iOS, per <code>persistent-gps-background</code>): no trail gap &gt;~30s over a 15–20 min locked-screen/Waze-in-front walk; if Android drops points, evaluate the paid transistorsoft plugin (OEM battery killers)."
+      "description": "The Android APK with the zero-redirect entry fix (prerelease <code>native-walk-test-apk-2026-08-13</code>) is <strong>device-unverified</strong> — nobody on the team currently has an Android device (Fernando is on an iPhone X).<br><br><strong>Plan, cheapest first:</strong> (1) emulator smoke test of the <code>/native-launch</code> entry + sign-in flow with mocked GPS — verifies the entry fix, <em>not</em> the background walk; (2) ask Aziel to sideload the APK on the Redmi (installs from the file, no adb needed) to verify the entry fix on real hardware; (3) ask <strong>Mark</strong> whether he has an Android phone to borrow for the locked-screen background-GPS walk; (4) if Robert's hire is un-gated (<code>hire-robert-qa</code>), fold the Android walk into his onboarding; (5) consider buying a ~$100 test device (Moto G / Redmi) as permanent team hardware.<br><br><strong>Pass bar for the walk</strong> (same as iOS, per <code>persistent-gps-background</code>): no trail gap &gt;~30s over a 15–20 min locked-screen/Waze-in-front walk; if Android drops points, evaluate the paid transistorsoft plugin (OEM battery killers).<br><br><strong>2026-09-02:</strong> UNBLOCKED — <em>Aziel</em> will run the test round on a <strong>real Android device</strong> (not an emulator) — which is what makes it count: background GPS, doze/battery-optimisation behaviour, foreground-service survival and lock-screen tracking cannot be validated on an emulator. Fresh APK published as prerelease <code>native-walk-test-apk-2026-09-02</code> with the entry verified <strong>inside the artifact</strong> as <code>/native-launch</code>, plus all 8 permissions confirmed merged via <code>aapt2 dump permissions</code>.<br>⚠️ Found while building: the previous prerelease <code>ready-set-driver-signin-fix.apk</code> (08-13) never contained the fix its name claims — <code>npx cap sync</code> had been run for iOS but never for Android, so the generated <code>android/app/src/main/assets/capacitor.config.json</code> still held <code>/sign-in?returnTo=%2Fdriver</code>. The old release is now marked superseded. Verify the config <em>inside</em> the .apk, never the source.<br><br><strong>Dedicated driver account provisioned 2026-09-02:</strong> <code>aziel.driver@readysetllc.com</code> (driver <code>a47ccb02-92fd-410f-809b-58d9acfdbfeb</code>) on rs-dev, via <code>pnpm driver:account</code>. Credentials in <code>secure/rs-dev-test-accounts.txt</code> — never in this board, the mirror is public. Per-tester logins are the point: a shared driver login is how one person's abandoned run becomes another person's blocked shift (the 2026-08-06 field run, and Fernando's 08-21 End-Shift deadlock). Verified DRIVER/ACTIVE, <code>is_active = true</code>, both <code>profile_id</code> and <code>user_id</code> linked, no open shift.<br><br><strong>2026-09-02 — round COMPLETED, coverage achieved.</strong> Aziel ran the full flow on a real device: sign-in → start shift → en route → arrived at vendor → pickup (signature) → walk → dropoff. 230 GPS points over 83 min. Android is no longer device-unverified. The run <em>failed</em> the background-GPS bar — evidence recorded on <code>persistent-gps-background</code> and <code>native-walk-locked-screen</code>. Drive closed manually 2026-09-03 (app could not complete it; end time set to the last GPS fix so the shift records its true 83.4 min)."
     },
     {
       "id": "web-mobile-round1-findings-triage",
@@ -687,7 +689,7 @@
         "critical",
         "bug"
       ],
-      "description": "GPS is lost when the app is closed, the phone is locked, or the driver switches to another app (e.g. opens Waze/Maps).<br><br><strong>Web slice — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/460\">#460</a> MERGED to <code>development</code> 2026-06-24:</strong> hardened the <em>foreground</em> trail — re-arm <code>watchPosition</code> + immediate fix on return to foreground (the old visibility handler was dead code), a screen <strong>wake lock</strong> during a shift, and flushing the offline queue before shift-end so mileage reflects the full trail. <strong>Needs a real-device <code>WALK-TEST-SF</code> re-walk to verify.</strong><br><br><strong>True background still requires the native wrapper</strong> (Capacitor + background-geolocation reusing <code>/driver</code>, posting to the existing <code>/api/tracking/locations</code> — no backend change), full eval/runbook in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>.<br><br><strong>Native POC scaffolding drafted — DRAFT PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (2026-06-24):</strong> <code>repos/ready-set/native/driver-app/</code> (Capacitor config + shell + the WebView-side <code>capacitor-tracking.ts</code> bridge + runbook), ready to build. <strong>Still GATED</strong> on a go/no-go + Apple Developer account + Android keystore + real iPhone/Android devices before the POC can actually be built + walk-tested.<br><br><strong>Update 2026-06-24:</strong> POC built out — Android <code>app-debug.apk</code> + the iOS shell both build, and iOS is confirmed loading <code>/driver</code> on the Simulator; the web-side GPS bridge is MERGED to <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> — no-op in a browser, active only inside the native shell). Remaining gate is just the free-Apple-ID signing + a real iPhone/Android to run the on-device background walk.<br><br><strong>Update 2026-06-24 (later):</strong> brought the iOS shell up on Emmanuel's real iPhone (Developer Mode + free-Apple-ID signing done) but hit a <strong>Capacitor 6 vs iOS 26.5 WebView wall</strong> (WKWebView black-screens + bounces to Safari; <code>Frame load interrupted</code> + WebContent sandbox errors; Safari/Simulator load the same URL fine). <strong>Upgraded the shell to Capacitor 8</strong> (now SPM); <strong>pending the on-device re-test</strong>, then the WALK-TEST-SF background walk. Resume: memory <code>native-driver-app-poc-resume</code>.<br><br><strong>Update 2026-07-21 — Phase-1 (prove-it) prep done; the ONLY remaining gate is the locked-screen walk on each platform.</strong> All web-side code is merged (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> bridge, <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> arm-recovery, <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a> walk fixes); the diagnostic <code>server.url</code> override (<code>/sign-in?returnTo=</code> + <code>allowNavigation:['*']</code>) is <strong>reverted</strong> (safe now — #485's sign-in self-heal redirects authed users), both native projects re-synced, and a <strong>fresh Android APK is built with the clean <code>/driver</code> URL baked</strong> (re-sideload before the next walk). iOS needs the 7-day re-sign with the phone attached: <code>cap sync ios</code> → <code>xcodebuild -allowProvisioningUpdates</code> → <code>devicectl device install app</code>. <strong>Pass bar:</strong> no trail gap &gt;~30s during a 15–20 min locked-screen/Waze-in-front walk, both platforms; if Android still drops points, evaluate the paid transistorsoft plugin (OEM battery killers). Once both pass → un-draft + merge #461 and move to productionization (<code>native-wrapper-productionization</code>).<br><br><strong>HANDED OFF to Fernando 2026-07-23</strong> (Emmanuel unavailable for device testing): Phase-1 locked-screen walk runbook is self-contained in a <a href=\"https://github.com/ReadySet1/ready-set/pull/461#issuecomment-5060228104\">PR #461 comment</a> (test creds included; repo now private) + prebuilt APK on the <code>native-walk-test-apk-2026-07-21</code> release; <code>ios/</code>+<code>android/</code> projects committed to the branch. Waiting on Fernando: platform coverage (iOS needs a Mac+Xcode), city/route, walk date → then re-stage via <code>test_stage_walk()</code>. Email draft: <code>docs/ready-set/emails/2026-07-23-fernando-walk-test-handoff-draft.md</code>.<br><br><strong>Update 2026-08-05 — NATIVE TRACK PARKED; the bug stays OPEN.</strong> Draft PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (the Capacitor shell scaffolding) was <strong>closed unmerged</strong> to keep the PR queue clean — the branch <code>chore/native-driver-app-poc</code> is <strong>deliberately preserved, not deleted</strong>. Parking is a <em>resourcing decision, not a technical verdict</em>: the Phase-1 locked-screen walk never ran because the available test device (Fernando's iPhone X) cannot run the native build and there is still no Apple Developer account. The native approach is <strong>unproven in both directions</strong> — not rejected.<br><br><strong>Nothing was lost by closing it:</strong> the web-side GPS bridge stays merged on <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a>), the eval spec lives in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>, the prebuilt APK remains on the <code>native-walk-test-apk-2026-07-21</code> release, and the walk runbook is preserved in the closed PR comment. About 95% of the shell regenerates via <code>npx cap add ios/android</code>; the only hand-written pieces are <code>capacitor.config.ts</code>, the iOS <code>Info.plist</code> usage strings, and the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.<br><br><strong>Still broken in production:</strong> drivers keep losing GPS when the phone locks or they switch to Waze/Maps — only the <em>foreground</em> trail is hardened. <strong>To resume:</strong> branch from <code>chore/native-driver-app-poc</code>, rebase onto <code>development</code>, then <code>cap sync</code>. Gated on <code>buy-app-store-licenses</code> (Apple $99/yr) plus a test device capable of running the build.<br><br><strong>Update 2026-08-17 — TRACK UN-PARKED.</strong> The wrapper is active again on Emmanuel's iPhone 16 Pro Max: the sign-in bounce class was killed for good with the <code>/native-launch</code> zero-redirect entry (web PR <a href=\"https://github.com/ReadySet1/ready-set/pull/514\">#514</a> + wrapper commit <code>a1893d43</code>, <strong>verified on-device 2026-08-13</strong> in the exact cookie-carrying state that broke every previous entry), and the Aug 11–14 CDMX drives ran the full driver flow inside the wrapper. A matching Android APK is published as prerelease <code>native-walk-test-apk-2026-08-13</code> (device-unverified).<br><br><strong>The ONLY remaining Phase-1 gate is still the locked-screen background-GPS walk</strong> — and the free-Apple-ID signing on the iPhone expires ~08-20, so either walk before then or re-sign (or finally buy the Apple Developer account per <code>buy-app-store-licenses</code>)."
+      "description": "GPS is lost when the app is closed, the phone is locked, or the driver switches to another app (e.g. opens Waze/Maps).<br><br><strong>Web slice — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/460\">#460</a> MERGED to <code>development</code> 2026-06-24:</strong> hardened the <em>foreground</em> trail — re-arm <code>watchPosition</code> + immediate fix on return to foreground (the old visibility handler was dead code), a screen <strong>wake lock</strong> during a shift, and flushing the offline queue before shift-end so mileage reflects the full trail. <strong>Needs a real-device <code>WALK-TEST-SF</code> re-walk to verify.</strong><br><br><strong>True background still requires the native wrapper</strong> (Capacitor + background-geolocation reusing <code>/driver</code>, posting to the existing <code>/api/tracking/locations</code> — no backend change), full eval/runbook in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>.<br><br><strong>Native POC scaffolding drafted — DRAFT PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (2026-06-24):</strong> <code>repos/ready-set/native/driver-app/</code> (Capacitor config + shell + the WebView-side <code>capacitor-tracking.ts</code> bridge + runbook), ready to build. <strong>Still GATED</strong> on a go/no-go + Apple Developer account + Android keystore + real iPhone/Android devices before the POC can actually be built + walk-tested.<br><br><strong>Update 2026-06-24:</strong> POC built out — Android <code>app-debug.apk</code> + the iOS shell both build, and iOS is confirmed loading <code>/driver</code> on the Simulator; the web-side GPS bridge is MERGED to <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> — no-op in a browser, active only inside the native shell). Remaining gate is just the free-Apple-ID signing + a real iPhone/Android to run the on-device background walk.<br><br><strong>Update 2026-06-24 (later):</strong> brought the iOS shell up on Emmanuel's real iPhone (Developer Mode + free-Apple-ID signing done) but hit a <strong>Capacitor 6 vs iOS 26.5 WebView wall</strong> (WKWebView black-screens + bounces to Safari; <code>Frame load interrupted</code> + WebContent sandbox errors; Safari/Simulator load the same URL fine). <strong>Upgraded the shell to Capacitor 8</strong> (now SPM); <strong>pending the on-device re-test</strong>, then the WALK-TEST-SF background walk. Resume: memory <code>native-driver-app-poc-resume</code>.<br><br><strong>Update 2026-07-21 — Phase-1 (prove-it) prep done; the ONLY remaining gate is the locked-screen walk on each platform.</strong> All web-side code is merged (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> bridge, <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> arm-recovery, <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a> walk fixes); the diagnostic <code>server.url</code> override (<code>/sign-in?returnTo=</code> + <code>allowNavigation:['*']</code>) is <strong>reverted</strong> (safe now — #485's sign-in self-heal redirects authed users), both native projects re-synced, and a <strong>fresh Android APK is built with the clean <code>/driver</code> URL baked</strong> (re-sideload before the next walk). iOS needs the 7-day re-sign with the phone attached: <code>cap sync ios</code> → <code>xcodebuild -allowProvisioningUpdates</code> → <code>devicectl device install app</code>. <strong>Pass bar:</strong> no trail gap &gt;~30s during a 15–20 min locked-screen/Waze-in-front walk, both platforms; if Android still drops points, evaluate the paid transistorsoft plugin (OEM battery killers). Once both pass → un-draft + merge #461 and move to productionization (<code>native-wrapper-productionization</code>).<br><br><strong>HANDED OFF to Fernando 2026-07-23</strong> (Emmanuel unavailable for device testing): Phase-1 locked-screen walk runbook is self-contained in a <a href=\"https://github.com/ReadySet1/ready-set/pull/461#issuecomment-5060228104\">PR #461 comment</a> (test creds included; repo now private) + prebuilt APK on the <code>native-walk-test-apk-2026-07-21</code> release; <code>ios/</code>+<code>android/</code> projects committed to the branch. Waiting on Fernando: platform coverage (iOS needs a Mac+Xcode), city/route, walk date → then re-stage via <code>test_stage_walk()</code>. Email draft: <code>docs/ready-set/emails/2026-07-23-fernando-walk-test-handoff-draft.md</code>.<br><br><strong>Update 2026-08-05 — NATIVE TRACK PARKED; the bug stays OPEN.</strong> Draft PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (the Capacitor shell scaffolding) was <strong>closed unmerged</strong> to keep the PR queue clean — the branch <code>chore/native-driver-app-poc</code> is <strong>deliberately preserved, not deleted</strong>. Parking is a <em>resourcing decision, not a technical verdict</em>: the Phase-1 locked-screen walk never ran because the available test device (Fernando's iPhone X) cannot run the native build and there is still no Apple Developer account. The native approach is <strong>unproven in both directions</strong> — not rejected.<br><br><strong>Nothing was lost by closing it:</strong> the web-side GPS bridge stays merged on <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a>), the eval spec lives in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>, the prebuilt APK remains on the <code>native-walk-test-apk-2026-07-21</code> release, and the walk runbook is preserved in the closed PR comment. About 95% of the shell regenerates via <code>npx cap add ios/android</code>; the only hand-written pieces are <code>capacitor.config.ts</code>, the iOS <code>Info.plist</code> usage strings, and the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.<br><br><strong>Still broken in production:</strong> drivers keep losing GPS when the phone locks or they switch to Waze/Maps — only the <em>foreground</em> trail is hardened. <strong>To resume:</strong> branch from <code>chore/native-driver-app-poc</code>, rebase onto <code>development</code>, then <code>cap sync</code>. Gated on <code>buy-app-store-licenses</code> (Apple $99/yr) plus a test device capable of running the build.<br><br><strong>Update 2026-08-17 — TRACK UN-PARKED.</strong> The wrapper is active again on Emmanuel's iPhone 16 Pro Max: the sign-in bounce class was killed for good with the <code>/native-launch</code> zero-redirect entry (web PR <a href=\"https://github.com/ReadySet1/ready-set/pull/514\">#514</a> + wrapper commit <code>a1893d43</code>, <strong>verified on-device 2026-08-13</strong> in the exact cookie-carrying state that broke every previous entry), and the Aug 11–14 CDMX drives ran the full driver flow inside the wrapper. A matching Android APK is published as prerelease <code>native-walk-test-apk-2026-08-13</code> (device-unverified).<br><br><strong>The ONLY remaining Phase-1 gate is still the locked-screen background-GPS walk</strong> — and the free-Apple-ID signing on the iPhone expires ~08-20, so either walk before then or re-sign (or finally buy the Apple Developer account per <code>buy-app-store-licenses</code>).<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact."
     },
     {
       "id": "native-app-go-no-go",
@@ -1099,20 +1101,20 @@
     },
     {
       "id": "add-tx-ga-counties-order-creation",
-      "status": "progress",
+      "status": "done",
       "title": "Add TX and GA counties to order creation",
       "owner": "fernando",
       "source": "aug10",
-      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific.<br><br><strong>2026-09-01:</strong> PR #522 reviewed, changes requested: swap Houston for Austin/Travis and store county names (<code>Dallas</code>, <code>Travis</code>, <code>Fulton</code>) instead of city names.",
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific.<br><br><strong>2026-09-01:</strong> PR #522 reviewed, changes requested: swap Houston for Austin/Travis and store county names (<code>Dallas</code>, <code>Travis</code>, <code>Fulton</code>) instead of city names. <strong>#522 merged 09-07.</strong>",
       "sourceRef": "#522"
     },
     {
       "id": "order-created-inbox-notification",
-      "status": "new",
+      "status": "done",
       "title": "Email the Ready Set inbox on every order created",
       "owner": "fernando",
       "source": "aug10",
-      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Every order created on the website should trigger an email notification to the Ready Set inbox account, so the team sees new orders without polling the admin dashboard.<br><br>Order creation runs through <code>src/app/api/orders/route.ts</code>; email plumbing already exists in <code>src/lib/email-service.ts</code> and <code>src/services/email-notification.ts</code>. Confirm first whether a notification is already wired and failing silently rather than genuinely absent — that changes this from a feature to a bug. Make delivery failures non-fatal so a bounced notification can never roll back a successful order."
+      "description": "<strong>Reported by the Ready Set team.</strong><br><br>Every order created on the website should trigger an email notification to the Ready Set inbox account, so the team sees new orders without polling the admin dashboard.<br><br>Order creation runs through <code>src/app/api/orders/route.ts</code>; email plumbing already exists in <code>src/lib/email-service.ts</code> and <code>src/services/email-notification.ts</code>. Confirm first whether a notification is already wired and failing silently rather than genuinely absent — that changes this from a feature to a bug. Make delivery failures non-fatal so a bounced notification can never roll back a successful order. <strong>Shipped as #534 (Fernando), merged 09-07.</strong>"
     },
     {
       "id": "pricing-section-how-pricing-works",
@@ -1363,16 +1365,16 @@
     },
     {
       "id": "merge-pr532-v260",
-      "status": "open",
-      "title": "Merge #532 dev→main from the ReadySet1 account (unblocks v2.6.0)",
+      "status": "done",
+      "title": "Promote v2.6.0 to main + close the dev→main cycle",
       "owner": "emmanuel",
       "source": "aug31",
       "sourceRef": "#532",
-      "description": "Promotion PR staged since 08-22, CI fully green, prod migration <code>delivery_return_requests</code> already applied+verified. Merge-commit (never squash) from the ReadySet1 login (main-protect ruleset), then merge the release-please PR so the apex flips to 2.6.0."
+      "description": "Promotion PR staged since 08-22, CI fully green, prod migration <code>delivery_return_requests</code> already applied+verified. Merge-commit (never squash) from the ReadySet1 login (main-protect ruleset), then merge the release-please PR so the apex flips to 2.6.0.<br><br><strong>2026-09-02 DONE:</strong> #532 merged 08-31 (<code>7f96c286</code>); release PR #538 merged (<code>6c2de40e</code>), v2.6.0 tagged + released. Prod apex verified <code>healthy</code> on <code>version: 2.6.0</code> (DB 533 ms) at 19:29Z. Cycle closed by #541 (<code>64db8555</code>): main-only divergence now 0. Note: the &quot;merge from the ReadySet1 account&quot; step was never real — <code>gh pr merge N --merge --admin</code> works from the normal CLI account."
     },
     {
       "id": "pr534-blockers-rereview",
-      "status": "open",
+      "status": "done",
       "title": "#534 admin order email — Fernando fixes 3 blockers, then re-review",
       "owner": "fernando",
       "source": "aug31",
@@ -1380,7 +1382,7 @@
       "tags": [
         "bug"
       ],
-      "description": "Changes Requested 08-25: NODE_ENV guard dead in Docker (rs-dev would email info@/austin@), invalid recipient list bypasses <code>ORDER_NOTIFICATIONS_ENABLED</code>, HTML injection from customer notes. Emmanuel re-reviews on his fix push."
+      "description": "Changes Requested 08-25: NODE_ENV guard dead in Docker (rs-dev would email info@/austin@), invalid recipient list bypasses <code>ORDER_NOTIFICATIONS_ENABLED</code>, HTML injection from customer notes. Emmanuel re-reviews on his fix push. <strong>#534 merged 09-07</strong> after re-review; set <code>ORDER_NOTIFICATION_RECIPIENTS</code> on rs-dev or dev notifications stay silently off."
     },
     {
       "id": "review-pr-522",
@@ -1408,7 +1410,7 @@
       "tags": [
         "critical"
       ],
-      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again."
+      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again.<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Gate NOT cleared on Android.</strong> iOS locked-screen walk still owed separately (profile re-signed 2026-09-02, valid to 09-09)."
     },
     {
       "id": "api-health-unhealthy-check",
@@ -1448,14 +1450,14 @@
     },
     {
       "id": "vps-backups-uptime-monitoring",
-      "status": "open",
+      "status": "progress",
       "title": "Off-host backups + uptime monitoring for the ready-set VPS",
       "owner": "emmanuel",
       "source": "aug31",
       "tags": [
         "critical"
       ],
-      "description": "Single-box SPOF since the 08-18 cutover (P0.3, never done; box has a 2026-06-01 unpaid-bill null-route history). Restic → Hetzner Storage Box for backups + external uptime monitoring."
+      "description": "Single-box SPOF since the 08-18 cutover (P0.3, never done; box has a 2026-06-01 unpaid-bill null-route history). Restic → Hetzner Storage Box for backups + external uptime monitoring.<br><br>Split 09-06 into <code>pilot-db-backup-workflow</code> and <code>pilot-uptime-paging</code>."
     },
     {
       "id": "destino-backup-secrets",
@@ -1503,6 +1505,213 @@
       ],
       "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load.<br><br><strong>2026-09-01:</strong> Root cause: greeting computed from the server clock (UTC) during SSR; the device (PDT) rendered a different time-of-day bucket. Fixed in PR #539 with a hydration regression test. Merged to development 2026-09-01 (d8390493).",
       "sourceRef": "#539"
+    },
+    {
+      "id": "delivery-advance-without-shift",
+      "status": "done",
+      "title": "Driver can advance a delivery with no shift running — untracked and invisible to admin",
+      "owner": "emmanuel",
+      "source": "qa",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Found 2026-09-02 on Aziel's first Android run. He signed in at 17:07 and the order <code>RSQA-20260902-2310</code> advanced to <code>IN_PROGRESS</code> / <code>EN_ROUTE_TO_VENDOR</code> at 17:27 — but <strong>no <code>driver_shifts</code> row was ever created</strong>, <code>drivers.is_on_duty</code> stayed false, <code>current_shift_id</code> null, and <code>driver_locations</code> took <strong>zero</strong> rows. No error in GlitchTip (nothing newer than 08-27), so nothing failed — auth and writes were working the whole time.<br><br><strong>Cause:</strong> the shift gate lives only in the tracking portal — <code>DriverTrackingPortal.tsx</code> renders the map and shift controls behind <code>isShiftActive</code>, and tracking only starts via <code>handleStartShift</code> → <code>startShift()</code> → <code>startTracking()</code>. The delivery detail page <code>src/app/(site)/(users)/driver/deliveries/[order_number]/page.tsx</code> references no shift state at all, so a driver can open a delivery and move it through its statuses while completely untracked.<br><br><strong>Impact:</strong> a delivery reads as EN_ROUTE to dispatch while the driver is invisible on <code>/admin/tracking</code> and no GPS trail is recorded — indistinguishable from the silent-403 class of failure, and it wastes a field tester's trip. <strong>Fix direction:</strong> either gate delivery-status advancement on an active shift, or auto-start a shift on first advance; at minimum surface a blocking prompt (\"Start your shift before continuing\").<br><br><strong>Pilot D1 (in progress 09-06):</strong> client gate in <code>handleNextAction</code> + server 422 in <code>PATCH /api/orders/[n]</code> when a DRIVER enters a movement state with no active shift. Plan: <code>docs/ready-set/reports/2026-09-06-real-driver-pilot-readiness.md</code>. <strong>Merged 09-07 as #546</strong> (server 422 SHIFT_REQUIRED + client toast; open shift = active|paused)."
+    },
+    {
+      "id": "reset-script-leaves-future-seed",
+      "status": "new",
+      "title": "test:drive:reset leaves a superseded future-dated seed assigned — re-seeding the same day can deadlock End Shift",
+      "owner": "emmanuel",
+      "source": "qa",
+      "tags": [
+        "bug"
+      ],
+      "description": "Found 2026-09-03 preparing Emmanuel's iOS run. Seeded a drive for 18:00, then re-seeded for 18:30 after correcting the time. <strong>Both orders ended up ASSIGNED to the same driver</strong> with live dispatch rows.<br><br><code>scripts/reset-driver-test-drive.ts</code> only clears orders its <code>blockingOrders</code> predicate matches: in-flight, or <code>ASSIGNED</code> with <code>pickupDateTime &lt;= now</code>. Its comment states <em>\"Future-dated assignments are harmless.\"</em> That holds when you seed shortly before a run, but <strong>not when you re-seed earlier the same day</strong> — the superseded order was 6 hours out at re-seed time, so it was skipped, and it would have come due at 17:59 while the tester was mid-walk. At End Shift both orders would be due and both would block.<br><br>This is the exact failure class of the 2026-08-06 field run and Fernando's 08-21 deadlock, arriving by a new route.<br><br><strong>Fix direction:</strong> when seeding, also retire any existing <em>disposable</em> (<code>RSQA-</code>) order still dispatched to that driver regardless of pickup time — <code>isDisposableTestOrder</code> already identifies them; the predicate just never consults it for future-dated rows. Cleared manually this time by deleting the dispatch row and soft-deleting the order."
+    },
+    {
+      "id": "wrapper-logout-safari-bounce",
+      "status": "new",
+      "title": "iOS wrapper: log out bounces to Safari and the user cannot actually log out",
+      "owner": "emmanuel",
+      "source": "qa",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Reported 2026-09-03 (Emmanuel, iOS wrapper). Tapping log out opens <strong>Safari</strong> instead of staying in the app, and the log out never completes — the user stays signed in.<br><br><strong>Cause:</strong> <code>src/app/(site)/(users)/driver/page.tsx:99</code> ends the handler with <code>window.location.href = \"/sign-in\"</code>. This is the same trap <code>/native-launch</code> was created to avoid: <code>capacitor.config.ts</code> documents that <code>/sign-in</code> issues a redirect when a session is still present, and <strong>any 307 on a WKWebView navigation fails the provisional load and bounces the user out to Safari</strong>. The \"cannot log out\" half is consistent with the known WebView cookie/session divergence (<code>native-shell-session-divergence</code>): <code>supabase.auth.signOut()</code> clears the client session while the server-side cookie survives, so <code>/sign-in</code> still redirects as authenticated.<br><br><strong>Fix direction:</strong> send log out to <code>/native-launch</code> (the only route that answers 200 in every auth state) rather than <code>/sign-in</code>, and make sign-out clear the server cookie — not just the client session — so the redirect decision agrees with the client. Sibling of <code>wrapper-post-login-safari-bounce</code>: same root cause on the way out instead of the way in."
+    },
+    {
+      "id": "pilot-db-backup-workflow",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "critical"
+      ],
+      "title": "O1 — Prod DB has NO backup: schedule scripts/backup-db.ts nightly + rehearse a restore",
+      "description": "Supabase org for <code>ready-set-web</code> is on the <strong>free plan</strong> (no platform backups/PITR) and nothing in the repo schedules <code>scripts/backup-db.ts</code>. Ship a GitHub Action (nightly, pooler URL, private destination, retention) + <code>docs/deployment/BACKUPS.md</code> with the restore procedure. Emmanuel: set the secrets, run one restore into rs-dev. <strong>#547 merged 09-07</strong> — workflow + runbook in; still needs the private bucket, 4 secrets, first manual run, restore rehearsal."
+    },
+    {
+      "id": "pilot-uptime-paging",
+      "status": "open",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "critical"
+      ],
+      "title": "O2 — Nobody is paged: uptime monitor on /api/health + GlitchTip SMTP via Resend",
+      "description": "No external uptime monitor on <code>https://readysetllc.com/api/health</code> (returns 503 when unhealthy) and GlitchTip mail is <code>consolemail://</code> so errors are never sent. Manual: free monitor (UptimeRobot/BetterStack) → Emmanuel phone; Resend SMTP in GlitchTip; test alert."
+    },
+    {
+      "id": "pilot-gps-auto-resume",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "title": "D2 — Web GPS only starts from /driver/tracking; a reload leaves an active shift with zero pings",
+      "description": "<code>startTracking()</code> is called only in <code>DriverTrackingPortal.tsx</code>; <code>DriverTrackingContext.tsx</code> auto-resumes the native watcher on <code>isShiftActive</code> but not the web one. Move the portal auto-resume effect into the provider so any page restarts web tracking while a shift is active. <strong>Merged 09-07 as #544 (f5b47609).</strong>"
+    },
+    {
+      "id": "pilot-active-shift-guard",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "bug"
+      ],
+      "title": "D3 — No server guard against a second active shift (client-only check)",
+      "description": "<code>startDriverShift</code> inserts unconditionally; only <code>useDriverShift</code> checks client-side. Two devices or a retried POST → orphan <code>active</code> shift, <code>is_on_duty</code> stuck, mileage never closed. Add a pre-insert check returning the existing shift (idempotent) + partial unique index <code>driver_shifts(driver_id) WHERE status='active'</code>. <strong>Merged 09-07 as #545 (8dc289f8). Migration <code>20260906000000_driver_shifts_single_active</code> still has to be applied on rs-dev and prod.</strong>"
+    },
+    {
+      "id": "pilot-download-path-traversal",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "title": "S1 — Path traversal on /api/download (no .. guard, middleware skips /api)",
+      "description": "<code>src/app/api/download/route.ts</code> joins user input under <code>public/resources</code> without resolving/containment check. Resolve + <code>startsWith</code> guard (or delete the route if unused). <strong>Merged 09-07 as #548</strong> — route deleted (no callers)."
+    },
+    {
+      "id": "pilot-api-auth-sweep",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [
+        "critical"
+      ],
+      "title": "S2 — Unauthenticated API routes expose driver PII / mutate orders & pricing",
+      "description": "No <code>withAuth</code>/ownership check on: <code>api/dispatch/[orderId]</code> GET (driver name/email/phone), <code>api/catering-requests/[orderId]/status</code> PATCH, <code>api/file-uploads/get</code>, <code>api/pricing/tiers</code> writes, <code>api/admin/upload-errors</code>, <code>admin/job-applications/stats</code>, <code>admin/carriers/[id]/stats</code>; server actions <code>sendDeliveryNotifications</code>, <code>sync-cater-valley-order-status</code>. Delete dead ones (<code>getUserFiles.ts</code>, <code>fix-catering-file</code>, mock scaffolds). Verify callers before gating. <strong>Merged 09-07 as #548.</strong> Owed: manual rs-dev check of admin status sync, driver dispatch load, apply-form upload. Follow-up: <code>fix-user-files</code> route is a similar one-off."
+    },
+    {
+      "id": "pilot-twilio-prod-creds",
+      "status": "open",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [],
+      "title": "S3 — TWILIO_* unset on prod: driver-cancel SMS silently skips",
+      "description": "#530 degrades to a logged skip without creds. Either set Twilio on <code>ready-set-prod</code> (Dokploy) or make it an ops rule that dispatch calls the driver on cancel during the pilot."
+    },
+    {
+      "id": "pilot-web-foreground-run",
+      "status": "new",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [],
+      "title": "Run the pilot: 2–3 real drivers, mobile web, foreground-only, 1 week, admin watching",
+      "description": "Web only (Chrome/Safari, no wrapper; Android Chrome preferred). Driver rules: start shift on Tracking before touching an order; screen on + app in front between stops; reopen Tracking after a reload; advance status only with signal; end shift from Tracking; if blocked → Return to dispatch or call admin. Admin watches stale markers &gt;5 min, double active shifts, stuck End Shift (force-end via <code>PUT /api/tracking/shifts/{id}</code> <code>metadata.force</code>). Starts after D1–D3, S1–S2, O1–O2 land and dev→main is promoted."
+    },
+    {
+      "id": "admin-actions-null-user",
+      "status": "new",
+      "owner": "emmanuel",
+      "source": "review",
+      "tags": [
+        "bug"
+      ],
+      "title": "createCateringOrder / createOnDemandOrder never reject a null user",
+      "description": "Found in the #534 re-review: both admin server actions call <code>supabase.auth.getUser()</code> but proceed on <code>null</code> (tests pass <code>user: null</code> and expect success). Middleware on <code>/admin/*</code> covers it today; add an explicit caller check."
+    },
+    {
+      "id": "npm-audit-main-red-again",
+      "status": "open",
+      "owner": "emmanuel",
+      "source": "pilot",
+      "tags": [],
+      "title": "NPM Security Audit fails on main again (16 highs &gt; cap 10 via googleapis &gt; qs)",
+      "description": "Not required by the ruleset, but the next dev→main promotion will show red. Override sweep like #540 before promoting."
+    },
+    {
+      "id": "delivery-finalize-multi-photo",
+      "status": "new",
+      "title": "Allow up to 3 photos when driver finalizes delivery",
+      "owner": "gary",
+      "source": "sep7",
+      "description": "Requested by Gary. The delivery-completion flow should accept a maximum of 3 photos (currently limited to one). Update the finalize-delivery UI and API to support multi-photo upload with a cap of three."
+    },
+    {
+      "id": "catering-order-address-not-editable",
+      "status": "new",
+      "title": "Address cannot be edited during new catering order creation",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug"
+      ],
+      "description": "The address field on the new catering order flow does not allow editing an existing address. Users must clear and re-enter the full address instead of correcting it in place."
+    },
+    {
+      "id": "post-qr-scan-role-modal",
+      "status": "new",
+      "title": "Post-QR-scan role modal (Driver / Client / Vendor)",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "After scanning the QR code, show a modal with three options: Driver routes to the driver application; Client and Vendor route to sign-up to create a new account."
+    },
+    {
+      "id": "pr-followup-fulton-counties-typing",
+      "status": "new",
+      "title": "PR follow-up — Fulton in CountiesSelection.tsx + counties strict typing",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types."
+    },
+    {
+      "id": "notify-order-created-findunique-bug",
+      "status": "new",
+      "title": "notifyOrderCreated uses findUnique instead of findFirst",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug"
+      ],
+      "description": "Switch to <code>findFirst</code> so the query can include <code>deletedAt: null</code> — <code>findUnique</code> cannot filter on non-unique fields, so soft-deleted records are not excluded."
+    },
+    {
+      "id": "harness-docblock-stale-guard-mention",
+      "status": "new",
+      "title": "Update harness docblock — remove NODE_ENV guard mention",
+      "owner": "fernando",
+      "source": "sep7",
+      "description": "The docblock still references a <code>NODE_ENV</code> guard that no longer exists. Remove the stale reference so the documentation matches the current implementation."
+    },
+    {
+      "id": "tasks-board-desktop-layout-bugs",
+      "status": "new",
+      "title": "Tasks Board renders incorrectly on desktop",
+      "owner": "fernando",
+      "source": "sep7",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "Two layout defects at wide viewports on <code>/admin/tasks-board</code>. (a) The left sidebar paints on top of the DONE column — nav labels overlap the first column's cards and make several unreadable. (b) The board overflows to the right with no horizontal scroll: the NEW column is clipped at the viewport edge and the header subtitle is cut mid-sentence."
     }
   ]
 }
