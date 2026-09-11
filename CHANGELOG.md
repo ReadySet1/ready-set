@@ -16,14 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-* **driver:** auto-resume web GPS tracking on any page while a shift is active ([f5b4760](https://github.com/ReadySet1/ready-set/commit/f5b476095982ac02bd5107f38c6d55e19e658323))
 * **driver:** auto-resume web GPS tracking on any page while a shift is active ([9fb2049](https://github.com/ReadySet1/ready-set/commit/9fb204962a9f622045079ab3384e80e98084a310))
-* **driver:** require an active shift before advancing a delivery ([c786820](https://github.com/ReadySet1/ready-set/commit/c786820d4692b8485017b1cfdb313328c36f63f1))
 * **driver:** require an active shift before advancing a delivery ([55220ee](https://github.com/ReadySet1/ready-set/commit/55220eead99162e965d6a650d40981acc7a0ef0f))
 * **driver:** treat a paused shift consistently in the delivery shift gate ([1450fb1](https://github.com/ReadySet1/ready-set/commit/1450fb1298c07298c83e9a867716a8534eff829c))
-* **forms:** centralise site origin and surface silent email failures ([a2f1564](https://github.com/ReadySet1/ready-set/commit/a2f15645cd7cf9ff08f9458296ebbc04bb8ac192))
 * **forms:** centralise site origin and surface silent email failures ([c98eba2](https://github.com/ReadySet1/ready-set/commit/c98eba21b3a1296aabb06cccb124a6813e26252f))
-* **tracking:** make shift start idempotent and enforce one active shift per driver ([8dc289f](https://github.com/ReadySet1/ready-set/commit/8dc289f88c900ca944acc38d34433400e65058c3))
 * **tracking:** make shift start idempotent and enforce one active shift per driver ([752318d](https://github.com/ReadySet1/ready-set/commit/752318d6d3410f92f9598098bbfe8da4912fa429))
 
 

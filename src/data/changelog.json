@@ -5,8 +5,8 @@
     {
       "version": "2.7.0",
       "date": "2026-09-11",
-      "title": "Release 2.7.0",
-      "summary": "",
+      "title": "More dependable driver shifts",
+      "summary": "Shifts now start cleanly, keep tracking when the app reloads, and can't be opened twice by accident.",
       "changes": [
         {
           "text": "Drivers must start a shift before working a delivery, so every delivery is tracked.",
