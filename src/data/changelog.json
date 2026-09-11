@@ -3,6 +3,30 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.7.0",
+      "date": "2026-09-11",
+      "title": "Release 2.7.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Drivers must start a shift before working a delivery, so every delivery is tracked.",
+          "type": "fixed"
+        },
+        {
+          "text": "Starting a shift twice no longer creates a duplicate shift.",
+          "type": "fixed"
+        },
+        {
+          "text": "Location tracking now resumes automatically after the app reloads during a shift.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.7.0"
+      }
+    },
+    {
       "version": "2.6.0",
       "date": "2026-08-31",
       "title": "Smoother driver shifts, live admin tracking",
