@@ -67,16 +67,16 @@ describe("FoodHeader Component", () => {
     it("renders the component successfully", () => {
       render(<FoodHeader />);
 
-      expect(screen.getByText("From Pickup to Complete Setup")).toBeInTheDocument();
+      expect(screen.getByText("Because Great Food Deserves Great Delivery.")).toBeInTheDocument();
       expect(screen.getByText(/More than delivery/)).toBeInTheDocument();
     });
 
     it("renders the background image", () => {
       render(<FoodHeader />);
 
-      const image = screen.getByAltText("Food containers with various prepared meals");
+      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute("src", expect.stringContaining("food/food-containers-v2"));
+      expect(image).toHaveAttribute("src", expect.stringContaining("food/catering-hero"));
     });
 
     it("renders the Get a Quote button", () => {
@@ -106,15 +106,15 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const heading = screen.getByRole("heading", { level: 1 });
-      expect(heading).toHaveTextContent("From Pickup to Complete Setup");
-      expect(heading).toHaveClass("text-xl", "font-black");
+      expect(heading).toHaveTextContent("Because Great Food Deserves Great Delivery.");
+      expect(heading).toHaveClass("text-2xl", "font-black");
     });
 
     it("renders the description paragraph", () => {
       render(<FoodHeader />);
 
       const paragraph = screen.getByText(/trusted partner helping/);
-      expect(paragraph).toHaveClass("text-xs", "font-medium");
+      expect(paragraph).toHaveClass("text-sm", "font-medium");
     });
   });
 
@@ -129,14 +129,14 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
+      const section = screen.getByText("Because Great Food Deserves Great Delivery.").closest("section");
       expect(section).toHaveClass("mt-6");
     });
 
     it("applies responsive margin classes via Tailwind", () => {
       render(<FoodHeader />);
 
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
+      const section = screen.getByText("Because Great Food Deserves Great Delivery.").closest("section");
       // Component uses Tailwind responsive classes: mt-6 md:mt-8 lg:mt-4
       expect(section).toHaveClass("mt-6");
       expect(section).toHaveClass("md:mt-8");
@@ -147,7 +147,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const heading = screen.getByRole("heading", { level: 1 });
-      expect(heading.className).toMatch(/text-xl|md:text-2xl|lg:text-3xl/);
+      expect(heading.className).toMatch(/text-2xl|md:text-4xl|lg:text-5xl/);
     });
 
     it("centers the background image on mobile", () => {
@@ -159,7 +159,7 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const image = screen.getByAltText("Food containers with various prepared meals");
+      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
       expect(image).toHaveClass("object-center");
       expect(image).not.toHaveClass("object-right");
     });
@@ -168,7 +168,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const paragraph = screen.getByText(/trusted partner helping/);
-      expect(paragraph.className).toMatch(/text-xs|md:text-sm|lg:text-base/);
+      expect(paragraph.className).toMatch(/text-sm|md:text-base/);
     });
 
     it("has responsive button sizing", () => {
@@ -222,8 +222,8 @@ describe("FoodHeader Component", () => {
     it("has proper section styling", () => {
       render(<FoodHeader />);
 
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
-      expect(section).toHaveClass("relative", "min-h-card-h-lg", "w-full");
+      const section = screen.getByText("Because Great Food Deserves Great Delivery.").closest("section");
+      expect(section).toHaveClass("relative", "min-h-[520px]", "w-full");
       expect(section?.className).toMatch(/mb-16|md:mb-24|lg:mb-32/);
     });
 
@@ -231,15 +231,16 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       // The content is wrapped in motion.div with specific classes
-      const contentContainer = screen.getByText("From Pickup to Complete Setup").closest(".mx-auto");
+      const contentContainer = screen.getByText("Because Great Food Deserves Great Delivery.").closest(".mx-auto");
       expect(contentContainer).toHaveClass("mx-auto", "max-w-[1600px]");
     });
 
     it("positions content correctly", () => {
       render(<FoodHeader />);
 
-      const contentWrapper = screen.getByText("From Pickup to Complete Setup").closest("div.relative.z-10");
-      expect(contentWrapper).toHaveClass("relative", "z-10", "ml-4");
+      const heading = screen.getByText("Because Great Food Deserves Great Delivery.");
+      const contentWrapper = heading.closest(".space-y-3");
+      expect(contentWrapper).toHaveClass("max-w-[55%]");
     });
 
     it("applies hover effects to Get a Quote button", () => {
@@ -261,8 +262,7 @@ describe("FoodHeader Component", () => {
 
       const quoteButton = screen.getByRole("button", { name: /Get a Quote/i });
       const buttonsContainer = quoteButton.closest(".flex");
-      // At mobile, container has flex-col gap-3, at sm: breakpoint it has flex-row flex-wrap items-center gap-4
-      expect(buttonsContainer).toHaveClass("flex", "flex-col", "gap-3");
+      expect(buttonsContainer).toHaveClass("flex", "flex-row", "flex-wrap", "gap-4");
     });
   });
 
@@ -271,7 +271,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       // Check that the container exists (framer-motion is mocked)
-      const heading = screen.getByText("From Pickup to Complete Setup");
+      const heading = screen.getByText("Because Great Food Deserves Great Delivery.");
       const container = heading.closest(".mx-auto");
       // Since framer-motion is mocked, we just verify the component renders
       expect(container).toBeInTheDocument();
@@ -290,7 +290,7 @@ describe("FoodHeader Component", () => {
     it("applies image animation variants", () => {
       render(<FoodHeader />);
 
-      const image = screen.getByAltText("Food containers with various prepared meals");
+      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
       expect(image).toBeInTheDocument();
     });
 
@@ -328,14 +328,14 @@ describe("FoodHeader Component", () => {
     it("image has descriptive alt text", () => {
       render(<FoodHeader />);
 
-      const image = screen.getByAltText("Food containers with various prepared meals");
+      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
       expect(image).toBeInTheDocument();
     });
 
     it("section uses semantic HTML", () => {
       render(<FoodHeader />);
 
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
+      const section = screen.getByText("Because Great Food Deserves Great Delivery.").closest("section");
       expect(section).toBeInTheDocument();
     });
   });
@@ -371,7 +371,7 @@ describe("FoodHeader Component", () => {
     it("displays the correct heading text", () => {
       render(<FoodHeader />);
 
-      expect(screen.getByText("From Pickup to Complete Setup")).toBeInTheDocument();
+      expect(screen.getByText("Because Great Food Deserves Great Delivery.")).toBeInTheDocument();
     });
 
     it("displays the correct description text", () => {
@@ -392,8 +392,8 @@ describe("FoodHeader Component", () => {
     it("uses correct image path", () => {
       render(<FoodHeader />);
 
-      const image = screen.getByAltText("Food containers with various prepared meals");
-      expect(image).toHaveAttribute("src", expect.stringContaining("food/food-containers-v2"));
+      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
+      expect(image).toHaveAttribute("src", expect.stringContaining("food/catering-hero"));
     });
   });
 
@@ -403,14 +403,14 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader onRequestQuote={mockOnRequestQuote} />);
 
       // The component should render without errors
-      expect(screen.getByText("From Pickup to Complete Setup")).toBeInTheDocument();
+      expect(screen.getByText("Because Great Food Deserves Great Delivery.")).toBeInTheDocument();
     });
 
     it("renders without onRequestQuote prop", () => {
       render(<FoodHeader />);
 
       // Should render normally without the prop
-      expect(screen.getByText("From Pickup to Complete Setup")).toBeInTheDocument();
+      expect(screen.getByText("Because Great Food Deserves Great Delivery.")).toBeInTheDocument();
     });
   });
 
@@ -423,7 +423,7 @@ describe("FoodHeader Component", () => {
       window.dispatchEvent(new Event("resize"));
       window.dispatchEvent(new Event("resize"));
 
-      expect(screen.getByText("From Pickup to Complete Setup")).toBeInTheDocument();
+      expect(screen.getByText("Because Great Food Deserves Great Delivery.")).toBeInTheDocument();
     });
 
     it("maintains functionality after multiple re-renders", () => {
@@ -454,6 +454,3 @@ describe("FoodHeader Component", () => {
     });
   });
 });
-
-
-
