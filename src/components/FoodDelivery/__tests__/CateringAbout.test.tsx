@@ -83,9 +83,9 @@ describe("CateringAbout", () => {
         "Restaurant owners reviewing catering orders",
       );
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute("src", "/images/food/catering-about");
-      expect(image).toHaveAttribute("width", "800");
-      expect(image).toHaveAttribute("height", "600");
+      expect(image).toHaveAttribute("src", "/images/food/catering-about-v2");
+      expect(image).toHaveAttribute("width", "1245");
+      expect(image).toHaveAttribute("height", "703");
       expect(image).toHaveClass("h-auto", "w-full", "object-cover");
     });
 
@@ -106,32 +106,18 @@ describe("CateringAbout", () => {
       );
     });
 
-    it("renders the top stats grid container with 3 columns", () => {
+    it("renders the stats grid container with 5 columns on lg", () => {
       const { container } = render(<CateringAbout />);
 
       const statsGrids = container.querySelectorAll(".grid");
-      // First grid is the main layout, second is top stats, third is bottom stats
-      const topStatsGrid = statsGrids[1];
-      expect(topStatsGrid).toHaveClass(
+      // First grid is the main layout, second is stats
+      const statsGrid = statsGrids[1];
+      expect(statsGrid).toHaveClass(
         "grid",
         "grid-cols-1",
         "gap-4",
         "sm:grid-cols-3",
-        "mb-4",
-      );
-    });
-
-    it("renders the bottom stats grid container with 2 columns and max-width", () => {
-      const { container } = render(<CateringAbout />);
-
-      const statsGrids = container.querySelectorAll(".grid");
-      const bottomStatsGrid = statsGrids[2];
-      expect(bottomStatsGrid).toHaveClass(
-        "grid",
-        "grid-cols-1",
-        "gap-4",
-        "sm:grid-cols-2",
-        "sm:max-w-[66%]",
+        "lg:grid-cols-5",
       );
     });
   });
@@ -194,28 +180,17 @@ describe("CateringAbout", () => {
       expect(fifthCard).toHaveTextContent("On-Time Delivery Rate");
     });
 
-    it("renders top row with exactly 3 stat cards", () => {
+    it("renders all 5 stat cards in a single grid", () => {
       const { container } = render(<CateringAbout />);
 
       const statsGrids = container.querySelectorAll(".grid");
-      const topStatsGrid = statsGrids[1];
-      const topStatCards = topStatsGrid?.querySelectorAll(
+      const statsGrid = statsGrids[1];
+      const statCards = statsGrid?.querySelectorAll(
         '[data-testid="stat-card"]',
       );
 
-      expect(topStatCards).toHaveLength(3);
-    });
-
-    it("renders bottom row with exactly 2 stat cards", () => {
-      const { container } = render(<CateringAbout />);
-
-      const statsGrids = container.querySelectorAll(".grid");
-      const bottomStatsGrid = statsGrids[2];
-      const bottomStatCards = bottomStatsGrid?.querySelectorAll(
-        '[data-testid="stat-card"]',
-      );
-
-      expect(bottomStatCards).toHaveLength(2);
+      expect(statCards).toHaveLength(5);
+      expect(statsGrid).toHaveClass("lg:grid-cols-5");
     });
   });
 
@@ -259,22 +234,12 @@ describe("CateringAbout", () => {
       );
     });
 
-    it("renders the second description paragraph with highlighted text", () => {
+    it("does not render the marketplace or broker paragraph", () => {
       render(<CateringAbout />);
 
-      // The text "We're not a marketplace or broker" is now wrapped in a <strong> tag
-      const strongText = screen.getByText(/We're not a marketplace or broker/);
-      expect(strongText.tagName).toBe("STRONG");
-
-      // The parent paragraph should have the styling classes
-      const paragraph = strongText.closest("p");
-      expect(paragraph).toHaveClass(
-        "font-[Montserrat]",
-        "text-base",
-        "leading-relaxed",
-        "text-gray-700",
-        "md:text-lg",
-      );
+      expect(
+        screen.queryByText(/We're not a marketplace or broker/),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -500,20 +465,12 @@ describe("CateringAbout", () => {
       expect(label).toHaveClass("text-base", "md:text-lg");
     });
 
-    it("applies responsive top stats grid classes", () => {
+    it("applies responsive stats grid classes", () => {
       const { container } = render(<CateringAbout />);
 
       const statsGrids = container.querySelectorAll(".grid");
-      const topStatsGrid = statsGrids[1];
-      expect(topStatsGrid).toHaveClass("grid-cols-1", "sm:grid-cols-3");
-    });
-
-    it("applies responsive bottom stats grid classes", () => {
-      const { container } = render(<CateringAbout />);
-
-      const statsGrids = container.querySelectorAll(".grid");
-      const bottomStatsGrid = statsGrids[2];
-      expect(bottomStatsGrid).toHaveClass("grid-cols-1", "sm:grid-cols-2");
+      const statsGrid = statsGrids[1];
+      expect(statsGrid).toHaveClass("grid-cols-1", "sm:grid-cols-3", "lg:grid-cols-5");
     });
 
     it("applies responsive text classes", () => {
@@ -530,15 +487,13 @@ describe("CateringAbout", () => {
     it("displays all five stats with correct data", () => {
       render(<CateringAbout />);
 
-      // Top row stats
+      // All stats
       expect(screen.getByText("2019")).toBeInTheDocument();
       expect(screen.getByText("Founded")).toBeInTheDocument();
       expect(screen.getByText("350+")).toBeInTheDocument();
       expect(screen.getByText("Restaurants Served")).toBeInTheDocument();
       expect(screen.getByText("338K+")).toBeInTheDocument();
       expect(screen.getByText("Deliveries Completed")).toBeInTheDocument();
-
-      // Bottom row stats
       expect(screen.getByText("200+")).toBeInTheDocument();
       expect(screen.getByText("Professional Drivers")).toBeInTheDocument();
       expect(screen.getByText("98%")).toBeInTheDocument();
@@ -561,18 +516,18 @@ describe("CateringAbout", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays correct service description", () => {
+    it("does not display removed service description", () => {
       render(<CateringAbout />);
 
       expect(
-        screen.getByText(/We're not a marketplace or broker/),
-      ).toBeInTheDocument();
+        screen.queryByText(/We're not a marketplace or broker/),
+      ).not.toBeInTheDocument();
       expect(
-        screen.getByText(/we don't take customer orders or list you on apps/),
-      ).toBeInTheDocument();
+        screen.queryByText(/we don't take customer orders or list you on apps/),
+      ).not.toBeInTheDocument();
       expect(
-        screen.getByText(/we act as your behind-the-scenes delivery partner/),
-      ).toBeInTheDocument();
+        screen.queryByText(/we act as your behind-the-scenes delivery partner/),
+      ).not.toBeInTheDocument();
     });
 
     it("displays correct link text (How Our Service Works)", () => {
@@ -585,30 +540,18 @@ describe("CateringAbout", () => {
   });
 
   describe("Stats Layout Structure", () => {
-    it("renders stats in correct 3+2 grid layout", () => {
+    it("renders stats in a single grid layout with 5 columns on lg", () => {
       const { container } = render(<CateringAbout />);
 
       const statsGrids = container.querySelectorAll(".grid");
 
-      // Should have 3 grids total: main layout, top stats, bottom stats
-      expect(statsGrids.length).toBeGreaterThanOrEqual(3);
+      // Should have 2 grids total: main layout, stats
+      expect(statsGrids.length).toBeGreaterThanOrEqual(2);
 
-      // Top stats grid should have 3-column layout on sm screens
-      const topStatsGrid = statsGrids[1];
-      expect(topStatsGrid).toHaveClass("sm:grid-cols-3");
-
-      // Bottom stats grid should have 2-column layout on sm screens
-      const bottomStatsGrid = statsGrids[2];
-      expect(bottomStatsGrid).toHaveClass("sm:grid-cols-2");
-    });
-
-    it("bottom stats grid has max-width constraint", () => {
-      const { container } = render(<CateringAbout />);
-
-      const statsGrids = container.querySelectorAll(".grid");
-      const bottomStatsGrid = statsGrids[2];
-
-      expect(bottomStatsGrid).toHaveClass("sm:max-w-[66%]");
+      // Stats grid should have 3-column layout on sm and 5-column on lg
+      const statsGrid = statsGrids[1];
+      expect(statsGrid).toHaveClass("sm:grid-cols-3");
+      expect(statsGrid).toHaveClass("lg:grid-cols-5");
     });
   });
 });

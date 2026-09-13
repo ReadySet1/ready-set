@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 import Link from "next/link";
 
 interface StatProps {
@@ -33,13 +33,10 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
 };
 
 const CateringAbout: React.FC = () => {
-  const topStats = [
+  const stats = [
     { value: "2019", label: "Founded", delay: 0 },
     { value: "350+", label: "Restaurants Served", delay: 100 },
     { value: "338K+", label: "Deliveries Completed", delay: 200 },
-  ];
-
-  const bottomStats = [
     { value: "200+", label: "Professional Drivers", delay: 300 },
     { value: "98%", label: "On-Time Delivery Rate", delay: 400 },
   ];
@@ -59,10 +56,11 @@ const CateringAbout: React.FC = () => {
             {/* Image */}
             <div className="relative mb-8 overflow-hidden rounded-3xl">
               <Image
-                src={getCloudinaryUrl("food/catering-about")}
+                src={getCloudinaryUrl("food/catering-about-v2", { version: ASSET_CACHE_VERSION })}
                 alt="Restaurant owners reviewing catering orders"
-                width={800}
-                height={600}
+                width={1245}
+                height={703}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 className="h-auto w-full object-cover"
                 priority
               />
@@ -80,21 +78,9 @@ const CateringAbout: React.FC = () => {
               deliveries from 350+ restaurants.
             </motion.p>
 
-            {/* Stats - Top Row (3 cards) */}
-            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {topStats.map((stat, index) => (
-                <StatCard
-                  key={index}
-                  value={stat.value}
-                  label={stat.label}
-                  delay={stat.delay}
-                />
-              ))}
-            </div>
-
-            {/* Stats - Bottom Row (2 cards) */}
-            <div className="grid grid-cols-1 gap-4 sm:max-w-[66%] sm:grid-cols-2">
-              {bottomStats.map((stat, index) => (
+            {/* Stats - Single Row (5 cards) */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {stats.map((stat, index) => (
                 <StatCard
                   key={index}
                   value={stat.value}
@@ -124,16 +110,6 @@ const CateringAbout: React.FC = () => {
                 expanded to Austin, Atlanta, and Dallas, partnering with
                 hundreds of restaurants and catering brands to ensure every
                 order arrives on time and perfectly presented.
-              </p>
-
-              <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
-                <strong>
-                  We're not a marketplace or broker — we don't take customer
-                  orders or list you on apps.
-                </strong>{" "}
-                Instead, we act as your behind-the-scenes delivery partner,
-                managing every step from pickup to setup so your team can focus
-                on the food and the experience.
               </p>
             </div>
 
