@@ -54,7 +54,7 @@ const CateringAbout: React.FC = () => {
             transition={{ duration: 0.6 }}
           >
             {/* Image */}
-            <div className="relative mb-8 overflow-hidden rounded-3xl">
+            <div className="relative overflow-hidden rounded-3xl">
               <Image
                 src={getCloudinaryUrl("food/catering-about-v2", { version: ASSET_CACHE_VERSION })}
                 alt="Restaurant owners reviewing catering orders"
@@ -66,9 +66,9 @@ const CateringAbout: React.FC = () => {
               />
             </div>
 
-            {/* Text above stats */}
+            {/* Caption below image */}
             <motion.p
-              className="mb-8 text-center font-[Montserrat] text-base font-medium text-gray-700 md:text-lg"
+              className="mt-6 text-center font-[Montserrat] text-sm font-medium leading-relaxed text-gray-700 sm:text-base md:text-lg"
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -77,18 +77,6 @@ const CateringAbout: React.FC = () => {
               Since 2019, we&apos;ve completed over 338,000 successful catering
               deliveries from 350+ restaurants.
             </motion.p>
-
-            {/* Stats - Single Row (5 cards) */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {stats.map((stat, index) => (
-                <StatCard
-                  key={index}
-                  value={stat.value}
-                  label={stat.label}
-                  delay={stat.delay}
-                />
-              ))}
-            </div>
           </motion.div>
 
           {/* Right Column - Content */}
@@ -122,12 +110,24 @@ const CateringAbout: React.FC = () => {
             >
               <Link
                 href="/vendor-hero"
-                className="inline-block rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
+                className="inline-block rounded-full bg-yellow-400 px-14 py-5 font-[Montserrat] text-xl font-extrabold text-gray-800 shadow-md transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
               >
                 How Our Service Works
               </Link>
             </motion.div>
           </motion.div>
+        </div>
+
+        {/* Stats - Full Width Below Two-Column Grid */}
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {stats.map((stat, index) => (
+            <StatCard
+              key={index}
+              value={stat.value}
+              label={stat.label}
+              delay={stat.delay}
+            />
+          ))}
         </div>
       </div>
     </div>

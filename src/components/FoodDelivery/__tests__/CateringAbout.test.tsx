@@ -96,13 +96,12 @@ describe("CateringAbout", () => {
         /Since 2019, we've completed over 338,000 successful catering deliveries/,
       );
       expect(statsText).toHaveClass(
-        "mb-8",
+        "mt-6",
         "text-center",
         "font-[Montserrat]",
-        "text-base",
         "font-medium",
+        "leading-relaxed",
         "text-gray-700",
-        "md:text-lg",
       );
     });
 
@@ -252,10 +251,10 @@ describe("CateringAbout", () => {
 
       // Verify the link has the correct styling
       expect(link).toHaveClass(
-        "rounded-lg",
+        "rounded-full",
         "bg-yellow-400",
-        "px-12",
-        "py-4",
+        "px-14",
+        "py-5",
         "font-extrabold",
       );
     });
@@ -274,12 +273,12 @@ describe("CateringAbout", () => {
       expect(link).toHaveTextContent("How Our Service Works");
       expect(link).toHaveClass(
         "inline-block",
-        "rounded-lg",
+        "rounded-full",
         "bg-yellow-400",
-        "px-12",
-        "py-4",
+        "px-14",
+        "py-5",
         "font-[Montserrat]",
-        "text-lg",
+        "text-xl",
         "font-extrabold",
         "text-gray-800",
         "shadow-md",
