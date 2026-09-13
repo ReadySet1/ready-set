@@ -114,7 +114,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const paragraph = screen.getByText(/trusted partner helping/);
-      expect(paragraph).toHaveClass("text-sm", "font-medium");
+      expect(paragraph).toHaveClass("text-base", "font-medium");
     });
   });
 
@@ -168,7 +168,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const paragraph = screen.getByText(/trusted partner helping/);
-      expect(paragraph.className).toMatch(/text-sm|md:text-base/);
+      expect(paragraph.className).toMatch(/text-base|md:text-lg/);
     });
 
     it("has responsive button sizing", () => {

@@ -69,7 +69,7 @@ const FoodHeader: React.FC = () => {
         animate="visible"
         variants={containerVariants}
       >
-        <div className="flex h-full flex-col justify-center">
+        <div className="flex h-full flex-col justify-end pb-12 md:pb-16">
           <motion.div
             className="w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:max-w-[50%] md:max-w-md md:rounded-none md:bg-transparent md:p-0 md:backdrop-blur-none"
             initial={false}
@@ -90,7 +90,7 @@ const FoodHeader: React.FC = () => {
             >
               <motion.button
                 onClick={handleQuoteClick}
-                className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
+                className="rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
                 initial={false}
                 variants={buttonVariants}
                 whileHover="hover"
@@ -101,14 +101,14 @@ const FoodHeader: React.FC = () => {
               <ScheduleDialog
                 buttonText="Book a Call"
                 calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-                className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
+                className="rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
               />
             </motion.div>
           </motion.div>
 
           {/* Description - flows under buttons on mobile, positioned bottom-right on md+ */}
           <motion.p
-            className="mt-4 max-w-md font-[Montserrat] text-sm font-medium leading-relaxed text-white/90 md:absolute md:bottom-10 md:right-8 md:mt-0 md:max-w-md md:text-base lg:right-12"
+            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:absolute md:bottom-10 md:right-8 md:mt-0 md:max-w-md md:text-center md:text-lg lg:right-12"
             initial={false}
             variants={itemVariants}
           >
