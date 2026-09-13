@@ -44,6 +44,9 @@ const FoodHeader: React.FC = () => {
     tap: { scale: 0.95 },
   };
 
+  const heroBtnClasses =
+    "rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg";
+
   return (
     <section
       className="relative min-h-[520px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
@@ -90,7 +93,7 @@ const FoodHeader: React.FC = () => {
             >
               <motion.button
                 onClick={handleQuoteClick}
-                className="rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
+                className={heroBtnClasses}
                 initial={false}
                 variants={buttonVariants}
                 whileHover="hover"
@@ -101,7 +104,7 @@ const FoodHeader: React.FC = () => {
               <ScheduleDialog
                 buttonText="Book a Call"
                 calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-                className="rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
+                className={heroBtnClasses}
               />
             </motion.div>
           </motion.div>
