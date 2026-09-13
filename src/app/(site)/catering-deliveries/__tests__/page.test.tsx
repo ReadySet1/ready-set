@@ -9,12 +9,6 @@ jest.mock("@/components/FoodDelivery/FoodHeader", () => {
   };
 });
 
-jest.mock("@/components/FoodDelivery/CateringFeatures", () => {
-  return function CateringFeatures() {
-    return <div data-testid="catering-features">CateringFeatures Component</div>;
-  };
-});
-
 jest.mock("@/components/FoodDelivery/CateringAbout", () => {
   return function CateringAbout() {
     return <div data-testid="catering-about">CateringAbout Component</div>;
