@@ -81,25 +81,28 @@ describe("ModernPricingLandingPage", () => {
   describe("Delivery Pricing Table", () => {
     it("should render all pricing tiers", () => {
       render(<ModernPricingLandingPage />);
-      
+      const chart = screen.getByRole("table");
+
       // Check for some sample headcount values
-      expect(screen.getByText("0-24")).toBeInTheDocument();
-      expect(screen.getByText("25-49")).toBeInTheDocument();
-      expect(screen.getByText("100-124")).toBeInTheDocument();
-      expect(screen.getByText("300+")).toBeInTheDocument();
+      expect(within(chart).getByText("0-24")).toBeInTheDocument();
+      expect(within(chart).getByText("25-49")).toBeInTheDocument();
+      expect(within(chart).getByText("100-124")).toBeInTheDocument();
+      expect(within(chart).getByText("300+")).toBeInTheDocument();
     });
 
     it("should render table headers", () => {
       render(<ModernPricingLandingPage />);
-      expect(screen.getByText("Headcount")).toBeInTheDocument();
-      expect(screen.getByText("Food Cost")).toBeInTheDocument();
-      expect(screen.getByText("Delivery Cost")).toBeInTheDocument();
+      const chart = screen.getByRole("table");
+      expect(within(chart).getByText("Headcount")).toBeInTheDocument();
+      expect(within(chart).getByText("Food Cost")).toBeInTheDocument();
+      expect(within(chart).getByText("Delivery Cost")).toBeInTheDocument();
     });
 
     it("should display correct delivery costs", () => {
       render(<ModernPricingLandingPage />);
-      expect(screen.getByText("$60")).toBeInTheDocument(); // 0-24 headcount
-      expect(screen.getByText("$70")).toBeInTheDocument(); // 25-49 headcount
+      const chart = screen.getByRole("table");
+      expect(within(chart).getByText("$60")).toBeInTheDocument(); // 0-24 headcount
+      expect(within(chart).getByText("$70")).toBeInTheDocument(); // 25-49 headcount
     });
   });
 
