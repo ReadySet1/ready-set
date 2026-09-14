@@ -1,7 +1,7 @@
 // src/app/(site)/catering-deliveries/page.tsx
 import { Metadata } from "next";
 // import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
-import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
+// import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
 import CateringAbout from "@/components/FoodDelivery/CateringAbout";
 import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
 import ServedPartners from "@/components/FoodDelivery/ServedPartners";
@@ -58,7 +58,7 @@ export default function FoodPage() {
     <div className="pt-20 md:pt-24">
       <FoodHeader />
       {/* <FoodServiceFeatures /> */}
-      <CateringFeatures />
+      {/* <CateringFeatures /> */}
       <CateringAbout />
       <DeliveryPartners />
       <ServedPartners />

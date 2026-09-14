@@ -36,18 +36,6 @@ const FoodHeader: React.FC = () => {
     },
   };
 
-  const imageVariants = {
-    hidden: { opacity: 0, scale: 0.9 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: {
-        duration: 0.8,
-        delay: 0.2,
-      },
-    },
-  };
-
   const buttonVariants = {
     hover: {
       scale: 1.05,
@@ -56,47 +44,74 @@ const FoodHeader: React.FC = () => {
     tap: { scale: 0.95 },
   };
 
+  const heroBtnClasses =
+    "rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg";
+
   return (
     <section
-      className="relative min-h-card-h-lg w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
+      className="relative min-h-[520px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
     >
       {/* Background image container */}
       <div className="absolute inset-0 z-0 overflow-hidden">
-        <div className="relative h-full w-full scale-100 md:scale-[1.28] lg:scale-[1.35]">
-          <Image
-            src={getCloudinaryUrl("food/food-containers-v2", { version: ASSET_CACHE_VERSION })}
-            alt="Food containers with various prepared meals"
-            fill
-            className="object-cover object-center md:object-[85%_50%] lg:object-[85%_50%]"
-            priority
-          />
-        </div>
-        {/* Dark gradient overlay for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+        <Image
+          src={getCloudinaryUrl("food/catering-hero", { version: ASSET_CACHE_VERSION })}
+          alt="Restaurant owners reviewing an order on a laptop"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          priority
+        />
+        {/* Gradient overlay for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
       </div>
 
       {/* Text content overlay */}
       <motion.div
-        className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-8 md:px-8 md:py-16 lg:px-12 lg:py-20"
+        className="relative z-10 mx-auto h-full max-w-[1600px] px-4 md:px-8 lg:px-12"
         initial={false}
         animate="visible"
         variants={containerVariants}
       >
-        <motion.div
-          className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md md:bg-transparent md:p-0 md:backdrop-blur-none lg:ml-32 lg:mt-28"
-          initial={false}
-          variants={containerVariants}
-        >
-          <motion.h1
-            className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-white md:text-2xl lg:text-3xl"
+        <div className="flex h-full flex-col justify-end pb-12 md:pb-16">
+          <motion.div
+            className="w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:max-w-[50%] md:max-w-md md:rounded-none md:bg-transparent md:p-0 md:backdrop-blur-none"
             initial={false}
-            variants={itemVariants}
+            variants={containerVariants}
           >
-            From Pickup to Complete Setup
-          </motion.h1>
+            <motion.h1
+              className="font-[Montserrat] text-2xl font-black leading-tight text-white md:text-4xl lg:text-5xl"
+              initial={false}
+              variants={itemVariants}
+            >
+              Because Great Food Deserves Great Delivery.
+            </motion.h1>
 
+            <motion.div
+              className="flex flex-row flex-wrap gap-4 pt-2"
+              initial={false}
+              variants={itemVariants}
+            >
+              <motion.button
+                onClick={handleQuoteClick}
+                className={heroBtnClasses}
+                initial={false}
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
+              >
+                Get a Quote
+              </motion.button>
+              <ScheduleDialog
+                buttonText="Book a Call"
+                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                className={heroBtnClasses}
+              />
+            </motion.div>
+          </motion.div>
+
+          {/* Description - flows under buttons on mobile, positioned bottom-right on md+ */}
           <motion.p
-            className="font-[Montserrat] text-xs font-medium leading-relaxed text-white/90 md:text-sm lg:text-base"
+            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:absolute md:bottom-10 md:right-8 md:mt-0 md:max-w-md md:text-center md:text-lg lg:right-12"
             initial={false}
             variants={itemVariants}
           >
@@ -104,29 +119,7 @@ const FoodHeader: React.FC = () => {
             restaurants, caterers, and foodservice providers solve their
             toughest logistics challenges.
           </motion.p>
-
-          <motion.div
-            className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
-            initial={false}
-            variants={itemVariants}
-          >
-            <motion.button
-              onClick={handleQuoteClick}
-              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
-              initial={false}
-              variants={buttonVariants}
-              whileHover="hover"
-              whileTap="tap"
-            >
-              Get a Quote
-            </motion.button>
-            <ScheduleDialog
-              buttonText="Book a Call"
-              calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
-            />
-          </motion.div>
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* Render the dialog form */}
