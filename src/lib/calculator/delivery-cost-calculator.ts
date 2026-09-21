@@ -104,23 +104,9 @@ export interface PricingTier {
   within10MilesPercent?: number; // Percentage of foodCost (e.g., 0.10 for 10%)
 }
 
-/**
- * Delivery cost tiers based on LESSER of headcount OR food cost
- * Uses the "more conservative" approach per business rules
- */
-const PRICING_TIERS: PricingTier[] = [
-  { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 30 },
-  { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 40 },
-  { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 60 },
-  { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 100, within10Miles: 70 },
-  { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 120, within10Miles: 80 },
-  { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 150, within10Miles: 90 },
-  { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 180, within10Miles: 100 },
-  { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 210, within10Miles: 110 },
-  { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 280, within10Miles: 120 },
-  { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 310, within10Miles: 130 },
-  { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 } // TBD
-];
+// Note: there is no module-level default tier table. Every caller resolves its
+// own `pricingTiers` from a ClientDeliveryConfiguration (see
+// ./client-configurations.ts) and passes them into `determinePricingTier`.
 
 // ============================================================================
 // CONSTANTS
@@ -916,7 +902,6 @@ const deliveryCostCalculator = {
   calculateVendorPay,
   validateDeliveryCostInput,
   // Export constants for testing
-  PRICING_TIERS,
   VENDOR_MILEAGE_RATE,
   DRIVER_MILEAGE_RATE,
   DISTANCE_THRESHOLD,
