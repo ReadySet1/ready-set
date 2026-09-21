@@ -49,13 +49,13 @@ const FoodHeader: React.FC = () => {
 
   return (
     <section
-      className="relative min-h-[520px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
+      className="relative flex flex-col min-h-[520px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
     >
       {/* Background image container */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <Image
           src={getCloudinaryUrl("food/catering-hero", { version: ASSET_CACHE_VERSION })}
-          alt="Restaurant owners reviewing an order on a laptop"
+          alt=""
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -63,16 +63,18 @@ const FoodHeader: React.FC = () => {
         />
         {/* Gradient overlay for text legibility */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
+        {/* Bottom scrim — darkens behind the headline block and the description */}
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
       </div>
 
       {/* Text content overlay */}
       <motion.div
-        className="relative z-10 mx-auto h-full max-w-[1600px] px-4 md:px-8 lg:px-12"
+        className="relative z-10 mx-auto flex flex-1 flex-col max-w-[1600px] px-4 md:px-8 lg:px-12"
         initial={false}
         animate="visible"
         variants={containerVariants}
       >
-        <div className="flex h-full flex-col justify-end pb-12 md:pb-16">
+        <div className="flex flex-1 flex-col justify-end pb-12 md:pb-16">
           <motion.div
             className="w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:max-w-[50%] md:max-w-md md:rounded-none md:bg-transparent md:p-0 md:backdrop-blur-none"
             initial={false}
@@ -109,9 +111,9 @@ const FoodHeader: React.FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Description - flows under buttons on mobile, positioned bottom-right on md+ */}
+          {/* Description - flows under buttons on mobile, positioned bottom-right on lg+ */}
           <motion.p
-            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:absolute md:bottom-10 md:right-8 md:mt-0 md:max-w-md md:text-center md:text-lg lg:right-12"
+            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:max-w-md md:text-lg lg:absolute lg:bottom-10 lg:mt-0 lg:text-center lg:right-12"
             initial={false}
             variants={itemVariants}
           >

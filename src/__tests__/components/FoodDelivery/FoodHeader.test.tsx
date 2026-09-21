@@ -71,11 +71,11 @@ describe("FoodHeader Component", () => {
       expect(screen.getByText(/More than delivery/)).toBeInTheDocument();
     });
 
-    it("renders the background image", () => {
-      render(<FoodHeader />);
+    it("renders the background image with decorative empty alt", () => {
+      const { container } = render(<FoodHeader />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
-      expect(image).toBeInTheDocument();
+      const image = container.querySelector("img");
+      expect(image).toHaveAttribute("alt", "");
       expect(image).toHaveAttribute("src", expect.stringContaining("food/catering-hero"));
     });
 
@@ -157,9 +157,9 @@ describe("FoodHeader Component", () => {
         value: 430,
       });
 
-      render(<FoodHeader />);
+      const { container } = render(<FoodHeader />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
+      const image = container.querySelector("img");
       expect(image).toHaveClass("object-center");
       expect(image).not.toHaveClass("object-right");
     });
@@ -169,6 +169,14 @@ describe("FoodHeader Component", () => {
 
       const paragraph = screen.getByText(/trusted partner helping/);
       expect(paragraph.className).toMatch(/text-base|md:text-lg/);
+    });
+
+    it("positions the description absolutely only at lg+, not at md", () => {
+      render(<FoodHeader />);
+
+      const paragraph = screen.getByText(/trusted partner helping/);
+      expect(paragraph).toHaveClass("lg:absolute");
+      expect(paragraph).not.toHaveClass("md:absolute");
     });
 
     it("has responsive button sizing", () => {
@@ -223,7 +231,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const section = screen.getByText("Because Great Food Deserves Great Delivery.").closest("section");
-      expect(section).toHaveClass("relative", "min-h-[520px]", "w-full");
+      expect(section).toHaveClass("relative", "flex", "flex-col", "min-h-[520px]", "w-full");
       expect(section?.className).toMatch(/mb-16|md:mb-24|lg:mb-32/);
     });
 
@@ -232,7 +240,7 @@ describe("FoodHeader Component", () => {
 
       // The content is wrapped in motion.div with specific classes
       const contentContainer = screen.getByText("Because Great Food Deserves Great Delivery.").closest(".mx-auto");
-      expect(contentContainer).toHaveClass("mx-auto", "max-w-[1600px]");
+      expect(contentContainer).toHaveClass("mx-auto", "flex", "flex-1", "flex-col", "max-w-[1600px]");
     });
 
     it("positions content correctly", () => {
@@ -255,6 +263,13 @@ describe("FoodHeader Component", () => {
 
       const quoteButton = screen.getByRole("button", { name: /Get a Quote/i });
       expect(quoteButton).toHaveClass("shadow-md", "hover:shadow-lg");
+    });
+
+    it("renders the bottom scrim gradient", () => {
+      const { container } = render(<FoodHeader />);
+
+      const scrim = container.querySelector('[class*="bg-gradient-to-t"]');
+      expect(scrim).toBeInTheDocument();
     });
 
     it("renders buttons in a flex container", () => {
@@ -288,9 +303,9 @@ describe("FoodHeader Component", () => {
     });
 
     it("applies image animation variants", () => {
-      render(<FoodHeader />);
+      const { container } = render(<FoodHeader />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
+      const image = container.querySelector("img");
       expect(image).toBeInTheDocument();
     });
 
@@ -325,11 +340,11 @@ describe("FoodHeader Component", () => {
       expect(quoteButton).toBeEnabled();
     });
 
-    it("image has descriptive alt text", () => {
-      render(<FoodHeader />);
+    it("hero image is decorative (empty alt)", () => {
+      const { container } = render(<FoodHeader />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
-      expect(image).toBeInTheDocument();
+      const image = container.querySelector("img");
+      expect(image).toHaveAttribute("alt", "");
     });
 
     it("section uses semantic HTML", () => {
@@ -390,9 +405,9 @@ describe("FoodHeader Component", () => {
     });
 
     it("uses correct image path", () => {
-      render(<FoodHeader />);
+      const { container } = render(<FoodHeader />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing an order on a laptop");
+      const image = container.querySelector("img");
       expect(image).toHaveAttribute("src", expect.stringContaining("food/catering-hero"));
     });
   });
