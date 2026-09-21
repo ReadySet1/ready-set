@@ -70,7 +70,9 @@ const mockOrdersResponse = {
       user: { name: 'Jane Smith' },
     },
   ],
-  totalPages: 1,
+  // The API pages at 10; prod has far more open orders than one page.
+  totalCount: 230,
+  totalPages: 23,
 };
 
 const mockUsersResponse = {
@@ -181,6 +183,21 @@ describe('DashboardHome', () => {
         expect(screen.getByText('Total Vendors')).toBeInTheDocument();
         expect(screen.getByText('Completed Orders')).toBeInTheDocument();
       });
+    });
+
+    it('should show the real active-order count, not the first page length', async () => {
+      renderPage(<DashboardHome />, {
+        user: mockAuthenticatedUser({ role: UserType.ADMIN }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Active Orders')).toBeInTheDocument();
+      });
+
+      // mockOrdersResponse pages 2 orders out of totalCount 230.
+      const card = screen.getByText('Active Orders').closest('div')!.parentElement!;
+      expect(card).toHaveTextContent('230');
+      expect(card).not.toHaveTextContent(/\b2\b/);
     });
   });
 
