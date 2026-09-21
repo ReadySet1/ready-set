@@ -3,6 +3,12 @@
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
 import { captureException } from '@/lib/monitoring/sentry'
+import {
+  getChunkRecoveryStrategy,
+  isChunkLoadError,
+  recoverFromChunkLoadError,
+} from '@/lib/chunk-load-recovery'
+import { ChunkLoadErrorFallback } from '@/components/ErrorBoundary/ChunkLoadErrorFallback'
 
 // Standard error props interface that follows Next.js pattern
 interface ErrorProps {
@@ -11,16 +17,39 @@ interface ErrorProps {
 }
 
 export default function Error({ error, reset }: ErrorProps) {
+  const isChunkError = isChunkLoadError(error)
+
+  // A chunk load failure means this tab is holding a page whose JS chunks no
+  // longer resolve (stale tab across a deploy, or a starved request). Nothing
+  // `reset()` can do helps — take the single session-guarded reload instead.
+  useEffect(() => {
+    if (isChunkError) {
+      recoverFromChunkLoadError(error)
+    }
+  }, [error, isChunkError])
+
   // Capture the error to Sentry for monitoring
   useEffect(() => {
     captureException(error, {
       component: 'App Router Error Boundary',
       metadata: {
         digest: error.digest,
-        type: 'error.tsx'
+        type: 'error.tsx',
+        isChunkLoadError: isChunkError
       }
     })
-  }, [error])
+  }, [error, isChunkError])
+
+  if (isChunkError) {
+    return (
+      <ChunkLoadErrorFallback
+        error={error}
+        errorId={error.digest}
+        onRetry={reset}
+        maxRetries={getChunkRecoveryStrategy(error).maxRetries}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center">
@@ -39,4 +68,4 @@ export default function Error({ error, reset }: ErrorProps) {
       </div>
     </div>
   )
-} 
+}
