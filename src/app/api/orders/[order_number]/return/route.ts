@@ -8,6 +8,8 @@ import {
   buildReturnReasonNote,
   createReturnRequest,
   executeReturnToDispatch,
+  findPendingReturnRequest,
+  findRecentRejectedReturnRequest,
   loadReturnableOrder,
   releaseCancelledOrder,
   type ReturnOrderType,
@@ -30,7 +32,8 @@ import * as Sentry from '@sentry/nextjs';
  *   request stops the order from blocking end-shift.
  *
  * GET returns the caller's pending request for the order so the driver UI can
- * render the "Return requested" state.
+ * render the "Return requested" state, plus the most recent REJECTED request
+ * (last 24h) so the UI can tell the driver dispatch declined the return.
  */
 
 const PRIVILEGED_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
@@ -300,9 +303,12 @@ export async function POST(
 }
 
 /**
- * GET - The caller's PENDING return request for this order (or null).
- * Drivers only see their own request; privileged roles see any pending one.
- * Smallest surface for the driver UI's "Return requested" state.
+ * GET - The caller's PENDING return request for this order (or null) and the
+ * most recent REJECTED one resolved in the last 24h (or null). Drivers only
+ * see their own requests; privileged roles see any. `lastRejected` closes the
+ * QA gap where a rejection only reached the driver as a push notification:
+ * the pending badge vanished on refresh and the order silently blocked
+ * end-shift again.
  */
 export async function GET(
   request: NextRequest,
@@ -339,23 +345,17 @@ export async function GET(
     }
     const isPrivileged = PRIVILEGED_ROLES.includes(userProfile.type);
 
-    const pending = await prisma.deliveryReturnRequest.findFirst({
-      where: {
-        orderNumber: { equals: orderNumber, mode: 'insensitive' },
-        status: 'PENDING',
-        ...(isPrivileged ? {} : { driverId: user.id }),
-      },
-      orderBy: { requestedAt: 'desc' },
-      select: {
-        id: true,
-        status: true,
-        reason: true,
-        details: true,
-        requestedAt: true,
-      },
-    });
+    const driverScope = isPrivileged ? null : user.id;
+    const [pending, lastRejected] = await Promise.all([
+      findPendingReturnRequest(orderNumber, driverScope),
+      findRecentRejectedReturnRequest(orderNumber, driverScope),
+    ]);
 
-    return NextResponse.json({ success: true, request: pending ?? null });
+    return NextResponse.json({
+      success: true,
+      request: pending ?? null,
+      lastRejected: lastRejected ?? null,
+    });
   } catch (error) {
     Sentry.captureException(error, {
       tags: { operation: 'return_request_lookup', route: 'orders' },

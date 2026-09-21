@@ -30,9 +30,12 @@ import { prisma } from '@/utils/prismaDB';
 import { returnOrderToDispatch } from '@/lib/state-machine/transition';
 import { getPartnerByOrderNumber } from '@/lib/services/partner-registry';
 import {
+  REJECTED_RETURN_VISIBILITY_MS,
   ReturnGuardError,
   approveReturnRequest,
   createReturnRequest,
+  findPendingReturnRequest,
+  findRecentRejectedReturnRequest,
   rejectReturnRequest,
   voidPendingReturnRequests,
 } from '../return-requests';
@@ -369,6 +372,73 @@ describe('voidPendingReturnRequests', () => {
         resolutionNotes: expect.stringContaining('Auto-voided'),
       }),
     });
+  });
+});
+
+describe('findPendingReturnRequest', () => {
+  it('looks up the PENDING request for the order scoped to the driver', async () => {
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(pendingRequest);
+
+    const found = await findPendingReturnRequest('cat-001', DRIVER_ID);
+
+    expect(found).toBe(pendingRequest);
+    expect(mockedPrisma.deliveryReturnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          orderNumber: { equals: 'cat-001', mode: 'insensitive' },
+          status: 'PENDING',
+          driverId: DRIVER_ID,
+        },
+        orderBy: { requestedAt: 'desc' },
+      }),
+    );
+  });
+
+  it('drops the driver filter for privileged lookups (driverId null)', async () => {
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await findPendingReturnRequest('CAT-001', null);
+
+    const args = (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mock.calls[0][0];
+    expect(args.where).not.toHaveProperty('driverId');
+  });
+});
+
+describe('findRecentRejectedReturnRequest', () => {
+  const NOW = new Date('2026-09-21T12:00:00Z');
+
+  it('returns the newest REJECTED request resolved inside the visibility window', async () => {
+    const rejected = {
+      ...pendingRequest,
+      status: 'REJECTED',
+      resolvedAt: new Date('2026-09-21T11:00:00Z'),
+      resolutionNotes: 'Too close to pickup',
+    };
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(rejected);
+
+    const found = await findRecentRejectedReturnRequest('CAT-001', DRIVER_ID, { now: NOW });
+
+    expect(found).toBe(rejected);
+    expect(REJECTED_RETURN_VISIBILITY_MS).toBe(24 * 60 * 60 * 1000);
+    expect(mockedPrisma.deliveryReturnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          orderNumber: { equals: 'CAT-001', mode: 'insensitive' },
+          status: 'REJECTED',
+          driverId: DRIVER_ID,
+          resolvedAt: { gte: new Date(NOW.getTime() - REJECTED_RETURN_VISIBILITY_MS) },
+        },
+        orderBy: { resolvedAt: 'desc' },
+      }),
+    );
+  });
+
+  it('returns null when nothing was rejected recently', async () => {
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      findRecentRejectedReturnRequest('CAT-001', DRIVER_ID, { now: NOW }),
+    ).resolves.toBeNull();
   });
 });
 

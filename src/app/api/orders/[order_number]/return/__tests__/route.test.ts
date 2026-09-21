@@ -18,7 +18,10 @@
  * request, FAILED for a privileged unwind.
  *
  * GET returns the caller's PENDING request for the order (drivers see only
- * their own) so the driver UI can render the "Return requested" state.
+ * their own) so the driver UI can render the "Return requested" state, plus
+ * the most recent REJECTED request resolved in the last 24h (`lastRejected`)
+ * so the UI can tell the driver dispatch declined the return (QA gap
+ * 2026-09-21: the rejection only reached the driver as a push).
  */
 
 jest.mock('@/utils/prismaDB', () => ({
@@ -606,5 +609,114 @@ describe('return-to-dispatch GET (pending request lookup)', () => {
     const where = (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mock
       .calls[0][0].where;
     expect(where.driverId).toBeUndefined();
+  });
+});
+
+describe('return-to-dispatch GET (recent rejection lookup)', () => {
+  const NOW = new Date('2026-09-21T12:00:00Z');
+  const rejectedRow = {
+    id: 'return-request-rejected',
+    status: 'REJECTED',
+    reason: 'VEHICLE_ISSUE',
+    details: 'Flat tire',
+    requestedAt: new Date('2026-09-21T10:00:00Z'),
+    resolvedAt: new Date('2026-09-21T10:30:00Z'),
+    resolutionNotes: 'Too close to pickup — please continue.',
+  };
+  const pendingRow = {
+    id: REQUEST_ID,
+    status: 'PENDING',
+    reason: 'VEHICLE_ISSUE',
+    details: null,
+    requestedAt: new Date('2026-09-21T11:00:00Z'),
+    resolvedAt: null,
+    resolutionNotes: null,
+  };
+
+  /** findFirst runs once for PENDING and once for REJECTED — route by status. */
+  const installFindFirst = (opts: { pending?: unknown; rejected?: unknown }) => {
+    (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mockImplementation(
+      async (args: { where: { status?: string } }) =>
+        args.where.status === 'PENDING' ? opts.pending ?? null : opts.rejected ?? null,
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(NOW);
+    setupMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('surfaces the most recent REJECTED request (last 24h) when nothing is pending', async () => {
+    installFindFirst({ pending: null, rejected: rejectedRow });
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.request).toBeNull();
+    expect(body.lastRejected).toEqual({
+      id: 'return-request-rejected',
+      status: 'REJECTED',
+      reason: 'VEHICLE_ISSUE',
+      details: 'Flat tire',
+      // NextResponse.json() under Jest hands back the Date instances unserialized.
+      requestedAt: rejectedRow.requestedAt,
+      resolvedAt: rejectedRow.resolvedAt,
+      resolutionNotes: 'Too close to pickup — please continue.',
+    });
+
+    // Driver-scoped, REJECTED, resolved within the 24h window, newest first.
+    expect(mockedPrisma.deliveryReturnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orderNumber: { equals: 'CAT-001', mode: 'insensitive' },
+          status: 'REJECTED',
+          driverId: DRIVER_ID,
+          resolvedAt: { gte: new Date('2026-09-20T12:00:00Z') },
+        }),
+        orderBy: { resolvedAt: 'desc' },
+      }),
+    );
+  });
+
+  it('returns lastRejected: null when no recent rejection exists', async () => {
+    installFindFirst({ pending: null, rejected: null });
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+
+    expect(await res.json()).toEqual({ success: true, request: null, lastRejected: null });
+  });
+
+  it('keeps returning the PENDING request alongside lastRejected', async () => {
+    installFindFirst({ pending: pendingRow, rejected: rejectedRow });
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+    const body = await res.json();
+
+    expect(body.request).toEqual(expect.objectContaining({ id: REQUEST_ID, status: 'PENDING' }));
+    expect(body.lastRejected).toEqual(
+      expect.objectContaining({ id: 'return-request-rejected', status: 'REJECTED' }),
+    );
+  });
+
+  it('does not scope the rejection lookup by driver for privileged callers', async () => {
+    setupMocks({ role: 'HELPDESK' });
+    installFindFirst({ pending: null, rejected: rejectedRow });
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+
+    expect((await res.json()).lastRejected?.id).toBe('return-request-rejected');
+    for (const call of (mockedPrisma.deliveryReturnRequest.findFirst as jest.Mock).mock.calls) {
+      expect(call[0].where).not.toHaveProperty('driverId');
+    }
   });
 });
