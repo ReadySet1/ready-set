@@ -182,6 +182,26 @@ describe('return-to-dispatch POST', () => {
     expect(res.status).toBe(401);
   });
 
+  it('treats a soft-deleted profile like an unknown caller (404, nothing filed)', async () => {
+    // A filter-less findUnique would still return the tombstoned row; the
+    // route must ask for `deletedAt: null` so the row is invisible.
+    (mockedPrisma.profile.findUnique as jest.Mock).mockImplementation(
+      async (args: { where: { id: string; deletedAt?: null } }) =>
+        args.where.deletedAt === null
+          ? null
+          : { id: DRIVER_ID, type: 'DRIVER', deletedAt: new Date('2026-09-01T00:00:00Z') },
+    );
+    const { POST } = await importRoute();
+    const res = await POST(createPostRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'User profile not found' });
+    expect(mockedPrisma.profile.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: DRIVER_ID, deletedAt: null } }),
+    );
+    expect(mockedPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('returns 403 for a non-privileged role', async () => {
     setupMocks({ role: 'CLIENT' });
     const { POST } = await importRoute();
