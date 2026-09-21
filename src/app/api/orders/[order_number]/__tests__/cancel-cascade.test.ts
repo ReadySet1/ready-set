@@ -185,6 +185,49 @@ describe('Orders API PATCH — cancel cascade', () => {
     expectCascade({ onDemandId: 'order-123' });
   });
 
+  it('stamps completeDateTime so the archiving job can pick the order up', async () => {
+    setupMocks('catering');
+    const { PATCH } = await importRoute();
+
+    await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    // dataArchiving selects terminal orders by `completeDateTime < cutoff`, so
+    // a cancelled order without one is never archivable.
+    const updateCall = (mockedPrisma.cateringRequest.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data.completeDateTime).toBeInstanceOf(Date);
+  });
+
+  it('stamps completeDateTime on a cancelled on-demand order too', async () => {
+    setupMocks('on_demand');
+    const { PATCH } = await importRoute();
+
+    await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    const updateCall = (mockedPrisma.onDemand.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data.completeDateTime).toBeInstanceOf(Date);
+  });
+
+  it('does not overwrite an existing completeDateTime when cancelling', async () => {
+    const alreadyStamped = new Date('2026-01-01T00:00:00.000Z');
+    setupMocks('catering', { completeDateTime: alreadyStamped });
+    const { PATCH } = await importRoute();
+
+    await PATCH(createPatchRequest({ status: 'CANCELLED' }), params);
+
+    const updateCall = (mockedPrisma.cateringRequest.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data.completeDateTime).toBeUndefined();
+  });
+
+  it('does NOT stamp completeDateTime on a non-terminal status change', async () => {
+    setupMocks('catering', { status: 'ACTIVE', driverStatus: null, dispatches: [] });
+    const { PATCH } = await importRoute();
+
+    await PATCH(createPatchRequest({ status: 'ASSIGNED' }), params);
+
+    const updateCall = (mockedPrisma.cateringRequest.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data.completeDateTime).toBeUndefined();
+  });
+
   it('runs the cascade inside the order-update transaction', async () => {
     setupMocks('catering');
     const { PATCH } = await importRoute();

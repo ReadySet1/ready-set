@@ -673,14 +673,20 @@ export async function PATCH(
       }
     }
 
-    // Stamp the completion time when the order reaches a completed state. The
+    // Stamp the completion time when the order reaches a terminal state. The
     // driver feed treats "active" as `completeDateTime IS NULL`, so without this
-    // a finished delivery keeps showing as active (the "2 active" walk-test bug).
-    // Covers both the driverStatus=COMPLETED transition and the explicit
-    // status=COMPLETED follow-up PATCH. Idempotent: only set if not already set.
-    const reachesCompleted =
-      driverStatus === DriverStatus.COMPLETED || updateData.status === 'COMPLETED';
-    if (reachesCompleted && !(existingOrder as any).completeDateTime) {
+    // a finished delivery keeps showing as active (the "2 active" walk-test bug),
+    // and the daily archiving job (src/jobs/dataArchiving.ts) selects terminal
+    // orders by `completeDateTime < cutoff` — a cancelled order without one can
+    // never be archived (old-orders audit, JOURNAL 2026-09-14).
+    // Covers the driverStatus=COMPLETED transition and the explicit
+    // status=COMPLETED / status=CANCELLED PATCH. Idempotent: only set if not
+    // already set.
+    const reachesTerminalState =
+      driverStatus === DriverStatus.COMPLETED ||
+      updateData.status === 'COMPLETED' ||
+      updateData.status === 'CANCELLED';
+    if (reachesTerminalState && !(existingOrder as any).completeDateTime) {
       updateData.completeDateTime = new Date();
     }
 
