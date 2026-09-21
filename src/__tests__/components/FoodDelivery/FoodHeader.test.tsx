@@ -171,12 +171,12 @@ describe("FoodHeader Component", () => {
       expect(paragraph.className).toMatch(/text-base|md:text-lg/);
     });
 
-    it("positions the description absolutely only at lg+, not at md", () => {
+    it("positions the description via flex layout on lg+, not absolute", () => {
       render(<FoodHeader />);
 
       const paragraph = screen.getByText(/trusted partner helping/);
-      expect(paragraph).toHaveClass("lg:absolute");
-      expect(paragraph).not.toHaveClass("md:absolute");
+      expect(paragraph).not.toHaveClass("lg:absolute");
+      expect(paragraph).toHaveClass("lg:max-w-sm");
     });
 
     it("has responsive button sizing", () => {

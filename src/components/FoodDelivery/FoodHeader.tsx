@@ -47,9 +47,10 @@ const FoodHeader: React.FC = () => {
   const heroBtnClasses =
     "rounded-full bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg";
 
+
   return (
     <section
-      className="relative flex flex-col min-h-[520px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
+      className="relative flex flex-col min-h-[520px] w-full md:h-[85vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
     >
       {/* Background image container */}
       <div className="absolute inset-0 z-0 overflow-hidden">
@@ -74,9 +75,9 @@ const FoodHeader: React.FC = () => {
         animate="visible"
         variants={containerVariants}
       >
-        <div className="flex flex-1 flex-col justify-end pb-12 md:pb-16">
+        <div className="flex flex-1 flex-col justify-end pb-12 md:pb-16 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
           <motion.div
-            className="w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:max-w-[50%] md:max-w-md md:rounded-none md:bg-transparent md:p-0 md:backdrop-blur-none"
+            className="w-full max-w-[55%] space-y-3 rounded-lg bg-black/40 p-4 backdrop-blur-sm sm:max-w-[50%] md:max-w-md md:rounded-none md:bg-transparent md:p-0 md:backdrop-blur-none lg:max-w-xl"
             initial={false}
             variants={containerVariants}
           >
@@ -111,9 +112,9 @@ const FoodHeader: React.FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Description - flows under buttons on mobile, positioned bottom-right on lg+ */}
+          {/* Description - flows under buttons on mobile, aligned bottom-right on lg+ */}
           <motion.p
-            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:max-w-md md:text-lg lg:absolute lg:bottom-10 lg:mt-0 lg:text-center lg:right-12"
+            className="mt-4 max-w-md font-[Montserrat] text-base font-medium leading-relaxed text-white/90 md:max-w-md md:text-lg lg:mt-0 lg:max-w-sm"
             initial={false}
             variants={itemVariants}
           >
