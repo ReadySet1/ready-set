@@ -685,6 +685,28 @@ describe('return-to-dispatch GET (recent rejection lookup)', () => {
     );
   });
 
+  it('treats a soft-deleted profile like an unknown caller (404, no lookups)', async () => {
+    // A filter-less findUnique would still return the tombstoned row; the
+    // route must ask for `deletedAt: null` so the row is invisible.
+    (mockedPrisma.profile.findUnique as jest.Mock).mockImplementation(
+      async (args: { where: { id: string; deletedAt?: null } }) =>
+        args.where.deletedAt === null
+          ? null
+          : { id: DRIVER_ID, type: 'DRIVER', deletedAt: new Date('2026-09-01T00:00:00Z') },
+    );
+    installFindFirst({ pending: null, rejected: rejectedRow });
+
+    const { GET } = await importRoute();
+    const res = await GET(createGetRequest(), params('CAT-001'));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'User profile not found' });
+    expect(mockedPrisma.profile.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: DRIVER_ID, deletedAt: null } }),
+    );
+    expect(mockedPrisma.deliveryReturnRequest.findFirst).not.toHaveBeenCalled();
+  });
+
   it('returns lastRejected: null when no recent rejection exists', async () => {
     installFindFirst({ pending: null, rejected: null });
 

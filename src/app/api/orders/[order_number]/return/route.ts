@@ -327,7 +327,7 @@ export async function GET(
     }
 
     const userProfile = await prisma.profile.findUnique({
-      where: { id: user.id },
+      where: { id: user.id, deletedAt: null },
       select: { id: true, type: true },
     });
     if (!userProfile) {

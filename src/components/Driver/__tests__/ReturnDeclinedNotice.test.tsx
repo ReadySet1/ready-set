@@ -34,6 +34,14 @@ describe("ReturnDeclinedNotice", () => {
     ).toBeInTheDocument();
   });
 
+  it("wraps a long unbroken note instead of overflowing the card", () => {
+    const longToken = "x".repeat(200);
+    render(<ReturnDeclinedNotice requestId="req-1" notes={longToken} />);
+
+    const notesEl = screen.getByText(longToken, { exact: false });
+    expect(notesEl.closest("div")).toHaveClass("break-words");
+  });
+
   it("hides on dismiss and remembers the request id in localStorage", () => {
     render(<ReturnDeclinedNotice requestId="req-1" notes={null} />);
 

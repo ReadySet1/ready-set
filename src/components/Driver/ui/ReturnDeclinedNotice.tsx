@@ -78,7 +78,7 @@ export function ReturnDeclinedNotice({
           This delivery is still yours to complete.
         </div>
         {trimmedNotes ? (
-          <div className="mt-1 text-[12.5px] font-medium leading-snug text-driver-text">
+          <div className="mt-1 break-words text-[12.5px] font-medium leading-snug text-driver-text">
             <span className="font-semibold">Note from dispatch:</span> {trimmedNotes}
           </div>
         ) : null}
