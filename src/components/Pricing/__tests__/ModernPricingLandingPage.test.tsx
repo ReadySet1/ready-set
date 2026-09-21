@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import ModernPricingLandingPage from "../ModernPricingLandingPage";
+import { calculateDeliveryCost } from "@/lib/calculator/delivery-cost-calculator";
 
 // Mock framer-motion to avoid animation issues in tests
 jest.mock("framer-motion", () => ({
@@ -81,25 +82,28 @@ describe("ModernPricingLandingPage", () => {
   describe("Delivery Pricing Table", () => {
     it("should render all pricing tiers", () => {
       render(<ModernPricingLandingPage />);
-      
+      const chart = screen.getByRole("table");
+
       // Check for some sample headcount values
-      expect(screen.getByText("0-24")).toBeInTheDocument();
-      expect(screen.getByText("25-49")).toBeInTheDocument();
-      expect(screen.getByText("100-124")).toBeInTheDocument();
-      expect(screen.getByText("300+")).toBeInTheDocument();
+      expect(within(chart).getByText("0-24")).toBeInTheDocument();
+      expect(within(chart).getByText("25-49")).toBeInTheDocument();
+      expect(within(chart).getByText("100-124")).toBeInTheDocument();
+      expect(within(chart).getByText("300+")).toBeInTheDocument();
     });
 
     it("should render table headers", () => {
       render(<ModernPricingLandingPage />);
-      expect(screen.getByText("Headcount")).toBeInTheDocument();
-      expect(screen.getByText("Food Cost")).toBeInTheDocument();
-      expect(screen.getByText("Delivery Cost")).toBeInTheDocument();
+      const chart = screen.getByRole("table");
+      expect(within(chart).getByText("Headcount")).toBeInTheDocument();
+      expect(within(chart).getByText("Food Cost")).toBeInTheDocument();
+      expect(within(chart).getByText("Delivery Cost")).toBeInTheDocument();
     });
 
     it("should display correct delivery costs", () => {
       render(<ModernPricingLandingPage />);
-      expect(screen.getByText("$60")).toBeInTheDocument(); // 0-24 headcount
-      expect(screen.getByText("$70")).toBeInTheDocument(); // 25-49 headcount
+      const chart = screen.getByRole("table");
+      expect(within(chart).getByText("$60")).toBeInTheDocument(); // 0-24 headcount
+      expect(within(chart).getByText("$70")).toBeInTheDocument(); // 25-49 headcount
     });
   });
 
@@ -257,6 +261,33 @@ describe("ModernPricingLandingPage", () => {
       expect(screen.getByText("2 Drives/Day-$5/drive")).toBeInTheDocument();
       expect(screen.getByText("3 Drives/Day-$10/drive")).toBeInTheDocument();
       expect(screen.getByText("4 Drives/Day-$15/drive")).toBeInTheDocument();
+    });
+
+    it("should publish the additional-stop charge the engine actually applies", () => {
+      // The terms card is the customer-facing contract: the rate it quotes
+      // must be the rate calculateDeliveryCost bills for a second stop.
+      const singleStop = calculateDeliveryCost({
+        headcount: 40,
+        foodCost: 550,
+        totalMileage: 0,
+        numberOfStops: 1,
+      });
+      const twoStops = calculateDeliveryCost({
+        headcount: 40,
+        foodCost: 550,
+        totalMileage: 0,
+        numberOfStops: 2,
+      });
+      const ratePerExtraStop =
+        twoStops.extraStopsCharge - singleStop.extraStopsCharge;
+
+      render(<ModernPricingLandingPage />);
+      expect(screen.getByText("Additional Stops")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          `$${ratePerExtraStop.toFixed(2)} per additional stop — the first stop is included in the delivery cost`,
+        ),
+      ).toBeInTheDocument();
     });
   });
 
