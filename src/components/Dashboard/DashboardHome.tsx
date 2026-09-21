@@ -74,6 +74,8 @@ interface JobApplicationsApiResponse {
 
 interface OrdersApiResponse {
   orders: CateringRequest[];
+  /** Total matching orders across all pages — the list itself is one page. */
+  totalCount?: number;
   totalPages: number;
 }
 
@@ -470,6 +472,7 @@ export function ModernDashboardHome() {
 
   const [recentOrders, setRecentOrders] = useState<CateringRequest[]>([]);
   const [activeOrders, setActiveOrders] = useState<CateringRequest[]>([]);
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [users, setUsers] = useState<any[]>([]);
   const [recentApplications, setRecentApplications] = useState<
     JobApplication[]
@@ -558,6 +561,9 @@ export function ModernDashboardHome() {
           const activeOrdersList = ordersData.orders || [];
           setRecentOrders(activeOrdersList);
           setActiveOrders(activeOrdersList);
+          // The endpoint pages at 10, so the list length is a ceiling, not a
+          // count — the stat card must use the server's total.
+          setActiveOrdersCount(ordersData.totalCount ?? activeOrdersList.length);
         } else {
           console.error("Failed to fetch orders:", ordersResult.reason);
           throw new Error("Failed to fetch orders data.");
@@ -906,7 +912,7 @@ export function ModernDashboardHome() {
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Active Orders"
-              value={activeOrders.length}
+              value={activeOrdersCount}
               icon={ClipboardList}
               change={`${activeOrdersPercentage}% of total`}
               changeType={
