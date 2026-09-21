@@ -68,7 +68,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(data.totalCount).toBe(1);
 
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { deletedAt: null },
         skip: 0,
         take: 10,
         orderBy: { pickupDateTime: 'desc' },
@@ -129,6 +129,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            deletedAt: null,
             status: OnDemandStatus.IN_PROGRESS,
           },
         })
@@ -149,7 +150,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
 
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {},
+          where: { deletedAt: null },
         })
       );
     });
@@ -169,6 +170,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            deletedAt: null,
             OR: [
               { orderNumber: { contains: 'jane', mode: 'insensitive' } },
               { user: { is: { name: { contains: 'jane', mode: 'insensitive' } } } },
@@ -377,6 +379,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            deletedAt: null,
             status: 'INVALID_STATUS',
           },
         })
@@ -433,6 +436,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            deletedAt: null,
             status: OnDemandStatus.COMPLETED,
             OR: [
               { orderNumber: { contains: 'OD-001', mode: 'insensitive' } },
@@ -483,6 +487,45 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
       expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: { orderTotal: 'ASC' },
+        })
+      );
+    });
+
+    it('should exclude soft-deleted orders (deletedAt null filter)', async () => {
+      (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.onDemand.count as jest.Mock).mockResolvedValue(0);
+
+      const request = createGetRequest('http://localhost:3000/api/orders/on-demand-orders');
+
+      await GET(request);
+
+      expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ deletedAt: null }),
+        })
+      );
+      expect(prisma.onDemand.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ deletedAt: null }),
+      });
+    });
+
+    it('should keep the soft-delete filter when status and search are applied', async () => {
+      (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.onDemand.count as jest.Mock).mockResolvedValue(0);
+
+      const request = createGetRequest(
+        'http://localhost:3000/api/orders/on-demand-orders?status=IN_PROGRESS&search=jane'
+      );
+
+      await GET(request);
+
+      expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            deletedAt: null,
+            status: OnDemandStatus.IN_PROGRESS,
+            OR: expect.any(Array),
+          }),
         })
       );
     });
