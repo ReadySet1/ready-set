@@ -151,7 +151,7 @@ interface CateringOrdersApiResponse {
 type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'IN_PROGRESS' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED';
 
 // Tab filter type for grouped status filtering
-type StatusTabFilter = 'all_open' | 'new' | 'in_transit' | 'completed' | 'cancelled';
+type StatusTabFilter = 'all_open' | 'new' | 'in_transit' | 'overdue' | 'completed' | 'cancelled';
 
 const statusConfig = {
   ACTIVE: { className: "bg-amber-100 text-amber-800 hover:bg-amber-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
@@ -232,6 +232,7 @@ const CateringOrdersPage: React.FC = () => {
     { value: 'all_open', label: 'All Open', description: 'All active orders' },
     { value: 'new', label: 'New', description: 'Pending & Confirmed' },
     { value: 'in_transit', label: 'In Transit', description: 'Active, Assigned, In Progress & Delivered' },
+    { value: 'overdue', label: 'Overdue', description: 'Still open more than a day past pickup' },
     { value: 'completed', label: 'Completed', description: 'Finished orders' },
     { value: 'cancelled', label: 'Cancelled', description: 'Cancelled orders' }
   ];

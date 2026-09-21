@@ -509,6 +509,58 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
       );
     });
 
+    it('should bound the overdue tab by pickup time as well as status', async () => {
+      (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
+
+      const request = createGetRequest(
+        'http://localhost:3000/api/orders/catering-orders?statusFilter=overdue'
+      );
+      request.headers.set('authorization', 'Bearer valid-token');
+
+      await GET(request);
+
+      const where = (prisma.cateringRequest.findMany as jest.Mock).mock.calls[0][0].where;
+      expect(where.deletedAt).toBeNull();
+      expect(where.status.in).toEqual(expect.arrayContaining([CateringStatus.PENDING]));
+      expect(where.status.in).not.toContain(CateringStatus.CANCELLED);
+      expect(where.status.in).not.toContain(CateringStatus.COMPLETED);
+      expect(where.pickupDateTime.lt).toBeInstanceOf(Date);
+      expect(where.pickupDateTime.lt.getTime()).toBeLessThan(Date.now());
+    });
+
+    it('should leave the all_open tab unbounded by date', async () => {
+      (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
+
+      const request = createGetRequest(
+        'http://localhost:3000/api/orders/catering-orders?statusFilter=all_open'
+      );
+      request.headers.set('authorization', 'Bearer valid-token');
+
+      await GET(request);
+
+      const where = (prisma.cateringRequest.findMany as jest.Mock).mock.calls[0][0].where;
+      expect(where.status.in).toEqual(expect.arrayContaining([CateringStatus.PENDING]));
+      expect(where.pickupDateTime).toBeUndefined();
+    });
+
+    it('should narrow, not replace, the overdue cutoff when a quick filter is applied', async () => {
+      (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
+
+      const request = createGetRequest(
+        'http://localhost:3000/api/orders/catering-orders?statusFilter=overdue&quickFilter=month'
+      );
+      request.headers.set('authorization', 'Bearer valid-token');
+
+      await GET(request);
+
+      const where = (prisma.cateringRequest.findMany as jest.Mock).mock.calls[0][0].where;
+      expect(where.pickupDateTime.lt).toBeInstanceOf(Date);
+      expect(where.pickupDateTime.gte).toBeInstanceOf(Date);
+    });
+
     it('should handle orders with null user name gracefully', async () => {
       const mockOrders = [
         {

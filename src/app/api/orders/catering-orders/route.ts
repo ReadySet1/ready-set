@@ -12,6 +12,7 @@ import {
     CateringStatus,
     CateringRequestWhereInput
 } from "@/types/prisma"; 
+import { buildCateringStatusTabWhere } from "@/lib/services/catering-order-filters";
 // PrismaClientKnownRequestError is now at Prisma.PrismaClientKnownRequestError in Prisma 7
 
 const ITEMS_PER_PAGE = 10;
@@ -71,48 +72,12 @@ export async function GET(req: NextRequest) {
       deletedAt: null
     };
 
-    // Handle statusFilter parameter for grouped status filtering
-    if (statusFilter === 'active') {
-      // Legacy: fetches all orders with active-like statuses
-      whereClause.status = {
-        in: [
-          CateringStatus.ACTIVE,
-          CateringStatus.ASSIGNED,
-          CateringStatus.PENDING,
-          CateringStatus.CONFIRMED,
-          CateringStatus.IN_PROGRESS,
-        ]
-      };
-    } else if (statusFilter === 'all_open') {
-      // All open orders (everything except completed and cancelled)
-      whereClause.status = {
-        in: [
-          CateringStatus.PENDING,
-          CateringStatus.CONFIRMED,
-          CateringStatus.ACTIVE,
-          CateringStatus.ASSIGNED,
-          CateringStatus.IN_PROGRESS,
-          CateringStatus.DELIVERED,
-        ]
-      };
-    } else if (statusFilter === 'new') {
-      // New orders awaiting processing
-      whereClause.status = {
-        in: [
-          CateringStatus.PENDING,
-          CateringStatus.CONFIRMED,
-        ]
-      };
-    } else if (statusFilter === 'in_transit') {
-      // Orders being worked on / in transit
-      whereClause.status = {
-        in: [
-          CateringStatus.ACTIVE,
-          CateringStatus.ASSIGNED,
-          CateringStatus.IN_PROGRESS,
-          CateringStatus.DELIVERED,
-        ]
-      };
+    // Handle statusFilter parameter for grouped status filtering. The groupings
+    // (including the date-bounded "overdue" tab) live in the service layer so
+    // they can be unit tested — see src/lib/services/catering-order-filters.ts.
+    const statusTabWhere = buildCateringStatusTabWhere(statusFilter);
+    if (statusTabWhere) {
+      Object.assign(whereClause, statusTabWhere);
     } else if (statusParam && statusParam !== 'all') {
       if (Object.values(CateringStatus).includes(statusParam as CateringStatus)) {
          whereClause.status = statusParam as CateringStatus;
@@ -129,7 +94,12 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Handle quick filters
+    // Handle quick filters. These narrow `pickupDateTime`, which the overdue tab
+    // has already bounded, so merge rather than overwrite.
+    const mergePickupBound = (bound: Record<string, Date>) => {
+      whereClause.pickupDateTime = { ...(whereClause.pickupDateTime ?? {}), ...bound };
+    };
+
     if (quickFilter) {
       const now = new Date();
       switch (quickFilter) {
@@ -138,7 +108,7 @@ export async function GET(req: NextRequest) {
           startOfDay.setHours(0, 0, 0, 0);
           const endOfDay = new Date(now);
           endOfDay.setHours(23, 59, 59, 999);
-          whereClause.pickupDateTime = { gte: startOfDay, lte: endOfDay };
+          mergePickupBound({ gte: startOfDay, lte: endOfDay });
           break;
         }
         case 'week': {
@@ -148,13 +118,13 @@ export async function GET(req: NextRequest) {
           const endOfWeek = new Date(startOfWeek);
           endOfWeek.setDate(startOfWeek.getDate() + 6);
           endOfWeek.setHours(23, 59, 59, 999);
-          whereClause.pickupDateTime = { gte: startOfWeek, lte: endOfWeek };
+          mergePickupBound({ gte: startOfWeek, lte: endOfWeek });
           break;
         }
         case 'month': {
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
           const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          whereClause.pickupDateTime = { gte: startOfMonth, lte: endOfMonth };
+          mergePickupBound({ gte: startOfMonth, lte: endOfMonth });
           break;
         }
         case 'high_value': {
