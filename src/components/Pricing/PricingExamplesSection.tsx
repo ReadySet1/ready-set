@@ -63,7 +63,7 @@ export default function PricingExamplesSection() {
           How Our Pricing Works
         </h2>
         <p className="mb-4 text-sm text-gray-600 sm:mb-5 sm:text-base md:mb-6 md:text-lg">
-          The delivery fee is the{" "}
+          The delivery cost is the{" "}
           <strong className="font-semibold text-gray-900">lower</strong> of the
           headcount rate and the food-cost rate, each looked up independently on
           the chart above.
@@ -71,7 +71,7 @@ export default function PricingExamplesSection() {
 
         <div className="grid gap-4 sm:gap-5 md:grid-cols-3 md:gap-6">
           {PRICING_EXAMPLES.map((ex) => {
-            const deliveryFee = Math.min(
+            const deliveryCost = Math.min(
               ex.headcountTierPrice,
               ex.foodCostTierPrice,
             );
@@ -125,10 +125,10 @@ export default function PricingExamplesSection() {
 
                   <div className="flex items-baseline justify-between border-t border-gray-200 pt-2 sm:pt-2.5 md:pt-3">
                     <dt className="text-xs font-bold text-gray-900 sm:text-sm md:text-base">
-                      Delivery Fee
+                      Delivery Cost
                     </dt>
                     <dd className="flex items-center gap-1.5 text-base font-black text-yellow-600 sm:gap-2 sm:text-lg md:text-xl">
-                      {formatUSD(deliveryFee)}
+                      {formatUSD(deliveryCost)}
                       {isLesserApplied && (
                         <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700 sm:text-sm">
                           lesser value applied
@@ -151,6 +151,10 @@ export default function PricingExamplesSection() {
             Tolls may be added depending on the route. If multiple deliveries
             are batched with the same driver, tolls and mileage are charged once
             for the total trip.
+          </p>
+          <p className="text-xs text-gray-600 sm:text-sm">
+            Additional stops are $5.00 each. The first stop is included in the
+            delivery cost.
           </p>
         </div>
       </section>

@@ -302,6 +302,19 @@ const ModernPricingLandingPage = () => {
                 </ul>
               </div>
 
+              {/* Additional Stops */}
+              <div className="mb-4 border-b border-white/20 pb-4 sm:mb-6 sm:pb-6 md:mb-8 md:pb-8">
+                <h3 className="mb-2 text-lg font-bold text-white sm:mb-3 sm:text-xl md:mb-4 md:text-2xl">
+                  Additional Stops
+                </h3>
+                <ul className="ml-4 list-disc space-y-1 sm:ml-5 sm:space-y-1.5 md:ml-6 md:space-y-2">
+                  <li className="text-sm text-white/90 sm:text-base">
+                    $5.00 per additional stop — the first stop is included in
+                    the delivery cost
+                  </li>
+                </ul>
+              </div>
+
               {/* Daily Drive Discount */}
               <div className="mb-4 border-b border-white/20 pb-4 sm:mb-6 sm:pb-6 md:mb-8 md:pb-8">
                 <h3 className="mb-2 text-lg font-bold text-white sm:mb-3 sm:text-xl md:mb-4 md:text-2xl">

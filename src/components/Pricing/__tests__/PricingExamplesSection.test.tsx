@@ -1,11 +1,29 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import PricingExamplesSection, {
   PRICING_EXAMPLES,
   formatUSD,
 } from "../PricingExamplesSection";
 import { pricingTiers } from "../ModernPricingLandingPage";
+import { calculateDeliveryCost } from "@/lib/calculator/delivery-cost-calculator";
+
+/**
+ * Every example on the page is a ≤10-mile, single-stop, single-drive quote,
+ * so the engine call that backs it fixes those inputs.
+ */
+const BASELINE_INPUT = {
+  totalMileage: 0,
+  numberOfDrives: 1,
+  numberOfStops: 1,
+} as const;
+
+/** Returns the card element that renders a given example. */
+function getExampleCard(label: string): HTMLElement {
+  const card = screen.getByRole("heading", { name: label }).closest("div");
+  if (!card) throw new Error(`No card found for ${label}`);
+  return card as HTMLElement;
+}
 
 // Mock framer-motion to avoid animation issues in tests
 jest.mock("framer-motion", () => ({
@@ -50,12 +68,14 @@ describe("PricingExamplesSection", () => {
   it("should show $70 for Example 1 with no 'lesser value applied' badge", () => {
     render(<PricingExamplesSection />);
 
-    // Example 1: both tiers are $70, so fee is $70 and no badge
-    const example1Fee = screen.getAllByText("$70");
-    expect(example1Fee.length).toBeGreaterThanOrEqual(1);
+    // Example 1: both tiers are $70, so the cost is $70 and no badge
+    const card = getExampleCard("Example 1");
+    expect(within(card).getByText("$70")).toBeInTheDocument();
+    expect(
+      within(card).queryByText("lesser value applied"),
+    ).not.toBeInTheDocument();
 
-    // "lesser value applied" should NOT appear for Example 1 (hc === fc)
-    // It should appear exactly twice (Examples 2 and 3)
+    // "lesser value applied" should appear exactly twice (Examples 2 and 3)
     const badges = screen.getAllByText("lesser value applied");
     expect(badges).toHaveLength(2);
   });
@@ -63,18 +83,28 @@ describe("PricingExamplesSection", () => {
   it("should show $90 with 'lesser value applied' for Example 2", () => {
     render(<PricingExamplesSection />);
 
-    // Example 2: headcount $100, food cost $90 → fee $90
-    // The fee $90 should be present
-    const ninetyTexts = screen.getAllByText("$90");
-    expect(ninetyTexts.length).toBeGreaterThanOrEqual(1);
+    // Example 2: headcount tier $100, food cost tier $90 → cost $90
+    const card = getExampleCard("Example 2");
+    expect(within(card).getByText("$90")).toBeInTheDocument();
+    expect(within(card).getByText("lesser value applied")).toBeInTheDocument();
   });
 
   it("should show $100 with 'lesser value applied' for Example 3", () => {
     render(<PricingExamplesSection />);
 
-    // Example 3: headcount $120, food cost $100 → fee $100
-    const hundredTexts = screen.getAllByText("$100");
-    expect(hundredTexts.length).toBeGreaterThanOrEqual(1);
+    // Example 3: headcount tier $120, food cost tier $100 → cost $100
+    const card = getExampleCard("Example 3");
+    expect(within(card).getByText("$100")).toBeInTheDocument();
+    expect(within(card).getByText("lesser value applied")).toBeInTheDocument();
+  });
+
+  it("should label the total 'Delivery Cost', matching the rate chart", () => {
+    render(<PricingExamplesSection />);
+
+    expect(screen.getAllByText("Delivery Cost")).toHaveLength(
+      PRICING_EXAMPLES.length,
+    );
+    expect(screen.queryByText("Delivery Fee")).not.toBeInTheDocument();
   });
 
   it("should format USD correctly with comma grouping", () => {
@@ -83,7 +113,7 @@ describe("PricingExamplesSection", () => {
     expect(formatUSD(550)).toBe("$550");
   });
 
-  it("should render both footnotes", () => {
+  it("should render every footnote", () => {
     render(<PricingExamplesSection />);
 
     expect(
@@ -95,6 +125,12 @@ describe("PricingExamplesSection", () => {
     expect(
       screen.getByText(
         /Tolls may be added depending on the route\. If multiple deliveries are batched with the same driver, tolls and mileage are charged once for the total trip\./,
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(
+        /Additional stops are \$5\.00 each\. The first stop is included in the delivery cost\./,
       ),
     ).toBeInTheDocument();
   });
@@ -160,6 +196,76 @@ describe("PricingExamplesSection", () => {
         const chartPrice = parseDeliveryPrice(row!.delivery);
         expect(chartPrice).toBe(ex.foodCostTierPrice);
       });
+    });
+  });
+
+  describe("guard test — examples stay consistent with the calculator engine", () => {
+    PRICING_EXAMPLES.forEach((ex) => {
+      it(`${ex.label}: headcountTierPrice is what the engine charges for ${ex.headcount} guests alone`, () => {
+        const { deliveryCost } = calculateDeliveryCost({
+          ...BASELINE_INPUT,
+          headcount: ex.headcount,
+          foodCost: 0,
+        });
+        expect(deliveryCost).toBe(ex.headcountTierPrice);
+      });
+
+      it(`${ex.label}: foodCostTierPrice is what the engine charges for $${ex.foodCost} of food alone`, () => {
+        const { deliveryCost } = calculateDeliveryCost({
+          ...BASELINE_INPUT,
+          headcount: 0,
+          foodCost: ex.foodCost,
+        });
+        expect(deliveryCost).toBe(ex.foodCostTierPrice);
+      });
+
+      it(`${ex.label}: the rendered delivery cost equals the engine's deliveryCost`, () => {
+        const { deliveryCost } = calculateDeliveryCost({
+          ...BASELINE_INPUT,
+          headcount: ex.headcount,
+          foodCost: ex.foodCost,
+        });
+
+        // The lesser-of-two-tiers rule the copy describes.
+        expect(deliveryCost).toBe(
+          Math.min(ex.headcountTierPrice, ex.foodCostTierPrice),
+        );
+
+        render(<PricingExamplesSection />);
+        const card = getExampleCard(ex.label);
+        expect(
+          within(card).getByText(formatUSD(deliveryCost)),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("the published additional-stop charge is the rate the engine applies", () => {
+      const oneStop = calculateDeliveryCost({
+        ...BASELINE_INPUT,
+        numberOfStops: 1,
+        headcount: 40,
+        foodCost: 550,
+      });
+      const twoStops = calculateDeliveryCost({
+        ...BASELINE_INPUT,
+        numberOfStops: 2,
+        headcount: 40,
+        foodCost: 550,
+      });
+
+      const ratePerExtraStop =
+        twoStops.extraStopsCharge - oneStop.extraStopsCharge;
+      expect(oneStop.extraStopsCharge).toBe(0);
+      expect(ratePerExtraStop).toBe(5);
+
+      render(<PricingExamplesSection />);
+      expect(
+        screen.getByText(
+          new RegExp(
+            `Additional stops are \\$${ratePerExtraStop.toFixed(2)} each\\.`,
+          ),
+        ),
+      ).toBeInTheDocument();
     });
   });
 });
