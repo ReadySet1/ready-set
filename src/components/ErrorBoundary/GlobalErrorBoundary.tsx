@@ -4,6 +4,12 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { collectErrorContext } from "@/lib/error-logging";
 import { captureException } from "@/lib/monitoring/sentry";
+import {
+  getChunkRecoveryStrategy,
+  isChunkLoadError,
+  recoverFromChunkLoadError,
+} from "@/lib/chunk-load-recovery";
+import { ChunkLoadErrorFallback } from "@/components/ErrorBoundary/ChunkLoadErrorFallback";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertTriangle, Home, Bug } from "lucide-react";
 
@@ -44,6 +50,13 @@ class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // A chunk load failure means the browser is holding a page whose JS chunks
+    // no longer resolve (stale tab across a deploy, or a starved request).
+    // Nothing inside the tree can fix it — take the single guarded reload.
+    if (isChunkLoadError(error)) {
+      recoverFromChunkLoadError(error);
+    }
+
     // Collect comprehensive error context
     const errorContext = collectErrorContext({
       errorBoundary: {
@@ -108,6 +121,26 @@ class GlobalErrorBoundary extends Component<Props, State> {
       // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback;
+      }
+
+      // Chunk load failures get the cache-clearing fallback, not the generic
+      // "Something went wrong" UI — the only useful action is a fresh load.
+      if (this.state.error && isChunkLoadError(this.state.error)) {
+        const strategy = getChunkRecoveryStrategy(this.state.error);
+
+        return (
+          <ChunkLoadErrorFallback
+            error={this.state.error}
+            errorId={this.state.errorId}
+            onRetry={this.handleRetry}
+            onGoHome={this.handleGoHome}
+            maxRetries={strategy.maxRetries}
+            showDetails={
+              this.props.showDetails ||
+              process.env.NODE_ENV === "development"
+            }
+          />
+        );
       }
 
       // Default enhanced error UI

@@ -217,6 +217,17 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Canonical host: www and the apex both served the app independently,
+      // splitting SEO signals and doubling the surface crawlers sweep.
+      // `permanent: true` is a 308, so the method and body survive.
+      // Must stay first — otherwise www.readysetllc.com/careers would redirect
+      // to www.readysetllc.com/apply and never reach the apex.
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.readysetllc.com' }],
+        destination: 'https://readysetllc.com/:path*',
+        permanent: true,
+      },
       {
         source: '/join-the-team',
         destination: '/apply',

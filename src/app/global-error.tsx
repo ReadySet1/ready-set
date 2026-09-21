@@ -3,6 +3,10 @@
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
 import { captureException } from '@/lib/monitoring/sentry'
+import {
+  isChunkLoadError,
+  recoverFromChunkLoadError,
+} from '@/lib/chunk-load-recovery'
 
 // Global error props interface for root layout errors
 interface GlobalErrorProps {
@@ -20,6 +24,16 @@ interface GlobalErrorProps {
  * @see https://nextjs.org/docs/app/building-your-application/routing/error-handling#handling-errors-in-root-layouts
  */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  // A root-layout chunk failure is only recoverable by a fresh load. Take the
+  // single session-guarded reload; `reset()` would re-run the same broken tree.
+  // Deliberately helper-only here: this file owns the global-error chunk that
+  // was itself failing to load, so it must not pull in more components.
+  useEffect(() => {
+    if (isChunkLoadError(error)) {
+      recoverFromChunkLoadError(error)
+    }
+  }, [error])
+
   // Capture the error to Sentry for monitoring
   useEffect(() => {
     captureException(error, {

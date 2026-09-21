@@ -293,6 +293,28 @@ export function getRecoveryStrategy(error: Error, context?: string): RecoveryOpt
   const errorMessage = error.message?.toLowerCase();
   const errorName = error.name?.toLowerCase();
 
+  // Chunk loading errors - clear cache and reload.
+  // Checked before the network branch: webpack's chunk timeout message reads
+  // "Loading chunk N failed. (timeout: ...)", which otherwise matched
+  // 'timeout' first and lost the cache-clear fallback.
+  if (errorMessage?.includes('chunk') || errorName === 'chunkloaderror') {
+    return {
+      maxRetries: 2,
+      retryDelay: 2000,
+      fallbackAction: () => {
+        if (typeof window !== 'undefined') {
+          // Clear cache and reload
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              names.forEach(name => caches.delete(name));
+            });
+          }
+          window.location.reload();
+        }
+      }
+    };
+  }
+
   // Network errors - aggressive retry with backoff
   if (errorMessage?.includes('network') || errorMessage?.includes('fetch') || errorMessage?.includes('timeout')) {
     return {
@@ -321,25 +343,6 @@ export function getRecoveryStrategy(error: Error, context?: string): RecoveryOpt
     return {
       maxRetries: 0,
       preserveState: true
-    };
-  }
-
-  // Chunk loading errors - clear cache and reload
-  if (errorMessage?.includes('chunk') || errorName === 'chunkloaderror') {
-    return {
-      maxRetries: 2,
-      retryDelay: 2000,
-      fallbackAction: () => {
-        if (typeof window !== 'undefined') {
-          // Clear cache and reload
-          if ('caches' in window) {
-            caches.keys().then(names => {
-              names.forEach(name => caches.delete(name));
-            });
-          }
-          window.location.reload();
-        }
-      }
     };
   }
 
