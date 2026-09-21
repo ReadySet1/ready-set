@@ -82,6 +82,40 @@ describe('useDriverRealtimeLocation', () => {
     });
   });
 
+  describe('consumer re-renders with unstable callbacks (SingleOrder wiring)', () => {
+    // SingleOrder passes an inline arrow for onLocationUpdate, so every parent
+    // render hands the hook a new callback identity. That must not tear the
+    // channel down and reconnect.
+    it('does not re-subscribe when callback identity changes between renders', async () => {
+      const { result, rerender } = renderHook(
+        ({ tick }) =>
+          useDriverRealtimeLocation({
+            driverProfileId: 'driver-1',
+            onLocationUpdate: () => tick,
+            onConnectionChange: () => tick,
+          }),
+        { initialProps: { tick: 0 } }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+      expect(createDriverLocationChannel).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        rerender({ tick: 1 });
+      });
+      await act(async () => {
+        rerender({ tick: 2 });
+      });
+
+      expect(createDriverLocationChannel).toHaveBeenCalledTimes(1);
+      expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
+      expect(result.current.isConnected).toBe(true);
+      expect(result.current.isConnecting).toBe(false);
+    });
+  });
+
   describe('channel lifecycle', () => {
     it('should create channel and subscribe on mount', async () => {
       const { result } = renderHook(() =>

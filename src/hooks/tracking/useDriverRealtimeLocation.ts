@@ -97,6 +97,16 @@ export function useDriverRealtimeLocation({
     driverIdRef.current = driverProfileId;
   }, [driverProfileId]);
 
+  // Consumers (e.g. SingleOrder) pass inline arrow callbacks whose identity
+  // changes on every render. Read them through refs so `connect` stays stable
+  // and a parent re-render does not tear the channel down and resubscribe.
+  const onLocationUpdateRef = useRef(onLocationUpdate);
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  useEffect(() => {
+    onLocationUpdateRef.current = onLocationUpdate;
+    onConnectionChangeRef.current = onConnectionChange;
+  }, [onLocationUpdate, onConnectionChange]);
+
   // Handle location update from realtime channel
   const handleLocationUpdate = useCallback((payload: DriverLocationUpdatedPayload) => {
     // Filter for our specific driver
@@ -121,8 +131,8 @@ export function useDriverRealtimeLocation({
     };
 
     setLocation(newLocation);
-    onLocationUpdate?.(newLocation);
-  }, [onLocationUpdate]);
+    onLocationUpdateRef.current?.(newLocation);
+  }, []);
 
   // Database record type for location inserts
   interface LocationRecord {
@@ -151,8 +161,8 @@ export function useDriverRealtimeLocation({
     };
 
     setLocation(newLocation);
-    onLocationUpdate?.(newLocation);
-  }, [onLocationUpdate]);
+    onLocationUpdateRef.current?.(newLocation);
+  }, []);
 
   // Connect to realtime channel
   const connect = useCallback(async () => {
@@ -184,17 +194,17 @@ export function useDriverRealtimeLocation({
           setIsConnected(true);
           setIsConnecting(false);
           setError(null);
-          onConnectionChange?.(true);
+          onConnectionChangeRef.current?.(true);
         },
         onDisconnect: () => {
           setIsConnected(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
         onError: (err) => {
           setError(err.message);
           setIsConnected(false);
           setIsConnecting(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
       });
     } catch (err) {
@@ -202,7 +212,7 @@ export function useDriverRealtimeLocation({
       setIsConnected(false);
       setIsConnecting(false);
     }
-  }, [enabled, driverProfileId, handleLocationUpdate, handleDatabaseInsert, onConnectionChange]);
+  }, [enabled, driverProfileId, handleLocationUpdate, handleDatabaseInsert]);
 
   // Reconnect function for manual refresh
   const reconnect = useCallback(() => {

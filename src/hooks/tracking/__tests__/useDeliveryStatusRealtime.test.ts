@@ -230,6 +230,84 @@ describe('useDeliveryStatusRealtime', () => {
     });
   });
 
+  describe('consumer re-renders with unstable callbacks (SingleOrder wiring)', () => {
+    // SingleOrder passes inline arrow functions for onStatusUpdate. Every
+    // parent render therefore hands the hook a new callback identity; the
+    // hook must not tear the channel down and reconnect because of that.
+    it('does not re-subscribe when callback identity changes between renders', async () => {
+      const { result, rerender } = renderHook(
+        ({ tick }) =>
+          useDeliveryStatusRealtime({
+            orderId: 'test-order-id',
+            onStatusUpdate: () => tick,
+            onConnectionChange: () => tick,
+          }),
+        { initialProps: { tick: 0 } }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+      expect(createDriverStatusChannel).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        rerender({ tick: 1 });
+      });
+      await act(async () => {
+        rerender({ tick: 2 });
+      });
+
+      expect(createDriverStatusChannel).toHaveBeenCalledTimes(1);
+      expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
+      expect(result.current.isConnected).toBe(true);
+      expect(result.current.isConnecting).toBe(false);
+    });
+
+    it('still resolves the safety timeout when the consumer re-renders while the channel hangs', async () => {
+      jest.useFakeTimers();
+      try {
+        // Channel never reports SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT.
+        mockChannelSubscribe.mockImplementation(async (callbacks) => {
+          channelCallbacks = callbacks;
+        });
+
+        const { result, rerender } = renderHook(
+          ({ tick }) =>
+            useDeliveryStatusRealtime({
+              orderId: 'test-order-id',
+              onStatusUpdate: () => tick,
+            }),
+          { initialProps: { tick: 0 } }
+        );
+
+        // Let the async pre-connect (getSession) settle and arm the timer.
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(result.current.isConnecting).toBe(true);
+
+        // Parent re-renders midway (e.g. a location update), new callback identity.
+        await act(async () => {
+          jest.advanceTimersByTime(6_000);
+        });
+        await act(async () => {
+          rerender({ tick: 1 });
+        });
+
+        // 12s after the first connect attempt the spinner must be gone.
+        await act(async () => {
+          jest.advanceTimersByTime(6_500);
+        });
+
+        expect(result.current.isConnecting).toBe(false);
+        expect(result.current.isConnected).toBe(false);
+        expect(result.current.error).toBe('Live updates timed out');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('status updates', () => {
     const createStatusPayload = (overrides: Partial<any> = {}) => ({
       orderId: 'test-order-id',

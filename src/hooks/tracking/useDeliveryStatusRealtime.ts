@@ -119,6 +119,19 @@ export function useDeliveryStatusRealtime({
   const channelRef = useRef<DriverStatusChannel | null>(null);
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Consumers (e.g. SingleOrder) pass inline arrow callbacks, so their identity
+  // changes on every render. Read them through refs so `connect` stays stable;
+  // otherwise every parent render tears the channel down, reconnects, and
+  // re-arms the CONNECT_TIMEOUT_MS safety net, leaving the UI on "Connecting…".
+  const onStatusUpdateRef = useRef(onStatusUpdate);
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  const showNotificationsRef = useRef(showNotifications);
+  useEffect(() => {
+    onStatusUpdateRef.current = onStatusUpdate;
+    onConnectionChangeRef.current = onConnectionChange;
+    showNotificationsRef.current = showNotifications;
+  }, [onStatusUpdate, onConnectionChange, showNotifications]);
+
   // Combine orderId and orderIds into a single set for filtering
   const orderIdsToTrack = useRef<Set<string>>(new Set());
 
@@ -156,7 +169,7 @@ export function useDeliveryStatusRealtime({
     });
 
     // Show toast notification if enabled
-    if (showNotifications) {
+    if (showNotificationsRef.current) {
       const statusInfo = STATUS_DISPLAY[statusPayload.status];
       const orderLabel = statusPayload.orderNumber || `Order ${statusPayload.orderId.slice(0, 8)}`;
 
@@ -177,8 +190,8 @@ export function useDeliveryStatusRealtime({
     }
 
     // Call user callback
-    onStatusUpdate?.(statusPayload);
-  }, [showNotifications, onStatusUpdate]);
+    onStatusUpdateRef.current?.(statusPayload);
+  }, []);
 
   // Connect to realtime channel
   const connect = useCallback(async () => {
@@ -211,7 +224,7 @@ export function useDeliveryStatusRealtime({
         setIsConnecting(false);
         setIsConnected(false);
         setError('Live updates unavailable — no active session');
-        onConnectionChange?.(false);
+        onConnectionChangeRef.current?.(false);
         return;
       }
 
@@ -222,7 +235,7 @@ export function useDeliveryStatusRealtime({
         connectTimeoutRef.current = null;
         setIsConnecting(false);
         setError((prev) => prev ?? 'Live updates timed out');
-        onConnectionChange?.(false);
+        onConnectionChangeRef.current?.(false);
       }, CONNECT_TIMEOUT_MS);
 
       const channel = createDriverStatusChannel();
@@ -238,11 +251,11 @@ export function useDeliveryStatusRealtime({
           setIsConnected(true);
           setIsConnecting(false);
           setError(null);
-          onConnectionChange?.(true);
+          onConnectionChangeRef.current?.(true);
         },
         onDisconnect: () => {
           setIsConnected(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
         onError: (err) => {
           if (connectTimeoutRef.current) {
@@ -252,7 +265,7 @@ export function useDeliveryStatusRealtime({
           setError(err.message);
           setIsConnected(false);
           setIsConnecting(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
       });
 
@@ -267,7 +280,7 @@ export function useDeliveryStatusRealtime({
       setIsConnected(false);
       setIsConnecting(false);
     }
-  }, [enabled, handleStatusUpdate, onConnectionChange]);
+  }, [enabled, handleStatusUpdate]);
 
   // Reconnect function for manual refresh
   const reconnect = useCallback(() => {
@@ -281,6 +294,10 @@ export function useDeliveryStatusRealtime({
     }
 
     return () => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       if (channelRef.current) {
         void channelRef.current.unsubscribe().catch(() => {
           // Ignore cleanup errors
