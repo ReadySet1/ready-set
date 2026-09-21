@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDriverRealtimeLocation } from '../useDriverRealtimeLocation';
 
@@ -113,6 +114,86 @@ describe('useDriverRealtimeLocation', () => {
       expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
       expect(result.current.isConnected).toBe(true);
       expect(result.current.isConnecting).toBe(false);
+    });
+  });
+
+  describe('callback freshness', () => {
+    it('invokes the callback from the latest render for a message delivered before passive effects flush', async () => {
+      const onLocationUpdateByTick = [jest.fn(), jest.fn()];
+      const payload = {
+        driverId: 'driver-1',
+        lat: 37.77,
+        lng: -122.41,
+        isMoving: true,
+        timestamp: new Date().toISOString(),
+      };
+
+      const { rerender } = renderHook(
+        ({ tick }) => {
+          useDriverRealtimeLocation({
+            driverProfileId: 'driver-1',
+            onLocationUpdate: onLocationUpdateByTick[tick],
+          });
+          useLayoutEffect(() => {
+            if (tick === 1) {
+              channelCallbacks.onLocationUpdate?.(payload);
+            }
+          }, [tick]);
+        },
+        { initialProps: { tick: 0 } }
+      );
+
+      await waitFor(() => {
+        expect(channelCallbacks.onLocationUpdate).toBeDefined();
+      });
+
+      await act(async () => {
+        rerender({ tick: 1 });
+      });
+
+      expect(onLocationUpdateByTick[1]).toHaveBeenCalledTimes(1);
+      expect(onLocationUpdateByTick[0]).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('overlapping connect() calls', () => {
+    it('creates exactly one new channel when a reconnect overlaps a slow unsubscribe', async () => {
+      const { result } = renderHook(() =>
+        useDriverRealtimeLocation({ driverProfileId: 'driver-1' })
+      );
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+      expect(createDriverLocationChannel).toHaveBeenCalledTimes(1);
+
+      const deferred: Array<() => void> = [];
+      mockChannelUnsubscribe.mockImplementation(
+        () => new Promise<void>((resolve) => { deferred.push(resolve); })
+      );
+      const flush = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      };
+
+      // First reconnect parks on the (slow) unsubscribe of the old channel;
+      // a second reconnect starts while it is still awaiting.
+      await act(async () => {
+        result.current.reconnect();
+        await flush();
+        result.current.reconnect();
+        await flush();
+      });
+      expect(deferred.length).toBeGreaterThanOrEqual(1);
+
+      // Release the parked unsubscribes, newest first, so the stale call
+      // resumes last.
+      for (const release of [...deferred].reverse()) {
+        await act(async () => { release(); await flush(); });
+      }
+
+      // Initial channel + exactly one replacement; the stale call must not
+      // create (and leak) a second replacement.
+      expect(createDriverLocationChannel).toHaveBeenCalledTimes(2);
+      expect(result.current.isConnected).toBe(true);
     });
   });
 

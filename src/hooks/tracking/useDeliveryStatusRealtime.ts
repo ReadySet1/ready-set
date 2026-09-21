@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import {
   createDriverStatusChannel,
   type DriverStatusChannel,
@@ -119,14 +120,26 @@ export function useDeliveryStatusRealtime({
   const channelRef = useRef<DriverStatusChannel | null>(null);
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // connect() awaits (dynamic import, getSession, subscribe). Each call and
+  // each effect cleanup bumps this generation; a call that resumes after an
+  // await and finds itself stale must not create a channel, arm a timer, or
+  // touch state — otherwise it leaks a subscription behind the newer call and
+  // can clear the newer call's safety timer.
+  const connectGenRef = useRef(0);
+  const invalidatePendingConnects = useCallback(() => {
+    connectGenRef.current++;
+  }, []);
+
   // Consumers (e.g. SingleOrder) pass inline arrow callbacks, so their identity
   // changes on every render. Read them through refs so `connect` stays stable;
   // otherwise every parent render tears the channel down, reconnects, and
   // re-arms the CONNECT_TIMEOUT_MS safety net, leaving the UI on "Connecting…".
+  // Synced in the layout phase so a WebSocket message that lands between
+  // commit and passive-effect flush already sees the latest callback.
   const onStatusUpdateRef = useRef(onStatusUpdate);
   const onConnectionChangeRef = useRef(onConnectionChange);
   const showNotificationsRef = useRef(showNotifications);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     onStatusUpdateRef.current = onStatusUpdate;
     onConnectionChangeRef.current = onConnectionChange;
     showNotificationsRef.current = showNotifications;
@@ -199,14 +212,19 @@ export function useDeliveryStatusRealtime({
       return;
     }
 
+    const gen = ++connectGenRef.current;
+    const isStale = () => gen !== connectGenRef.current;
+
     // Cleanup existing channel
     if (channelRef.current) {
+      const previous = channelRef.current;
+      channelRef.current = null;
       try {
-        await channelRef.current.unsubscribe();
+        await previous.unsubscribe();
       } catch (e) {
         // Ignore cleanup errors
       }
-      channelRef.current = null;
+      if (isStale()) return;
     }
 
     setIsConnecting(true);
@@ -220,6 +238,7 @@ export function useDeliveryStatusRealtime({
       const { createClient } = await import('@/utils/supabase/client');
       const supabase = createClient();
       const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (isStale()) return;
       if (authError || !session) {
         setIsConnecting(false);
         setIsConnected(false);
@@ -233,6 +252,7 @@ export function useDeliveryStatusRealtime({
       if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
       connectTimeoutRef.current = setTimeout(() => {
         connectTimeoutRef.current = null;
+        if (isStale()) return;
         setIsConnecting(false);
         setError((prev) => prev ?? 'Live updates timed out');
         onConnectionChangeRef.current?.(false);
@@ -241,9 +261,13 @@ export function useDeliveryStatusRealtime({
       const channel = createDriverStatusChannel();
       channelRef.current = channel;
 
+      // Channel events from a superseded connect() are ignored: the realtime
+      // client keys channels by name, so a stale CLOSED/error must not clobber
+      // the state of the channel a newer connect() now owns.
       await channel.subscribe({
         onStatusUpdate: undefined, // We handle driver shift status separately
         onConnect: () => {
+          if (isStale()) return;
           if (connectTimeoutRef.current) {
             clearTimeout(connectTimeoutRef.current);
             connectTimeoutRef.current = null;
@@ -254,10 +278,12 @@ export function useDeliveryStatusRealtime({
           onConnectionChangeRef.current?.(true);
         },
         onDisconnect: () => {
+          if (isStale()) return;
           setIsConnected(false);
           onConnectionChangeRef.current?.(false);
         },
         onError: (err) => {
+          if (isStale()) return;
           if (connectTimeoutRef.current) {
             clearTimeout(connectTimeoutRef.current);
             connectTimeoutRef.current = null;
@@ -268,10 +294,14 @@ export function useDeliveryStatusRealtime({
           onConnectionChangeRef.current?.(false);
         },
       });
+      // Whoever superseded us already tore this channel down; do not
+      // unsubscribe by name here or we would remove the newer channel.
+      if (isStale()) return;
 
       // Listen specifically for delivery status updates
       channel.on(REALTIME_EVENTS.DELIVERY_STATUS_UPDATED, handleStatusUpdate);
     } catch (err) {
+      if (isStale()) return;
       if (connectTimeoutRef.current) {
         clearTimeout(connectTimeoutRef.current);
         connectTimeoutRef.current = null;
@@ -294,6 +324,8 @@ export function useDeliveryStatusRealtime({
     }
 
     return () => {
+      // Invalidate any connect() still parked on an await.
+      invalidatePendingConnects();
       if (connectTimeoutRef.current) {
         clearTimeout(connectTimeoutRef.current);
         connectTimeoutRef.current = null;
@@ -305,7 +337,7 @@ export function useDeliveryStatusRealtime({
         channelRef.current = null;
       }
     };
-  }, [enabled, connect]);
+  }, [enabled, connect, invalidatePendingConnects]);
 
   // Cleanup on unmount
   useEffect(() => {
