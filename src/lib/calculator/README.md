@@ -184,21 +184,34 @@ const myCustomConfig: ClientDeliveryConfiguration = {
 
 ### Pricing Tiers
 
-The calculator uses 11 pricing tiers based on the **LESSER** of headcount OR food cost (conservative approach):
+There is no global tier table. Every calculation resolves `pricingTiers` from a
+client configuration in [`client-configurations.ts`](./client-configurations.ts),
+and each config picks its tier by the **LESSER** of headcount OR food cost
+(conservative approach).
+
+The table below is `READY_SET_FOOD_STANDARD` (`ready-set-food-standard`), the
+configuration used by the examples in this document. Note that its within-10-miles
+rate **equals** its regular rate — the distance threshold changes only whether
+per-mile charges apply, not the base fee:
 
 | Tier | Headcount | Food Cost | Regular Rate | Within 10 Miles |
 |------|-----------|-----------|--------------|-----------------|
-| 1 | 0-24 | $0-$299.99 | $60 | $30 |
-| 2 | 25-49 | $300-$599.99 | $70 | $40 |
-| 3 | 50-74 | $600-$899.99 | $90 | $60 |
-| 4 | 75-99 | $900-$1,199.99 | $100 | $70 |
-| 5 | 100-124 | $1,200-$1,499.99 | $120 | $80 |
-| 6 | 125-149 | $1,500-$1,699.99 | $150 | $90 |
-| 7 | 150-174 | $1,700-$1,899.99 | $180 | $100 |
-| 8 | 175-199 | $1,900-$2,099.99 | $210 | $110 |
-| 9 | 200-249 | $2,100-$2,299.99 | $280 | $120 |
-| 10 | 250-299 | $2,300-$2,499.99 | $310 | $130 |
+| 1 | 0-24 | $0-$299.99 | $60 | $60 |
+| 2 | 25-49 | $300-$599.99 | $70 | $70 |
+| 3 | 50-74 | $600-$899.99 | $90 | $90 |
+| 4 | 75-99 | $900-$1,199.99 | $100 | $100 |
+| 5 | 100-124 | $1,200-$1,499.99 | $120 | $120 |
+| 6 | 125-149 | $1,500-$1,699.99 | $150 | $150 |
+| 7 | 150-174 | $1,700-$1,899.99 | $180 | $180 |
+| 8 | 175-199 | $1,900-$2,099.99 | $210 | $210 |
+| 9 | 200-249 | $2,100-$2,299.99 | $280 | $280 |
+| 10 | 250-299 | $2,300-$2,499.99 | $310 | $310 |
 | 11 | 300+ | $2,500+ | TBD | TBD |
+
+Other clients have their own tables and their own within-10-miles columns — for
+example `KASA` discounts short trips ($30/$40/$60/$70/$80…) while
+`READY_SET_FOOD_PREMIUM` and `CATER_VALLEY` differ again. Always read the tiers
+from the config you are pricing against, never from this table.
 
 ### Mileage Calculation
 
@@ -431,7 +444,7 @@ const result = calculateDeliveryCost({
   totalMileage: 9,
   numberOfDrives: 1
 });
-// Result: { deliveryCost: 80, totalMileagePay: 0, dailyDriveDiscount: 0, deliveryFee: 80 }
+// Result: { deliveryCost: 120, totalMileagePay: 0, dailyDriveDiscount: 0, deliveryFee: 120 }
 ```
 
 ### Example 4: With Bridge Toll
