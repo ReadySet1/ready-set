@@ -25,18 +25,6 @@ export const MARKETING_CTA_FLAGS = {
    */
   FLOWERS_ABOUT_SERVICE_WORKS: false,
 
-  /**
-   * CATERING_FEATURES_GET_STARTED
-   * Controls the "Get Started" ScheduleDialog trigger in CateringFeatures
-   * (/catering-deliveries). Opens the Google Calendar booking flow.
-   *
-   * Disabled 2026-08 as a marketing decision — NOT because it was a duplicate.
-   *
-   * Safe to hide because the booking path on this page is unaffected:
-   * FoodHeader, CateringStats and CateringContact each keep their own
-   * ScheduleDialog trigger.
-   */
-  CATERING_FEATURES_GET_STARTED: false,
 } as const;
 
 export type MarketingCtaFlag = keyof typeof MARKETING_CTA_FLAGS;
