@@ -253,8 +253,9 @@ describe("DriverDeliveryDetail", () => {
     function installFetchWithReturn(opts: {
       postStatus?: number;
       pendingRequest?: Record<string, unknown> | null;
+      lastRejected?: Record<string, unknown> | null;
     } = {}) {
-      const { postStatus = 202, pendingRequest = null } = opts;
+      const { postStatus = 202, pendingRequest = null, lastRejected = null } = opts;
       installFetch();
       const base = global.fetch as jest.Mock;
       global.fetch = jest.fn((url: string, init?: RequestInit) => {
@@ -274,7 +275,8 @@ describe("DriverDeliveryDetail", () => {
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: () => Promise.resolve({ success: true, request: pendingRequest }),
+            json: () =>
+              Promise.resolve({ success: true, request: pendingRequest, lastRejected }),
           });
         }
         return base(url, init);
@@ -362,6 +364,105 @@ describe("DriverDeliveryDetail", () => {
       ).not.toHaveLength(0);
       expect(
         screen.queryByRole("button", { name: /can't complete this delivery/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("declined return request signal (QA gap 2026-09-21)", () => {
+    const rejected = {
+      id: "req-rejected-1",
+      status: "REJECTED",
+      reason: "VEHICLE_ISSUE",
+      details: null,
+      requestedAt: "2026-09-21T10:00:00Z",
+      resolvedAt: "2026-09-21T10:30:00Z",
+      resolutionNotes: "Too close to pickup — please continue.",
+    };
+
+    /** Same GET/POST routing as the return suite above. */
+    function installFetchWithReturn(opts: {
+      pendingRequest?: Record<string, unknown> | null;
+      lastRejected?: Record<string, unknown> | null;
+    } = {}) {
+      const { pendingRequest = null, lastRejected = null } = opts;
+      installFetch();
+      const base = global.fetch as jest.Mock;
+      global.fetch = jest.fn((url: string, init?: RequestInit) => {
+        if (typeof url === "string" && url.includes("/return")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({ success: true, request: pendingRequest, lastRejected }),
+          });
+        }
+        return base(url, init);
+      }) as unknown as typeof fetch;
+    }
+
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("shows the declined notice with dispatch's note and keeps the return CTA", async () => {
+      installFetchWithReturn({ lastRejected: rejected });
+      renderDetail();
+
+      expect(
+        await screen.findByText(/dispatch declined your return request/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/too close to pickup — please continue\./i),
+      ).toBeInTheDocument();
+      // The order stays with the driver: no pending badge, CTA still offered.
+      expect(
+        screen.queryByText(/return requested — awaiting dispatch/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /can't complete this delivery/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("hides the declined notice while a newer request is pending", async () => {
+      installFetchWithReturn({
+        pendingRequest: { id: "req-pending-2", status: "PENDING" },
+        lastRejected: rejected,
+      });
+      renderDetail();
+
+      expect(
+        await screen.findAllByText(/return requested — awaiting dispatch/i),
+      ).not.toHaveLength(0);
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("dismisses the notice and does not show it again on the next load", async () => {
+      installFetchWithReturn({ lastRejected: rejected });
+      const { unmount } = renderDetail();
+
+      await screen.findByText(/dispatch declined your return request/i);
+      fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+
+      unmount();
+      renderDetail();
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows nothing extra when there is no recent rejection", async () => {
+      installFetchWithReturn({ lastRejected: null });
+      renderDetail();
+
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
       ).not.toBeInTheDocument();
     });
   });

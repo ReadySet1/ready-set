@@ -31,6 +31,29 @@ export const MAX_RETURN_DETAILS_LENGTH = 500;
 
 export const TERMINAL_ORDER_STATUSES = ['COMPLETED', 'CANCELLED'];
 
+/**
+ * How long a REJECTED request stays visible to the driver UI after dispatch
+ * resolves it. Long enough to cover a full shift plus the next morning's
+ * check-in; short enough that an old decline never resurfaces on a re-run
+ * order number.
+ */
+export const REJECTED_RETURN_VISIBILITY_MS = 24 * 60 * 60 * 1000;
+
+/** Fields the driver-facing lookup exposes (never the resolver's id). */
+export const RETURN_REQUEST_LOOKUP_SELECT = {
+  id: true,
+  status: true,
+  reason: true,
+  details: true,
+  requestedAt: true,
+  resolvedAt: true,
+  resolutionNotes: true,
+} satisfies Prisma.DeliveryReturnRequestSelect;
+
+export type ReturnRequestLookup = Prisma.DeliveryReturnRequestGetPayload<{
+  select: typeof RETURN_REQUEST_LOOKUP_SELECT;
+}>;
+
 // Once the driver holds the food, a silent hand-back would strand the order —
 // post-pickup returns must go through dispatch (admins can still force).
 export const POST_PICKUP_DRIVER_STATUSES = [
@@ -494,4 +517,53 @@ export async function voidPendingReturnRequests(
     },
   });
   return result.count;
+}
+
+/**
+ * The PENDING request for an order — scoped to `driverId` for drivers, or
+ * unscoped (`null`) for privileged callers. Drives the driver UI's
+ * "Return requested" state. Order numbers match case-insensitively because
+ * the driver client may carry a differently-cased copy of the number.
+ *
+ * `delivery_return_requests` has no soft-delete column, so there is no
+ * `deletedAt` filter here (resolution is modelled by `status`, not deletion).
+ */
+export async function findPendingReturnRequest(
+  orderNumber: string,
+  driverId: string | null,
+  db: Db = prisma,
+): Promise<ReturnRequestLookup | null> {
+  return db.deliveryReturnRequest.findFirst({
+    where: {
+      orderNumber: { equals: orderNumber, mode: 'insensitive' },
+      status: 'PENDING',
+      ...(driverId ? { driverId } : {}),
+    },
+    orderBy: { requestedAt: 'desc' },
+    select: RETURN_REQUEST_LOOKUP_SELECT,
+  });
+}
+
+/**
+ * The most recent REJECTED request for an order resolved within
+ * `REJECTED_RETURN_VISIBILITY_MS`, scoped like `findPendingReturnRequest`.
+ * Lets the driver UI explain why the "Return requested" badge vanished and
+ * why the order still blocks end-shift, instead of relying on the push alone.
+ */
+export async function findRecentRejectedReturnRequest(
+  orderNumber: string,
+  driverId: string | null,
+  opts: { now?: Date; db?: Db } = {},
+): Promise<ReturnRequestLookup | null> {
+  const { now = new Date(), db = prisma } = opts;
+  return db.deliveryReturnRequest.findFirst({
+    where: {
+      orderNumber: { equals: orderNumber, mode: 'insensitive' },
+      status: 'REJECTED',
+      ...(driverId ? { driverId } : {}),
+      resolvedAt: { gte: new Date(now.getTime() - REJECTED_RETURN_VISIBILITY_MS) },
+    },
+    orderBy: { resolvedAt: 'desc' },
+    select: RETURN_REQUEST_LOOKUP_SELECT,
+  });
 }

@@ -33,6 +33,7 @@ import {
 } from "@/components/Driver/ui";
 import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
+import { ReturnDeclinedNotice } from "@/components/Driver/ui/ReturnDeclinedNotice";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
@@ -192,6 +193,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [returnOpen, setReturnOpen] = useState(false);
   /** True while this order has a PENDING return request awaiting dispatch. */
   const [pendingReturn, setPendingReturn] = useState(false);
+  /** Most recent REJECTED return request (last 24h) — dispatch said no and
+   *  the delivery is still ours; rendered as a dismissable notice. */
+  const [rejectedReturn, setRejectedReturn] = useState<{
+    id: string;
+    resolutionNotes: string | null;
+  } | null>(null);
 
   // Cache the session per mount cycle to reduce auth-lock contention (same
   // pattern SingleOrder uses).
@@ -258,8 +265,9 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     }
   }, [orderNumber, getValidSession, router]);
 
-  /** Non-fatal lookup of the caller's PENDING return request for this order —
-   *  drives the "Return requested — awaiting dispatch" state. */
+  /** Non-fatal lookup of the caller's return requests for this order —
+   *  drives the "Return requested — awaiting dispatch" state and the
+   *  "Dispatch declined your return request" notice. */
   const fetchPendingReturn = useCallback(async () => {
     if (!orderNumber) return;
     try {
@@ -276,8 +284,23 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         },
       );
       if (!res.ok) return;
-      const data = (await res.json()) as { request?: unknown };
+      const data = (await res.json()) as {
+        request?: unknown;
+        lastRejected?: { id?: unknown; resolutionNotes?: unknown } | null;
+      };
       setPendingReturn(data.request != null);
+      const rejected = data.lastRejected;
+      setRejectedReturn(
+        rejected && typeof rejected.id === "string"
+          ? {
+              id: rejected.id,
+              resolutionNotes:
+                typeof rejected.resolutionNotes === "string"
+                  ? rejected.resolutionNotes
+                  : null,
+            }
+          : null,
+      );
     } catch {
       /* best-effort — the badge simply stays hidden */
     }
@@ -572,6 +595,14 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             <Hourglass className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
             Return requested — awaiting dispatch
           </div>
+        ) : rejectedReturn && !isDone ? (
+          // A newer PENDING request supersedes the decline; otherwise explain
+          // why the badge vanished and why this order still blocks end-shift.
+          <ReturnDeclinedNotice
+            key={rejectedReturn.id}
+            requestId={rejectedReturn.id}
+            notes={rejectedReturn.resolutionNotes}
+          />
         ) : null}
       </DriverCard>
 
