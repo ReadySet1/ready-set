@@ -4,6 +4,7 @@
  * Tests real-time delivery status updates for helpdesk, vendor, and client users.
  */
 
+import { useLayoutEffect } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDeliveryStatusRealtime } from '../useDeliveryStatusRealtime';
 
@@ -39,13 +40,11 @@ jest.mock('@/lib/realtime', () => ({
 // The hook now does a pre-connection auth check (getSession) before
 // subscribing (REA-DRT-07 guard) — mock a valid session so the channel
 // connects in tests.
+const mockGetSession = jest.fn();
 jest.mock('@/utils/supabase/client', () => ({
   createClient: jest.fn(() => ({
     auth: {
-      getSession: jest.fn().mockResolvedValue({
-        data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
-        error: null,
-      }),
+      getSession: mockGetSession,
     },
   })),
 }));
@@ -82,6 +81,11 @@ describe('useDeliveryStatusRealtime', () => {
     });
 
     mockChannelUnsubscribe.mockResolvedValue(undefined);
+
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+      error: null,
+    });
   });
 
   describe('initialization', () => {
@@ -227,6 +231,187 @@ describe('useDeliveryStatusRealtime', () => {
       await waitFor(() => {
         expect(createDriverStatusChannel).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('consumer re-renders with unstable callbacks (SingleOrder wiring)', () => {
+    // SingleOrder passes inline arrow functions for onStatusUpdate. Every
+    // parent render therefore hands the hook a new callback identity; the
+    // hook must not tear the channel down and reconnect because of that.
+    it('does not re-subscribe when callback identity changes between renders', async () => {
+      const { result, rerender } = renderHook(
+        ({ tick }) =>
+          useDeliveryStatusRealtime({
+            orderId: 'test-order-id',
+            onStatusUpdate: () => tick,
+            onConnectionChange: () => tick,
+          }),
+        { initialProps: { tick: 0 } }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+      expect(createDriverStatusChannel).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        rerender({ tick: 1 });
+      });
+      await act(async () => {
+        rerender({ tick: 2 });
+      });
+
+      expect(createDriverStatusChannel).toHaveBeenCalledTimes(1);
+      expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
+      expect(result.current.isConnected).toBe(true);
+      expect(result.current.isConnecting).toBe(false);
+    });
+
+    it('still resolves the safety timeout when the consumer re-renders while the channel hangs', async () => {
+      jest.useFakeTimers();
+      try {
+        // Channel never reports SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT.
+        mockChannelSubscribe.mockImplementation(async (callbacks) => {
+          channelCallbacks = callbacks;
+        });
+
+        const { result, rerender } = renderHook(
+          ({ tick }) =>
+            useDeliveryStatusRealtime({
+              orderId: 'test-order-id',
+              onStatusUpdate: () => tick,
+            }),
+          { initialProps: { tick: 0 } }
+        );
+
+        // Let the async pre-connect (getSession) settle and arm the timer.
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(result.current.isConnecting).toBe(true);
+
+        // Parent re-renders midway (e.g. a location update), new callback identity.
+        await act(async () => {
+          jest.advanceTimersByTime(6_000);
+        });
+        await act(async () => {
+          rerender({ tick: 1 });
+        });
+
+        // 12s after the first connect attempt the spinner must be gone.
+        await act(async () => {
+          jest.advanceTimersByTime(6_500);
+        });
+
+        expect(result.current.isConnecting).toBe(false);
+        expect(result.current.isConnected).toBe(false);
+        expect(result.current.error).toBe('Live updates timed out');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('callback freshness', () => {
+    // A WebSocket message can land between React committing a render and
+    // flushing passive effects. The hook must already point at the latest
+    // callback in that window, i.e. the ref sync has to be a layout effect.
+    it('invokes the callback from the latest render for a message delivered before passive effects flush', async () => {
+      const onStatusUpdateByTick = [jest.fn(), jest.fn()];
+      const payload = {
+        orderId: 'test-order-id',
+        orderNumber: 'ORD-001',
+        orderType: 'catering',
+        driverId: 'driver-123',
+        status: 'PICKED_UP',
+        timestamp: new Date().toISOString(),
+      };
+
+      const { rerender } = renderHook(
+        ({ tick }) => {
+          useDeliveryStatusRealtime({
+            orderId: 'test-order-id',
+            showNotifications: false,
+            onStatusUpdate: onStatusUpdateByTick[tick],
+          });
+          // Runs in the same layout phase as the hook's own layout effects,
+          // before any passive effect of this render.
+          useLayoutEffect(() => {
+            if (tick === 1) {
+              eventListeners.get(REALTIME_EVENTS.DELIVERY_STATUS_UPDATED)?.({ payload });
+            }
+          }, [tick]);
+        },
+        { initialProps: { tick: 0 } }
+      );
+
+      await waitFor(() => {
+        expect(eventListeners.get(REALTIME_EVENTS.DELIVERY_STATUS_UPDATED)).toBeDefined();
+      });
+
+      await act(async () => {
+        rerender({ tick: 1 });
+      });
+
+      expect(onStatusUpdateByTick[1]).toHaveBeenCalledWith(payload);
+      expect(onStatusUpdateByTick[0]).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('overlapping connect() calls', () => {
+    it('keeps exactly one live channel and one armed timer when a slow getSession overlaps a reconnect', async () => {
+      const deferred: Array<(value: unknown) => void> = [];
+      mockGetSession.mockImplementation(
+        () => new Promise((resolve) => { deferred.push(resolve); })
+      );
+      // Channel never auto-connects here; we drive onConnect by hand.
+      mockChannelSubscribe.mockImplementation(async (callbacks) => {
+        channelCallbacks = callbacks;
+      });
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const flush = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      };
+
+      try {
+        const { result } = renderHook(() =>
+          useDeliveryStatusRealtime({ orderId: 'test-order-id' })
+        );
+
+        // First connect() is parked on getSession.
+        await act(flush);
+        await waitFor(() => expect(deferred).toHaveLength(1));
+
+        // Second connect() starts while the first is still awaiting.
+        await act(async () => {
+          result.current.reconnect();
+          await flush();
+        });
+        await waitFor(() => expect(deferred).toHaveLength(2));
+
+        const session = {
+          data: { session: { access_token: 'test-token', user: { id: 'test-user' } } },
+          error: null,
+        };
+        // Resolve the newer call first, then let the stale one resume.
+        await act(async () => { deferred[1]!(session); await flush(); });
+        await act(async () => { deferred[0]!(session); await flush(); });
+
+        expect(createDriverStatusChannel).toHaveBeenCalledTimes(1);
+        expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
+        const armedSafetyTimers = setTimeoutSpy.mock.calls.filter((c) => c[1] === 12_000);
+        expect(armedSafetyTimers).toHaveLength(1);
+        expect(result.current.isConnecting).toBe(true);
+
+        // The one live channel connects and resolves the UI.
+        await act(async () => {
+          channelCallbacks.onConnect?.();
+        });
+        expect(result.current.isConnected).toBe(true);
+        expect(result.current.isConnecting).toBe(false);
+      } finally {
+        setTimeoutSpy.mockRestore();
+      }
     });
   });
 
