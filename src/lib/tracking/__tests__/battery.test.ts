@@ -5,7 +5,12 @@
  * never read battery at all. These helpers are the single place both paths
  * read and the server validates the value.
  */
-import { readBatteryLevel, BatteryLevelSchema } from '../battery';
+import {
+  readBatteryLevel,
+  BatteryLevelSchema,
+  BATTERY_READ_TIMEOUT_MS,
+  batteryStatusFor,
+} from '../battery';
 
 const setGetBattery = (value: unknown) => {
   Object.defineProperty(navigator, 'getBattery', {
@@ -36,6 +41,19 @@ describe('readBatteryLevel', () => {
     await expect(readBatteryLevel()).resolves.toBeNull();
   });
 
+  it('resolves null after ~250ms when getBattery never settles (WebView stall)', async () => {
+    jest.useFakeTimers();
+    try {
+      setGetBattery(jest.fn(() => new Promise(() => {})));
+      const pending = readBatteryLevel();
+      jest.advanceTimersByTime(BATTERY_READ_TIMEOUT_MS);
+      await expect(pending).resolves.toBeNull();
+      expect(BATTERY_READ_TIMEOUT_MS).toBeLessThanOrEqual(250);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('returns null for a non-numeric level', async () => {
     setGetBattery(jest.fn().mockResolvedValue({ level: undefined }));
     await expect(readBatteryLevel()).resolves.toBeNull();
@@ -58,4 +76,19 @@ describe('BatteryLevelSchema', () => {
       expect(BatteryLevelSchema.parse(input)).toBeNull();
     },
   );
+});
+
+describe('batteryStatusFor', () => {
+  it('treats a real 0% as critical, not as missing data', () => {
+    expect(batteryStatusFor(0)).toEqual({ level: 0, status: 'critical' });
+  });
+
+  it.each([[null], [undefined]])('reports no level for %p', (level) => {
+    expect(batteryStatusFor(level)).toEqual({ status: 'good' });
+  });
+
+  it('grades low and good levels', () => {
+    expect(batteryStatusFor(25)).toEqual({ level: 25, status: 'low' });
+    expect(batteryStatusFor(80)).toEqual({ level: 80, status: 'good' });
+  });
 });

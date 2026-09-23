@@ -99,6 +99,8 @@ import {
   getActionCaller,
 } from '@/lib/auth/driver-ownership';
 
+import { insertParamFor } from '@/__tests__/helpers/insert-param';
+
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockCallerMayActOnDriver = callerMayActOnDriver as jest.Mock;
 const mockGetActionCaller = getActionCaller as jest.Mock;
@@ -348,6 +350,24 @@ describe('Driver Tracking Actions', () => {
       expect(result).toEqual({ success: true });
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2); // INSERT location + UPDATE driver
       expect(locationRateLimiter.checkAndRecordLimit).toHaveBeenCalledWith(validDriverId);
+    });
+
+    it.each([
+      [63.7, 64],
+      [0, 0],
+      [150, null],
+      [Number.NaN, null],
+      [undefined, null],
+    ])('validates batteryLevel %p through BatteryLevelSchema -> %p', async (input, stored) => {
+      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+
+      await updateDriverLocation(validDriverId, { ...mockLocationUpdate, batteryLevel: input });
+
+      const insertCall = (mockPrisma.$executeRawUnsafe as jest.Mock).mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO driver_locations'),
+      );
+      expect(insertCall).toBeDefined();
+      expect(insertParamFor(insertCall!, 'battery_level')).toBe(stored);
     });
 
     it('returns error when rate limited', async () => {

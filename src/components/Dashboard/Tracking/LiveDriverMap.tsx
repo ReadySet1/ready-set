@@ -19,7 +19,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
-import { MAP_CONFIG, MARKER_CONFIG, BATTERY_THRESHOLDS } from '@/constants/tracking-config';
+import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
+import { batteryStatusFor } from '@/lib/tracking/battery';
 import { isLocationStale } from '@/lib/realtime/stale-detection';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
@@ -312,13 +313,7 @@ export default function LiveDriverMap({
   // Get battery status
   const getBatteryStatus = useCallback((driverId: string): { level?: number; status: 'good' | 'low' | 'critical' } => {
     const location = recentLocations.find(loc => loc.driverId === driverId);
-    const level = location?.batteryLevel;
-
-    if (!level) return { status: 'good' };
-
-    if (level <= BATTERY_THRESHOLDS.CRITICAL) return { level, status: 'critical' };
-    if (level <= BATTERY_THRESHOLDS.LOW) return { level, status: 'low' };
-    return { level, status: 'good' };
+    return batteryStatusFor(location?.batteryLevel);
   }, [recentLocations]);
 
   // Create custom marker element
@@ -355,7 +350,7 @@ export default function LiveDriverMap({
             <path d="M14 16H9m10-5.5V12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5.5M5.2 4h13.6c.5 0 1.1.2 1.4.6.3.3.4.8.4 1.4v8c0 .5-.1 1-.4 1.4-.3.3-.9.6-1.4.6H5.2c-.5 0-1.1-.2-1.4-.6-.3-.3-.4-.8-.4-1.4V6c0-.5.1-1 .4-1.4C4.1 4.2 4.7 4 5.2 4z"/>
           </svg>
         </div>
-        ${battery.level ? `
+        ${battery.level != null ? `
           <div style="
             position: absolute;
             top: -4px;

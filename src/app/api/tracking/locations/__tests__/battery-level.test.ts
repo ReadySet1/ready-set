@@ -30,6 +30,7 @@ jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
 }));
 
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
+import { insertParamFor } from '@/__tests__/helpers/insert-param';
 import { withAuth } from '@/lib/auth-middleware';
 import { withRawTx } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
@@ -41,13 +42,12 @@ const mockTxExec = jest.fn();
 const URL_ = 'http://localhost:3000/api/tracking/locations';
 const base = { driver_id: 'driver-1', latitude: 37.7749, longitude: -122.4194 };
 
-/** INSERT params: [driver_id, lng, lat, accuracy, speed, heading, altitude, battery_level, ...] */
 function insertedBatteryParam(): unknown {
   const call = mockTxQuery.mock.calls.find(
     ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO driver_locations'),
   );
   expect(call).toBeDefined();
-  return call![8];
+  return insertParamFor(call!, 'battery_level');
 }
 
 describe('locations POST — battery_level persistence', () => {
