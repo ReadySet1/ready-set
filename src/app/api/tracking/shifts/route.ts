@@ -2,7 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { getDriverForUser } from '@/lib/auth/driver-ownership';
-import type { DriverShift } from '@/types/tracking';
+import { startDriverShift } from '@/app/actions/tracking/driver-actions';
+
+interface ShiftListRow {
+  id: string;
+  driver_id: string;
+  shift_start: Date;
+  shift_end: Date | null;
+  start_location_geojson: string | null;
+  end_location_geojson: string | null;
+  total_distance: number | null;
+  total_distance_miles: number | null;
+  gps_distance_miles: number | null;
+  mileage_source: string | null;
+  delivery_count: number | null;
+  status: string;
+  notes: string | null;
+  break_start: Date | null;
+  break_end: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  employee_id: string | null;
+  vehicle_number: string | null;
+}
 
 // GET - Get shifts for a driver or all active shifts (admin)
 export async function GET(request: NextRequest) {
@@ -22,25 +44,34 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
+    // Columns follow the shipped driver_shifts schema (see the note in
+    // ./[id]/route.ts): shift_start / shift_end, total_distance (legacy km),
+    // *_miles, mileage_source, notes, inline break_start / break_end. There is
+    // no metadata column and no shift_breaks table.
     let query = `
-      SELECT 
+      SELECT
         ds.id,
         ds.driver_id,
-        ds.start_time,
-        ds.end_time,
+        ds.shift_start,
+        ds.shift_end,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_km,
+        ds.total_distance,
+        ds.total_distance_miles,
+        ds.gps_distance_miles,
+        ds.mileage_source,
         ds.delivery_count,
         ds.status,
-        ds.metadata,
+        ds.notes,
+        ds.break_start,
+        ds.break_end,
         ds.created_at,
         ds.updated_at,
         d.employee_id,
         d.vehicle_number
       FROM driver_shifts ds
       LEFT JOIN drivers d ON ds.driver_id = d.id
-      WHERE 1=1
+      WHERE ds.deleted_at IS NULL
     `;
 
     const params: any[] = [];
@@ -72,61 +103,39 @@ export async function GET(request: NextRequest) {
       paramCounter++;
     }
 
-    query += ` ORDER BY ds.start_time DESC LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
+    query += ` ORDER BY ds.shift_start DESC LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
     params.push(limit, offset);
 
-    const result = await prisma.$queryRawUnsafe<any[]>(query, ...params);
+    const result = await prisma.$queryRawUnsafe<ShiftListRow[]>(query, ...params);
 
-    // Get breaks for each shift
-    const shifts = await Promise.all(
-      result.map(async (shift) => {
-        const breaks = await prisma.$queryRawUnsafe<any[]>(`
-          SELECT 
-            id,
-            shift_id,
-            start_time,
-            end_time,
-            break_type,
-            ST_AsGeoJSON(location) as location_geojson,
-            created_at
-          FROM shift_breaks
-          WHERE shift_id = $1
-          ORDER BY start_time DESC
-        `, shift.id);
-
-        return {
-          id: shift.id,
-          driverId: shift.driver_id,
-          startTime: shift.start_time,
-          endTime: shift.end_time,
-          startLocation: shift.start_location_geojson ? 
-            JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-          endLocation: shift.end_location_geojson ? 
-            JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-          totalDistanceKm: shift.total_distance_km,
-          deliveryCount: shift.delivery_count,
-          status: shift.status,
-          breaks: breaks.map(b => ({
-            id: b.id,
-            shiftId: b.shift_id,
-            startTime: b.start_time,
-            endTime: b.end_time,
-            breakType: b.break_type,
-            location: b.location_geojson ? 
-              JSON.parse(b.location_geojson).coordinates.reverse() : undefined,
-            createdAt: b.created_at
-          })),
-          metadata: shift.metadata,
-          createdAt: shift.created_at,
-          updatedAt: shift.updated_at,
-          // Additional driver info for admin views
-          driverInfo: authResult.context.user.type !== 'DRIVER' ? {
-            employeeId: shift.employee_id,
-            vehicleNumber: shift.vehicle_number
-          } : undefined
-        };
-      })
-    );
+    const shifts = result.map((shift) => ({
+      id: shift.id,
+      driverId: shift.driver_id,
+      startTime: shift.shift_start,
+      endTime: shift.shift_end,
+      startLocation: shift.start_location_geojson ?
+        JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
+      endLocation: shift.end_location_geojson ?
+        JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
+      totalDistanceMiles: shift.total_distance_miles,
+      gpsDistanceMiles: shift.gps_distance_miles,
+      mileageSource: shift.mileage_source,
+      totalDistanceKm: shift.total_distance,
+      deliveryCount: shift.delivery_count,
+      status: shift.status,
+      notes: shift.notes,
+      // Single inline break per shift (break_start/break_end on the row).
+      breaks: shift.break_start
+        ? [{ startTime: shift.break_start, endTime: shift.break_end }]
+        : [],
+      createdAt: shift.created_at,
+      updatedAt: shift.updated_at,
+      // Additional driver info for admin views
+      driverInfo: authResult.context.user.type !== 'DRIVER' ? {
+        employeeId: shift.employee_id,
+        vehicleNumber: shift.vehicle_number
+      } : undefined
+    }));
 
     return NextResponse.json({
       success: true,
@@ -191,69 +200,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new shift
-    const shiftResult = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      INSERT INTO driver_shifts (
-        driver_id,
-        start_time,
-        start_location,
-        status,
-        metadata
-      ) VALUES (
-        $1::uuid,
-        NOW(),
-        ST_GeogFromText($2),
-        'active',
-        $3::jsonb
-      ) RETURNING id
-    `,
-      driver?.id,
-      `POINT(${location.coordinates.lng} ${location.coordinates.lat})`,
-      JSON.stringify({ vehicleCheck, ...metadata })
+    // Delegate the insert (and the driver on-duty update) to startDriverShift,
+    // which targets the real schema and re-checks caller authorization.
+    const started = await startDriverShift(
+      driver.id,
+      location,
+      { vehicleCheck, ...metadata }
     );
 
-    const shiftId = shiftResult[0]?.id;
-    if (!shiftId) {
+    if (!started.success || !started.shiftId) {
+      if (started.error === 'Access denied') {
+        return NextResponse.json(
+          { success: false, error: 'Access denied' },
+          { status: 403 }
+        );
+      }
+      // Never echo the underlying error to the client.
+      console.error('Error starting shift:', started.error);
       return NextResponse.json(
-        { success: false, error: 'Failed to create shift' },
+        { success: false, error: 'Failed to start shift' },
         { status: 500 }
       );
     }
 
-    // Update driver status
-    await prisma.$executeRawUnsafe(`
-      UPDATE drivers 
-      SET 
-        is_on_duty = true,
-        current_shift_id = $2::uuid,
-        shift_start_time = NOW(),
-        last_known_location = ST_GeogFromText($3),
-        last_location_update = NOW(),
-        updated_at = NOW()
-      WHERE id = $1::uuid
-    `,
-      driver?.id,
-      shiftId,
-      `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
-    );
+    // startDriverShift resumes an already-open shift instead of creating one.
+    const resumed = started.resumed === true;
 
     return NextResponse.json({
       success: true,
       data: {
-        shiftId,
+        shiftId: started.shiftId,
         startTime: new Date().toISOString(),
-        status: 'active'
+        status: 'active',
+        ...(resumed ? { resumed: true } : {})
       }
-    }, { status: 201 });
+    }, { status: resumed ? 200 : 201 });
 
   } catch (error) {
     console.error('Error starting shift:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to start shift',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: 'Failed to start shift' },
       { status: 500 }
     );
   }
