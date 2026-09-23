@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     const sortField = url.searchParams.get('sort') || 'pickupDateTime';
     const sortDirection = url.searchParams.get('direction') || 'desc';
 
-    let whereClause: any = {};
+    // Soft-delete rule (see CLAUDE.md): every query must exclude deleted rows.
+    let whereClause: any = { deletedAt: null };
 
     // Status filter
     if (status && status !== 'all') {

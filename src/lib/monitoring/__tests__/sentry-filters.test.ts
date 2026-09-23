@@ -42,6 +42,64 @@ describe('createBeforeSend — Supabase auth navigator-lock AbortErrors', () => 
   });
 });
 
+describe('createBeforeSend — crawler traffic', () => {
+  const CHROME_141 =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+  const BYTESPIDER =
+    'Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)';
+
+  function eventWithUa(
+    userAgent: string,
+    exception: { type: string; value: string } = {
+      type: 'TypeError',
+      value: 'x is not a function',
+    },
+    headerName = 'User-Agent'
+  ): ErrorEvent {
+    return {
+      exception: { values: [exception] },
+      request: { headers: { [headerName]: userAgent } },
+    } as unknown as ErrorEvent;
+  }
+
+  const chunkTimeout = {
+    type: 'ChunkLoadError',
+    value:
+      'Loading chunk app/global-error-3f1a failed.\n(timeout: https://www.readysetllc.com/_next/static/chunks/app/global-error-3f1a.js)',
+  };
+
+  it('drops any event from a known crawler UA', () => {
+    expect(beforeSend(eventWithUa(BYTESPIDER), noHint)).toBeNull();
+  });
+
+  it('reads a lower-cased user-agent header too', () => {
+    expect(
+      beforeSend(eventWithUa(BYTESPIDER, undefined, 'user-agent'), noHint)
+    ).toBeNull();
+  });
+
+  it('drops a crawler ChunkLoadError timeout', () => {
+    expect(beforeSend(eventWithUa(BYTESPIDER, chunkTimeout), noHint)).toBeNull();
+  });
+
+  it('KEEPS a real-user ChunkLoadError timeout', () => {
+    expect(
+      beforeSend(eventWithUa(CHROME_141, chunkTimeout), noHint)
+    ).not.toBeNull();
+  });
+
+  it('keeps ordinary errors from a real browser', () => {
+    expect(beforeSend(eventWithUa(CHROME_141), noHint)).not.toBeNull();
+  });
+
+  it('keeps events with no user agent at all', () => {
+    const event = {
+      exception: { values: [{ type: 'TypeError', value: 'boom' }] },
+    } as unknown as ErrorEvent;
+    expect(beforeSend(event, noHint)).not.toBeNull();
+  });
+});
+
 describe('getSentryEnvironment — environment tag resolution', () => {
   const ENV_KEYS = [
     'NEXT_PUBLIC_SENTRY_ENVIRONMENT',

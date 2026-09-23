@@ -222,7 +222,7 @@ export default function DriverStatusList({
               </div>
 
               {/* Battery level */}
-              {locationData?.batteryLevel && (
+              {locationData?.batteryLevel != null && (
                 <div className="flex items-center space-x-1">
                   <BatteryIcon className={cn('w-4 h-4', {
                     'text-green-500': locationData.batteryLevel > 30,

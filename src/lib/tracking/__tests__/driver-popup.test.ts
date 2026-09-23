@@ -26,6 +26,11 @@ describe('escapeHtml', () => {
 });
 
 describe('buildDriverPopupHtml', () => {
+  it('renders a real 0% battery instead of hiding it', () => {
+    const html = buildDriverPopupHtml({ driver, battery: { level: 0, status: 'critical' } });
+    expect(html).toContain('0%');
+  });
+
   it('escapes interpolated driver strings', () => {
     const html = buildDriverPopupHtml({ driver, battery: { status: 'good' } });
     expect(html).toContain('Fernando &lt;Driver&gt;');

@@ -46,23 +46,30 @@ export async function runDriverMileageRecalculation(
     const lookbackStart = new Date();
     lookbackStart.setHours(lookbackStart.getHours() - lookbackHours);
 
+    // Columns follow the shipped `driver_shifts` schema (prisma `DriverShift`):
+    // `shift_end` (not end_time) and `total_distance` (legacy km).
+    // Only GPS-sourced (or never-computed) shifts are recalculated:
+    // calculateShiftMileage writes mileage_source = 'gps', which would clobber
+    // odometer / manual / hybrid mileage recorded at end of shift.
     const candidateShifts = await prisma.$queryRawUnsafe<{
       id: string;
       driver_id: string;
-      end_time: Date | null;
-      total_distance_km: number | null;
+      shift_end: Date | null;
+      total_distance: number | null;
     }[]>(`
       SELECT
         id,
         driver_id,
-        end_time,
-        total_distance_km
+        shift_end,
+        total_distance
       FROM driver_shifts
       WHERE
         status = 'completed'
-        AND end_time IS NOT NULL
-        AND end_time >= $1::timestamptz
-      ORDER BY end_time DESC
+        AND deleted_at IS NULL
+        AND (mileage_source IS NULL OR mileage_source = 'gps')
+        AND shift_end IS NOT NULL
+        AND shift_end >= $1::timestamptz
+      ORDER BY shift_end DESC
       LIMIT $2::int
     `, lookbackStart, batchSize);
 

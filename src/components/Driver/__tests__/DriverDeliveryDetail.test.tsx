@@ -221,6 +221,33 @@ describe("DriverDeliveryDetail", () => {
     await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
   });
 
+  it("does not hold the driver on the redundant order-status follow-up PATCH", async () => {
+    currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_TO_CLIENT });
+    const baseFetch = global.fetch as jest.Mock;
+    const passthrough = baseFetch.getMockImplementation();
+    baseFetch.mockImplementation((url: string, init?: RequestInit) =>
+      init?.body === JSON.stringify({ status: "COMPLETED" })
+        ? new Promise(() => {}) // never settles
+        : passthrough!(url, init),
+    );
+    renderDetail();
+
+    fireEvent.click(await screen.findByText("Complete delivery"));
+    fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+
+    // The completion still finishes (feed refresh + success toast) even
+    // though the follow-up PATCH never answers.
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Status updated"));
+    expect(baseFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/orders/CV-12345"),
+      // Not awaited, so it must survive navigation / webview unload.
+      expect.objectContaining({
+        body: JSON.stringify({ status: "COMPLETED" }),
+        keepalive: true,
+      }),
+    );
+  });
+
   it("treats a failed feed refresh as non-fatal (local update already applied)", async () => {
     refreshDeliveries.mockRejectedValueOnce(new Error("offline"));
     renderDetail();
@@ -253,8 +280,9 @@ describe("DriverDeliveryDetail", () => {
     function installFetchWithReturn(opts: {
       postStatus?: number;
       pendingRequest?: Record<string, unknown> | null;
+      lastRejected?: Record<string, unknown> | null;
     } = {}) {
-      const { postStatus = 202, pendingRequest = null } = opts;
+      const { postStatus = 202, pendingRequest = null, lastRejected = null } = opts;
       installFetch();
       const base = global.fetch as jest.Mock;
       global.fetch = jest.fn((url: string, init?: RequestInit) => {
@@ -274,7 +302,8 @@ describe("DriverDeliveryDetail", () => {
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: () => Promise.resolve({ success: true, request: pendingRequest }),
+            json: () =>
+              Promise.resolve({ success: true, request: pendingRequest, lastRejected }),
           });
         }
         return base(url, init);
@@ -362,6 +391,105 @@ describe("DriverDeliveryDetail", () => {
       ).not.toHaveLength(0);
       expect(
         screen.queryByRole("button", { name: /can't complete this delivery/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("declined return request signal (QA gap 2026-09-21)", () => {
+    const rejected = {
+      id: "req-rejected-1",
+      status: "REJECTED",
+      reason: "VEHICLE_ISSUE",
+      details: null,
+      requestedAt: "2026-09-21T10:00:00Z",
+      resolvedAt: "2026-09-21T10:30:00Z",
+      resolutionNotes: "Too close to pickup — please continue.",
+    };
+
+    /** Same GET/POST routing as the return suite above. */
+    function installFetchWithReturn(opts: {
+      pendingRequest?: Record<string, unknown> | null;
+      lastRejected?: Record<string, unknown> | null;
+    } = {}) {
+      const { pendingRequest = null, lastRejected = null } = opts;
+      installFetch();
+      const base = global.fetch as jest.Mock;
+      global.fetch = jest.fn((url: string, init?: RequestInit) => {
+        if (typeof url === "string" && url.includes("/return")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({ success: true, request: pendingRequest, lastRejected }),
+          });
+        }
+        return base(url, init);
+      }) as unknown as typeof fetch;
+    }
+
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("shows the declined notice with dispatch's note and keeps the return CTA", async () => {
+      installFetchWithReturn({ lastRejected: rejected });
+      renderDetail();
+
+      expect(
+        await screen.findByText(/dispatch declined your return request/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/too close to pickup — please continue\./i),
+      ).toBeInTheDocument();
+      // The order stays with the driver: no pending badge, CTA still offered.
+      expect(
+        screen.queryByText(/return requested — awaiting dispatch/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /can't complete this delivery/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("hides the declined notice while a newer request is pending", async () => {
+      installFetchWithReturn({
+        pendingRequest: { id: "req-pending-2", status: "PENDING" },
+        lastRejected: rejected,
+      });
+      renderDetail();
+
+      expect(
+        await screen.findAllByText(/return requested — awaiting dispatch/i),
+      ).not.toHaveLength(0);
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("dismisses the notice and does not show it again on the next load", async () => {
+      installFetchWithReturn({ lastRejected: rejected });
+      const { unmount } = renderDetail();
+
+      await screen.findByText(/dispatch declined your return request/i);
+      fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+
+      unmount();
+      renderDetail();
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows nothing extra when there is no recent rejection", async () => {
+      installFetchWithReturn({ lastRejected: null });
+      renderDetail();
+
+      await screen.findByText("Acme Corp");
+      expect(
+        screen.queryByText(/dispatch declined your return request/i),
       ).not.toBeInTheDocument();
     });
   });

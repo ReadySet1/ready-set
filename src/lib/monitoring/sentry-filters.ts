@@ -6,6 +6,7 @@
  */
 
 import type { ErrorEvent, EventHint } from '@sentry/nextjs';
+import { isBotUserAgent } from './bot-user-agents';
 
 /**
  * Resolve the Sentry `environment` tag, shared by the client, server, and edge
@@ -225,9 +226,72 @@ function isBotOrOutdatedBrowserError(event: ErrorEvent): boolean {
 }
 
 /**
+ * Best-effort user agent for an event. Sentry populates request.headers when it
+ * can; in the browser it often cannot, so fall back to navigator.
+ */
+function resolveUserAgent(event: ErrorEvent): string | undefined {
+  const headers = event.request?.headers as
+    | Record<string, string | undefined>
+    | undefined;
+
+  const fromHeaders = headers?.['User-Agent'] ?? headers?.['user-agent'];
+  if (fromHeaders) return fromHeaders;
+
+  if (typeof navigator !== 'undefined' && navigator.userAgent) {
+    return navigator.userAgent;
+  }
+
+  return undefined;
+}
+
+/**
+ * Check if the event came from a bot or crawler.
+ *
+ * Crawlers sweeping the marketing routes produced 1,613 events across 98 issues
+ * on 2026-09-15 — no user-facing failure, just burnt quota. See
+ * docs/ready-set/reports/2026-09-21-glitchtip-triage.md.
+ */
+function isCrawlerEvent(event: ErrorEvent): boolean {
+  return isBotUserAgent(resolveUserAgent(event));
+}
+
+/**
+ * Check if the event is a crawler-induced chunk load *timeout*.
+ *
+ * Stated separately from isCrawlerEvent even though it is narrower, because it
+ * is the specific shape the 09-15 burst took and the boundary matters: real
+ * users hitting the same webpack 120s timeout must keep reporting, since that
+ * is exactly what the ChunkLoadError recovery path exists to serve.
+ */
+function isBotChunkLoadTimeout(event: ErrorEvent): boolean {
+  const errorType = event.exception?.values?.[0]?.type || '';
+  const errorValue = event.exception?.values?.[0]?.value || '';
+
+  const isChunkLoad =
+    errorType === 'ChunkLoadError' || errorValue.includes('ChunkLoadError');
+  if (!isChunkLoad) return false;
+
+  // webpack's two failure modes: `timeout:` (request starved) vs `error:` (404).
+  // Only the starved one is crawler-shaped.
+  if (!errorValue.includes('timeout:')) return false;
+
+  return isBotUserAgent(resolveUserAgent(event));
+}
+
+/**
  * Apply client-specific filters
  */
 function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
+  // Filter out crawler-induced chunk load timeouts (the 09-15 burst shape)
+  if (isBotChunkLoadTimeout(event)) {
+    return false;
+  }
+
+  // Filter out everything else from known bots and crawlers
+  if (isCrawlerEvent(event)) {
+    return false;
+  }
+
   // Filter out browser extension errors
   if (isExtensionError(event)) {
     return false;

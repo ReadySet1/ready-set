@@ -403,6 +403,19 @@ describe('error-recovery', () => {
       expect(strategy.fallbackAction).toBeDefined();
     });
 
+    it('should return reload strategy for chunk timeouts, not the network one', () => {
+      // Webpack's chunk timeout message contains the word "timeout", which used
+      // to fall into the network branch and lose the cache-clear fallback.
+      const error = new Error(
+        'Loading chunk app/global-error-3f1a failed.\n(timeout: https://www.readysetllc.com/_next/static/chunks/app/global-error-3f1a.js)'
+      );
+      error.name = 'ChunkLoadError';
+      const strategy = getRecoveryStrategy(error);
+
+      expect(strategy.maxRetries).toBe(2);
+      expect(strategy.fallbackAction).toBeDefined();
+    });
+
     it('should return default strategy for unknown errors', () => {
       const strategy = getRecoveryStrategy(new Error('Unknown error'));
 

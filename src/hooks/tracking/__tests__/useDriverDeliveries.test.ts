@@ -475,6 +475,44 @@ describe('useDriverDeliveries', () => {
     });
   });
 
+  describe('completion does not wait on the order-status follow-up', () => {
+    it('resolves while the second (order-status) PATCH is still in flight', async () => {
+      setDeliveries([mockOrder]);
+
+      // The follow-up PATCH is redundant server-side (driverStatus=COMPLETED
+      // already maps the order to COMPLETED) and failure-tolerant, so the
+      // driver must not wait an extra round trip for it.
+      let patchCount = 0;
+      orderPatchHandler = () => {
+        patchCount += 1;
+        if (patchCount >= 2) return new Promise<FetchResult>(() => {});
+        return okJson({}, 200);
+      };
+
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await result.current.updateDeliveryStatus(
+          mockDeliveryId,
+          DriverStatus.COMPLETED,
+          mockLocation,
+        );
+      });
+
+      expect(ok).toBe(true);
+      const followUp = orderPatchCalls().find(
+        ([, init]) => init.body === JSON.stringify({ status: 'COMPLETED' }),
+      );
+      expect(followUp).toBeDefined();
+      // Not awaited, so it must survive navigation / webview unload.
+      expect(followUp![1]).toMatchObject({ keepalive: true });
+    });
+  });
+
   describe('refreshDeliveries', () => {
     it('should refresh delivery data', async () => {
       setDeliveries([mockOrder]);

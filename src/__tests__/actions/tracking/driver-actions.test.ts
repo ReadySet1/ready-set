@@ -25,11 +25,21 @@ jest.mock('next/cache', () => ({
 // Mock the ownership/auth helper — these unit tests target the actions' own
 // logic. beforeEach re-primes the caller as the owning driver (resetAllMocks
 // wipes implementations); the AuthZ block overrides per-test.
-jest.mock('@/lib/auth/driver-ownership', () => ({
-  callerMayActOnDriver: jest.fn(),
-  getActionCaller: jest.fn(),
-  userOwnsDriver: jest.fn(),
-}));
+jest.mock('@/lib/auth/driver-ownership', () => {
+  const callerMayActOnDriver = jest.fn();
+  const getActionCaller = jest.fn();
+  return {
+    callerMayActOnDriver,
+    getActionCaller,
+    userOwnsDriver: jest.fn(),
+    // Plain function (survives resetAllMocks) derived from the two mocks
+    // above, so each test's allow/deny + privileged setup keeps driving it.
+    authorizeDriverAction: async (driverId: unknown) => ({
+      allowed: await callerMayActOnDriver(await driverId),
+      caller: await getActionCaller(),
+    }),
+  };
+});
 
 // Mock rate limiter
 jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
@@ -99,6 +109,8 @@ import {
   getActionCaller,
 } from '@/lib/auth/driver-ownership';
 
+import { insertParamFor } from '@/__tests__/helpers/insert-param';
+
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockCallerMayActOnDriver = callerMayActOnDriver as jest.Mock;
 const mockGetActionCaller = getActionCaller as jest.Mock;
@@ -139,27 +151,21 @@ describe('Driver Tracking Actions', () => {
   describe('startDriverShift', () => {
     it('starts a driver shift successfully', async () => {
       primeNoOpenShift();
-      // Mock the INSERT for shift creation
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      // Mock the UPDATE for driver status
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      // Mock the SELECT for getting shift ID
+      // One statement inserts the shift, flips the driver row and returns the id
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
 
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
 
       expect(result.success).toBe(true);
       expect(result.shiftId).toBe(validShiftId);
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
-      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2); // open-shift lookup + id fetch
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2); // open-shift lookup + insert/flip
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tracking');
       expect(revalidatePath).toHaveBeenCalledWith('/driver');
     });
 
     it('accepts metadata parameter', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
 
       const metadata = { vehicleId: 'vehicle-123', notes: 'Starting morning shift' };
@@ -167,7 +173,7 @@ describe('Driver Tracking Actions', () => {
 
       expect(result.success).toBe(true);
       // Verify notes from metadata was passed to SQL query
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO driver_shifts'),
         validDriverId,
         mockLocationUpdate.coordinates.lng,
@@ -178,7 +184,7 @@ describe('Driver Tracking Actions', () => {
 
     it('handles database errors gracefully', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Database connection failed')
       );
 
@@ -190,8 +196,6 @@ describe('Driver Tracking Actions', () => {
 
     it('handles empty query result when getting shift ID', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
 
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
@@ -348,6 +352,24 @@ describe('Driver Tracking Actions', () => {
       expect(result).toEqual({ success: true });
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2); // INSERT location + UPDATE driver
       expect(locationRateLimiter.checkAndRecordLimit).toHaveBeenCalledWith(validDriverId);
+    });
+
+    it.each([
+      [63.7, 64],
+      [0, 0],
+      [150, null],
+      [Number.NaN, null],
+      [undefined, null],
+    ])('validates batteryLevel %p through BatteryLevelSchema -> %p', async (input, stored) => {
+      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+
+      await updateDriverLocation(validDriverId, { ...mockLocationUpdate, batteryLevel: input });
+
+      const insertCall = (mockPrisma.$executeRawUnsafe as jest.Mock).mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO driver_locations'),
+      );
+      expect(insertCall).toBeDefined();
+      expect(insertParamFor(insertCall!, 'battery_level')).toBe(stored);
     });
 
     it('returns error when rate limited', async () => {
@@ -730,7 +752,7 @@ describe('Driver Tracking Actions', () => {
   describe('Error Handling', () => {
     it('handles network/database errors gracefully in startDriverShift', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockRejectedValueOnce(
         new Error('Network error')
       );
 
@@ -742,7 +764,7 @@ describe('Driver Tracking Actions', () => {
 
     it('handles unexpected errors with generic message', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce('String error');
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockRejectedValueOnce('String error');
 
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
 
@@ -762,6 +784,13 @@ describe('Driver Tracking Actions', () => {
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
       expect(result).toEqual({ success: false, error: 'Access denied' });
       expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
+        expect.stringContaining('INSERT'),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
     });
 
     it('denies ending a foreign driver shift', async () => {
@@ -807,14 +836,12 @@ describe('Driver Tracking Actions', () => {
   describe('Data Validation', () => {
     it('passes location coordinates to PostGIS correctly', async () => {
       primeNoOpenShift();
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
 
       await startDriverShift(validDriverId, mockLocationUpdate);
 
       // Verify longitude (lng) is passed before latitude (lat) for PostGIS ST_MakePoint
-      // The INSERT query is the first call
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('ST_MakePoint'),
         validDriverId,
         mockLocationUpdate.coordinates.lng, // lng first

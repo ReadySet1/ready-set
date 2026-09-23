@@ -12,6 +12,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import {
   createDriverLocationChannel,
   type DriverLocationChannel,
@@ -97,6 +98,26 @@ export function useDriverRealtimeLocation({
     driverIdRef.current = driverProfileId;
   }, [driverProfileId]);
 
+  // Consumers (e.g. SingleOrder) pass inline arrow callbacks whose identity
+  // changes on every render. Read them through refs so `connect` stays stable
+  // and a parent re-render does not tear the channel down and resubscribe.
+  // Synced in the layout phase so a WebSocket message that lands between
+  // commit and passive-effect flush already sees the latest callback.
+  const onLocationUpdateRef = useRef(onLocationUpdate);
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  useIsomorphicLayoutEffect(() => {
+    onLocationUpdateRef.current = onLocationUpdate;
+    onConnectionChangeRef.current = onConnectionChange;
+  }, [onLocationUpdate, onConnectionChange]);
+
+  // connect() awaits (unsubscribe, subscribe). Each call and each effect
+  // cleanup bumps this generation; a call that resumes stale must not create
+  // a channel or touch state, or it leaks a subscription behind the newer call.
+  const connectGenRef = useRef(0);
+  const invalidatePendingConnects = useCallback(() => {
+    connectGenRef.current++;
+  }, []);
+
   // Handle location update from realtime channel
   const handleLocationUpdate = useCallback((payload: DriverLocationUpdatedPayload) => {
     // Filter for our specific driver
@@ -121,8 +142,8 @@ export function useDriverRealtimeLocation({
     };
 
     setLocation(newLocation);
-    onLocationUpdate?.(newLocation);
-  }, [onLocationUpdate]);
+    onLocationUpdateRef.current?.(newLocation);
+  }, []);
 
   // Database record type for location inserts
   interface LocationRecord {
@@ -151,8 +172,8 @@ export function useDriverRealtimeLocation({
     };
 
     setLocation(newLocation);
-    onLocationUpdate?.(newLocation);
-  }, [onLocationUpdate]);
+    onLocationUpdateRef.current?.(newLocation);
+  }, []);
 
   // Connect to realtime channel
   const connect = useCallback(async () => {
@@ -160,14 +181,19 @@ export function useDriverRealtimeLocation({
       return;
     }
 
+    const gen = ++connectGenRef.current;
+    const isStale = () => gen !== connectGenRef.current;
+
     // Cleanup existing channel
     if (channelRef.current) {
+      const previous = channelRef.current;
+      channelRef.current = null;
       try {
-        await channelRef.current.unsubscribe();
+        await previous.unsubscribe();
       } catch (e) {
         // Ignore cleanup errors
       }
-      channelRef.current = null;
+      if (isStale()) return;
     }
 
     setIsConnecting(true);
@@ -177,32 +203,39 @@ export function useDriverRealtimeLocation({
       const channel = createDriverLocationChannel();
       channelRef.current = channel;
 
+      // Events from a superseded connect() are ignored: the realtime client
+      // keys channels by name, so a stale CLOSED/error must not clobber the
+      // state of the channel a newer connect() now owns.
       await channel.subscribe({
         onLocationUpdate: handleLocationUpdate,
         onDatabaseInsert: handleDatabaseInsert,
         onConnect: () => {
+          if (isStale()) return;
           setIsConnected(true);
           setIsConnecting(false);
           setError(null);
-          onConnectionChange?.(true);
+          onConnectionChangeRef.current?.(true);
         },
         onDisconnect: () => {
+          if (isStale()) return;
           setIsConnected(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
         onError: (err) => {
+          if (isStale()) return;
           setError(err.message);
           setIsConnected(false);
           setIsConnecting(false);
-          onConnectionChange?.(false);
+          onConnectionChangeRef.current?.(false);
         },
       });
     } catch (err) {
+      if (isStale()) return;
       setError(err instanceof Error ? err.message : 'Failed to connect');
       setIsConnected(false);
       setIsConnecting(false);
     }
-  }, [enabled, driverProfileId, handleLocationUpdate, handleDatabaseInsert, onConnectionChange]);
+  }, [enabled, driverProfileId, handleLocationUpdate, handleDatabaseInsert]);
 
   // Reconnect function for manual refresh
   const reconnect = useCallback(() => {
@@ -216,6 +249,8 @@ export function useDriverRealtimeLocation({
     }
 
     return () => {
+      // Invalidate any connect() still parked on an await.
+      invalidatePendingConnects();
       if (channelRef.current) {
         void channelRef.current.unsubscribe().catch(() => {
           // Ignore cleanup errors
@@ -223,7 +258,7 @@ export function useDriverRealtimeLocation({
         channelRef.current = null;
       }
     };
-  }, [enabled, driverProfileId, connect]);
+  }, [enabled, driverProfileId, connect, invalidatePendingConnects]);
 
   // Cleanup on unmount
   useEffect(() => {

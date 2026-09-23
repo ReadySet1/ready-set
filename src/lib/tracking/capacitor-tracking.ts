@@ -29,6 +29,7 @@ import {
   nextMotionState,
   type MotionState,
 } from './motion-state';
+import { readBatteryLevel } from './battery';
 
 // v1.x exposes only the plugin TYPE; the runtime object is obtained via
 // Capacitor's registerPlugin, which binds to the native implementation inside
@@ -146,6 +147,8 @@ async function postLocation(
   token: string,
 ): Promise<void> {
   motionState = nextMotionState(motionState, location.speed);
+  // null on iOS (WKWebView has no Battery API); a real value on Android.
+  const batteryLevel = await readBatteryLevel();
   try {
     await fetch('/api/tracking/locations', {
       method: 'POST',
@@ -161,6 +164,7 @@ async function postLocation(
         speed: location.speed ?? undefined,
         heading: location.bearing ?? undefined,
         altitude: location.altitude ?? undefined,
+        battery_level: batteryLevel,
         is_moving: motionState.isMoving,
       }),
     });

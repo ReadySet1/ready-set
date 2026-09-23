@@ -9,6 +9,8 @@
  */
 
 import {
+  authorizeDriverAction,
+  callerMayActOnDriver,
   driverOwnershipCondition,
   getActionCaller,
   getDriverForUser,
@@ -192,5 +194,144 @@ describe("getDriverForUser", () => {
   it("returns null when the user has no driver row", async () => {
     mockQuery.mockResolvedValue([]);
     expect(await getDriverForUser(USER_ID)).toBeNull();
+  });
+});
+
+/**
+ * Round-trip budget (2026-09-22 field feedback: every driver action is slow
+ * since the app moved to a VPS ~150 ms from the database). After the auth
+ * user is known, the role lookup and the ownership lookup are independent —
+ * they must run concurrently, and the resolved caller must be reusable so an
+ * action never re-authenticates.
+ */
+describe("authorizeDriverAction", () => {
+  const mockHeaders = headers as jest.Mock;
+  const mockCreateClient = createClient as jest.Mock;
+  const mockGetUserRole = getUserRole as jest.Mock;
+  const mockGetUser = jest.fn();
+
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  /** Let every already-settled promise continuation run. */
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  beforeEach(() => {
+    mockCreateClient.mockResolvedValue({ auth: { getUser: mockGetUser } });
+    mockHeaders.mockResolvedValue({ get: () => null });
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+    mockGetUserRole.mockResolvedValue("DRIVER");
+  });
+
+  it("starts the ownership lookup before the role lookup resolves", async () => {
+    const role = deferred<string>();
+    mockGetUserRole.mockReturnValue(role.promise);
+    mockQuery.mockResolvedValue([{ id: DRIVER_ID }]);
+
+    const pending = authorizeDriverAction(DRIVER_ID);
+    await flush();
+
+    // Both lookups are in flight at the same time: one round trip, not two.
+    expect(mockGetUserRole).toHaveBeenCalledWith(USER_ID);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+
+    role.resolve("DRIVER");
+    await expect(pending).resolves.toEqual({
+      allowed: true,
+      caller: { userId: USER_ID, isPrivileged: false },
+    });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies a non-privileged caller who does not own the driver", async () => {
+    mockQuery.mockResolvedValue([]);
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toEqual({
+      allowed: false,
+      caller: { userId: USER_ID, isPrivileged: false },
+    });
+  });
+
+  it("allows ADMIN / SUPER_ADMIN on any driver", async () => {
+    mockGetUserRole.mockResolvedValue("super_admin");
+    mockQuery.mockResolvedValue([]);
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toEqual({
+      allowed: true,
+      caller: { userId: USER_ID, isPrivileged: true },
+    });
+  });
+
+  it("does not let an ownership-lookup failure block a privileged caller", async () => {
+    mockGetUserRole.mockResolvedValue("ADMIN");
+    mockQuery.mockRejectedValue(new Error("db down"));
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toMatchObject({
+      allowed: true,
+    });
+  });
+
+  it("propagates an ownership-lookup failure for a non-privileged caller", async () => {
+    mockQuery.mockRejectedValue(new Error("db down"));
+    await expect(authorizeDriverAction(DRIVER_ID)).rejects.toThrow("db down");
+  });
+
+  it("returns no caller and runs no lookups when unauthenticated", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toEqual({
+      allowed: false,
+      caller: null,
+    });
+    expect(mockGetUserRole).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("authenticates while a pending driverId is still being resolved", async () => {
+    const driverId = deferred<string | undefined>();
+    mockQuery.mockResolvedValue([{ id: DRIVER_ID }]);
+
+    const pending = authorizeDriverAction(driverId.promise);
+    await flush();
+
+    // Auth user lookup overlaps the caller's own query (e.g. the shift row).
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+
+    driverId.resolve(DRIVER_ID);
+    await expect(pending).resolves.toMatchObject({ allowed: true });
+    expect(mockQuery.mock.calls[0]?.[1]).toBe(DRIVER_ID);
+  });
+
+  it("treats HELPDESK as non-privileged (ownership still required)", async () => {
+    mockGetUserRole.mockResolvedValue("HELPDESK");
+    mockQuery.mockResolvedValue([]);
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toEqual({
+      allowed: false,
+      caller: { userId: USER_ID, isPrivileged: false },
+    });
+  });
+
+  it("rejects when a pending driverId rejects, without deciding", async () => {
+    await expect(
+      authorizeDriverAction(Promise.reject(new Error("shift lookup failed"))),
+    ).rejects.toThrow("shift lookup failed");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("never treats a missing driverId as owned", async () => {
+    await expect(authorizeDriverAction(undefined)).resolves.toMatchObject({
+      allowed: false,
+    });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("backs callerMayActOnDriver", async () => {
+    mockQuery.mockResolvedValue([{ id: DRIVER_ID }]);
+    await expect(callerMayActOnDriver(DRIVER_ID)).resolves.toBe(true);
+    mockQuery.mockResolvedValue([]);
+    await expect(callerMayActOnDriver(DRIVER_ID)).resolves.toBe(false);
   });
 });

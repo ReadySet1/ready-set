@@ -1048,6 +1048,44 @@ describe('useLocationTracking', () => {
     });
   });
 
+  describe('battery level', () => {
+    afterEach(() => {
+      delete (navigator as unknown as Record<string, unknown>).getBattery;
+    });
+
+    async function postOneFix() {
+      const { result } = renderHook(() => useLocationTracking());
+      await act(async () => {
+        result.current.startTracking();
+      });
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+      await waitFor(() => {
+        expect(locationPostCalls().length).toBeGreaterThan(0);
+      });
+      return { result, body: JSON.parse(locationPostCalls().pop()![1].body) };
+    }
+
+    it('sends battery_level as a 0-100 integer when the Battery API is present', async () => {
+      mockNavigatorProperty('getBattery', jest.fn().mockResolvedValue({ level: 0.64 }));
+
+      const { result, body } = await postOneFix();
+
+      expect(body.battery_level).toBe(64);
+      // The same LocationUpdate feeds the Realtime broadcast payload.
+      expect(result.current.currentLocation?.batteryLevel).toBe(64);
+    });
+
+    it('sends battery_level: null when the Battery API is absent (iOS Safari)', async () => {
+      delete (navigator as unknown as Record<string, unknown>).getBattery;
+
+      const { body } = await postOneFix();
+
+      expect(body).toHaveProperty('battery_level', null);
+    });
+  });
+
   describe('location formatting', () => {
     it('should correctly format location update with all fields', async () => {
       const { result } = renderHook(() => useLocationTracking());

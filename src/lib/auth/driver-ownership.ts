@@ -42,12 +42,11 @@ export interface ActionCaller {
 }
 
 /**
- * Resolve the authenticated caller of a server action. Server actions are
- * plain POST endpoints — every action that reads or mutates driver data must
- * authenticate the caller itself; nothing upstream does it for them.
- * Returns null when unauthenticated.
+ * Authenticate the caller of a server action / route: Bearer token first,
+ * then cookies. One Supabase Auth round trip in the common case. Returns the
+ * auth user id, or null when unauthenticated.
  */
-export async function getActionCaller(): Promise<ActionCaller | null> {
+async function getActionCallerId(): Promise<string | null> {
   const supabase = await createClient();
 
   let user: { id: string } | null = null;
@@ -73,13 +72,66 @@ export async function getActionCaller(): Promise<ActionCaller | null> {
     } = await supabase.auth.getUser();
     user = cookieUser;
   }
-  if (!user) return null;
+  return user?.id ?? null;
+}
 
-  const role = (await getUserRole(user.id))?.toUpperCase();
-  return {
-    userId: user.id,
-    isPrivileged: role === 'ADMIN' || role === 'SUPER_ADMIN',
-  };
+function isPrivilegedRole(role: string | null | undefined): boolean {
+  const upper = role?.toUpperCase();
+  return upper === 'ADMIN' || upper === 'SUPER_ADMIN';
+}
+
+/**
+ * Resolve the authenticated caller of a server action. Server actions are
+ * plain POST endpoints — every action that reads or mutates driver data must
+ * authenticate the caller itself; nothing upstream does it for them.
+ * Returns null when unauthenticated.
+ */
+export async function getActionCaller(): Promise<ActionCaller | null> {
+  const userId = await getActionCallerId();
+  if (!userId) return null;
+
+  const role = await getUserRole(userId);
+  return { userId, isPrivileged: isPrivilegedRole(role) };
+}
+
+export interface DriverActionAuthorization {
+  /** Owner-or-admin decision for the target driver. */
+  allowed: boolean;
+  /** The resolved caller, for reuse within the same action. Null when unauthenticated. */
+  caller: ActionCaller | null;
+}
+
+/**
+ * Owner-or-admin gate for server actions acting on a driver's data, returning
+ * the resolved caller as well so the action never re-authenticates.
+ *
+ * Latency: the database sits ~150 ms from the app server, so this runs the
+ * Supabase Auth lookup concurrently with however the caller is still
+ * resolving `driverId` (pass a promise, e.g. derived from the shift row), and
+ * the role and ownership lookups concurrently with each other. The decision
+ * is identical to checking them one after the other: privileged callers are
+ * allowed regardless of ownership (an ownership-lookup failure never blocks
+ * them), everyone else must own the driver row.
+ */
+export async function authorizeDriverAction(
+  driverId: string | null | undefined | Promise<string | null | undefined>
+): Promise<DriverActionAuthorization> {
+  const [userId, targetDriverId] = await Promise.all([
+    getActionCallerId(),
+    driverId,
+  ]);
+  if (!userId) return { allowed: false, caller: null };
+
+  const ownership = userOwnsDriver(targetDriverId, userId).then(
+    (owns) => ({ ok: true as const, owns }),
+    (error: unknown) => ({ ok: false as const, error })
+  );
+  const [role, owned] = await Promise.all([getUserRole(userId), ownership]);
+
+  const caller: ActionCaller = { userId, isPrivileged: isPrivilegedRole(role) };
+  if (caller.isPrivileged) return { allowed: true, caller };
+  if (!owned.ok) throw owned.error;
+  return { allowed: owned.owns, caller };
 }
 
 /**
@@ -89,10 +141,7 @@ export async function getActionCaller(): Promise<ActionCaller | null> {
 export async function callerMayActOnDriver(
   driverId: string | null | undefined
 ): Promise<boolean> {
-  const caller = await getActionCaller();
-  if (!caller) return false;
-  if (caller.isPrivileged) return true;
-  return userOwnsDriver(driverId, caller.userId);
+  return (await authorizeDriverAction(driverId)).allowed;
 }
 
 export interface DriverIdentity {

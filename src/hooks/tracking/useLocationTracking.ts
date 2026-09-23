@@ -6,6 +6,7 @@ import { getLocationStore } from '@/utils/indexedDB/locationStore';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { setNativePostThrottleMs } from '@/lib/tracking/capacitor-tracking';
 import { createMotionState, nextMotionState } from '@/lib/tracking/motion-state';
+import { readBatteryLevel } from '@/lib/tracking/battery';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
@@ -219,24 +220,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       speed,
       heading,
       altitude: position.coords.altitude ?? undefined,
-      batteryLevel: await getBatteryLevel(),
+      batteryLevel: (await readBatteryLevel()) ?? undefined,
       activityType: determineActivityType(speed),
       isMoving: motionStateRef.current.isMoving,
       timestamp: new Date(position.timestamp)
     };
   }, [getDriverId]);
-
-  // Get battery level if available
-  const getBatteryLevel = async (): Promise<number | undefined> => {
-    try {
-      if ('getBattery' in navigator) {
-        const battery = await (navigator as any).getBattery();
-        return battery.level * 100;
-      }
-    } catch (error) {
-          }
-    return undefined;
-  };
 
   // Determine activity type based on speed
   const determineActivityType = (speed: number): 'walking' | 'driving' | 'stationary' => {
@@ -269,7 +258,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
             heading: location.heading,
             altitude: location.altitude,
             battery_level:
-              location.batteryLevel != null ? Math.round(location.batteryLevel) : undefined,
+              location.batteryLevel != null ? Math.round(location.batteryLevel) : null,
             is_moving: location.isMoving,
             timestamp: Number.isFinite(fixMs)
               ? new Date(fixMs).toISOString()

@@ -93,9 +93,11 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
 
+    // Catering and on-demand deliveries are independent lookups: issue them
+    // together (the database is ~150 ms from the app server).
     // Fetch catering deliveries with historical limit
     // Filter: include incomplete deliveries OR recent completed deliveries
-    const cateringDeliveries = await prisma.cateringRequest.findMany({
+    const cateringLookup = prisma.cateringRequest.findMany({
       where: {
         id: { in: cateringIds },
         OR: [
@@ -116,7 +118,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch on-demand deliveries with historical limit
     // Filter: include incomplete deliveries OR recent completed deliveries
-    const onDemandDeliveries = await prisma.onDemand.findMany({
+    const onDemandLookup = prisma.onDemand.findMany({
       where: {
         id: { in: onDemandIds },
         OR: [
@@ -135,12 +137,10 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Fetch delivery addresses for on-demand deliveries
-    const onDemandDeliveryAddresses = await prisma.address.findMany({
-      where: {
-        id: { in: onDemandDeliveries.map((d: any) => d.deliveryAddressId) },
-      },
-    });
+    const [cateringDeliveries, onDemandDeliveries] = await Promise.all([
+      cateringLookup,
+      onDemandLookup,
+    ]);
 
     // Combine and sort deliveries
     const allDeliveries: Delivery[] = [
@@ -151,18 +151,14 @@ export async function GET(req: NextRequest) {
         address: d.pickupAddress,
         delivery_address: d.deliveryAddress,
       })),
-      ...onDemandDeliveries.map((d: any) => {
-        const deliveryAddress = onDemandDeliveryAddresses.find(
-          (addr: any) => addr.id === d.deliveryAddressId,
-        );
-        return {
-          ...d,
-          delivery_type: "on_demand" as const,
-          user: d.user,
-          address: d.pickupAddress,
-          delivery_address: deliveryAddress,
-        };
-      }),
+      ...onDemandDeliveries.map((d: any) => ({
+        ...d,
+        delivery_type: "on_demand" as const,
+        user: d.user,
+        address: d.pickupAddress,
+        // Included above (required FK on deliveryAddressId); no second query.
+        delivery_address: d.deliveryAddress,
+      })),
     ]
       .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(skip, skip + limit);
@@ -172,8 +168,13 @@ export async function GET(req: NextRequest) {
       .map((d: any) => d.orderNumber)
       .filter(Boolean) as string[];
 
-    let deliveryTimestampsMap: Record<string, any> = {};
-    if (orderNumbers.length > 0) {
+    // Stage timestamps and pending return requests are independent reads
+    // (both non-fatal): issue them together.
+    const orderIds = allDeliveries.map((d: any) => d.id).filter(Boolean) as string[];
+
+    const loadTimestamps = async (): Promise<Record<string, any>> => {
+      const map: Record<string, any> = {};
+      if (orderNumbers.length === 0) return map;
       try {
         const deliveryRecords = await prisma.delivery.findMany({
           where: { orderNumber: { in: orderNumbers } },
@@ -192,7 +193,7 @@ export async function GET(req: NextRequest) {
         const toISO = (d: Date | null) => d?.toISOString() ?? null;
         for (const rec of deliveryRecords) {
           if (rec.orderNumber) {
-            deliveryTimestampsMap[rec.orderNumber] = {
+            map[rec.orderNumber] = {
               assignedAt: toISO(rec.assignedAt),
               enRouteToVendorAt: toISO(rec.enRouteToVendorAt),
               arrivedAtVendorAt: toISO(rec.arrivedAtVendorAt),
@@ -206,24 +207,30 @@ export async function GET(req: NextRequest) {
       } catch (deliveryError) {
         console.warn('Failed to fetch delivery timestamps for driver deliveries:', deliveryError);
       }
-    }
+      return map;
+    };
 
     // Flag orders with a PENDING driver return request so the driver portal
     // can mirror the server-side end-shift guard (a pending request stops the
     // order from blocking) and show the "Return requested" state.
-    let pendingReturnOrderIds = new Set<string>();
-    const orderIds = allDeliveries.map((d: any) => d.id).filter(Boolean) as string[];
-    if (orderIds.length > 0) {
+    const loadPendingReturns = async (): Promise<Set<string>> => {
+      if (orderIds.length === 0) return new Set<string>();
       try {
         const pendingRequests = await prisma.deliveryReturnRequest.findMany({
           where: { orderId: { in: orderIds }, status: 'PENDING' },
           select: { orderId: true },
         });
-        pendingReturnOrderIds = new Set(pendingRequests.map((r) => r.orderId));
+        return new Set(pendingRequests.map((r) => r.orderId));
       } catch (pendingErr) {
         console.warn('Failed to fetch pending return requests for driver deliveries:', pendingErr);
+        return new Set<string>();
       }
-    }
+    };
+
+    const [deliveryTimestampsMap, pendingReturnOrderIds] = await Promise.all([
+      loadTimestamps(),
+      loadPendingReturns(),
+    ]);
 
     const serializedDeliveries = allDeliveries.map((delivery) => {
       const serialized = JSON.parse(

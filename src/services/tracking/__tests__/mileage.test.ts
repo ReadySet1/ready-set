@@ -279,3 +279,57 @@ describe("calculateShiftMileage with admin tracking settings", () => {
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Round trips (end shift waits on this; the DB is ~150 ms from the app server)
+// ---------------------------------------------------------------------------
+
+describe("calculateShiftMileage round trips", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("reads the shift window and the settings concurrently", async () => {
+    let releaseShift!: (v: unknown) => void;
+    mockMileageQueries([]);
+    const base = mockQueryRaw.getMockImplementation()!;
+    mockQueryRaw.mockImplementation((sql: string) =>
+      sql.includes("FROM driver_shifts")
+        ? new Promise((r) => {
+            releaseShift = r;
+          })
+        : base(sql),
+    );
+
+    const pending = calculateShiftMileage(SHIFT_ID);
+    await flush();
+    // Settings are requested while the shift row is still in flight.
+    expect(mockGetSettings).toHaveBeenCalledTimes(1);
+
+    releaseShift(await base("FROM driver_shifts"));
+    await pending;
+  });
+
+  it("runs the GPS diagnostic and trail queries concurrently", async () => {
+    let releaseDiagnostic!: (v: unknown) => void;
+    const points = straightPathPoints(1, 10);
+    mockMileageQueries(points);
+    const base = mockQueryRaw.getMockImplementation()!;
+    mockQueryRaw.mockImplementation((sql: string) =>
+      sql.includes("total_points")
+        ? new Promise((r) => {
+            releaseDiagnostic = r;
+          })
+        : base(sql),
+    );
+
+    const pending = calculateShiftMileage(SHIFT_ID);
+    await flush();
+    const trailQueries = mockQueryRaw.mock.calls.filter(([sql]) =>
+      String(sql).includes("ORDER BY recorded_at"),
+    );
+    expect(trailQueries).toHaveLength(1);
+
+    releaseDiagnostic([{ total_points: points.length, filtered_points: 0 }]);
+    const result = await pending;
+    expect(result.totalMiles).toBeCloseTo(1, 1);
+  });
+});

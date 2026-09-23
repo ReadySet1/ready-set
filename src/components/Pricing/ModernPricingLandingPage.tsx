@@ -14,8 +14,9 @@ import {
   DollarSign,
 } from "lucide-react";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import PricingExamplesSection from "./PricingExamplesSection";
 
-interface PricingTier {
+export interface PricingTier {
   headcount: string;
   foodCost: string;
   delivery: string;
@@ -31,24 +32,24 @@ interface HostingOption {
   includesDelivery?: boolean;
 }
 
+export const pricingTiers: PricingTier[] = [
+  { headcount: "0-24", foodCost: "<$300", delivery: "$60" },
+  { headcount: "25-49", foodCost: "$300-$599", delivery: "$70" },
+  { headcount: "50-74", foodCost: "$600-$899", delivery: "$90" },
+  { headcount: "75-99", foodCost: "$900-$1199", delivery: "$100" },
+  { headcount: "100-124", foodCost: "$1200-$1499", delivery: "$120" },
+  { headcount: "125-149", foodCost: "$1500-$1699", delivery: "$150" },
+  { headcount: "150-174", foodCost: "$1700-$1899", delivery: "$180" },
+  { headcount: "175-199", foodCost: "$1900-$2099", delivery: "$210" },
+  { headcount: "200-249", foodCost: "$2100-$2299", delivery: "$280" },
+  { headcount: "250-299", foodCost: "$2300-$2499", delivery: "$310" },
+  { headcount: "300+", foodCost: "TBD", delivery: "TBD" },
+];
+
 const ModernPricingLandingPage = () => {
   const [activeTab, setActiveTab] = useState<"delivery" | "hosting">(
     "delivery",
   );
-
-  const pricingTiers: PricingTier[] = [
-    { headcount: "0-24", foodCost: "<$300", delivery: "$60" },
-    { headcount: "25-49", foodCost: "$300-$599", delivery: "$70" },
-    { headcount: "50-74", foodCost: "$600-$899", delivery: "$90" },
-    { headcount: "75-99", foodCost: "$900-$1199", delivery: "$100" },
-    { headcount: "100-124", foodCost: "$1200-$1499", delivery: "$120" },
-    { headcount: "125-149", foodCost: "$1500-$1699", delivery: "$150" },
-    { headcount: "150-174", foodCost: "$1700-$1899", delivery: "$180" },
-    { headcount: "175-199", foodCost: "$1900-$2099", delivery: "$210" },
-    { headcount: "200-249", foodCost: "$2100-$2299", delivery: "$280" },
-    { headcount: "250-299", foodCost: "$2300-$2499", delivery: "$310" },
-    { headcount: "300+", foodCost: "TBD", delivery: "TBD" },
-  ];
 
   const hostingOptions: HostingOption[] = [
     {
@@ -301,6 +302,19 @@ const ModernPricingLandingPage = () => {
                 </ul>
               </div>
 
+              {/* Additional Stops */}
+              <div className="mb-4 border-b border-white/20 pb-4 sm:mb-6 sm:pb-6 md:mb-8 md:pb-8">
+                <h3 className="mb-2 text-lg font-bold text-white sm:mb-3 sm:text-xl md:mb-4 md:text-2xl">
+                  Additional Stops
+                </h3>
+                <ul className="ml-4 list-disc space-y-1 sm:ml-5 sm:space-y-1.5 md:ml-6 md:space-y-2">
+                  <li className="text-sm text-white/90 sm:text-base">
+                    $5.00 per additional stop — the first stop is included in
+                    the delivery cost
+                  </li>
+                </ul>
+              </div>
+
               {/* Daily Drive Discount */}
               <div className="mb-4 border-b border-white/20 pb-4 sm:mb-6 sm:pb-6 md:mb-8 md:pb-8">
                 <h3 className="mb-2 text-lg font-bold text-white sm:mb-3 sm:text-xl md:mb-4 md:text-2xl">
@@ -341,6 +355,8 @@ const ModernPricingLandingPage = () => {
                 </ol>
               </div>
             </motion.div>
+
+            <PricingExamplesSection />
           </div>
         </section>
       )}
