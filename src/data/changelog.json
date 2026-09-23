@@ -3,6 +3,62 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.8.0",
+      "date": "2026-09-23",
+      "title": "Faster driver actions and a better signature pad",
+      "summary": "Every driver action responds faster, the signature pad works in landscape, order history shows each driver step, and admins get an Overdue tab with accurate counts.",
+      "changes": [
+        {
+          "text": "Starting a shift, updating a delivery and ending a shift now respond noticeably faster.",
+          "type": "improved"
+        },
+        {
+          "text": "The signature pad opens in landscape and keeps your signature intact when you expand or collapse it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers see a notice in the app when dispatch declines a return request.",
+          "type": "new"
+        },
+        {
+          "text": "If the app fails to load after an update, it refreshes itself once instead of showing an error.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order history now records every driver step: en route, arrived, picked up, delivered.",
+          "type": "new"
+        },
+        {
+          "text": "Admins can see catering orders that are past pickup time but still open in a new Overdue tab.",
+          "type": "new"
+        },
+        {
+          "text": "The dashboard's Active Orders count shows every open order, not just the first ten, and deleted on-demand orders no longer appear in the list.",
+          "type": "fixed"
+        },
+        {
+          "text": "The live-updates indicator on the admin order page no longer gets stuck on \"Connecting...\".",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver shift mileage is recalculated nightly again, and mileage entered from the odometer is never overwritten.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver's phone battery level shows on tracked GPS points where the phone supports it.",
+          "type": "improved"
+        },
+        {
+          "text": "The pricing page shows the $5.00 charge for each additional stop, with the first stop included in the delivery cost.",
+          "type": "improved"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.8.0"
+      }
+    },
+    {
       "version": "2.7.0",
       "date": "2026-09-11",
       "title": "More dependable driver shifts",
