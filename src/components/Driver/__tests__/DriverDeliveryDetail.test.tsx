@@ -221,6 +221,29 @@ describe("DriverDeliveryDetail", () => {
     await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
   });
 
+  it("does not hold the driver on the redundant order-status follow-up PATCH", async () => {
+    currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_TO_CLIENT });
+    const baseFetch = global.fetch as jest.Mock;
+    const passthrough = baseFetch.getMockImplementation();
+    baseFetch.mockImplementation((url: string, init?: RequestInit) =>
+      init?.body === JSON.stringify({ status: "COMPLETED" })
+        ? new Promise(() => {}) // never settles
+        : passthrough!(url, init),
+    );
+    renderDetail();
+
+    fireEvent.click(await screen.findByText("Complete delivery"));
+    fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+
+    // The completion still finishes (feed refresh + success toast) even
+    // though the follow-up PATCH never answers.
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Status updated"));
+    expect(baseFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/orders/CV-12345"),
+      expect.objectContaining({ body: JSON.stringify({ status: "COMPLETED" }) }),
+    );
+  });
+
   it("treats a failed feed refresh as non-fatal (local update already applied)", async () => {
     refreshDeliveries.mockRejectedValueOnce(new Error("offline"));
     renderDetail();

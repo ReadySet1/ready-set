@@ -17,10 +17,20 @@ jest.mock("@/utils/prismaDB", () => ({
 }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("@/lib/auth-middleware", () => ({ withAuth: jest.fn() }));
-jest.mock("@/lib/auth/driver-ownership", () => ({
-  callerMayActOnDriver: jest.fn(),
-  getActionCaller: jest.fn(),
-}));
+jest.mock("@/lib/auth/driver-ownership", () => {
+  const callerMayActOnDriver = jest.fn();
+  const getActionCaller = jest.fn();
+  return {
+    callerMayActOnDriver,
+    getActionCaller,
+    // Plain function (survives resetAllMocks) derived from the two mocks
+    // above, so each test's allow/deny + privileged setup keeps driving it.
+    authorizeDriverAction: async (driverId: unknown) => ({
+      allowed: await callerMayActOnDriver(await driverId),
+      caller: await getActionCaller(),
+    }),
+  };
+});
 jest.mock("@/services/tracking/tracking-settings", () => ({
   getTrackingSettings: jest.fn(),
 }));
@@ -134,7 +144,7 @@ describe("endDriverShift delivery_count recompute", () => {
     expect(sql).toContain("LOWER(status) IN ('delivered','completed')");
     expect(sql).toContain("deleted_at IS NULL");
     expect(sql).toContain("shift_id = $1::uuid");
-    expect(params).toEqual([SHIFT_ID]);
+    expect(params[0]).toBe(SHIFT_ID);
   });
 
   it("does not recompute when the end-shift guard blocks", async () => {

@@ -168,8 +168,9 @@ async function calculateWindowDistanceMiles(
   assertUuid(driverId, 'driverId');
   const warnings: string[] = [];
 
-  // Run diagnostic query to check GPS data quality
-  const diagnosticRows = await prisma.$queryRawUnsafe<{
+  // Run diagnostic query to check GPS data quality. It is independent of the
+  // trail query below, so both are issued together (one round trip).
+  const diagnosticQuery = prisma.$queryRawUnsafe<{
     total_points: number;
     filtered_points: number;
   }[]>(`
@@ -181,6 +182,32 @@ async function calculateWindowDistanceMiles(
       AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
       AND deleted_at IS NULL
   `, driverId, startTime, endTime, settings.mileageGpsAccuracyThresholdM);
+
+  // Fetch the ordered, admissible trail; accumulation happens in TypeScript.
+  // NOTE: the previous per-segment stationary-speed gate (speed >= minimum)
+  // is intentionally gone — it failed open on iOS Safari web geolocation
+  // (speed reports null) and the anchor odometer subsumes it: stationary
+  // jitter never reaches MIN_DISPLACEMENT_M from the anchor.
+  const trailQuery = prisma.$queryRawUnsafe<OdometerPoint[]>(`
+    SELECT
+      latitude,
+      longitude,
+      recorded_at
+    FROM driver_locations
+    WHERE driver_id = $1::uuid
+      AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
+      AND deleted_at IS NULL
+      -- Accuracy filter: keep only reasonably accurate points
+      AND (accuracy IS NULL OR accuracy <= $4)
+    ORDER BY recorded_at ASC
+  `,
+    driverId,
+    startTime,
+    endTime,
+    settings.mileageGpsAccuracyThresholdM
+  );
+
+  const [diagnosticRows, points] = await Promise.all([diagnosticQuery, trailQuery]);
 
   const totalPoints = Number(diagnosticRows[0]?.total_points ?? 0);
   const filteredPoints = Number(diagnosticRows[0]?.filtered_points ?? 0);
@@ -218,30 +245,6 @@ async function calculateWindowDistanceMiles(
   const maxSpeedMs = mphToMs(settings.mileageMaxSpeedMph);
   const maxSegmentMeters = milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES);
 
-  // Fetch the ordered, admissible trail; accumulation happens in TypeScript.
-  // NOTE: the previous per-segment stationary-speed gate (speed >= minimum)
-  // is intentionally gone — it failed open on iOS Safari web geolocation
-  // (speed reports null) and the anchor odometer subsumes it: stationary
-  // jitter never reaches MIN_DISPLACEMENT_M from the anchor.
-  const points = await prisma.$queryRawUnsafe<OdometerPoint[]>(`
-    SELECT
-      latitude,
-      longitude,
-      recorded_at
-    FROM driver_locations
-    WHERE driver_id = $1::uuid
-      AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
-      AND deleted_at IS NULL
-      -- Accuracy filter: keep only reasonably accurate points
-      AND (accuracy IS NULL OR accuracy <= $4)
-    ORDER BY recorded_at ASC
-  `,
-    driverId,
-    startTime,
-    endTime,
-    settings.mileageGpsAccuracyThresholdM
-  );
-
   const totalMiles =
     computeAnchorDistanceMeters(points, maxSpeedMs, maxSegmentMeters) *
     METERS_TO_MILES;
@@ -278,6 +281,23 @@ async function getShiftWindow(shiftId: string): Promise<ShiftWindow | null> {
 }
 
 /**
+ * Load the shift window and the tracking-settings snapshot together (they are
+ * independent; one round trip instead of two). Throws when the shift is gone.
+ */
+async function loadShiftWindowAndSettings(
+  shiftId: string
+): Promise<{ shift: ShiftWindow; settings: TrackingSettings }> {
+  const [shift, settings] = await Promise.all([
+    getShiftWindow(shiftId),
+    getTrackingSettings(),
+  ]);
+  if (!shift) {
+    throw new Error('Shift not found for mileage calculation');
+  }
+  return { shift, settings };
+}
+
+/**
  * Calculate total mileage for a given shift based on the driver's GPS trail,
  * and persist it back to driver_shifts.total_distance_miles.
  *
@@ -285,15 +305,11 @@ async function getShiftWindow(shiftId: string): Promise<ShiftWindow | null> {
  * stored total_distance_miles value for the given shift.
  */
 export async function calculateShiftMileage(shiftId: string): Promise<ShiftMileageResult> {
-  const shift = await getShiftWindow(shiftId);
-  if (!shift) {
-    throw new Error('Shift not found for mileage calculation');
-  }
+  const { shift, settings } = await loadShiftWindowAndSettings(shiftId);
 
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
-  const settings = await getTrackingSettings();
   const { miles: totalMiles, warnings } = await calculateWindowDistanceMiles(
     shift.driver_id,
     startTime,
@@ -349,15 +365,11 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
 export async function calculateShiftMileageWithBreakdown(
   shiftId: string
 ): Promise<ShiftMileageWithBreakdown> {
-  const shift = await getShiftWindow(shiftId);
-  if (!shift) {
-    throw new Error('Shift not found for mileage calculation');
-  }
+  const { shift, settings } = await loadShiftWindowAndSettings(shiftId);
 
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
-  const settings = await getTrackingSettings();
   const [totalResult, deliveries] = await Promise.all([
     calculateWindowDistanceMiles(shift.driver_id, startTime, endTime, settings),
     prisma.$queryRawUnsafe<{
@@ -476,15 +488,11 @@ export async function calculateShiftMileageWithValidation(
   shiftId: string,
   reportedMiles: number
 ): Promise<ShiftMileageResult & { discrepancyPercent: number | null }> {
-  const shift = await getShiftWindow(shiftId);
-  if (!shift) {
-    throw new Error('Shift not found for mileage calculation');
-  }
+  const { shift, settings } = await loadShiftWindowAndSettings(shiftId);
 
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
-  const settings = await getTrackingSettings();
   const { miles: gpsMiles, warnings } = await calculateWindowDistanceMiles(
     shift.driver_id,
     startTime,

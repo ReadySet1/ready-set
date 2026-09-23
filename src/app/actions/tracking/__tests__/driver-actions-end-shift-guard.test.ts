@@ -18,10 +18,20 @@ jest.mock("@/utils/prismaDB", () => ({
 }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("@/lib/auth-middleware", () => ({ withAuth: jest.fn() }));
-jest.mock("@/lib/auth/driver-ownership", () => ({
-  callerMayActOnDriver: jest.fn(),
-  getActionCaller: jest.fn(),
-}));
+jest.mock("@/lib/auth/driver-ownership", () => {
+  const callerMayActOnDriver = jest.fn();
+  const getActionCaller = jest.fn();
+  return {
+    callerMayActOnDriver,
+    getActionCaller,
+    // Plain function (survives resetAllMocks) derived from the two mocks
+    // above, so each test's allow/deny + privileged setup keeps driving it.
+    authorizeDriverAction: async (driverId: unknown) => ({
+      allowed: await callerMayActOnDriver(await driverId),
+      caller: await getActionCaller(),
+    }),
+  };
+});
 jest.mock("@/services/tracking/tracking-settings", () => ({
   getTrackingSettings: jest.fn(),
 }));

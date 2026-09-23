@@ -18,10 +18,20 @@ jest.mock("@/utils/prismaDB", () => ({
 }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("@/lib/auth-middleware", () => ({ withAuth: jest.fn() }));
-jest.mock("@/lib/auth/driver-ownership", () => ({
-  callerMayActOnDriver: jest.fn(),
-  getActionCaller: jest.fn(),
-}));
+jest.mock("@/lib/auth/driver-ownership", () => {
+  const callerMayActOnDriver = jest.fn();
+  const getActionCaller = jest.fn();
+  return {
+    callerMayActOnDriver,
+    getActionCaller,
+    // Plain function (survives resetAllMocks) derived from the two mocks
+    // above, so each test's allow/deny + privileged setup keeps driving it.
+    authorizeDriverAction: async (driverId: unknown) => ({
+      allowed: await callerMayActOnDriver(await driverId),
+      caller: await getActionCaller(),
+    }),
+  };
+});
 jest.mock("@/services/tracking/tracking-settings", () => ({
   getTrackingSettings: jest.fn(),
 }));
@@ -70,8 +80,9 @@ const startLocation = {
 const isOpenShiftLookup = (sql: string) =>
   sql.includes("FROM driver_shifts") && sql.includes("'paused'") && sql.includes("deleted_at IS NULL");
 
+// The INSERT and the driver on-duty flip travel in one statement.
 const insertCalls = () =>
-  mockExecuteRaw.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO driver_shifts"));
+  mockQueryRaw.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO driver_shifts"));
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -99,10 +110,9 @@ describe("startDriverShift — one open shift per driver", () => {
   it("inserts a new shift when the driver has no open shift", async () => {
     mockQueryRaw.mockImplementation((sql: string) => {
       if (isOpenShiftLookup(sql)) return Promise.resolve([]);
-      // Post-insert id fetch
+      // INSERT ... RETURNING id
       return Promise.resolve([{ id: NEW_SHIFT_ID }]);
     });
-    mockExecuteRaw.mockResolvedValue(1);
 
     const result = await startDriverShift(DRIVER_ID, startLocation);
 
@@ -110,13 +120,16 @@ describe("startDriverShift — one open shift per driver", () => {
     expect(result.shiftId).toBe(NEW_SHIFT_ID);
     expect(result.resumed).toBe(false);
     expect(insertCalls()).toHaveLength(1);
-    // Driver row still gets flipped on duty.
-    expect(mockExecuteRaw).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE drivers"),
+    // Driver row still gets flipped on duty, pointing at the new shift.
+    const [insertSql, ...params] = insertCalls()[0]!;
+    expect(insertSql).toContain("UPDATE drivers");
+    expect(insertSql).toContain("is_on_duty = true");
+    expect(insertSql).toContain("current_shift_id = (SELECT id FROM new_shift)");
+    expect(params.slice(0, 3)).toEqual([
       DRIVER_ID,
       startLocation.coordinates.lng,
       startLocation.coordinates.lat,
-    );
+    ]);
   });
 
   it.each([
@@ -144,12 +157,10 @@ describe("startDriverShift — one open shift per driver", () => {
         lookups += 1;
         return Promise.resolve(lookups === 1 ? [] : [{ id: EXISTING_SHIFT_ID }]);
       }
+      if (String(sql).includes("INSERT INTO driver_shifts")) return Promise.reject(uniqueError);
       return Promise.resolve([]);
     });
-    mockExecuteRaw.mockImplementation((sql: string) => {
-      if (String(sql).includes("INSERT INTO driver_shifts")) return Promise.reject(uniqueError);
-      return Promise.resolve(1);
-    });
+    mockExecuteRaw.mockResolvedValue(1);
 
     const result = await startDriverShift(DRIVER_ID, startLocation);
 
@@ -157,17 +168,16 @@ describe("startDriverShift — one open shift per driver", () => {
     expect(insertCalls()).toHaveLength(1);
     expect(lookups).toBe(2);
     // The losing caller must not touch the driver row; the winner already did.
-    expect(mockExecuteRaw).not.toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE drivers"),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-    );
+    // (Its only driver write was inside the rejected statement.)
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
   });
 
   it("still surfaces non-unique database errors", async () => {
-    mockQueryRaw.mockResolvedValue([]);
-    mockExecuteRaw.mockRejectedValue(new Error("connection reset"));
+    mockQueryRaw.mockImplementation((sql: string) =>
+      String(sql).includes("INSERT INTO driver_shifts")
+        ? Promise.reject(new Error("connection reset"))
+        : Promise.resolve([]),
+    );
 
     const result = await startDriverShift(DRIVER_ID, startLocation);
 

@@ -165,8 +165,11 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         }
 
         // Mirror the Detail screen: a completed delivery also completes the order.
+        // Not awaited: the server already maps driverStatus=COMPLETED to the
+        // order status, and this follow-up is failure-tolerant — the driver
+        // should not wait an extra round trip for it.
         if (status === DriverStatus.COMPLETED) {
-          await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, {
+          void fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, {
             method: 'PATCH',
             credentials: 'include',
             headers,
