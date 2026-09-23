@@ -43,6 +43,22 @@ jest.mock('@/services/tracking/active-shift', () => ({
   resolveOpenShiftIdForUser: jest.fn().mockResolvedValue(null),
 }));
 
+// Driver-transition audit trail. The partner gate is controlled per test
+// (a test can opt into the real gate); the writer delegates to the real
+// implementation so the single INSERT runs against the mocked global client.
+jest.mock('@/lib/services/order-status-history', () => {
+  const actual = jest.requireActual('@/lib/services/order-status-history');
+  return {
+    shouldRecordDriverHistory: jest.fn().mockResolvedValue(true),
+    recordDriverStatusTransition: jest.fn((...args: unknown[]) =>
+      actual.recordDriverStatusTransition(...args),
+    ),
+  };
+});
+jest.mock('@/lib/logging/realtime-logger', () => ({
+  realtimeLogger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+}));
+
 import { NextRequest } from 'next/server';
 
 // Import after mocks
@@ -51,6 +67,11 @@ import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { sendDispatchStatusNotification } from '@/services/notifications/delivery-status';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 import { resolveOpenShiftIdForUser } from '@/services/tracking/active-shift';
+import {
+  recordDriverStatusTransition,
+  shouldRecordDriverHistory,
+} from '@/lib/services/order-status-history';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
 // Get mocked versions
 const mockedPrisma = jest.mocked(prisma);
@@ -59,6 +80,8 @@ const mockedCreateAdminClient = jest.mocked(createAdminClient);
 const mockedSendDispatchStatusNotification = jest.mocked(sendDispatchStatusNotification);
 const mockedRecordLifecycle = jest.mocked(recordAndDispatchLifecycleEvent);
 const mockedResolveOpenShiftIdForUser = jest.mocked(resolveOpenShiftIdForUser);
+const mockedShouldRecordHistory = jest.mocked(shouldRecordDriverHistory);
+const mockedRecordHistory = jest.mocked(recordDriverStatusTransition);
 
 // Track calls to channel methods
 let channelSendCalls: any[] = [];
@@ -780,6 +803,129 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(body.error).toBeUndefined();
       expect(body.message).toMatch(/Cannot transition driverStatus/);
       expect(mockedResolveOpenShiftIdForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Driver status history (order_status_history)', () => {
+    let historyCreate: jest.Mock;
+    let events: string[];
+
+    beforeEach(() => {
+      events = [];
+      mockedShouldRecordHistory.mockResolvedValue(true);
+      historyCreate = jest.fn().mockImplementation(async () => {
+        events.push('history-insert');
+        return { id: 'h-1' };
+      });
+      (mockedPrisma as any).orderStatusHistory = { create: historyCreate };
+      // Record when the status transaction commits (its callback resolves).
+      (mockedPrisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+        if (typeof fn !== 'function') return Promise.all(fn);
+        const result = await fn(mockedPrisma);
+        events.push('status-commit');
+        return result;
+      });
+    });
+
+    afterEach(() => {
+      delete (mockedPrisma as any).orderStatusHistory;
+      delete (mockedPrisma as any).apiPartner;
+    });
+
+    it('inserts the history row after the status transaction commits, with the right fields', async () => {
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'EN_ROUTE_TO_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ driverStatus: 'ARRIVED_AT_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedShouldRecordHistory).toHaveBeenCalledWith('catering', 'CAT-001');
+      expect(events).toEqual(['status-commit', 'history-insert']);
+      expect(historyCreate).toHaveBeenCalledTimes(1);
+      expect(historyCreate).toHaveBeenCalledWith({
+        data: {
+          cateringRequestId: 'order-123',
+          driverStatus: 'ARRIVED_AT_VENDOR',
+          partnerStatus: 'IN_PROGRESS',
+          changedBy: 'test-user-id',
+          location: undefined,
+          notes: 'driver:ARRIVED_AT_VENDOR',
+        },
+      });
+    });
+
+    it('logs an insert failure and still returns 200 with the updated order', async () => {
+      historyCreate.mockRejectedValue(new Error('insert failed'));
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.orderNumber).toBe('CAT-001');
+      expect(body.driverStatus).toBe('PICKED_UP');
+      expect(historyCreate).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(realtimeLogger.error)).toHaveBeenCalledWith(
+        expect.stringContaining('failed to record driver transition'),
+        expect.anything(),
+      );
+    });
+
+    it('does not insert when driverStatus is unchanged or absent', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' });
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+      await PATCH(createPatchRequest({ status: 'IN_PROGRESS' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(mockedRecordHistory).not.toHaveBeenCalled();
+      expect(historyCreate).not.toHaveBeenCalled();
+    });
+
+    it('skips the row for a CaterValley (CV-) order via real partner detection', async () => {
+      const actual = jest.requireActual('@/lib/services/order-status-history');
+      mockedShouldRecordHistory.mockImplementation(actual.shouldRecordDriverHistory);
+      (mockedPrisma as any).apiPartner = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p-cv',
+            slug: 'catervalley',
+            displayName: 'CaterValley',
+            orderPrefix: 'CV-',
+            webhookUrl: null,
+            webhookSecret: null,
+            rateLimitPerMin: 60,
+            isActive: true,
+          },
+        ]),
+      };
+      setupMocks({ orderNumber: 'CV-12345', status: 'ACTIVE', driverStatus: 'ASSIGNED' });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(
+        createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }, 'CV-12345'),
+        { params: Promise.resolve({ order_number: 'CV-12345' }) },
+      );
+
+      expect(response.status).toBe(200);
+      expect((mockedPrisma as any).apiPartner.findMany).toHaveBeenCalled();
+      expect(mockedRecordHistory).not.toHaveBeenCalled();
+      expect(historyCreate).not.toHaveBeenCalled();
     });
   });
 });
