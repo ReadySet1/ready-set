@@ -44,7 +44,7 @@ jobs:
       - name: Regenerate user-facing changelog
         if: ${{ steps.release.outputs.pr }}
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
         run: |
           set -euo pipefail
           git fetch origin "$RELEASE_PR_BRANCH"
@@ -60,7 +60,7 @@ jobs:
         if: ${{ steps.release.outputs.pr }}
         uses: actions/github-script@v7
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
         with:
           script: |
             const fs = require('fs');
