@@ -4,7 +4,7 @@ import { GET, POST } from '@/app/api/tracking/shifts/route';
 import { GET as GET_SHIFT, PUT } from '@/app/api/tracking/shifts/[id]/route';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
-import { endDriverShift } from '@/app/actions/tracking/driver-actions';
+import { endDriverShift, startDriverShift } from '@/app/actions/tracking/driver-actions';
 import {
   createGetRequest,
   createPostRequest,
@@ -21,10 +21,16 @@ jest.mock('@/utils/prismaDB', () => ({
     $executeRawUnsafe: jest.fn(),
   },
 }));
-// The detail route's `action=end` delegates to the guarded endDriverShift.
+// The detail route's `action=end` delegates to the guarded endDriverShift;
+// the list route's POST delegates the insert to startDriverShift.
 jest.mock('@/app/actions/tracking/driver-actions', () => ({
   endDriverShift: jest.fn(),
+  startDriverShift: jest.fn(),
 }));
+
+// Columns/tables that do not exist on the shipped driver_shifts schema.
+const NON_EXISTENT_SHIFT_COLUMNS =
+  /\bstart_time\b|\bend_time\b|total_distance_km|\bmetadata\b|shift_breaks/;
 
 describe('/api/tracking/shifts API', () => {
   beforeEach(() => {
@@ -45,16 +51,21 @@ describe('/api/tracking/shifts API', () => {
           {
             id: 'shift-1',
             driver_id: 'driver-1',
-            start_time: new Date('2024-12-01T08:00:00Z'),
-            end_time: null,
+            shift_start: new Date('2024-12-01T08:00:00Z'),
+            shift_end: null,
             start_location_geojson: JSON.stringify({
               coordinates: [-97.7431, 30.2672],
             }),
             end_location_geojson: null,
-            total_distance_km: 25.5,
+            total_distance: 25.5,
+            total_distance_miles: 15.8,
+            gps_distance_miles: 15.8,
+            mileage_source: 'gps',
             delivery_count: 5,
             status: 'active',
-            metadata: { vehicleCheck: true },
+            notes: null,
+            break_start: null,
+            break_end: null,
             created_at: new Date(),
             updated_at: new Date(),
             employee_id: 'EMP-001',
@@ -62,11 +73,7 @@ describe('/api/tracking/shifts API', () => {
           },
         ];
 
-        const mockBreaks: never[] = [];
-
-        (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce(mockShifts) // Get shifts
-          .mockResolvedValueOnce(mockBreaks); // Get breaks for shift
+        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce(mockShifts);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/shifts'
@@ -81,6 +88,20 @@ describe('/api/tracking/shifts API', () => {
         expect(data.data[0].status).toBe('active');
         expect(data.data[0].driverInfo).toBeDefined();
         expect(data.data[0].driverInfo.employeeId).toBe('EMP-001');
+        expect(data.data[0].startTime).toEqual(new Date('2024-12-01T08:00:00Z'));
+        expect(data.data[0].totalDistanceMiles).toBe(15.8);
+        expect(data.data[0].totalDistanceKm).toBe(25.5);
+        expect(data.data[0].mileageSource).toBe('gps');
+        expect(data.data[0].breaks).toEqual([]);
+
+        // Single query against the real schema (no shift_breaks round-trip)
+        expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+        const sql = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0] as string;
+        expect(sql).not.toMatch(NON_EXISTENT_SHIFT_COLUMNS);
+        expect(sql).toMatch(/ds\.shift_start/);
+        expect(sql).toMatch(/ds\.shift_end/);
+        expect(sql).toMatch(/ds\.deleted_at IS NULL/);
+        expect(sql).toMatch(/ORDER BY ds\.shift_start DESC/);
       });
 
       it('should filter shifts by driver_id for admin', async () => {
@@ -166,16 +187,21 @@ describe('/api/tracking/shifts API', () => {
           {
             id: 'shift-1',
             driver_id: 'driver-1',
-            start_time: new Date(),
-            end_time: null,
+            shift_start: new Date(),
+            shift_end: null,
             start_location_geojson: JSON.stringify({
               coordinates: [-97.7431, 30.2672],
             }),
             end_location_geojson: null,
-            total_distance_km: 0,
+            total_distance: 0,
+            total_distance_miles: 0,
+            gps_distance_miles: null,
+            mileage_source: null,
             delivery_count: 0,
             status: 'active',
-            metadata: {},
+            notes: null,
+            break_start: null,
+            break_end: null,
             created_at: new Date(),
             updated_at: new Date(),
             employee_id: null,
@@ -184,7 +210,6 @@ describe('/api/tracking/shifts API', () => {
         ];
 
         (prisma.$queryRawUnsafe as jest.Mock).mockImplementation((sql: string) => {
-          if (sql.includes('FROM shift_breaks')) return Promise.resolve([]);
           if (sql.includes('FROM driver_shifts')) return Promise.resolve(mockShifts);
           // Driver row resolution (profile_id OR user_id linkage)
           return Promise.resolve([
@@ -209,7 +234,7 @@ describe('/api/tracking/shifts API', () => {
         );
       });
 
-      it('should include breaks for each shift', async () => {
+      it('should expose the inline break on the shift row', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -221,16 +246,21 @@ describe('/api/tracking/shifts API', () => {
           {
             id: 'shift-1',
             driver_id: 'driver-1',
-            start_time: new Date(),
-            end_time: null,
+            shift_start: new Date(),
+            shift_end: null,
             start_location_geojson: JSON.stringify({
               coordinates: [-97.7431, 30.2672],
             }),
             end_location_geojson: null,
-            total_distance_km: 0,
+            total_distance: 0,
+            total_distance_miles: 0,
+            gps_distance_miles: null,
+            mileage_source: null,
             delivery_count: 0,
             status: 'active',
-            metadata: {},
+            notes: null,
+            break_start: new Date('2024-12-01T12:00:00Z'),
+            break_end: new Date('2024-12-01T12:30:00Z'),
             created_at: new Date(),
             updated_at: new Date(),
             employee_id: 'EMP-001',
@@ -238,23 +268,7 @@ describe('/api/tracking/shifts API', () => {
           },
         ];
 
-        const mockBreaks = [
-          {
-            id: 'break-1',
-            shift_id: 'shift-1',
-            start_time: new Date(),
-            end_time: new Date(),
-            break_type: 'lunch',
-            location_geojson: JSON.stringify({
-              coordinates: [-97.7431, 30.2672],
-            }),
-            created_at: new Date(),
-          },
-        ];
-
-        (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce(mockShifts)
-          .mockResolvedValueOnce(mockBreaks);
+        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce(mockShifts);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/shifts'
@@ -263,8 +277,12 @@ describe('/api/tracking/shifts API', () => {
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
 
-        expect(data.data[0].breaks).toHaveLength(1);
-        expect(data.data[0].breaks[0].breakType).toBe('lunch');
+        expect(data.data[0].breaks).toEqual([
+          {
+            startTime: new Date('2024-12-01T12:00:00Z'),
+            endTime: new Date('2024-12-01T12:30:00Z'),
+          },
+        ]);
       });
     });
 
@@ -358,10 +376,8 @@ describe('/api/tracking/shifts API', () => {
         });
 
         (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]) // Get driver
-          .mockResolvedValueOnce([{ id: 'shift-new-1' }]); // Create shift
-
-        (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]); // Get driver
+        (startDriverShift as jest.Mock).mockResolvedValue({ success: true, shiftId: 'shift-new-1' });
 
         const shiftData = {
           location: {
@@ -381,6 +397,94 @@ describe('/api/tracking/shifts API', () => {
         expect(data.success).toBe(true);
         expect(data.data.shiftId).toBe('shift-new-1');
         expect(data.data.status).toBe('active');
+
+        // The insert is delegated; the route never writes driver_shifts itself
+        expect(startDriverShift).toHaveBeenCalledWith(
+          'driver-1',
+          shiftData.location,
+          { vehicleCheck: true }
+        );
+        expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
+        for (const [sql] of (prisma.$queryRawUnsafe as jest.Mock).mock.calls) {
+          expect(sql).not.toMatch(/INSERT INTO driver_shifts/);
+        }
+      });
+
+      it('should return 200 with resumed: true when an open shift is resumed', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'driver-user-123', type: 'DRIVER' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]);
+        (startDriverShift as jest.Mock).mockResolvedValue({
+          success: true,
+          shiftId: 'shift-open-1',
+          resumed: true,
+        });
+
+        const request = createPostRequest(
+          'http://localhost:3000/api/tracking/shifts',
+          { location: { coordinates: { lat: 30.2672, lng: -97.7431 } } }
+        );
+
+        const response = await POST(request);
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.data.shiftId).toBe('shift-open-1');
+        expect(data.data.resumed).toBe(true);
+        expect(data.data.status).toBe('active');
+      });
+
+      it('should map an "Access denied" startDriverShift failure to 403', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'driver-user-123', type: 'DRIVER' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]);
+        (startDriverShift as jest.Mock).mockResolvedValue({ success: false, error: 'Access denied' });
+
+        const request = createPostRequest(
+          'http://localhost:3000/api/tracking/shifts',
+          { location: { coordinates: { lat: 30.2672, lng: -97.7431 } } }
+        );
+
+        const response = await POST(request);
+        await expectErrorResponse(response, 403, /Access denied/i);
+      });
+
+      it('should map an unexpected startDriverShift failure to a generic 500', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'driver-user-123', type: 'DRIVER' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]);
+        (startDriverShift as jest.Mock).mockResolvedValue({
+          success: false,
+          error: 'relation "driver_shifts" violates constraint xyz',
+        });
+
+        const request = createPostRequest(
+          'http://localhost:3000/api/tracking/shifts',
+          { location: { coordinates: { lat: 30.2672, lng: -97.7431 } } }
+        );
+
+        const response = await POST(request);
+        expect(response.status).toBe(500);
+        const body = await response.json();
+        expect(body).toEqual({ success: false, error: 'Failed to start shift' });
+        expect(JSON.stringify(body)).not.toMatch(/driver_shifts|constraint/);
       });
 
       it('should include metadata in shift creation', async () => {
@@ -392,10 +496,8 @@ describe('/api/tracking/shifts API', () => {
         });
 
         (prisma.$queryRawUnsafe as jest.Mock)
-          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }])
-          .mockResolvedValueOnce([{ id: 'shift-new-2' }]);
-
-        (prisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+          .mockResolvedValueOnce([{ id: 'driver-1', is_active: true, current_shift_id: null }]);
+        (startDriverShift as jest.Mock).mockResolvedValue({ success: true, shiftId: 'shift-new-2' });
 
         const shiftData = {
           location: {
@@ -412,12 +514,11 @@ describe('/api/tracking/shifts API', () => {
 
         await POST(request);
 
-        // Verify metadata was included
-        expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('INSERT INTO driver_shifts'),
+        // Verify metadata was forwarded to startDriverShift
+        expect(startDriverShift).toHaveBeenCalledWith(
           'driver-1',
-          expect.stringContaining('POINT'),
-          expect.stringContaining('vehicleCheck')
+          shiftData.location,
+          { vehicleCheck: true, customField: 'value' }
         );
       });
     });
@@ -556,6 +657,8 @@ describe('/api/tracking/shifts API', () => {
 
         const response = await POST(request);
         await expectErrorResponse(response, 500, /Failed to start shift/i);
+        const body = await response.json();
+        expect(JSON.stringify(body)).not.toMatch(/Database error/);
       });
     });
   });

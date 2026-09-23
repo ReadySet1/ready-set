@@ -38,6 +38,10 @@ import {
 } from '@/services/tracking/active-shift';
 import { requiresActiveShift } from '@/lib/state-machine/driver-state';
 import {
+  recordDriverStatusTransition,
+  shouldRecordDriverHistory,
+} from '@/lib/services/order-status-history';
+import {
   POST_PICKUP_DRIVER_STATUSES,
   voidPendingReturnRequests,
 } from '@/lib/services/return-requests';
@@ -808,6 +812,14 @@ export async function PATCH(
       justSetTimestamp = { field: mirrorTimestampField, value: now };
     }
 
+    // Driver-transition audit row (order_status_history). The partner gate
+    // runs here, before the transaction; the insert runs after it commits.
+    // Only real changes are recorded, never a re-affirmed status.
+    const recordHistory =
+      !!driverStatus &&
+      driverStatus !== currentDriverStatus &&
+      (await shouldRecordDriverHistory(orderType, dbOrderNumber));
+
     // Perform the order update + deliveries-mirror upsert atomically. If the
     // mirror upsert throws, the whole transaction rolls back (a retryable 500 via
     // the outer catch) instead of silently stranding a terminal order.
@@ -904,6 +916,20 @@ export async function PATCH(
       return updated;
     });
     updatedOrder = { ...updatedRaw, order_type: orderType } as Order;
+
+    // Written after commit with one INSERT on the global client, awaited but
+    // never thrown: a failed audit write is logged and the transition stands
+    // (the row can then be missing — accepted trade-off, see the helper).
+    // The PATCH carries no driver position, so location stays empty rather
+    // than costing an extra query.
+    if (recordHistory) {
+      await recordDriverStatusTransition({
+        cateringRequestId: (updatedRaw as any).id,
+        driverStatus: driverStatus as DriverStatus,
+        partnerStatus: String((updatedRaw as any).status),
+        changedBy: user.id,
+      });
+    }
 
     // Advancing to PICKED_UP (or beyond) means the driver kept working the
     // delivery, so any PENDING return request no longer applies — auto-void

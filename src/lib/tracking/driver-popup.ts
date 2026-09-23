@@ -80,7 +80,7 @@ export function buildDriverPopupHtml({ driver, battery, activeDelivery, trailMil
           ">
             ${driver.isOnDuty ? 'On Duty' : 'Off Duty'}
           </span>
-          ${battery.level ? `
+          ${battery.level != null ? `
             <span style="font-size: 11px;">
               ${batteryIcon} ${escapeHtml(battery.level)}%
             </span>
