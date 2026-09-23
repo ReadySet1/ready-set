@@ -107,8 +107,24 @@ class AlertStore {
   }
 }
 
-// Global alert store
-const alertStore = new AlertStore();
+// Process-wide alert store. Next.js evaluates this module once per bundle
+// layer; keeping the store on globalThis means /api/health/alerts reads the
+// same alerts the monitoring interval writes.
+const ALERT_STORE_KEY = Symbol.for('readyset.alerting.alertStore');
+
+function getProcessAlertStore(): AlertStore {
+  const g = globalThis as Record<symbol, unknown>;
+  const existing = g[ALERT_STORE_KEY];
+  if (existing instanceof AlertStore) return existing;
+  // A store created by another module copy is a different class instance;
+  // it still has the same shape, so reuse it rather than orphaning it.
+  if (existing && typeof (existing as AlertStore).add === 'function') return existing as AlertStore;
+  const store = new AlertStore();
+  g[ALERT_STORE_KEY] = store;
+  return store;
+}
+
+const alertStore = getProcessAlertStore();
 
 /**
  * Generate a fingerprint for alert deduplication
@@ -382,6 +398,8 @@ export function getMemorySnapshot(): MemorySnapshot | null {
   };
 }
 
+const MEMORY_NO_LIMIT_WARNED_KEY = Symbol.for('readyset.alerting.memoryNoLimitWarned');
+
 const toMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 
 /**
@@ -395,6 +413,15 @@ const toMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 export function monitorMemoryUsage(snapshot: MemorySnapshot | null = getMemorySnapshot()): void {
   if (!snapshot) return;
   const threshold = DEFAULT_THRESHOLDS.memoryUsagePercentage;
+
+  if (!snapshot.heapLimit && !snapshot.cgroupLimit) {
+    const g = globalThis as Record<symbol, unknown>;
+    if (!g[MEMORY_NO_LIMIT_WARNED_KEY]) {
+      g[MEMORY_NO_LIMIT_WARNED_KEY] = true;
+      console.warn('memory monitoring disabled: no heap or cgroup limit available');
+    }
+    return;
+  }
 
   const heapUsagePercentage =
     snapshot.heapLimit && snapshot.heapLimit > 0 ? (snapshot.heapUsed / snapshot.heapLimit) * 100 : null;

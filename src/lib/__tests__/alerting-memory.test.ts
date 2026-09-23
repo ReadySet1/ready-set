@@ -33,12 +33,21 @@ function snapshot(overrides: Partial<MemorySnapshot> = {}): MemorySnapshot {
 }
 
 const MONITOR_KEY = Symbol.for('readyset.alerting.monitoringInterval');
+const STORE_KEY = Symbol.for('readyset.alerting.alertStore');
+const NO_LIMIT_WARNED_KEY = Symbol.for('readyset.alerting.memoryNoLimitWarned');
+
+function resetProcessState() {
+  const g = globalThis as Record<symbol, unknown>;
+  delete g[STORE_KEY];
+  delete g[NO_LIMIT_WARNED_KEY];
+}
 
 describe('monitorMemoryUsage', () => {
   let warnSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    resetProcessState();
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -85,6 +94,29 @@ describe('monitorMemoryUsage', () => {
     const mod = loadAlerting();
     expect(() => mod.monitorMemoryUsage(snapshot({ cgroupLimit: null, rss: 50 * GB }))).not.toThrow();
     expect(memoryAlerts(mod)).toHaveLength(0);
+  });
+
+  it('warns once when neither a heap nor a cgroup limit is available', () => {
+    const mod = loadAlerting();
+    const noLimits = snapshot({ heapLimit: null, cgroupLimit: null });
+    mod.monitorMemoryUsage(noLimits);
+    mod.monitorMemoryUsage(noLimits);
+    // A second module copy in the same process must not warn again either.
+    loadAlerting().monitorMemoryUsage(noLimits);
+
+    const disabledWarnings = warnSpy.mock.calls.filter((args) =>
+      String(args[0]).includes('memory monitoring disabled: no heap or cgroup limit available')
+    );
+    expect(disabledWarnings).toHaveLength(1);
+    expect(memoryAlerts(mod)).toHaveLength(0);
+  });
+
+  it('does not warn about disabled monitoring when a limit is known', () => {
+    const mod = loadAlerting();
+    mod.monitorMemoryUsage(snapshot({ cgroupLimit: null }));
+    expect(
+      warnSpy.mock.calls.some((args) => String(args[0]).includes('memory monitoring disabled'))
+    ).toBe(false);
   });
 
   it('does nothing when no snapshot can be taken', () => {
@@ -146,6 +178,26 @@ describe('monitoring schedule', () => {
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+
+describe('alert store', () => {
+  beforeEach(resetProcessState);
+
+  it('is shared by every copy of the module in the process', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const writer = loadAlerting();
+      const reader = loadAlerting();
+      writer.monitorMemoryUsage(snapshot({ heapUsed: 3.9 * GB }));
+
+      const seen = reader
+        .getActiveAlerts()
+        .filter((a) => a.type === reader.AlertType.RESOURCE_EXHAUSTION);
+      expect(seen).toHaveLength(1);
+    } finally {
+      errorSpy.mockRestore();
     }
   });
 });
