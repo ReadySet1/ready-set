@@ -160,16 +160,16 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                             <p style={{ margin: '0 0 10px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontSize: '16px' }}>Follow us!</p>
                             <p style={{ margin: '0 0 20px' }}>
                               <a href="https://www.facebook.com/ReadySetCoGroup/" style={{ display: 'inline-block', margin: '0 10px', textDecoration: 'none' }}>
-                                <img src="https://readysetllc.com/images/social/1.png" alt="Facebook" style={{ width: '24px', height: '24px' }} />
+                                <img src="https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/social/1" alt="Facebook" style={{ width: '24px', height: '24px' }} />
                               </a>
                               <a href="https://www.tiktok.com/@readyset.co" style={{ display: 'inline-block', margin: '0 10px', textDecoration: 'none' }}>
-                                <img src="https://readysetllc.com/images/social/2.png" alt="TikTok" style={{ width: '24px', height: '24px' }} />
+                                <img src="https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/social/2" alt="TikTok" style={{ width: '24px', height: '24px' }} />
                               </a>
                               <a href="https://www.instagram.com/readyset.co/" style={{ display: 'inline-block', margin: '0 10px', textDecoration: 'none' }}>
-                                <img src="https://readysetllc.com/images/social/3.png" alt="Instagram" style={{ width: '24px', height: '24px' }} />
+                                <img src="https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/social/3" alt="Instagram" style={{ width: '24px', height: '24px' }} />
                               </a>
                               <a href="http://linkedin.com/company/ready-set-group-llc/" style={{ display: 'inline-block', margin: '0 10px', textDecoration: 'none' }}>
-                                <img src="https://readysetllc.com/images/social/4.png" alt="LinkedIn" style={{ width: '24px', height: '24px' }} />
+                                <img src="https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/social/4" alt="LinkedIn" style={{ width: '24px', height: '24px' }} />
                               </a>
                             </p>
                             <p style={{ color: '#FFFFFF', fontFamily: 'Arial, sans-serif', fontSize: '14px', lineHeight: 1.5, margin: '0 0 10px' }}>
