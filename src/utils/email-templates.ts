@@ -101,7 +101,7 @@ export const BRAND_COLORS = {
 export const generateEmailHeader = (title: string) => {
   // Use hardcoded public URL for maximum email client compatibility
   // Email clients often block images from variable URLs or localhost
-  const logoUrl = 'https://www.readysetllc.com/images/logo/full-logo-dark.png';
+  const logoUrl = 'https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/logo/full-logo-dark';
 
   return `
   <div style="background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
