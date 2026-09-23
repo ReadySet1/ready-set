@@ -107,8 +107,24 @@ class AlertStore {
   }
 }
 
-// Global alert store
-const alertStore = new AlertStore();
+// Process-wide alert store. Next.js evaluates this module once per bundle
+// layer; keeping the store on globalThis means /api/health/alerts reads the
+// same alerts the monitoring interval writes.
+const ALERT_STORE_KEY = Symbol.for('readyset.alerting.alertStore');
+
+function getProcessAlertStore(): AlertStore {
+  const g = globalThis as Record<symbol, unknown>;
+  const existing = g[ALERT_STORE_KEY];
+  if (existing instanceof AlertStore) return existing;
+  // A store created by another module copy is a different class instance;
+  // it still has the same shape, so reuse it rather than orphaning it.
+  if (existing && typeof (existing as AlertStore).add === 'function') return existing as AlertStore;
+  const store = new AlertStore();
+  g[ALERT_STORE_KEY] = store;
+  return store;
+}
+
+const alertStore = getProcessAlertStore();
 
 /**
  * Generate a fingerprint for alert deduplication
@@ -294,34 +310,152 @@ export function monitorApiPerformance(endpoint: string, responseTime: number): v
   }
 }
 
+export interface MemorySnapshot {
+  heapUsed: number;
+  heapTotal: number;
+  /** V8 heap ceiling (`heap_size_limit`, honours --max-old-space-size). */
+  heapLimit: number | null;
+  rss: number;
+  external: number;
+  /** Container memory limit from cgroups, or null when unlimited/unreadable. */
+  cgroupLimit: number | null;
+}
+
+const CGROUP_LIMIT_PATHS = [
+  '/sys/fs/cgroup/memory.max', // cgroup v2
+  '/sys/fs/cgroup/memory/memory.limit_in_bytes', // cgroup v1
+];
+
+// cgroup v1 reports "no limit" as a page-aligned value near 2^63.
+const CGROUP_UNLIMITED_THRESHOLD = 2 ** 60;
+
+type NodeBuiltinLoader = (id: string) => any;
+
 /**
- * Monitor memory usage
+ * Load a Node builtin without a static import, so client/edge bundles that
+ * transitively include this module never try to resolve `fs` / `v8`.
  */
-export function monitorMemoryUsage(): void {
-  const memoryUsage = process.memoryUsage();
-  const totalMemory = memoryUsage.heapTotal;
-  const usedMemory = memoryUsage.heapUsed;
-  const usagePercentage = (usedMemory / totalMemory) * 100;
-  const threshold = DEFAULT_THRESHOLDS.memoryUsagePercentage;
-  
-  if (usagePercentage >= threshold) {
-    createAlert(
-      AlertType.RESOURCE_EXHAUSTION,
-      usagePercentage >= 95 ? AlertSeverity.CRITICAL : AlertSeverity.WARNING,
-      'High Memory Usage',
-      `Memory usage is ${usagePercentage.toFixed(2)}% (threshold: ${threshold}%)`,
-      'resource-monitoring',
-      {
-        usagePercentage,
-        threshold,
-        memoryUsage: {
-          used: `${(usedMemory / 1024 / 1024).toFixed(2)} MB`,
-          total: `${(totalMemory / 1024 / 1024).toFixed(2)} MB`,
-          external: `${(memoryUsage.external / 1024 / 1024).toFixed(2)} MB`
-        }
-      }
-    );
+function loadNodeBuiltin(id: string): any | null {
+  if (typeof process === 'undefined') return null;
+  const loader = (process as unknown as { getBuiltinModule?: NodeBuiltinLoader }).getBuiltinModule;
+  if (typeof loader !== 'function') return null;
+  try {
+    return loader(id) ?? null;
+  } catch {
+    return null;
   }
+}
+
+function defaultReadFile(path: string): string {
+  const fs = loadNodeBuiltin('fs');
+  if (!fs) throw new Error('fs unavailable');
+  return fs.readFileSync(path, 'utf8');
+}
+
+/**
+ * Read the container memory limit (cgroup v2, then v1). Returns null when the
+ * limit is "max", the v1 unlimited sentinel, or the files are unreadable.
+ */
+export function readCgroupMemoryLimit(
+  readFile: (path: string) => string = defaultReadFile
+): number | null {
+  for (const path of CGROUP_LIMIT_PATHS) {
+    let raw: string;
+    try {
+      raw = readFile(path).trim();
+    } catch {
+      continue;
+    }
+    if (raw === '' || raw === 'max') return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0 || value >= CGROUP_UNLIMITED_THRESHOLD) return null;
+    return value;
+  }
+  return null;
+}
+
+/**
+ * Snapshot current process memory against its real ceilings. Returns null
+ * outside Node (browser / edge runtime).
+ */
+export function getMemorySnapshot(): MemorySnapshot | null {
+  if (typeof process === 'undefined' || typeof process.memoryUsage !== 'function') return null;
+  const usage = process.memoryUsage();
+  const v8 = loadNodeBuiltin('v8');
+  let heapLimit: number | null = null;
+  try {
+    heapLimit = v8 ? v8.getHeapStatistics().heap_size_limit : null;
+  } catch {
+    heapLimit = null;
+  }
+  return {
+    heapUsed: usage.heapUsed,
+    heapTotal: usage.heapTotal,
+    heapLimit,
+    rss: usage.rss,
+    external: usage.external,
+    cgroupLimit: readCgroupMemoryLimit(),
+  };
+}
+
+const MEMORY_NO_LIMIT_WARNED_KEY = Symbol.for('readyset.alerting.memoryNoLimitWarned');
+
+const toMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+
+/**
+ * Monitor memory usage.
+ *
+ * Compares heapUsed against the V8 heap size limit and RSS against the cgroup
+ * memory limit. heapUsed / heapTotal is deliberately NOT used: V8 keeps
+ * heapTotal just above heapUsed, so that ratio sits at 85-96% on a healthy
+ * process.
+ */
+export function monitorMemoryUsage(snapshot: MemorySnapshot | null = getMemorySnapshot()): void {
+  if (!snapshot) return;
+  const threshold = DEFAULT_THRESHOLDS.memoryUsagePercentage;
+
+  if (!snapshot.heapLimit && !snapshot.cgroupLimit) {
+    const g = globalThis as Record<symbol, unknown>;
+    if (!g[MEMORY_NO_LIMIT_WARNED_KEY]) {
+      g[MEMORY_NO_LIMIT_WARNED_KEY] = true;
+      console.warn('memory monitoring disabled: no heap or cgroup limit available');
+    }
+    return;
+  }
+
+  const heapUsagePercentage =
+    snapshot.heapLimit && snapshot.heapLimit > 0 ? (snapshot.heapUsed / snapshot.heapLimit) * 100 : null;
+  const rssUsagePercentage =
+    snapshot.cgroupLimit && snapshot.cgroupLimit > 0 ? (snapshot.rss / snapshot.cgroupLimit) * 100 : null;
+
+  const usagePercentage = Math.max(heapUsagePercentage ?? 0, rssUsagePercentage ?? 0);
+  if (usagePercentage < threshold) return;
+
+  const parts: string[] = [];
+  if (heapUsagePercentage !== null) parts.push(`heap ${heapUsagePercentage.toFixed(2)}% of V8 limit`);
+  if (rssUsagePercentage !== null) parts.push(`RSS ${rssUsagePercentage.toFixed(2)}% of container limit`);
+
+  createAlert(
+    AlertType.RESOURCE_EXHAUSTION,
+    usagePercentage >= 95 ? AlertSeverity.CRITICAL : AlertSeverity.WARNING,
+    'High Memory Usage',
+    `Memory usage is ${usagePercentage.toFixed(2)}% (${parts.join(', ')}; threshold: ${threshold}%)`,
+    'resource-monitoring',
+    {
+      usagePercentage,
+      heapUsagePercentage,
+      rssUsagePercentage,
+      threshold,
+      memoryUsage: {
+        used: toMb(snapshot.heapUsed),
+        total: snapshot.heapLimit ? toMb(snapshot.heapLimit) : null,
+        heapTotal: toMb(snapshot.heapTotal),
+        external: toMb(snapshot.external),
+        rss: toMb(snapshot.rss),
+        cgroupLimit: snapshot.cgroupLimit ? toMb(snapshot.cgroupLimit) : null,
+      },
+    }
+  );
 }
 
 /**
@@ -460,9 +594,22 @@ export function getAlertStatistics(): {
   };
 }
 
-// Initialize periodic monitoring (run every 5 minutes)
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+// Initialize periodic monitoring (run every 5 minutes).
+// Next.js evaluates this module once per bundle layer/chunk that includes it,
+// all inside the same Node process. A process-wide guard on globalThis keeps it
+// to a single interval; without it each copy scheduled its own and every tick
+// logged the memory alert more than once.
+const MONITORING_INTERVAL_KEY = Symbol.for('readyset.alerting.monitoringInterval');
+
+function scheduleMonitoring(): void {
+  if (typeof window !== 'undefined' || typeof setInterval === 'undefined') return;
+  const g = globalThis as Record<symbol, unknown>;
+  if (g[MONITORING_INTERVAL_KEY]) return;
+  const handle = setInterval(() => {
     runMonitoringChecks();
-  }, 5 * 60 * 1000); // 5 minutes
-} 
+  }, 5 * 60 * 1000);
+  (handle as { unref?: () => void }).unref?.();
+  g[MONITORING_INTERVAL_KEY] = handle;
+}
+
+scheduleMonitoring();
