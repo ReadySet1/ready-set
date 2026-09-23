@@ -119,7 +119,18 @@ export function SignatureCapture({
 
     let lastW = 0;
     let lastH = 0;
+    // A resize mid-stroke (e.g. the Android keyboard closing after blur()
+    // while the driver is already signing) must not fold the unfinished
+    // stroke: clear()+fromData() would swap in a replayed copy that
+    // signature_pad keeps appending to, and everything drawn after it would
+    // be dropped on the next resize. Defer until the finger lifts.
+    let drawing = false;
+    let pendingResize = false;
     const applySize = () => {
+      if (drawing) {
+        pendingResize = true;
+        return;
+      }
       const w = canvas.offsetWidth;
       const h = canvas.offsetHeight;
       if (w === 0 || h === 0) return; // not laid out yet — wait for the observer
@@ -167,11 +178,24 @@ export function SignatureCapture({
     const observer = new ResizeObserver(() => applySize());
     observer.observe(canvas);
 
-    const onEnd = () => setHasInk(!pad.isEmpty());
+    const onBegin = () => {
+      drawing = true;
+    };
+    const onEnd = () => {
+      drawing = false;
+      if (pendingResize) {
+        pendingResize = false;
+        applySize(); // also refreshes hasInk
+      } else {
+        setHasInk(!pad.isEmpty());
+      }
+    };
+    pad.addEventListener("beginStroke", onBegin);
     pad.addEventListener("endStroke", onEnd);
 
     return () => {
       observer.disconnect();
+      pad.removeEventListener("beginStroke", onBegin);
       pad.removeEventListener("endStroke", onEnd);
       pad.off();
       padRef.current = null;
@@ -202,8 +226,9 @@ export function SignatureCapture({
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
     setFullscreen(true);
-    // Opportunistic: works on some Android browsers, rejects on iOS. The CSS
-    // rotation is the guaranteed path.
+    // Best effort only: rejects on iOS, and on Android Chrome it only works
+    // while the document is in browser fullscreen. The CSS rotation is the
+    // guaranteed path.
     try {
       const orientation = window.screen?.orientation as LockableOrientation | undefined;
       orientation?.lock?.("landscape")?.catch?.(() => {});
@@ -212,14 +237,22 @@ export function SignatureCapture({
     }
   }, []);
 
-  const exitFullscreen = useCallback(() => {
-    setFullscreen(false);
-    try {
-      (window.screen?.orientation as LockableOrientation | undefined)?.unlock?.();
-    } catch {
-      /* not supported */
-    }
-  }, []);
+  const exitFullscreen = useCallback(() => setFullscreen(false), []);
+
+  // Leaving fullscreen by ANY path — Done, or the sheet unmounting (Escape,
+  // backdrop) — releases the orientation lock and moves focus sensibly.
+  const doneRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!fullscreen) return;
+    doneRef.current?.focus();
+    return () => {
+      try {
+        (window.screen?.orientation as LockableOrientation | undefined)?.unlock?.();
+      } catch {
+        /* not supported */
+      }
+    };
+  }, [fullscreen]);
 
   const handleClear = useCallback(() => {
     padRef.current?.clear();
@@ -324,6 +357,7 @@ export function SignatureCapture({
             </span>
             <button
               type="button"
+              ref={doneRef}
               onClick={exitFullscreen}
               className="flex items-center gap-1.5 rounded-xl border-[1.5px] border-driver-border px-3 py-1.5 text-[12.5px] font-semibold text-driver-muted"
               aria-label="Exit full screen"
@@ -336,7 +370,9 @@ export function SignatureCapture({
         <div
           className={cn(
             "relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt",
-            fullscreen && "flex-1",
+            // min-h-0: let the pad shrink with the viewport instead of its
+            // canvas pushing Clear off-screen.
+            fullscreen && "min-h-0 flex-1",
           )}
         >
           <canvas
@@ -386,7 +422,8 @@ export function SignatureCapture({
               </span>
               <button
                 type="button"
-                onClick={exitFullscreen}
+                ref={doneRef}
+              onClick={exitFullscreen}
                 className="pointer-events-auto flex items-center gap-1.5 rounded-xl border-[1.5px] border-driver-border bg-driver-surface px-3 py-1.5 text-[12.5px] font-semibold text-driver-muted"
                 aria-label="Exit full screen"
               >

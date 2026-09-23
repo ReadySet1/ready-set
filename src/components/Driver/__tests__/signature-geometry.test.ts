@@ -87,16 +87,33 @@ describe("signature-geometry", () => {
   });
 
   it("scales pen widths and stroke timing with the geometry so the replay is an exact scaled copy", () => {
-    const view = computeView(INLINE, 170, 96, 0); // half size
-    expect(view.scale).toBeCloseTo(0.5);
+    const view = computeView(INLINE, 680, 384, 0); // double size
+    expect(view.scale).toBeCloseTo(2);
     const out = toView(BOB, view);
-    expect(out[0]!.minWidth).toBeCloseTo(0.4);
-    expect(out[0]!.maxWidth).toBeCloseTo(1.2);
+    expect(out[0]!.minWidth).toBeCloseTo(1.6);
+    expect(out[0]!.maxWidth).toBeCloseTo(4.8);
     // signature_pad's width is a function of velocity = distance / Δtime;
     // scaling Δtime with distance keeps the velocity (and so the width
     // profile) identical.
     const [p0, p1] = out[0]!.points;
-    expect(p1!.time - p0!.time).toBeCloseTo(10 * 0.5);
+    expect(p1!.time - p0!.time).toBeCloseTo(10 * 2);
+  });
+
+  it("floors the pen at 0.8 CSS px when shrinking so a fullscreen signature doesn't upload faint", () => {
+    // iPhone 13: landscape 760×363 → inline 339×192 is s ≈ 0.446, which
+    // would thin the pen to ~0.36–1.07 px.
+    const view = computeView(INLINE, 170, 96, 0); // s = 0.5
+    const out = toView(BOB, view);
+    expect(out[0]!.minWidth).toBeCloseTo(0.8);
+    // maxWidth keeps the pen's min:max ratio (1:3).
+    expect(out[0]!.maxWidth).toBeCloseTo(2.4);
+    // Geometry and timing still scale with the view.
+    expect(out[0]!.points[1]!.y - out[0]!.points[0]!.y).toBeCloseTo(110 * 0.5);
+    expect(out[0]!.points[1]!.time - out[0]!.points[0]!.time).toBeCloseTo(5);
+    // A thin base pen (drawn in fullscreen, stored at ≈0.45) is floored too.
+    const thin = toView([{ ...BOB[0]!, minWidth: 0.45, maxWidth: 1.35 }], view);
+    expect(thin[0]!.minWidth).toBeCloseTo(0.8);
+    expect(thin[0]!.maxWidth).toBeCloseTo(2.4);
   });
 
   describe("landscape (CSS-rotated chrome over a portrait canvas)", () => {

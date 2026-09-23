@@ -67,6 +67,9 @@ describe("SignatureCapture", () => {
       mockPad._data = [];
     });
     resizeCallbacks = [];
+    jest
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockImplementation(() => ({ scale: jest.fn() }) as any);
     global.ResizeObserver = CapturingResizeObserver as unknown as typeof ResizeObserver;
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -231,13 +234,14 @@ describe("SignatureCapture", () => {
       expect(pts[0]).toMatchObject({ time: 1000, pressure: 0.5 });
       expect(pts[1].time).toBeCloseTo(1000 + 1 * 0.32);
       expect(pts[1].pressure).toBe(0.5);
-      // Pen widths scale with the ink so the shrunk copy is not blobby.
+      // Pen widths scale with the ink so the shrunk copy is not blobby…
       expect(replayed[0]).toMatchObject({
         penColor: "#15202e",
         compositeOperation: "source-over",
       });
-      expect(replayed[0].minWidth).toBeCloseTo(0.8 * 0.32);
-      expect(replayed[0].maxWidth).toBeCloseTo(2.4 * 0.32);
+      // …but never below the 0.8px floor (faint uploads), ratio kept.
+      expect(replayed[0].minWidth).toBeCloseTo(0.8);
+      expect(replayed[0].maxWidth).toBeCloseTo(2.4);
       // Everything stays on-canvas — the uploaded PNG must show the ink.
       for (const p of pts) {
         expect(p.x).toBeGreaterThanOrEqual(0);
@@ -411,6 +415,43 @@ describe("SignatureCapture", () => {
         expect(p.y).toBeLessThanOrEqual(192);
       }
     });
+    it("defers a resize that lands mid-stroke until the stroke ends (no points lost)", () => {
+      render(
+        <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+      );
+      const canvas = screen.getByLabelText(/signature pad/i);
+      setCanvasSize(canvas, 340, 192);
+      fireResize();
+
+      // The driver starts signing…
+      act(() => mockPad._handlers["beginStroke"]?.());
+      const stroke = strokeGroup([
+        { x: 50, y: 50 },
+        { x: 60, y: 60 },
+      ]);
+      mockPad._data = [stroke];
+
+      // …the keyboard closes (Android) and the pad resizes under the finger.
+      setCanvasSize(canvas, 340, 300);
+      fireResize();
+      expect(mockPad.fromData).not.toHaveBeenCalled(); // deferred
+
+      // The finger keeps going, then lifts: the deferred resize runs now.
+      stroke.points.push(
+        { x: 70, y: 70, time: 1002, pressure: 0.5 },
+        { x: 80, y: 80, time: 1003, pressure: 0.5 },
+      );
+      act(() => mockPad._handlers["endStroke"]?.());
+      expect(mockPad.fromData).toHaveBeenCalledTimes(1);
+
+      // Tapping Done / another resize must keep every point.
+      setCanvasSize(canvas, 340, 192);
+      fireResize();
+      const pts = mockPad._data.flatMap((g: any) => g.points);
+      expect(pts).toHaveLength(4);
+      expect(pts[3].x).toBeCloseTo(80);
+      expect(pts[3].y).toBeCloseTo(80);
+    });
   });
 
   describe("landscape fullscreen", () => {
@@ -532,6 +573,41 @@ describe("SignatureCapture", () => {
       expect(document.activeElement).toBe(input);
       fireEvent.click(screen.getByRole("button", { name: /sign in full screen/i }));
       expect(document.activeElement).not.toBe(input);
+    });
+    it("unlocks orientation when unmounted while fullscreen (sheet closed / Escape)", () => {
+      setViewport(390, 844);
+      const unlock = jest.fn();
+      Object.defineProperty(window.screen, "orientation", {
+        value: { lock: jest.fn().mockResolvedValue(undefined), unlock, type: "portrait-primary" },
+        configurable: true,
+      });
+      const { unmount } = render(
+        <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /sign in full screen/i }));
+      expect(unlock).not.toHaveBeenCalled();
+      unmount();
+      expect(unlock).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves focus to Done when fullscreen opens", () => {
+      setViewport(390, 844);
+      render(
+        <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /sign in full screen/i }));
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: /exit full screen/i }),
+      );
+    });
+
+    it("lets the pad shrink with the viewport (min-h-0) so Clear stays on-screen", () => {
+      setViewport(844, 390);
+      render(
+        <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /sign in full screen/i }));
+      expect(screen.getByLabelText(/signature pad/i).parentElement).toHaveClass("flex-1", "min-h-0");
     });
   });
 });

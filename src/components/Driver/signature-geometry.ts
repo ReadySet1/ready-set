@@ -55,21 +55,27 @@ export function computeView(
   };
 }
 
+/** Thinnest pen (CSS px) a replayed stroke may shrink to. A signature drawn
+ *  in the landscape pad collapses to s ≈ 0.45 inline (iPhone 13), which would
+ *  otherwise thin the pen to ~0.36–1.07 px and upload a faint PNG. */
+export const MIN_REPLAY_PEN_WIDTH = 0.8;
+
 function mapGroup(
   group: StrokeGroup,
   point: (x: number, y: number) => { x: number; y: number },
   factor: number,
+  widthFactor: number = factor,
 ): StrokeGroup {
   const t0 = group.points[0]?.time ?? 0;
   return {
     ...group,
     // Pen widths scale with the geometry, and so does Δtime: signature_pad
     // derives width from velocity = distance / Δtime, so scaling both keeps
-    // the width profile — the replay is an exact scaled copy, not a
-    // re-inked (blobby or hairline) version of the signature.
-    minWidth: group.minWidth * factor,
-    maxWidth: group.maxWidth * factor,
-    dotSize: group.dotSize * factor,
+    // the width profile — the replay is a scaled copy, not a re-inked
+    // (blobby or hairline) version of the signature.
+    minWidth: group.minWidth * widthFactor,
+    maxWidth: group.maxWidth * widthFactor,
+    dotSize: group.dotSize * widthFactor,
     points: group.points.map((p) => ({
       ...p,
       ...point(p.x, p.y),
@@ -78,11 +84,18 @@ function mapGroup(
   };
 }
 
-/** Base space → canvas CSS px for the given view. */
+/** Base space → canvas CSS px for the given view. Pen widths follow the
+ *  scale but are floored at {@link MIN_REPLAY_PEN_WIDTH} (min:max ratio
+ *  kept). Replayed copies never go back through {@link fromView} — only
+ *  freshly drawn strokes do — so the floor never leaks into the base. */
 export function toView(groups: StrokeGroup[], view: View): StrokeGroup[] {
   const { frame, scale, offsetX, offsetY, rotation, canvasWidth } = view;
-  return groups.map((g) =>
-    mapGroup(
+  return groups.map((g) => {
+    const widthFactor =
+      g.minWidth > 0 && g.minWidth * scale < MIN_REPLAY_PEN_WIDTH
+        ? MIN_REPLAY_PEN_WIDTH / g.minWidth
+        : scale;
+    return mapGroup(
       g,
       (x, y) => {
         const u = (x - frame.x) * scale + offsetX;
@@ -90,8 +103,9 @@ export function toView(groups: StrokeGroup[], view: View): StrokeGroup[] {
         return rotation === 90 ? { x: canvasWidth - v, y: u } : { x: u, y: v };
       },
       scale,
-    ),
-  );
+      widthFactor,
+    );
+  });
 }
 
 /** Canvas CSS px → base space (exact inverse of {@link toView}). */
