@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0](https://github.com/ReadySet1/ready-set/compare/v2.7.0...v2.8.0) (2026-09-23)
+
+
+### Added
+
+* add 'How Our Pricing Works' examples to delivery pricing page ([13f6508](https://github.com/ReadySet1/ready-set/commit/13f6508441a3358ae43edd8a3a977a215e433615))
+* **admin:** add an Overdue tab to catering orders ([603d68c](https://github.com/ReadySet1/ready-set/commit/603d68ca9986b5042bf66a92ea7d556e778cb9c0))
+* **driver:** show a notice when dispatch declines a return request ([8d7d5cd](https://github.com/ReadySet1/ready-set/commit/8d7d5cd7bf35cccff7cccc89cf9156337a6ae862))
+* **driver:** show a notice when dispatch declines a return request ([12e4c61](https://github.com/ReadySet1/ready-set/commit/12e4c61dcf08b96c36c089cf7583df152dd47d3a))
+* **orders:** record driver status transitions in order_status_history ([f377542](https://github.com/ReadySet1/ready-set/commit/f377542530f27cb49f7afafcfd6d173108cab577))
+* **orders:** record driver status transitions in order_status_history ([0750f00](https://github.com/ReadySet1/ready-set/commit/0750f008d377f37d9655f9a5121e6236da562852))
+* **pricing:** publish the $5 additional-stop charge ([f6cea35](https://github.com/ReadySet1/ready-set/commit/f6cea3584a2f16373a7b8f9717a4f3adb9a8729d))
+
+
+### Fixed
+
+* **admin:** overdue orders tab, real dashboard count, cancel timestamp ([9021806](https://github.com/ReadySet1/ready-set/commit/902180617128b20e2ce06ae0ae892e919346284e))
+* **alerting:** measure memory against real limits and schedule once per process ([fd99b44](https://github.com/ReadySet1/ready-set/commit/fd99b4465da50c4971d0295daf85a22a395eddc5))
+* **alerting:** measure memory against real limits and schedule once per process ([49d0e19](https://github.com/ReadySet1/ready-set/commit/49d0e19f9ffbd05f937dca29fc2afc1e87f59a5c))
+* **alerting:** share the alert store per process and warn when memory limits are unknown ([a509f8c](https://github.com/ReadySet1/ready-set/commit/a509f8c887f1b168788c3de538699b517eb71973))
+* **api:** exclude soft-deleted on-demand orders from the list endpoint ([7971283](https://github.com/ReadySet1/ready-set/commit/797128305cec1aaec602a46b14bc4dfb12c49d82))
+* **dashboard:** count active orders from the server total ([000b335](https://github.com/ReadySet1/ready-set/commit/000b3359b2d5870381e2ab8413e3f4f1b375a18b))
+* **driver:** defer mid-stroke pad resizes and floor replayed pen width ([54171bd](https://github.com/ReadySet1/ready-set/commit/54171bdd950c20faf46aa2d617e7b5c1438b1ef5))
+* **driver:** ignore soft-deleted profiles on the return POST too ([c21c494](https://github.com/ReadySet1/ready-set/commit/c21c494d8a03d36c86f2c69df86c361d1af44cfb))
+* **driver:** lossless signature resize and landscape fullscreen pad ([c4a45d8](https://github.com/ReadySet1/ready-set/commit/c4a45d85bbe59f461360bf4c6045824d3c6882d1))
+* **driver:** lossless signature resize and landscape fullscreen pad ([f3d5725](https://github.com/ReadySet1/ready-set/commit/f3d57250ddc246886d1e56a5d08e98b9446ec639))
+* **driver:** wrap long dispatch notes and ignore soft-deleted profiles ([f5fc3bc](https://github.com/ReadySet1/ready-set/commit/f5fc3bca6f595bf19456c0486553073585981b69))
+* **errors:** recover from ChunkLoadError with the existing fallback ([84eeda8](https://github.com/ReadySet1/ready-set/commit/84eeda8360060bd4b9b9fb9b728154b873b79f38))
+* **errors:** recover from ChunkLoadError, filter crawler noise, canonical host redirect ([8e639da](https://github.com/ReadySet1/ready-set/commit/8e639dab3b1e841c5a6446c093896f96844d3edc))
+* **monitoring:** drop known crawler events before they reach GlitchTip ([9ef6d72](https://github.com/ReadySet1/ready-set/commit/9ef6d72affaaddf7141597ca8891f1acb462f9a9))
+* **orders:** guard realtime hooks against overlapping connects and stale callbacks ([4215ae3](https://github.com/ReadySet1/ready-set/commit/4215ae370ee6bf839a2861d2764ff664d3ad8f8b))
+* **orders:** keep on-demand lookup failures from failing catering PATCHes ([e769e92](https://github.com/ReadySet1/ready-set/commit/e769e92f458dd45aca1f0af1185597fc68290070))
+* **orders:** stamp completeDateTime when an order is cancelled ([1f09ce1](https://github.com/ReadySet1/ready-set/commit/1f09ce18bff0bf7e879dd00d9c016bdc94604e2f))
+* **orders:** stop realtime hooks reconnecting on every parent render ([d10b8e9](https://github.com/ReadySet1/ready-set/commit/d10b8e9cc65deae4de902419655f8ba45d67886c))
+* **orders:** stop realtime hooks reconnecting on every parent render ([1150e93](https://github.com/ReadySet1/ready-set/commit/1150e93f4da1fcd33fb6b00a2ae9423b2b609407))
+* **seo:** redirect www to the apex domain ([4c5f816](https://github.com/ReadySet1/ready-set/commit/4c5f8163d45e0a8c0c05d20f47c4b4c77b525f7d))
+* **tracking:** align shifts list route with the driver_shifts schema ([6733556](https://github.com/ReadySet1/ready-set/commit/6733556e0b3a4bfa664dd42fad902ceccd8f5457))
+* **tracking:** bound battery read and render real 0% battery ([7dfb7fe](https://github.com/ReadySet1/ready-set/commit/7dfb7fe4c9fc55d5c38a9e884eda711232764893))
+* **tracking:** record battery level on GPS points ([a55818e](https://github.com/ReadySet1/ready-set/commit/a55818e4f28cba97c3ca5eff10d796eaefd6d021))
+* **tracking:** record battery level on GPS points ([a3abd04](https://github.com/ReadySet1/ready-set/commit/a3abd04c45e1505f069aa21860c4c12885e4ef0b))
+* **tracking:** use real driver_shifts columns in mileage recalculation job ([794b0c8](https://github.com/ReadySet1/ready-set/commit/794b0c8378e2aaedf3da94dad94053290ad08120))
+* **tracking:** use real driver_shifts columns in mileage recalculation job ([d33d5fd](https://github.com/ReadySet1/ready-set/commit/d33d5fd8082d5341dceaa09684a32893a6121550))
+
+
+### Performance
+
+* **driver:** cut sequential database round trips in driver actions ([fbf6496](https://github.com/ReadySet1/ready-set/commit/fbf6496dbede3a87f70bf6d11a8dc383e24db72c))
+* **driver:** cut sequential database round trips in driver actions ([5ba16a8](https://github.com/ReadySet1/ready-set/commit/5ba16a86125db6f2d30d69f33a6dcbf1c84f39f9))
+
+
+### Security
+
+* **deps:** bump csv-parse to 7.0.2 ([adc93ca](https://github.com/ReadySet1/ready-set/commit/adc93cac5bae9803cc035af2933e6eec2c78cfa2))
+
+
+### Changed
+
+* **calculator:** remove the dead PRICING_TIERS constant ([11a2280](https://github.com/ReadySet1/ready-set/commit/11a22808a840eb319f93406de3f3c070a78fa89f))
+* **calculator:** remove the dead PRICING_TIERS constant ([f936e1f](https://github.com/ReadySet1/ready-set/commit/f936e1ff247486239edc5b23b2c3d04408441bf5))
+
+
+### Documentation
+
+* **claude:** release-please generates CHANGELOG sections from commits ([6efb355](https://github.com/ReadySet1/ready-set/commit/6efb35519d191d13764429b266fe741fe9348583))
+
 ## [2.7.0](https://github.com/ReadySet1/ready-set/compare/v2.6.0...v2.7.0) (2026-09-11)
 
 
