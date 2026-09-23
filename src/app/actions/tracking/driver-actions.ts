@@ -20,8 +20,9 @@ import {
   calculateShiftMileageWithBreakdown,
   calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
-import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
+import { authorizeDriverAction, callerMayActOnDriver } from '@/lib/auth/driver-ownership';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import { settle, unwrap } from '@/utils/settle';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
 import {
   END_SHIFT_STALE_PICKUP_HOURS,
@@ -84,39 +85,62 @@ export async function startDriverShift(
       return { success: false, error: 'Invalid driverId' };
     }
 
+    // The open-shift lookup is a read keyed by the requested driverId; start it
+    // alongside authorization (each round trip costs ~150 ms from the app
+    // server) and only look at its result once the caller is authorized.
+    const openShiftLookup = settle(findOpenShiftId(driverId));
+
     // AuthZ: only the driver themself (or an admin) may start their shift.
     if (!(await callerMayActOnDriver(driverId))) {
       return { success: false, error: 'Access denied' };
     }
 
     // Application guard: resume an open shift instead of starting a second one.
-    const openShiftId = await findOpenShiftId(driverId);
+    const openShiftId = unwrap(await openShiftLookup);
     if (openShiftId) {
       return { success: true, shiftId: openShiftId, resumed: true };
     }
 
-    // Use raw SQL for PostGIS operations since Prisma doesn't support geography types well
+    // Use raw SQL for PostGIS operations since Prisma doesn't support geography types well.
+    // One statement inserts the shift and flips the driver row on duty
+    // (atomically, one round trip); the unique index still rejects a second
+    // open shift, failing the whole statement.
+    let newShiftId: string | undefined;
     try {
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO driver_shifts (
-          driver_id,
-          shift_start,
-          start_location,
-          status,
-          notes
-        ) VALUES (
-          $1::uuid,
-          NOW(),
-          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-          'active',
-          $4
-        ) RETURNING id
+      const inserted = await prisma.$queryRawUnsafe<{ id: string }[]>(`
+        WITH new_shift AS (
+          INSERT INTO driver_shifts (
+            driver_id,
+            shift_start,
+            start_location,
+            status,
+            notes
+          ) VALUES (
+            $1::uuid,
+            NOW(),
+            ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+            'active',
+            $4
+          ) RETURNING id
+        ), on_duty AS (
+          UPDATE drivers
+          SET
+            is_on_duty = true,
+            current_shift_id = (SELECT id FROM new_shift),
+            shift_start_time = NOW(),
+            last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+            last_location_update = NOW(),
+            updated_at = NOW()
+          WHERE id = $1::uuid
+        )
+        SELECT id FROM new_shift
       `,
         driverId,
         startLocation.coordinates.lng,
         startLocation.coordinates.lat,
         metadata.notes || null
       );
+      newShiftId = inserted[0]?.id;
     } catch (insertError) {
       if (!isUniqueViolation(insertError)) throw insertError;
       // DB guard: another caller won the race between our pre-check and the
@@ -130,44 +154,12 @@ export async function startDriverShift(
       return { success: true, shiftId: winnerShiftId, resumed: true };
     }
 
-    // Update driver status
-    await prisma.$executeRawUnsafe(`
-      UPDATE drivers
-      SET
-        is_on_duty = true,
-        current_shift_id = (
-          SELECT id FROM driver_shifts
-          WHERE driver_id = $1::uuid
-          AND status = 'active'
-          ORDER BY shift_start DESC
-          LIMIT 1
-        ),
-        shift_start_time = NOW(),
-        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        last_location_update = NOW(),
-        updated_at = NOW()
-      WHERE id = $1::uuid
-    `,
-      driverId,
-      startLocation.coordinates.lng,
-      startLocation.coordinates.lat
-    );
-
-    // Get the created shift ID
-    const shiftRecord = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      SELECT id FROM driver_shifts
-      WHERE driver_id = $1::uuid
-      AND status = 'active'
-      ORDER BY shift_start DESC
-      LIMIT 1
-    `, driverId);
-
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
 
     return {
       success: true,
-      shiftId: shiftRecord[0]?.id,
+      shiftId: newShiftId,
       resumed: false,
     };
   } catch (error) {
@@ -198,7 +190,7 @@ export async function endDriverShift(
 }> {
   try {
     // Get shift info and ensure it is active before proceeding
-    const shiftInfo = await prisma.$queryRawUnsafe<{
+    const shiftLookup = prisma.$queryRawUnsafe<{
       driver_id: string;
       status: string;
     }[]>(`
@@ -209,14 +201,24 @@ export async function endDriverShift(
       WHERE id = $1::uuid
     `, shiftId);
 
+    // AuthZ: only the shift's driver (or an admin) may end it. Authentication
+    // overlaps the shift lookup; the decision still uses the shift's driver.
+    // The resolved caller is reused for the admin force check below.
+    const authorization = authorizeDriverAction(
+      shiftLookup.then((rows) => rows[0]?.driver_id)
+    );
+    authorization.catch(() => {}); // observed below; avoid an unhandled rejection on early return
+
+    const shiftInfo = await shiftLookup;
+
     if (shiftInfo.length === 0 || (shiftInfo[0]?.status !== 'active' && shiftInfo[0]?.status !== 'paused')) {
       return { success: false, error: 'Active shift not found' };
     }
 
     const shift = shiftInfo[0];
 
-    // AuthZ: only the shift's driver (or an admin) may end it.
-    if (!(await callerMayActOnDriver(shift?.driver_id))) {
+    const { allowed, caller } = await authorization;
+    if (!allowed) {
       return { success: false, error: 'Access denied' };
     }
 
@@ -239,7 +241,6 @@ export async function endDriverShift(
     // block: the driver has already asked dispatch to take the order back,
     // so the shift can end while the request awaits review.
     // Mirrored client-side by blocksEndShift in DriverTrackingPortal.
-    const caller = await getActionCaller();
     const force = metadata?.force === true && (caller?.isPrivileged ?? false);
     if (!force) {
       const settings = await getTrackingSettings();
@@ -364,6 +365,10 @@ export async function endDriverShift(
     // casing the orders PATCH writes (e.g. 'COMPLETED') — would otherwise
     // close the shift with a stale count. Case-insensitive, and both
     // 'delivered' and 'completed' count as a completed delivery.
+    //
+    // Always record the end location in the database first so that the
+    // mileage calculation window has a proper closing point. Both writes go
+    // in one statement (one round trip).
     await prisma.$executeRawUnsafe(`
       UPDATE driver_shifts
       SET
@@ -374,15 +379,6 @@ export async function endDriverShift(
             AND LOWER(status) IN ('delivered','completed')
             AND deleted_at IS NULL
         ),
-        updated_at = NOW()
-      WHERE id = $1::uuid
-    `, shiftId);
-
-    // Always record the end location in the database first so that the
-    // mileage calculation window has a proper closing point.
-    await prisma.$executeRawUnsafe(`
-      UPDATE driver_shifts
-      SET
         shift_end = NOW(),
         end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         status = 'completed',
@@ -395,6 +391,25 @@ export async function endDriverShift(
       endLocation.coordinates.lat,
       metadata.notes ? ` ${metadata.notes}` : (finalMileage ? ` [Client reported mileage: ${finalMileage} km]` : '')
     );
+
+    // The shift is closed. Releasing the driver row does not depend on the
+    // mileage calculation (different tables), so the two run concurrently.
+    const releaseDriver = prisma.$executeRawUnsafe(`
+      UPDATE drivers
+      SET
+        is_on_duty = false,
+        current_shift_id = NULL,
+        shift_start_time = NULL,
+        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+        last_location_update = NOW(),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+    `,
+      shift?.driver_id,
+      endLocation.coordinates.lng,
+      endLocation.coordinates.lat
+    );
+    releaseDriver.catch(() => {}); // awaited below
 
     // Calculate mileage from GPS trail. If finalMileage is provided (e.g., odometer reading),
     // use validation to compare GPS vs reported values and log discrepancies.
@@ -449,22 +464,7 @@ export async function endDriverShift(
       totalKm);
     }
 
-    // Update driver status
-    await prisma.$executeRawUnsafe(`
-      UPDATE drivers
-      SET
-        is_on_duty = false,
-        current_shift_id = NULL,
-        shift_start_time = NULL,
-        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        last_location_update = NOW(),
-        updated_at = NOW()
-      WHERE id = $1::uuid
-    `,
-      shift?.driver_id,
-      endLocation.coordinates.lng,
-      endLocation.coordinates.lat
-    );
+    await releaseDriver;
 
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
@@ -490,17 +490,24 @@ export async function startShiftBreak(
 ): Promise<{ success: boolean; breakId?: string; error?: string }> {
   try {
     // Verify shift exists and is active
-    const shiftExists = await prisma.$queryRawUnsafe<{ id: string; driver_id: string }[]>(`
+    const shiftLookup = prisma.$queryRawUnsafe<{ id: string; driver_id: string }[]>(`
       SELECT id, driver_id FROM driver_shifts
       WHERE id = $1::uuid AND status = 'active' AND deleted_at IS NULL
     `, shiftId);
 
+    // AuthZ: only the shift's driver (or an admin) may pause it.
+    // Authentication overlaps the shift lookup.
+    const authorization = authorizeDriverAction(
+      shiftLookup.then((rows) => rows[0]?.driver_id)
+    );
+    authorization.catch(() => {}); // observed below
+
+    const shiftExists = await shiftLookup;
     if (shiftExists.length === 0) {
       return { success: false, error: 'Active shift not found' };
     }
 
-    // AuthZ: only the shift's driver (or an admin) may pause it.
-    if (!(await callerMayActOnDriver(shiftExists[0]?.driver_id))) {
+    if (!(await authorization).allowed) {
       return { success: false, error: 'Access denied' };
     }
 
@@ -544,7 +551,7 @@ export async function endShiftBreak(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Verify shift exists and is paused (on break)
-    const shiftInfo = await prisma.$queryRawUnsafe<{
+    const shiftLookup = prisma.$queryRawUnsafe<{
       id: string;
       status: string;
       driver_id: string;
@@ -554,12 +561,19 @@ export async function endShiftBreak(
       WHERE id = $1::uuid AND status = 'paused' AND deleted_at IS NULL
     `, breakId);
 
+    // AuthZ: only the shift's driver (or an admin) may resume it.
+    // Authentication overlaps the shift lookup.
+    const authorization = authorizeDriverAction(
+      shiftLookup.then((rows) => rows[0]?.driver_id)
+    );
+    authorization.catch(() => {}); // observed below
+
+    const shiftInfo = await shiftLookup;
     if (shiftInfo.length === 0) {
       return { success: false, error: 'Paused shift not found (no active break)' };
     }
 
-    // AuthZ: only the shift's driver (or an admin) may resume it.
-    if (!(await callerMayActOnDriver(shiftInfo[0]?.driver_id))) {
+    if (!(await authorization).allowed) {
       return { success: false, error: 'Access denied' };
     }
 

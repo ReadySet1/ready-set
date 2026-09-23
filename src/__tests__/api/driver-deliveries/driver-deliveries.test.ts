@@ -425,6 +425,13 @@ describe('/api/driver-deliveries API', () => {
           { cateringRequestId: null, onDemandId: 'ondemand-1' },
         ];
 
+        const mockDeliveryAddress = {
+          id: 'delivery-addr-1',
+          street1: '321 Home Ln',
+          city: 'Austin',
+        };
+
+        // The route includes deliveryAddress (required FK) on the query.
         const mockOnDemandDelivery = {
           id: 'ondemand-1',
           deliveryAddressId: 'delivery-addr-1',
@@ -435,12 +442,7 @@ describe('/api/driver-deliveries API', () => {
             street1: '789 Store Rd',
             city: 'Austin',
           },
-        };
-
-        const mockDeliveryAddress = {
-          id: 'delivery-addr-1',
-          street1: '321 Home Ln',
-          city: 'Austin',
+          deliveryAddress: mockDeliveryAddress,
         };
 
         (prisma.dispatch.findMany as jest.Mock).mockResolvedValue(

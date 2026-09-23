@@ -31,6 +31,7 @@ import {
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
 import { runAfterResponse } from '@/lib/api/after-response';
+import { settle, unwrap } from '@/utils/settle';
 import {
   resolveOpenShiftIdForDriver,
   resolveOpenShiftIdForUser,
@@ -415,11 +416,21 @@ export async function PATCH(
       );
     }
 
-    // Find the order first to determine its type and check status
+    // Find the order first to determine its type and check status.
+    // The catering lookup, the on-demand lookup and the caller's role lookup
+    // are independent, so they are issued together (one round trip instead of
+    // up to three — the database is ~150 ms from the app server). Catering
+    // still wins when both tables match. The role lookup's outcome is only
+    // consulted where it was before (after the 404 check).
     let existingOrder: Order | null = null;
     let orderType: 'catering' | 'on_demand' = 'catering';
 
-    const cateringRequest = await prisma.cateringRequest.findFirst({
+    const callerProfileLookup = settle(
+      (async () =>
+        supabase.from('profiles').select('type').eq('id', user.id).single())()
+    );
+
+    const cateringLookup = prisma.cateringRequest.findFirst({
       where: {
         orderNumber: { equals: order_number, mode: 'insensitive' },
         deletedAt: null,
@@ -439,34 +450,41 @@ export async function PATCH(
       },
     });
 
+    const onDemandLookup = prisma.onDemand.findFirst({
+      where: {
+        orderNumber: { equals: order_number, mode: 'insensitive' },
+        deletedAt: null,
+      },
+      include: {
+        user: { select: { name: true, email: true } },
+        pickupAddress: true,
+        deliveryAddress: true,
+        dispatches: {
+          include: {
+            driver: {
+              select: { id: true, name: true, email: true, contactNumber: true },
+            },
+          },
+        },
+        fileUploads: true,
+      },
+    });
+
+    // The on-demand result is only consulted when catering found nothing, so
+    // its failure must not fail a request the catering order already answers
+    // (the sequential version never ran that query in that case).
+    const [cateringRequest, onDemandResult] = await Promise.all([
+      cateringLookup,
+      settle(onDemandLookup),
+    ]);
+    const onDemandOrder = cateringRequest ? null : unwrap(onDemandResult);
+
     if (cateringRequest) {
       existingOrder = { ...cateringRequest, order_type: "catering" };
       orderType = 'catering';
-    } else {
-      const onDemandOrder = await prisma.onDemand.findFirst({
-        where: {
-          orderNumber: { equals: order_number, mode: 'insensitive' },
-          deletedAt: null,
-        },
-        include: {
-          user: { select: { name: true, email: true } },
-          pickupAddress: true,
-          deliveryAddress: true,
-          dispatches: {
-            include: {
-              driver: {
-                select: { id: true, name: true, email: true, contactNumber: true },
-              },
-            },
-          },
-          fileUploads: true,
-        },
-      });
-
-      if (onDemandOrder) {
-        existingOrder = { ...onDemandOrder, order_type: "on_demand" };
-        orderType = 'on_demand';
-      }
+    } else if (onDemandOrder) {
+      existingOrder = { ...onDemandOrder, order_type: "on_demand" };
+      orderType = 'on_demand';
     }
 
     if (!existingOrder) {
@@ -482,11 +500,7 @@ export async function PATCH(
     // status by order number (the role check below only runs for field updates).
     let callerIsPrivileged = false;
     if (driverStatus || status) {
-      const { data: callerProfile } = await supabase
-        .from('profiles')
-        .select('type')
-        .eq('id', user.id)
-        .single();
+      const { data: callerProfile } = unwrap(await callerProfileLookup);
       const callerType = callerProfile?.type?.toUpperCase();
       const privileged =
         callerType === 'ADMIN' ||
@@ -513,12 +527,8 @@ export async function PATCH(
 
     // For full field updates (not just status), check permissions and terminal status
     if (hasFieldUpdates) {
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('type')
-        .eq('id', user.id)
-        .single();
+      // User profile (role), fetched together with the order above
+      const { data: profile } = unwrap(await callerProfileLookup);
 
       if (!profile?.type || !ORDER_EDIT_ROLES.includes(profile.type)) {
         return NextResponse.json(
@@ -587,6 +597,35 @@ export async function PATCH(
         { status: 422 },
       );
     }
+    // Deliveries-mirror attribution (driver row + open shift of the DISPATCHED
+    // driver) depends only on the order, so it is resolved now and runs
+    // concurrently with the shift gate and pickup check below; it is consumed
+    // only once those have passed.
+    const mirrorTimestampField = driverStatus ? getDeliveryTimestampField(driverStatus) : null;
+    const mirrorAttribution = mirrorTimestampField
+      ? settle(
+          (async () => {
+            const dispatchDriverProfileId = (existingOrder as any).dispatches?.[0]?.driver?.id as
+              | string
+              | undefined;
+            let deliveryDriverId: string | null = null;
+            if (dispatchDriverProfileId) {
+              const driverRecord = await prisma.driver.findFirst({
+                where: { profileId: dispatchDriverProfileId },
+                select: { id: true },
+              });
+              deliveryDriverId = driverRecord?.id ?? null;
+            }
+            // Stamp the driver's OPEN (active or paused) shift on the mirror so the
+            // delivery-count trigger can attribute the delivery to the shift.
+            // driver_shifts.driver_id references drivers.id (same as
+            // deliveries.driver_id), NOT the dispatch's profile id.
+            const deliveryShiftId = await resolveOpenShiftIdForDriver(deliveryDriverId);
+            return { driverId: deliveryDriverId, shiftId: deliveryShiftId };
+          })()
+        )
+      : null;
+
     // A driver must be on an open shift (active or paused: a break keeps GPS
     // flowing) to work a delivery. Without one no GPS is recorded and dispatch
     // never sees the delivery moving (reproduced in the field 2026-09-02).
@@ -757,35 +796,20 @@ export async function PATCH(
           deliveryAddress: string;
         }
       | null = null;
-    if (driverStatus) {
-      const timestampField = getDeliveryTimestampField(driverStatus);
-      if (timestampField) {
-        const now = new Date();
-        const dispatchDriverProfileId = (existingOrder as any).dispatches?.[0]?.driver?.id as
-          | string
-          | undefined;
-        let deliveryDriverId: string | null = null;
-        if (dispatchDriverProfileId) {
-          const driverRecord = await prisma.driver.findFirst({
-            where: { profileId: dispatchDriverProfileId },
-            select: { id: true },
-          });
-          deliveryDriverId = driverRecord?.id ?? null;
-        }
-        // Stamp the driver's OPEN (active or paused) shift on the mirror so the
-        // delivery-count trigger can attribute the delivery to the shift.
-        // driver_shifts.driver_id references drivers.id (same as
-        // deliveries.driver_id), NOT the dispatch's profile id.
-        const deliveryShiftId = await resolveOpenShiftIdForDriver(deliveryDriverId);
-        mirror = {
-          field: timestampField,
-          now,
-          driverId: deliveryDriverId,
-          shiftId: deliveryShiftId,
-          deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',
-        };
-        justSetTimestamp = { field: timestampField, value: now };
-      }
+    if (mirrorTimestampField && mirrorAttribution) {
+      const now = new Date();
+      // Resolved concurrently with the checks above (see mirrorAttribution).
+      const { driverId: deliveryDriverId, shiftId: deliveryShiftId } = unwrap(
+        await mirrorAttribution
+      );
+      mirror = {
+        field: mirrorTimestampField,
+        now,
+        driverId: deliveryDriverId,
+        shiftId: deliveryShiftId,
+        deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',
+      };
+      justSetTimestamp = { field: mirrorTimestampField, value: now };
     }
 
     // Driver-transition audit row (order_status_history). The partner gate
@@ -910,16 +934,19 @@ export async function PATCH(
     // Advancing to PICKED_UP (or beyond) means the driver kept working the
     // delivery, so any PENDING return request no longer applies — auto-void
     // it server-side. Non-fatal: the status update already committed.
-    if (
-      driverStatus &&
-      POST_PICKUP_DRIVER_STATUSES.includes(String(driverStatus))
-    ) {
-      try {
-        await voidPendingReturnRequests((updatedRaw as any).id);
-      } catch (voidErr) {
-        console.warn('Failed to auto-void pending return requests:', voidErr);
+    // Runs concurrently with the timestamp read-back below and is awaited
+    // before the response goes out.
+    const voidReturnRequests =
+      driverStatus && POST_PICKUP_DRIVER_STATUSES.includes(String(driverStatus))
+        ? settle(voidPendingReturnRequests((updatedRaw as any).id))
+        : null;
+    const finishVoidReturnRequests = async () => {
+      if (!voidReturnRequests) return;
+      const voided = await voidReturnRequests;
+      if (!voided.ok) {
+        console.warn('Failed to auto-void pending return requests:', voided.error);
       }
-    }
+    };
 
     if (updatedOrder) {
       // Dispatch cancelled an order that had a driver: tell the driver on both
@@ -1116,9 +1143,11 @@ export async function PATCH(
         }
       }
 
+      await finishVoidReturnRequests();
       return NextResponse.json(serializedOrder);
     }
 
+    await finishVoidReturnRequests();
     return NextResponse.json({ message: "Order not found" }, { status: 404 });
   } catch (error) {
     console.error("Error updating order:", error);

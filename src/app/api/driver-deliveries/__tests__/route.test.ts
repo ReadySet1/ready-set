@@ -498,4 +498,66 @@ describe("/api/driver-deliveries", () => {
       );
     });
   });
+
+  /**
+   * Round trips: the portal refetches this feed after every status change and
+   * the database is ~150 ms from the app server, so independent queries must
+   * be in flight together and redundant ones must not run.
+   */
+  describe("round trips", () => {
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+
+    function deferred<T>() {
+      let resolve!: (v: T) => void;
+      const promise = new Promise<T>((r) => {
+        resolve = r;
+      });
+      return { promise, resolve };
+    }
+
+    beforeEach(() => {
+      mockPrisma.dispatch.findMany.mockResolvedValue([
+        mockCateringDispatch,
+        mockOnDemandDispatch,
+      ]);
+    });
+
+    it("fetches catering and on-demand orders together", async () => {
+      const catering = deferred<unknown[]>();
+      mockPrisma.cateringRequest.findMany.mockReturnValue(catering.promise);
+
+      const pending = GET(createGetRequest("http://localhost:3000/api/driver-deliveries"));
+      await flush();
+      expect(mockPrisma.onDemand.findMany).toHaveBeenCalledTimes(1);
+
+      catering.resolve([mockCateringDelivery]);
+      await expectSuccessResponse(await pending, 200);
+    });
+
+    it("fetches stage timestamps and pending return requests together", async () => {
+      mockPrisma.cateringRequest.findMany.mockResolvedValue([mockCateringDelivery]);
+      const timestamps = deferred<unknown[]>();
+      mockPrisma.delivery.findMany.mockReturnValue(timestamps.promise);
+
+      const pending = GET(createGetRequest("http://localhost:3000/api/driver-deliveries"));
+      await flush();
+      expect(mockPrisma.deliveryReturnRequest.findMany).toHaveBeenCalledTimes(1);
+
+      timestamps.resolve([]);
+      await expectSuccessResponse(await pending, 200);
+    });
+
+    it("uses the included on-demand delivery address instead of re-querying it", async () => {
+      mockPrisma.onDemand.findMany.mockResolvedValue([
+        { ...mockOnDemandDelivery, deliveryAddress: mockDeliveryAddress },
+      ]);
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/driver-deliveries"));
+      const data = await expectSuccessResponse(response, 200);
+
+      expect(mockPrisma.address.findMany).not.toHaveBeenCalled();
+      const onDemand = data.deliveries.find((d: any) => d.delivery_type === "on_demand");
+      expect(onDemand.delivery_address).toMatchObject({ id: "delivery-addr-1" });
+    });
+  });
 });
