@@ -22,6 +22,7 @@ import {
 } from '@/services/tracking/mileage';
 import { callerMayActOnDriver, getActionCaller } from '@/lib/auth/driver-ownership';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import { BatteryLevelSchema } from '@/lib/tracking/battery';
 import {
   END_SHIFT_STALE_PICKUP_HOURS,
   formatBlockingOrdersMessage,
@@ -775,7 +776,7 @@ export async function updateDriverLocation(
       location.speed ?? 0,
       location.heading ?? 0,
       location.altitude ?? null,
-      location.batteryLevel != null ? Math.round(location.batteryLevel) : null,
+      BatteryLevelSchema.parse(location.batteryLevel),
       location.isMoving ?? false,
       location.timestamp
     );

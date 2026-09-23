@@ -218,6 +218,19 @@ describe('DriverStatusList', () => {
     jest.clearAllMocks();
   });
 
+  describe('Battery display', () => {
+    it('shows a real 0% battery instead of treating it as no data', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1]}
+          recentLocations={[{ ...mockLocationData1, batteryLevel: 0 }]}
+        />
+      );
+
+      expect(screen.getByText('0%')).toBeInTheDocument();
+    });
+  });
+
   describe('Component Rendering', () => {
     it('should render the driver list with names', () => {
       render(

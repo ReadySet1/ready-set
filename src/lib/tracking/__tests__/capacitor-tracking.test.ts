@@ -176,4 +176,27 @@ describe('capacitor-tracking', () => {
       expect(postedBody(2).is_moving).toBe(false);
     });
   });
+  describe('battery level', () => {
+    afterEach(() => {
+      delete (navigator as unknown as Record<string, unknown>).getBattery;
+    });
+
+    it('sends battery_level when the WebView exposes the Battery API (Android)', async () => {
+      Object.defineProperty(navigator, 'getBattery', {
+        value: jest.fn().mockResolvedValue({ level: 0.42 }),
+        configurable: true,
+        writable: true,
+      });
+      await bridge.startNativeShiftTracking(session());
+      await emitFix();
+      expect(postedBody().battery_level).toBe(42);
+    });
+
+    it('sends battery_level: null when the Battery API is absent (iOS WKWebView)', async () => {
+      delete (navigator as unknown as Record<string, unknown>).getBattery;
+      await bridge.startNativeShiftTracking(session());
+      await emitFix();
+      expect(postedBody()).toHaveProperty('battery_level', null);
+    });
+  });
 });
