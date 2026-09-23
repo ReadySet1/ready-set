@@ -504,8 +504,12 @@ describe('useDriverDeliveries', () => {
       });
 
       expect(ok).toBe(true);
-      const bodies = orderPatchCalls().map(([, init]) => JSON.parse(init.body));
-      expect(bodies).toContainEqual({ status: 'COMPLETED' });
+      const followUp = orderPatchCalls().find(
+        ([, init]) => init.body === JSON.stringify({ status: 'COMPLETED' }),
+      );
+      expect(followUp).toBeDefined();
+      // Not awaited, so it must survive navigation / webview unload.
+      expect(followUp![1]).toMatchObject({ keepalive: true });
     });
   });
 

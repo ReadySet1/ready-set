@@ -141,6 +141,20 @@ describe('PATCH /api/orders/[order_number] round trips', () => {
     expect(prisma.onDemand.update).not.toHaveBeenCalled();
   });
 
+  it('ignores an on-demand lookup failure when the catering order matched', async () => {
+    (prisma.onDemand.findFirst as jest.Mock).mockRejectedValue(new Error('on-demand down'));
+    const res = await patch({ driverStatus: 'PICKED_UP' });
+    expect(res.status).toBe(200);
+    expect(prisma.cateringRequest.update).toHaveBeenCalled();
+  });
+
+  it('surfaces an on-demand lookup failure when no catering order matched', async () => {
+    (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.onDemand.findFirst as jest.Mock).mockRejectedValue(new Error('on-demand down'));
+    const res = await patch({ driverStatus: 'PICKED_UP' });
+    expect(res.status).toBe(500);
+  });
+
   it('resolves the deliveries-mirror driver and shift while the shift gate runs', async () => {
     const gate = deferred<string | null>();
     (resolveOpenShiftIdForUser as jest.Mock).mockReturnValue(gate.promise);

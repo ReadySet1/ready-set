@@ -382,6 +382,8 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         if (newStatus === DriverStatus.COMPLETED) {
           void fetch(`/api/orders/${encodeURIComponent(order.orderNumber)}`, {
             method: "PATCH",
+            // Not awaited: keep it alive through navigation / webview unload.
+            keepalive: true,
             credentials: "include",
             headers: {
               Authorization: `Bearer ${session.access_token}`,

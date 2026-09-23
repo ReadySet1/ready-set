@@ -466,10 +466,14 @@ export async function PATCH(
       },
     });
 
-    const [cateringRequest, onDemandOrder] = await Promise.all([
+    // The on-demand result is only consulted when catering found nothing, so
+    // its failure must not fail a request the catering order already answers
+    // (the sequential version never ran that query in that case).
+    const [cateringRequest, onDemandResult] = await Promise.all([
       cateringLookup,
-      onDemandLookup,
+      settle(onDemandLookup),
     ]);
+    const onDemandOrder = cateringRequest ? null : unwrap(onDemandResult);
 
     if (cateringRequest) {
       existingOrder = { ...cateringRequest, order_type: "catering" };

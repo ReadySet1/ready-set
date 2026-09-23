@@ -305,6 +305,22 @@ describe("authorizeDriverAction", () => {
     expect(mockQuery.mock.calls[0]?.[1]).toBe(DRIVER_ID);
   });
 
+  it("treats HELPDESK as non-privileged (ownership still required)", async () => {
+    mockGetUserRole.mockResolvedValue("HELPDESK");
+    mockQuery.mockResolvedValue([]);
+    await expect(authorizeDriverAction(DRIVER_ID)).resolves.toEqual({
+      allowed: false,
+      caller: { userId: USER_ID, isPrivileged: false },
+    });
+  });
+
+  it("rejects when a pending driverId rejects, without deciding", async () => {
+    await expect(
+      authorizeDriverAction(Promise.reject(new Error("shift lookup failed"))),
+    ).rejects.toThrow("shift lookup failed");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("never treats a missing driverId as owned", async () => {
     await expect(authorizeDriverAction(undefined)).resolves.toMatchObject({
       allowed: false,

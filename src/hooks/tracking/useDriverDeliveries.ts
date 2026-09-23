@@ -171,6 +171,8 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         if (status === DriverStatus.COMPLETED) {
           void fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, {
             method: 'PATCH',
+            // Not awaited: keep it alive through navigation / webview unload.
+            keepalive: true,
             credentials: 'include',
             headers,
             body: JSON.stringify({ status: OrderStatus.COMPLETED }),

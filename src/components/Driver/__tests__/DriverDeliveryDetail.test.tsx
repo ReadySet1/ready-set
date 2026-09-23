@@ -240,7 +240,11 @@ describe("DriverDeliveryDetail", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Status updated"));
     expect(baseFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/orders/CV-12345"),
-      expect.objectContaining({ body: JSON.stringify({ status: "COMPLETED" }) }),
+      // Not awaited, so it must survive navigation / webview unload.
+      expect.objectContaining({
+        body: JSON.stringify({ status: "COMPLETED" }),
+        keepalive: true,
+      }),
     );
   });
 
