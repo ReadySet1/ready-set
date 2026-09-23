@@ -190,7 +190,7 @@ Cross-link convention: tasks promoted from a QA failure carry `relatedQa: "REA-O
 The app's version (`package.json`) is managed by [`release-please`](https://github.com/googleapis/release-please) — humans never bump it manually. The bot watches `main`; after each dev → main sync it opens a `chore(main): release X.Y.Z` PR that:
 
 - Bumps `package.json` `version`
-- Cuts the current `## [Unreleased]` block of `CHANGELOG.md` into a `## [X.Y.Z] - YYYY-MM-DD` section
+- Generates the `## [X.Y.Z]` section of `CHANGELOG.md` from the conventional commits since the last release — never hand-edit `CHANGELOG.md` (put user-facing wording in a `Changelog:` commit trailer instead)
 - Creates the git tag and a GitHub Release when merged
 
 **Conventional commit prefixes → bump level:**
