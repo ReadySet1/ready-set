@@ -5,64 +5,52 @@
     {
       "version": "2.8.0",
       "date": "2026-09-23",
-      "title": "Release 2.8.0",
-      "summary": "",
+      "title": "Faster driver actions and a better signature pad",
+      "summary": "Every driver action responds faster, the signature pad works in landscape, order history shows each driver step, and admins get an Overdue tab with accurate counts.",
       "changes": [
         {
-          "text": "Driver actions like starting a shift, updating a delivery and ending a shift respond faster.",
+          "text": "Starting a shift, updating a delivery and ending a shift now respond noticeably faster.",
           "type": "improved"
         },
         {
-          "text": "The signature pad now opens in landscape and keeps your signature intact when you expand or collapse it.",
+          "text": "The signature pad opens in landscape and keeps your signature intact when you expand or collapse it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers see a notice in the app when dispatch declines a return request.",
+          "type": "new"
+        },
+        {
+          "text": "If the app fails to load after an update, it refreshes itself once instead of showing an error.",
           "type": "fixed"
         },
         {
           "text": "Order history now records every driver step: en route, arrived, picked up, delivered.",
-          "type": "improved"
+          "type": "new"
         },
         {
-          "text": "Removed false \"High Memory Usage\" alerts that appeared in server logs every 5 minutes.",
+          "text": "Admins can see catering orders that are past pickup time but still open in a new Overdue tab.",
+          "type": "new"
+        },
+        {
+          "text": "The dashboard's Active Orders count shows every open order, not just the first ten, and deleted on-demand orders no longer appear in the list.",
           "type": "fixed"
-        },
-        {
-          "text": "Driver shift mileage is now recalculated nightly again, and mileage entered from the odometer is never overwritten.",
-          "type": "fixed"
-        },
-        {
-          "text": "The driver's phone battery level now shows on tracked GPS points where the phone supports it.",
-          "type": "fixed"
-        },
-        {
-          "text": "Drivers now see a notice in the app when dispatch declines a return request.",
-          "type": "improved"
         },
         {
           "text": "The live-updates indicator on the admin order page no longer gets stuck on \"Connecting...\".",
           "type": "fixed"
         },
         {
-          "text": "If the app fails to load after an update, it now refreshes itself once automatically instead of showing an error.",
+          "text": "Driver shift mileage is recalculated nightly again, and mileage entered from the odometer is never overwritten.",
           "type": "fixed"
         },
         {
-          "text": "The pricing page now shows the $5.00 charge for each additional stop, with the first stop included in the delivery cost.",
+          "text": "The driver's phone battery level shows on tracked GPS points where the phone supports it.",
           "type": "improved"
         },
         {
-          "text": "Cancelled orders are now archived on schedule instead of staying in the active tables forever.",
-          "type": "fixed"
-        },
-        {
-          "text": "The admin dashboard's Active Orders number now shows every open order, not just the first ten.",
-          "type": "fixed"
-        },
-        {
-          "text": "Admins can now see catering orders that are past their pickup time but still open, in their own Overdue tab.",
-          "type": "new"
-        },
-        {
-          "text": "Deleted on-demand orders no longer show up in the admin order list.",
-          "type": "fixed"
+          "text": "The pricing page shows the $5.00 charge for each additional stop, with the first stop included in the delivery cost.",
+          "type": "improved"
         }
       ],
       "link": {
