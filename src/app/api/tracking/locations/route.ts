@@ -5,6 +5,7 @@ import { rawQuery, withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
+import { BatteryLevelSchema } from '@/lib/tracking/battery';
 
 interface LocationUpdate {
   driver_id: string;
@@ -14,7 +15,7 @@ interface LocationUpdate {
   speed?: number;
   heading?: number;
   altitude?: number;
-  battery_level?: number;
+  battery_level?: number | null;
   is_moving?: boolean;
   /** GPS fix time (ISO string) — offline-replayed points carry the original
    *  capture time instead of the replay time. */
@@ -85,6 +86,8 @@ export async function POST(request: NextRequest) {
     }: LocationUpdate = body;
 
     const recordedAt = resolveRecordedAt(timestamp);
+    // 0-100 integer or null; invalid values degrade to null, never a 400.
+    const batteryLevel = BatteryLevelSchema.parse(battery_level);
 
     // Validate required fields
     if (!driver_id || typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -166,7 +169,7 @@ export async function POST(request: NextRequest) {
         speed ?? null,
         heading ?? null,
         altitude ?? null,
-        battery_level ?? null,
+        batteryLevel,
         is_moving ?? null,
         recordedAt,
       );
