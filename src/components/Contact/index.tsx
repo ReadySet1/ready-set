@@ -81,7 +81,10 @@ const Contact = () => {
       };
 
       const result = await sendEmail(formDataWithToken);
-      setMessage({ type: "success", text: result });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      setMessage({ type: "success", text: result.message });
 
       setTimeout(() => {
         setMessage(null);

@@ -37,6 +37,9 @@ export default function JoinOurTeam() {
   const onSubmit: SubmitHandler<FormInputs> = async (data) => {
     try {
       const result = await sendEmail(data);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
       setMessage({
         type: "success",

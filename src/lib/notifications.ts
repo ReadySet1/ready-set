@@ -1,9 +1,11 @@
 // app/lib/notifications.ts
-import sendEmail from "../app/actions/email";
+import sendEmail, { type SendEmailResult } from "../app/actions/email";
 import { emailTemplates } from "./email-templates";
 import { FormDataUnion } from "../components/Auth/SignUp/FormSchemas";
 
-export async function sendRegistrationNotification(userData: FormDataUnion) {
+export async function sendRegistrationNotification(
+  userData: FormDataUnion,
+): Promise<SendEmailResult> {
   const { subject, html } = emailTemplates.getRegistrationEmail({
     userType: userData.userType,
     email: userData.email,

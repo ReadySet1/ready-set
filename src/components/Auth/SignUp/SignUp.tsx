@@ -83,8 +83,16 @@ const SignUp = () => {
 
       const userData = await response.json();
 
-      // Send notification email
-      await sendRegistrationNotification(data);
+      // Best-effort admin notification: the account already exists, so a
+      // rate-limited or failed email must never surface as a registration error
+      try {
+        const notification = await sendRegistrationNotification(data);
+        if (!notification.success) {
+          console.warn("SignUp: registration notification not sent:", notification);
+        }
+      } catch (notifyErr) {
+        console.warn("SignUp: registration notification failed:", notifyErr);
+      }
 
       // Extract user name based on user type
       const userName = data.userType === "vendor" || data.userType === "client"
