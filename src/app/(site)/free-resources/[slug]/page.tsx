@@ -405,6 +405,7 @@ export default async function GuidePage({
                   <DownloadButtonWrapper
                     files={guide.downloadableFiles || []}
                     guideTitle={guide.title}
+                    guideSlug={guide.slug?.current}
                   />
                 )}
 

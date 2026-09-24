@@ -31,6 +31,8 @@ const LeadCaptureForm: React.FC<LeadCaptureFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  // `false` only when the API says the resource email failed
+  const [emailSent, setEmailSent] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const downloadAttempted = useRef(false);
 
@@ -175,6 +177,7 @@ const LeadCaptureForm: React.FC<LeadCaptureFormProps> = ({
 
       const data = await response.json();
 
+      setEmailSent(data.emailSent);
       setIsSubmitted(true);
 
       // Try to trigger download immediately after form submission
@@ -212,8 +215,9 @@ const LeadCaptureForm: React.FC<LeadCaptureFormProps> = ({
         </CardHeader>
         <CardContent className="pt-4">
           <p className="text-center text-sm text-gray-500">
-            We've also sent a copy to your email. If you don't see it, please
-            check your spam folder.
+            {emailSent === false
+              ? "We couldn't email you a copy right now. Use the button below to download it again."
+              : "We've also sent a copy to your email. If you don't see it, please check your spam folder."}
           </p>
           <div className="mt-6 text-center">
             <Button

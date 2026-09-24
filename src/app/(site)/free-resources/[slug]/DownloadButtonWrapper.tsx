@@ -17,12 +17,14 @@ interface DownloadableFile {
 interface DownloadButtonWrapperProps {
   files?: DownloadableFile[];
   guideTitle: string;
+  guideSlug?: string;
 }
 
 // Client component that wraps the download button functionality
 export function DownloadButtonWrapper({ 
   files, 
-  guideTitle 
+  guideTitle,
+  guideSlug,
 }: DownloadButtonWrapperProps) {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   
@@ -43,6 +45,7 @@ export function DownloadButtonWrapper({
         isOpen={isDownloadOpen}
         onClose={() => setIsDownloadOpen(false)}
         title={guideTitle}
+        resourceSlug={guideSlug}
         downloadFiles={files}
       />
     </div>
