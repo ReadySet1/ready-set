@@ -46,7 +46,10 @@ describe("CateringContact", () => {
     jest.clearAllMocks();
     mockLoadRecaptchaScript.mockResolvedValue(undefined);
     mockExecuteRecaptcha.mockResolvedValue("mock-recaptcha-token");
-    mockSendEmail.mockResolvedValue({ success: true });
+    mockSendEmail.mockResolvedValue({
+      success: true,
+      message: "Your message was sent successfully.",
+    });
   });
 
   describe("Component Rendering", () => {
@@ -278,6 +281,25 @@ describe("CateringContact", () => {
         expect(screen.getByText(/error sending message/i)).toBeInTheDocument();
         expect(screen.getByText(/email sending failed/i)).toBeInTheDocument();
       });
+    });
+
+    it("shows the returned error when sendEmail resolves with a failure", async () => {
+      mockSendEmail.mockResolvedValue({
+        success: false,
+        reason: "rate_limited",
+        error: "Too many submissions. Please wait a few minutes and try again.",
+      });
+      const user = userEvent.setup();
+      render(<CateringContact />);
+
+      await fillForm(user);
+      await user.click(screen.getByRole("button", { name: /submit/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/error sending message/i)).toBeInTheDocument();
+        expect(screen.getByText(/too many submissions/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/message sent successfully/i)).not.toBeInTheDocument();
     });
 
     it("shows generic error message for non-Error exceptions", async () => {

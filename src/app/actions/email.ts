@@ -42,10 +42,45 @@ function sanitizeEmailForLogging(email: string): string {
   return `${sanitized}@${domain}`;
 }
 
-const sendEmail = async (data: FormInputs) => {
+export type SendEmailFailureReason =
+  | "validation"
+  | "rate_limited"
+  | "spam"
+  | "recaptcha"
+  | "config"
+  | "send_failed";
+
+/**
+ * Server actions that throw have their message masked in production, so
+ * expected failures are returned instead of thrown. Callers show `error`.
+ */
+export type SendEmailResult =
+  | { success: true; message: string }
+  | { success: false; error: string; reason: SendEmailFailureReason };
+
+const GENERIC_SEND_ERROR =
+  "Unable to send message. Please try again later or contact us directly.";
+
+const fail = (
+  reason: SendEmailFailureReason,
+  error: string,
+): SendEmailResult => ({ success: false, reason, error });
+
+const sendEmail = async (data: FormInputs): Promise<SendEmailResult> => {
+  try {
+    return await sendEmailUnsafe(data);
+  } catch (error) {
+    // Anything unexpected (header access, template parsing, SDK bugs) must
+    // still resolve: a thrown server-action error reaches the user masked.
+    console.error("[Email] Unexpected error:", error);
+    return fail("send_failed", GENERIC_SEND_ERROR);
+  }
+};
+
+const sendEmailUnsafe = async (data: FormInputs): Promise<SendEmailResult> => {
   // Basic validation
   if (data.message.length > 1000) {
-    throw new Error("Message cannot exceed 1000 characters.");
+    return fail("validation", "Message cannot exceed 1000 characters.");
   }
 
   // Get client IP for rate limiting
@@ -55,6 +90,10 @@ const sendEmail = async (data: FormInputs) => {
   const realIp = headersList.get('x-real-ip');
   const clientIp = extractClientIp(forwardedFor, realIp);
 
+  // Bucket per form type so e.g. five contact submissions cannot block the
+  // sign-up notification from the same IP.
+  const notificationType = determineNotificationType(data);
+
   // Spam protection check
   const spamCheck = await SpamProtectionManager.checkForSpam({
     email: data.email,
@@ -62,7 +101,7 @@ const sendEmail = async (data: FormInputs) => {
     name: data.name,
     phone: data.phone,
     honeypot: data.honeypot,
-    identifier: clientIp, // Use IP for rate limiting
+    identifier: `${notificationType}:${clientIp}`,
   });
 
   if (spamCheck.isSpam) {
@@ -78,8 +117,16 @@ const sendEmail = async (data: FormInputs) => {
       console.warn(`[SPAM BLOCKED] IP: ${clientIp.substring(0, 10)}... Score: ${spamCheck.score}`);
     }
 
+    // Rate limiting is expected for legitimate users, so say what happened
+    if (spamCheck.details?.rateLimitExceeded) {
+      return fail(
+        "rate_limited",
+        "Too many submissions. Please wait a few minutes and try again.",
+      );
+    }
+
     // Return generic error to avoid giving spammers feedback
-    throw new Error("Unable to send message. Please try again later or contact us directly.");
+    return fail("spam", GENERIC_SEND_ERROR);
   }
 
   // Log spam score for monitoring (even if not spam)
@@ -119,7 +166,7 @@ const sendEmail = async (data: FormInputs) => {
       }
 
       // Return generic error to avoid giving bots feedback
-      throw new Error("Unable to verify submission. Please try again.");
+      return fail("recaptcha", "Unable to verify submission. Please try again.");
     }
 
     // Log reCAPTCHA score for monitoring (development only)
@@ -130,26 +177,20 @@ const sendEmail = async (data: FormInputs) => {
 
   // Validate recipient address
   const recipient = process.env.NOTIFICATION_RECIPIENT || "info@readysetllc.com";
-  if (!recipient) {
-    throw new Error("No recipient configured for emails");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    console.error("Invalid recipient email address:", recipient);
+    return fail("config", GENERIC_SEND_ERROR);
   }
 
-  const notificationType = determineNotificationType(data);
+  const resend = getResendClient();
+  if (!resend) {
+    console.error("⚠️  Resend client not available - RESEND_API_KEY missing or invalid");
+    return fail("config", GENERIC_SEND_ERROR);
+  }
+
   const { subject, html } = await createEmailContent(data, notificationType);
 
   try {
-    const resend = getResendClient();
-    if (!resend) {
-      console.error("⚠️  Resend client not available - RESEND_API_KEY missing or invalid");
-      throw new Error("Email service not configured. Please check RESEND_API_KEY environment variable.");
-    }
-
-    // Add this validation before sending
-    if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
-      console.error("Invalid recipient email address:", recipient);
-      throw new Error(`Invalid recipient email address: ${recipient}`);
-    }
-
     console.log(`[Email] Sending email to: ${recipient}, from: solutions@updates.readysetllc.com`);
     console.log(`[Email] Subject: ${subject}`);
 
@@ -160,26 +201,24 @@ const sendEmail = async (data: FormInputs) => {
       html,
     });
 
+    // Resend reports API failures in the result instead of throwing
+    if (result.error) {
+      console.error("[Email] Resend API error:", result.error);
+      return fail("send_failed", GENERIC_SEND_ERROR);
+    }
+
     console.log("[Email] Email sent successfully:", result);
 
-    return "Your message was sent successfully.";
+    return { success: true, message: "Your message was sent successfully." };
   } catch (error) {
     console.error("[Email] Email sending error:", error);
-    
-    // Provide more detailed error information
+
     if (error instanceof Error) {
       console.error("[Email] Error message:", error.message);
       console.error("[Email] Error stack:", error.stack);
-      
-      // Check if it's a Resend API error
-      if (error.message.includes("API") || error.message.includes("resend")) {
-        throw new Error(`Email service error: ${error.message}. Please check RESEND_API_KEY configuration.`);
-      }
-      
-      throw error; // Re-throw with original message
     }
-    
-    throw new Error(`Error trying to send the message: ${String(error)}`);
+
+    return fail("send_failed", GENERIC_SEND_ERROR);
   }
 };
 

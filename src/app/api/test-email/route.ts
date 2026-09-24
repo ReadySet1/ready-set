@@ -27,7 +27,14 @@ export async function POST(request: NextRequest) {
       phone: '1234567890', // Optional
     });
 
-    return NextResponse.json({ success: true, message: result });
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error, reason: result.reason },
+        { status: result.reason === 'rate_limited' ? 429 : 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, message: result.message });
   } catch (error) {
     console.error('Email test error:', error);
     return NextResponse.json(
