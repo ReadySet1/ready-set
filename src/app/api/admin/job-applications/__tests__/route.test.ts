@@ -404,6 +404,17 @@ describe("/api/admin/job-applications", () => {
         );
       });
 
+      it("should filter by id for deep links", async () => {
+        const request = createAdminRequest({ id: "app-1" });
+        await GET(request);
+
+        expect(mockPrisma.jobApplication.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ id: "app-1", deletedAt: null }),
+          })
+        );
+      });
+
       it("should always filter out soft-deleted records", async () => {
         const request = createAdminRequest();
         await GET(request);

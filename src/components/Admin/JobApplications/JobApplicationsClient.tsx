@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ClipboardList,
   Users,
@@ -67,6 +67,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { approveJobApplication, deleteJobApplication } from '@/app/actions/admin/job-applications';
 import { createClient } from "@/utils/supabase/client";
 import { ApplicationDetailDialog } from "./ApplicationDetailDialog";
+import { JOB_APPLICATION_ID_PARAM } from "@/lib/admin-links";
 import { 
   JobApplication, 
   ApplicationStatus, 
@@ -500,7 +501,9 @@ interface JobApplicationsClientProps {
 
 const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const deepLinkedId = searchParams.get(JOB_APPLICATION_ID_PARAM);
   
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [stats, setStats] = useState<JobApplicationStats | null>(null);
@@ -717,6 +720,56 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
     fetchStats();
     fetchApplications();
   }, [fetchStats, fetchApplications]);
+
+  // Open the application named by ?id= (linked from the new-application
+  // email). It is fetched on its own because it may not be on this page.
+  useEffect(() => {
+    if (!deepLinkedId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        const params = new URLSearchParams({ [JOB_APPLICATION_ID_PARAM]: deepLinkedId, limit: "1" });
+        const response = await fetch(`/api/admin/job-applications?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!response.ok) throw new Error("Failed to fetch application");
+
+        const data = await response.json();
+        const application: JobApplication | undefined = data.applications?.[0];
+        if (cancelled) return;
+
+        if (application) {
+          setSelectedApplication(application);
+          setIsDetailDialogOpen(true);
+        } else {
+          toast({
+            title: "Application not found",
+            description: "It may have been deleted.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching linked application:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkedId]);
+
+  const closeDetailDialog = () => {
+    setIsDetailDialogOpen(false);
+    // Drop ?id= so a refresh does not reopen the dialog
+    if (deepLinkedId) {
+      router.replace(pathname);
+    }
+  };
 
   // Handle page change
   const handlePageChange = (newPage: number) => {
@@ -1122,7 +1175,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
       <ApplicationDetailDialog
         application={selectedApplication}
         open={isDetailDialogOpen}
-        onClose={() => setIsDetailDialogOpen(false)}
+        onClose={closeDetailDialog}
         onStatusChange={handleStatusChange}
         onDeleteClick={(application) => openDeleteConfirmation(application)}
         isSubmitting={isSubmitting}
