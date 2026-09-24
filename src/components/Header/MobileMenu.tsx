@@ -158,218 +158,6 @@ const DesktopMenu: React.FC<{
   );
 };
 
-const MobileMenuOverlay: React.FC<{
-  navbarOpen: boolean;
-  menuData: MenuItem[];
-  openIndex: number;
-  handleSubmenu: (index: number) => void;
-  closeNavbarOnNavigate: () => void;
-  navbarToggleHandler: () => void;
-  pathUrl: string;
-  sticky: boolean;
-}> = ({
-  navbarOpen,
-  menuData,
-  openIndex,
-  handleSubmenu,
-  closeNavbarOnNavigate,
-  navbarToggleHandler,
-  pathUrl,
-  sticky,
-}) => {
-  const { user, userRole } = useUser();
-  const [supabase, setSupabase] = useState<any>(null);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const router = useRouter();
-
-  // Get role-specific menu item
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
-
-  // Initialize Supabase client
-  useEffect(() => {
-    const initSupabase = async () => {
-      try {
-        const client = await createClient();
-        setSupabase(client);
-      } catch (error) {
-        console.error("Error initializing Supabase client:", error);
-      }
-    };
-
-    initSupabase();
-  }, []);
-
-  const handleSignOut = async () => {
-    if (!supabase) return;
-
-    try {
-      setIsSigningOut(true);
-
-      // Clear all authentication cookies before signing out
-      clearAuthCookies();
-
-      await supabase.auth.signOut();
-      window.location.href = "/";
-      navbarToggleHandler();
-    } catch (error) {
-      console.error("Error signing out:", error);
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
-  if (!menuData) return null;
-
-  return (
-    <AnimatePresence>
-      {navbarOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 lg:hidden"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <motion.div
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={navbarToggleHandler}
-          />
-
-          <motion.nav
-            className="fixed bottom-0 right-0 top-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
-            style={{ height: "100vh" }}
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="flex h-full flex-col justify-between p-6">
-              <div>
-                <div className="mb-6 flex items-center justify-end">
-                  <button
-                    onClick={navbarToggleHandler}
-                    className="text-dark hover:text-primary dark:text-white"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-
-                <ul className="mb-6 space-y-4">
-                  {user && roleMenuItem && roleMenuItem.path && (
-                    <li>
-                      <Link
-                        href={roleMenuItem.path}
-                        className="text-base font-medium text-dark hover:text-primary dark:text-white"
-                        onClick={closeNavbarOnNavigate}
-                      >
-                        {roleMenuItem.title}
-                      </Link>
-                    </li>
-                  )}
-                  {menuData.map((menuItem, index) => (
-                    <li key={`mobile-${menuItem.id}-${index}`}>
-                      {menuItem.submenu ? (
-                        <>
-                          <button
-                            onClick={() => handleSubmenu(index)}
-                            className="flex w-full items-center justify-between text-base font-medium text-dark hover:text-primary dark:text-white"
-                          >
-                            {menuItem.title}
-                            <motion.div
-                              animate={{
-                                rotate: openIndex === index ? 180 : 0,
-                              }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </motion.div>
-                          </button>
-                          <AnimatePresence>
-                            {openIndex === index && (
-                              <motion.ul
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="mt-4 space-y-2 pl-4"
-                              >
-                                {menuItem.submenu.map((submenuItem, i) => (
-                                  <motion.li
-                                    key={`mobile-submenu-${submenuItem.id}-${i}`}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.2 }}
-                                  >
-                                    {submenuItem.path && (
-                                      <Link
-                                        href={submenuItem.path}
-                                        className="block text-sm text-dark/80 hover:text-primary dark:text-white/80"
-                                        onClick={closeNavbarOnNavigate}
-                                      >
-                                        {submenuItem.title}
-                                      </Link>
-                                    )}
-                                  </motion.li>
-                                ))}
-                              </motion.ul>
-                            )}
-                          </AnimatePresence>
-                        </>
-                      ) : menuItem.path ? (
-                        <Link
-                          href={menuItem.path}
-                          className="block text-base font-medium text-dark hover:text-primary dark:text-white"
-                          onClick={closeNavbarOnNavigate}
-                        >
-                          {menuItem.title}
-                        </Link>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Auth buttons */}
-              <div className="mt-auto">
-                {user ? (
-                  <button
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                    className="flex w-full items-center justify-center rounded-lg bg-amber-400 px-6 py-3 text-base font-medium text-black transition duration-300 ease-in-out hover:bg-amber-500 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-                  >
-                    {isSigningOut ? "Signing Out..." : "Sign Out"}
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    <Link
-                      href="/sign-in"
-                      className="block w-full rounded-lg bg-gray-100 px-6 py-3 text-center text-base font-medium text-dark transition duration-300 ease-in-out hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-                      onClick={closeNavbarOnNavigate}
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/sign-up"
-                      className="block w-full rounded-lg bg-amber-400 px-6 py-3 text-center text-base font-medium text-black transition duration-300 ease-in-out hover:bg-amber-500 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-                      onClick={closeNavbarOnNavigate}
-                    >
-                      Sign Up
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.nav>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
 const MobileMenu: React.FC<MobileMenuProps> = ({
   navbarOpen,
   menuData,
@@ -521,9 +309,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
               onClick={navbarToggleHandler}
             />
 
+            {/* h-dvh, not 100vh: on iOS Safari 100vh extends under the toolbar
+                and hid the bottom-pinned Sign In link (forms QA G5) */}
             <motion.nav
-              className="fixed bottom-0 right-0 top-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
-              style={{ height: "100vh" }}
+              className="fixed bottom-0 right-0 top-0 h-dvh w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
@@ -538,7 +327,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                 <X className="h-6 w-6" />
               </motion.button>
 
-              <div className="flex h-full flex-col px-6 py-16">
+              <div className="flex min-h-full flex-col px-6 py-16">
                 <motion.ul
                   className="space-y-2"
                   initial="closed"
