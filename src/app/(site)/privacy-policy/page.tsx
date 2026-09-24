@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { CONTACT_EMAIL, CONTACT_MAILTO } from '@/config/contact'
 
 export const metadata: Metadata = {
   title: 'Privacy Notice | Ready Set Group',
@@ -185,12 +186,12 @@ export default function PrivacyPolicy() {
           >
             (415) 226-6872
           </a><br />
-          <a 
-            href="mailto:info@ready-set.co" 
+          <a
+            href={CONTACT_MAILTO}
             className="text-blue-600 hover:text-blue-800"
-            aria-label="Email us at info@ready-set.co"
+            aria-label={`Email us at ${CONTACT_EMAIL}`}
           >
-            info@ready-set.co
+            {CONTACT_EMAIL}
           </a>
         </address>
         <p className="italic mt-4">
