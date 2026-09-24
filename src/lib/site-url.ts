@@ -64,6 +64,18 @@ export function siteUrl(path: string = "/"): string {
 }
 
 /**
+ * A caller-supplied redirect target (`?next=`) reduced to a same-site path.
+ *
+ * Only a single leading slash is accepted: `//host` and `/\host` are
+ * protocol-relative to browsers and would leave the site.
+ */
+export function safeRedirectPath(value: string | null | undefined, fallback = "/"): string {
+  if (!value || !value.startsWith("/")) return fallback;
+  if (value.startsWith("//") || value.startsWith("/\\")) return fallback;
+  return value;
+}
+
+/**
  * Origins accepted as "us" when validating an inbound request.
  *
  * The apex and `www` forms are treated as equivalent so that a deployment

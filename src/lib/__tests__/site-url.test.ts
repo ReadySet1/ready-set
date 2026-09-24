@@ -1,6 +1,7 @@
 import {
   allowedOrigins,
   normalizeOrigin,
+  safeRedirectPath,
   siteOrigin,
   siteUrl,
 } from "../site-url";
@@ -157,5 +158,22 @@ describe("allowedOrigins", () => {
   it("does not invent a www variant for a host that has no registrable pair", () => {
     setSiteUrl("http://localhost:3000");
     expect(allowedOrigins()).toEqual(["http://localhost:3000"]);
+  });
+});
+
+describe("safeRedirectPath", () => {
+  it("keeps a same-site path with its query", () => {
+    expect(safeRedirectPath("/update-password?x=1")).toBe("/update-password?x=1");
+  });
+
+  it.each([
+    ["missing", null],
+    ["empty", ""],
+    ["absolute URL", "https://evil.example/x"],
+    ["protocol-relative", "//evil.example"],
+    ["backslash protocol-relative", "/\\evil.example"],
+    ["relative path", "client"],
+  ])("falls back for a %s value", (_label, value) => {
+    expect(safeRedirectPath(value, "/fallback")).toBe("/fallback");
   });
 });
