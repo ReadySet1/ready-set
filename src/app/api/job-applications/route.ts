@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
+import { jobApplicationAdminUrl } from "@/lib/admin-links";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
 
@@ -308,7 +309,7 @@ export async function POST(request: Request) {
         // Handle this case - maybe send email with initial data?
     } else {
         let htmlBody = `<h1>New Job Application Received</h1>`;
-        htmlBody += `<p><strong>Application ID:</strong> <a href="${process.env.NEXT_PUBLIC_SITE_URL}/admin/job-applications/${application.id}">${application.id}</a></p>`;
+        htmlBody += `<p><strong>Application ID:</strong> <a href="${jobApplicationAdminUrl(application.id)}">${application.id}</a></p>`;
         htmlBody += `<h2>Applicant Details:</h2><ul>`;
 
         // Iterate over application fields (excluding relations)
