@@ -103,7 +103,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Handle resource download email using Resend - only send if sendEmail flag is true
+    // Handle resource download email using Resend - only send if sendEmail flag is true.
+    // `emailSent` lets the form stop promising an email that never went out.
+    let emailSent: boolean | undefined;
     if (validatedData.resourceSlug && validatedData.sendEmail) {
       try {
         await sendDownloadEmail(
@@ -111,14 +113,19 @@ export async function POST(req: NextRequest) {
           validatedData.firstName,
           validatedData.resourceSlug
         );
+        emailSent = true;
       } catch (error) {
-        // Log the error but don't throw it
+        // The lead is saved and the file downloads in the browser, so this is not a request failure
         console.error('Download email failed:', { error });
+        emailSent = false;
       }
     }
 
-    // Return success even if email operations fail
-    return NextResponse.json({ success: true, data: lead });
+    return NextResponse.json({
+      success: true,
+      data: lead,
+      ...(emailSent === undefined ? {} : { emailSent }),
+    });
   } catch (error) {
     console.error('Error in leads API:', error);
     return NextResponse.json(

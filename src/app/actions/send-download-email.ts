@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { resources } from "@/components/Resources/Data/Resources";
 import { generateSlug } from "@/lib/create-slug";
 import { DownloadEmailTemplate } from '@/components/Resources/DownloadEmailTemplate';
+import { getGuideBySlug } from "@/sanity/lib/queries";
 
 export type ResourceSlug = string;
 type Resource = (typeof resources)[number];
@@ -31,6 +32,36 @@ const getResendClient = () => {
   return new Resend(process.env.RESEND_API_KEY);
 };
 
+export interface DownloadResource {
+  title: string;
+  downloadUrl: string;
+}
+
+/**
+ * Resolve a resource slug to its title and download URL.
+ *
+ * Only server-side sources are trusted for the URL, so the email can never
+ * carry a link supplied by the caller: the static resource list first, then
+ * the Sanity guide with that slug (`/free-resources/<slug>`), which is not in
+ * the static list.
+ */
+export const resolveDownloadResource = async (
+  resourceSlug: ResourceSlug,
+): Promise<DownloadResource | null> => {
+  const staticResource = RESOURCE_MAP[resourceSlug];
+  if (staticResource?.downloadUrl) {
+    return { title: staticResource.title, downloadUrl: staticResource.downloadUrl };
+  }
+
+  const guide = await getGuideBySlug(resourceSlug);
+  const fileUrl = guide?.downloadableFiles?.[0]?.asset?.url;
+  if (guide && fileUrl) {
+    return { title: guide.title || "Resource", downloadUrl: fileUrl };
+  }
+
+  return null;
+};
+
 export const sendDownloadEmail = async (
   userEmail: string,
   firstName: string,
@@ -42,25 +73,17 @@ export const sendDownloadEmail = async (
       throw new Error("Missing required parameters for sending download email");
     }
 
-    const resource = RESOURCE_MAP[resourceSlug];
+    const resource = await resolveDownloadResource(resourceSlug);
     if (!resource) {
       throw new Error(`Resource not found: ${resourceSlug}`);
     }
 
-    // Only use allowed (pre-registered) download URLs from RESOURCE_MAP
-    const downloadUrl = resource.downloadUrl;
-
-    if (!downloadUrl) {
-      throw new Error(`No download URL available for resource: ${resourceSlug}`);
-    }
+    const { downloadUrl, title: resourceTitle } = resource;
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
       throw new Error("Invalid email format");
     }
 
-    
-    // Get the title from the resource map or use a default if not found
-    const resourceTitle = resource?.title || "Resource";
 
     // Create an async function that returns a Promise<ReactNode>
     const emailTemplate = async () => {

@@ -48,6 +48,16 @@ on:
     branches: [main, development]
   workflow_dispatch:
 
+# Every run pushes the same moving tag (`:development` / `:main`) and fires the
+# deploy webhook, so the LAST RUN TO FINISH is what gets deployed, not the
+# newest commit. On 2026-09-24 six back-to-back merges built in parallel and
+# rs-dev ended up on the second-oldest image. One run per branch at a time:
+# on development a newer push cancels the in-flight build; on main runs queue
+# instead, so a production build is never cut off mid-push or mid-deploy.
+concurrency:
+  group: build-and-push-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }} # ReadySet1/ready-set -> ghcr.io/readyset1/ready-set

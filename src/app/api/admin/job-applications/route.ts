@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") as ApplicationStatus | null;
     const position = searchParams.get("position");
     const search = searchParams.get("search");
+    const id = searchParams.get("id");
     const statsOnly = searchParams.get("statsOnly") === "true";
 
     // Calculate pagination values
@@ -65,6 +66,11 @@ export async function GET(request: NextRequest) {
 
     // Build filter conditions
     const where: any = { deletedAt: null };
+
+    // Deep link from the new-application email (?id=<applicationId>)
+    if (id) {
+      where.id = id;
+    }
     
     if (status) {
       where.status = status;

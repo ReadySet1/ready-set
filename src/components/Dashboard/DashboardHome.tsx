@@ -865,9 +865,6 @@ export function ModernDashboardHome() {
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="lg:hidden">
-                <Menu className="h-5 w-5" />
-              </Button>
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-blue-50 p-2">
                   <LayoutDashboard className="h-5 w-5 text-blue-600" />

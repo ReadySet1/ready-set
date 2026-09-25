@@ -129,7 +129,10 @@ const CateringContact: React.FC = () => {
         recaptchaToken: recaptchaToken || undefined,
       };
 
-      await sendEmail(emailData);
+      const result = await sendEmail(emailData);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
       setMessage({
         type: "success",

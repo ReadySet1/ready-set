@@ -9,6 +9,11 @@ interface DownloadPopupProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  /**
+   * Slug the server resolves the emailed file from. Sanity guides must pass
+   * their real slug; the title-derived fallback only matches static guides.
+   */
+  resourceSlug?: string;
   downloadUrl?: string;
   downloadFiles?: Array<{
     _key: string;
@@ -25,6 +30,7 @@ export const DownloadPopup: React.FC<DownloadPopupProps> = ({
   isOpen,
   onClose,
   title,
+  resourceSlug,
   downloadUrl,
   downloadFiles,
   onSuccess,
@@ -85,7 +91,7 @@ export const DownloadPopup: React.FC<DownloadPopupProps> = ({
           {`Download ${title}`}
         </DialogTitle>
         <LeadCaptureForm
-          resourceSlug={generateSlug(title)}
+          resourceSlug={resourceSlug || generateSlug(title)}
           resourceTitle={title}
           onSuccess={handleDownloadSuccess}
           downloadUrl={primaryDownloadUrl || ""}

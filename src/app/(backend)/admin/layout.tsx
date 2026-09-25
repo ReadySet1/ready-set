@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { usePathname } from 'next/navigation'; 
 import { AdminFooter } from "@/components/Dashboard/Footer/admin-footer";
 import AppSidebar from "@/components/Dashboard/Sidebar/app-sidebar";
+import { AdminMobileTopBar } from "@/components/Dashboard/Sidebar/admin-mobile-top-bar";
 
 export default function AdminLayout({
   children,
@@ -61,6 +62,7 @@ export default function AdminLayout({
             {/* Removed w-full as flex-1 handles width in flex row */}
             <SidebarInset className="flex flex-1 flex-col p-0"> 
               {/* <TopNav /> */}
+              <AdminMobileTopBar />
 
               {/* Main content area: flex-1 for vertical expansion, overflow for scrolling */}
               <main className="flex flex-1 flex-col overflow-auto"> {/* Added flex flex-col */}

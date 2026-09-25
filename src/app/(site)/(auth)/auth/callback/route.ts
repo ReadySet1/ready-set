@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 import { setSentryUser } from '@/lib/monitoring/sentry';
 import { withRateLimit, RateLimitConfigs } from '@/lib/rate-limiting';
+import { safeRedirectPath, siteOrigin } from '@/lib/site-url';
 
 const callbackRateLimit = withRateLimit(RateLimitConfigs.authCallback);
 
@@ -26,8 +27,11 @@ export async function GET(request: NextRequest) {
   }
 
   const requestUrl = new URL(request.url);
+  // Behind the proxy `request.url` carries the container's bind address
+  // (0.0.0.0:3000), so redirects must be built on the configured origin.
+  const origin = siteOrigin();
   const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') || '/';
+  const next = safeRedirectPath(requestUrl.searchParams.get('next'));
   // Capture userType from signup flow (passed by GoogleAuthButton)
   const userTypeParam = requestUrl.searchParams.get('userType');
   
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         console.error('Auth code exchange error:', error);
         // Redirect to auth error page with error details
-        const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
+        const errorUrl = new URL('/auth/auth-code-error', origin);
         errorUrl.searchParams.set('error', error.message);
         return NextResponse.redirect(errorUrl);
       }
@@ -53,14 +57,14 @@ export async function GET(request: NextRequest) {
       if (session) {
         // If 'next' is explicitly set (e.g., for password reset), use it directly
         // This allows password reset flow to work without being redirected to dashboard
-        if (next && next !== '/' && next.startsWith('/')) {
+        if (next !== '/') {
           // Set Sentry user context for error tracking
           setSentryUser({
             id: session.user.id,
             email: session.user.email || undefined,
             role: undefined
           });
-          return NextResponse.redirect(new URL(next, requestUrl.origin));
+          return NextResponse.redirect(new URL(next, origin));
         }
 
         try {
@@ -98,19 +102,19 @@ export async function GET(request: NextRequest) {
 
               if (createError) {
                 console.error('Error creating default profile:', createError);
-                return NextResponse.redirect(new URL(next, requestUrl.origin));
+                return NextResponse.redirect(new URL(next, origin));
               }
 
               userType = newProfile?.type;
                           } catch (createProfileError) {
               console.error('Exception creating default profile:', createProfileError);
-              return NextResponse.redirect(new URL(next, requestUrl.origin));
+              return NextResponse.redirect(new URL(next, origin));
             }
           }
 
           if (!userType) {
             console.error('No user type found after profile creation');
-            return NextResponse.redirect(new URL(next, requestUrl.origin));
+            return NextResponse.redirect(new URL(next, origin));
           }
 
           // Normalize the user type to lowercase for consistent handling
@@ -127,20 +131,20 @@ export async function GET(request: NextRequest) {
           const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
 
           // Redirect to the appropriate dashboard
-          return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));
+          return NextResponse.redirect(new URL(homeRoute, origin));
         } catch (profileError) {
           console.error('Error in profile lookup:', profileError);
           // Fall back to the provided 'next' parameter
-          return NextResponse.redirect(new URL(next, requestUrl.origin));
+          return NextResponse.redirect(new URL(next, origin));
         }
       }
       
       // Successful auth but no session - redirect to home or requested page
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      return NextResponse.redirect(new URL(next, origin));
     } catch (error) {
       console.error('Auth callback error:', error);
       // Redirect to auth error page
-      const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
+      const errorUrl = new URL('/auth/auth-code-error', origin);
       if (error instanceof Error) {
         errorUrl.searchParams.set('error', error.message);
       }
@@ -149,5 +153,5 @@ export async function GET(request: NextRequest) {
   }
   
   // If no code is present, redirect to error page
-  return NextResponse.redirect(new URL('/auth/auth-code-error?error=no_code', requestUrl.origin));
+  return NextResponse.redirect(new URL('/auth/auth-code-error?error=no_code', origin));
 }
