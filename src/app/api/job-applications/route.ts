@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
-import { jobApplicationAdminUrl } from "@/lib/admin-links";
+import { buildJobApplicationEmailHtml } from "@/lib/job-application-email";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
 
@@ -308,35 +308,8 @@ export async function POST(request: Request) {
         console.error("Could not refetch application with files for email notification.");
         // Handle this case - maybe send email with initial data?
     } else {
-        let htmlBody = `<h1>New Job Application Received</h1>`;
-        htmlBody += `<p><strong>Application ID:</strong> <a href="${jobApplicationAdminUrl(application.id)}">${application.id}</a></p>`;
-        htmlBody += `<h2>Applicant Details:</h2><ul>`;
-
-        // Iterate over application fields (excluding relations)
-        for (const [key, value] of Object.entries(applicationWithFiles)) {
-            if (key === 'fileUploads' || key === 'profile') continue; // Skip relations
-
-            const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/([Ff]ile[Pp]ath)/, ' File Path').replace(/^./, (str) => str.toUpperCase());
-            htmlBody += `<li><strong>${formattedKey}:</strong> ${value || 'N/A'}</li>`;
-        }
-        
-        // Add links for processed files
-        if (applicationWithFiles.fileUploads && applicationWithFiles.fileUploads.length > 0) {
-            htmlBody += `<h2>Uploaded Documents:</h2><ul>`;
-            applicationWithFiles.fileUploads.forEach((file: any) => {
-                // Use category or fileName for the link text
-                const linkText = file.category ? file.category.charAt(0).toUpperCase() + file.category.slice(1) : file.fileName || 'View File';
-                if (file.fileUrl) { // Use the updated fileUrl
-                   // Use fileUrl directly as it should now be the permanent public URL
-                   htmlBody += `<li><strong>${linkText}:</strong> <a href="${file.fileUrl}" target="_blank">Open File</a></li>`;
-                } else {
-                   htmlBody += `<li><strong>${linkText}:</strong> Link unavailable (Original Name: ${file.fileName})</li>`;
-                }
-            });
-            htmlBody += `</ul>`;
-        }
-
-        htmlBody += `</ul>`; // Close Applicant Details list
+        const { fileUploads, ...applicationFields } = applicationWithFiles;
+        const htmlBody = buildJobApplicationEmailHtml(applicationFields, fileUploads);
 
         try {
           await sendEmail({
