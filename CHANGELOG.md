@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0](https://github.com/ReadySet1/ready-set/compare/v2.8.0...v2.9.0) (2026-09-25)
+
+
+### Added
+
+* **catering:** redesign hero and about sections on /catering-deliveries ([824c70c](https://github.com/ReadySet1/ready-set/commit/824c70cf3a1e94d3bc1cc653704623e106f1f348))
+
+
+### Fixed
+
+* **admin:** add a working sidebar trigger on mobile ([c05ac29](https://github.com/ReadySet1/ready-set/commit/c05ac29c342d502859fe5f82b9203704c5f49131))
+* **admin:** add a working sidebar trigger on mobile ([bd5b472](https://github.com/ReadySet1/ready-set/commit/bd5b4728042c75ac8d0b3caa23418072fbc48720))
+* **auth:** build callback and confirm redirects on the site origin ([fa9edb1](https://github.com/ReadySet1/ready-set/commit/fa9edb158e8e0a44e369db31f145f583fc640451))
+* **auth:** build callback and confirm redirects on the site origin ([61979f5](https://github.com/ReadySet1/ready-set/commit/61979f57d668d319fb6a4d7d7808f1e9b83a85a4))
+* **email:** serve email images from Cloudinary instead of the site /images folder ([1ca2ef5](https://github.com/ReadySet1/ready-set/commit/1ca2ef5431591c902231adebd153b9e97adc323e))
+* **email:** serve email images from Cloudinary instead of the site /images folder ([01034c6](https://github.com/ReadySet1/ready-set/commit/01034c65f68b22e19e1b5c7596a6f269fd7d165c))
+* **forms:** return email action failures instead of throwing ([4c65422](https://github.com/ReadySet1/ready-set/commit/4c6542282b7e3b43aa2ac0a7b0c8cce38c0c7c67))
+* **forms:** return email action failures instead of throwing ([fcf7e37](https://github.com/ReadySet1/ready-set/commit/fcf7e37897691c27c8ed0f128fd3a8eabda0ce12))
+* **header:** size the mobile menu to the dynamic viewport ([3928d23](https://github.com/ReadySet1/ready-set/commit/3928d23372a01d84c7ead4164a72418c7a1ad343))
+* **header:** size the mobile menu to the dynamic viewport ([b8c91f2](https://github.com/ReadySet1/ready-set/commit/b8c91f228359c7797b611c87a83c7e68f18eafe4))
+* **job-applications:** deep-link the admin email to the list dialog ([e13a3b0](https://github.com/ReadySet1/ready-set/commit/e13a3b07b8eebc0d54c5b4d05d81107af39398f5))
+* **job-applications:** deep-link the admin email to the list dialog ([5c5fc60](https://github.com/ReadySet1/ready-set/commit/5c5fc60a24061e706dcec9468960b8d667506a5c))
+* **resources:** email Sanity guide downloads and report email failures ([25d1331](https://github.com/ReadySet1/ready-set/commit/25d1331705868a7147be01a4aa114ce92635fdc1))
+* **resources:** email Sanity guide downloads and report email failures ([f30deea](https://github.com/ReadySet1/ready-set/commit/f30deea1c1b29857027a5431a00630188c77b3bb))
+
 ## [2.8.0](https://github.com/ReadySet1/ready-set/compare/v2.7.0...v2.8.0) (2026-09-23)
 
 

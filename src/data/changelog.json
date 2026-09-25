@@ -3,6 +3,46 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.0",
+      "date": "2026-09-25",
+      "title": "A new catering page and forms you can count on",
+      "summary": "The catering page has a fresh look, every form now sends its emails reliably, and the admin menu works on phones.",
+      "changes": [
+        {
+          "text": "The catering deliveries page has a new look, with a new header photo and a clearer section about what we do.",
+          "type": "new"
+        },
+        {
+          "text": "Downloading a free guide now also emails you a copy, as promised.",
+          "type": "fixed"
+        },
+        {
+          "text": "Signing up no longer shows an error after you have recently sent other forms.",
+          "type": "fixed"
+        },
+        {
+          "text": "The Sign In button in the phone menu is no longer hidden behind Safari's toolbar.",
+          "type": "fixed"
+        },
+        {
+          "text": "The admin menu now opens on phones.",
+          "type": "fixed"
+        },
+        {
+          "text": "Email notifications show the Ready Set logo and social icons again.",
+          "type": "fixed"
+        },
+        {
+          "text": "The admin email about a new job application now opens that application directly.",
+          "type": "improved"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.0"
+      }
+    },
+    {
       "version": "2.8.0",
       "date": "2026-09-23",
       "title": "Faster driver actions and a better signature pad",
