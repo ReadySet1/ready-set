@@ -578,6 +578,10 @@ const JobApplicationForm = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // Proves the attached files were uploaded in this applicant's session.
+          ...(session?.uploadToken
+            ? { "x-upload-token": session.uploadToken }
+            : {}),
         },
         body: JSON.stringify(submissionData),
       });

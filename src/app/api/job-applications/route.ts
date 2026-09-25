@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
 import { buildJobApplicationEmailHtml } from "@/lib/job-application-email";
+import { resolveOwnedApplicationUploads } from "@/lib/job-application-uploads";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
 
@@ -44,22 +45,23 @@ export async function POST(request: Request) {
       data.equipmentPhotoFileId
     ].filter((id): id is string => typeof id === 'string' && id !== '');
 
-    let temporaryFileUploads: any[] = [];
-    if (fileIdsToProcess.length > 0) {
-                temporaryFileUploads = await prisma.fileUpload.findMany({
-            where: {
-                id: { in: fileIdsToProcess },
-                // Don't restrict by isTemporary flag - some files may not be marked correctly
-                // but we still want to process them
-            }
-        });
+    // Only accept files uploaded in the caller's own application session and
+    // not yet linked to any application. Resolved before anything is created.
+    const ownedUploads = await resolveOwnedApplicationUploads({
+      uploadToken: request.headers.get("x-upload-token"),
+      fileIds: fileIdsToProcess,
+      supabaseAdmin,
+      prisma,
+    });
 
-        // Optional: Check if all requested IDs were found
-        if (temporaryFileUploads.length !== fileIdsToProcess.length) {
-            console.warn("⚠️ Mismatch between requested file IDs and found files. Some files might not exist or IDs are invalid.");
-            // Decide if this should be a hard error or just a warning
-        }
+    if (!ownedUploads.ok) {
+      return NextResponse.json(
+        { error: ownedUploads.error },
+        { status: ownedUploads.status }
+      );
     }
+
+    const temporaryFileUploads = ownedUploads.files;
 
 
     // --- Step 2: Create Job Application Data (prepare but don't save yet if dependent on file processing outcome) ---
