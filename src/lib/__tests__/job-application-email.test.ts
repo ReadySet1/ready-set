@@ -66,6 +66,52 @@ describe("buildJobApplicationEmailHtml", () => {
     expect(html).toContain("Link unavailable (Original Name: &lt;i&gt;id&lt;/i&gt;.png)");
   });
 
+  it("only links https file URLs", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      { category: "license", fileName: "license.png", fileUrl: "javascript:alert(1)" },
+      { category: "insurance", fileName: "ins.pdf", fileUrl: "not a url" },
+    ]);
+
+    expect(html).not.toContain("href=\"javascript:");
+    expect(html).toContain(
+      "<li><strong>License:</strong> Link unavailable (Original Name: license.png)</li>",
+    );
+    expect(html).toContain(
+      "<li><strong>Insurance:</strong> Link unavailable (Original Name: ins.pdf)</li>",
+    );
+  });
+
+  it("formats the shapes a real application row carries", () => {
+    const html = buildJobApplicationEmailHtml(
+      {
+        ...baseApplication,
+        resumeFilePath: "applications/app-123/cv.pdf",
+        phone: "",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      [],
+    );
+
+    expect(html).toContain(
+      "<li><strong>Resume File Path:</strong> applications/app-123/cv.pdf</li>",
+    );
+    expect(html).toContain("<li><strong>Phone:</strong> N/A</li>");
+    expect(html).toContain(
+      "<li><strong>Created At:</strong> 2026-01-01T00:00:00.000Z</li>",
+    );
+  });
+
+  it("closes the applicant list before the documents section", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      { category: "resume", fileName: "cv.pdf", fileUrl: "https://files.example.com/cv.pdf" },
+    ]);
+
+    expect(html).toContain("</ul><h2>Uploaded Documents:</h2><ul>");
+    expect(html.endsWith("</ul>")).toBe(true);
+    expect(html.match(/<ul>/g)).toHaveLength(2);
+    expect(html.match(/<\/ul>/g)).toHaveLength(2);
+  });
+
   it("uses the capitalized category as the link text when present", () => {
     const html = buildJobApplicationEmailHtml(baseApplication, [
       { category: "resume", fileName: "cv.pdf", fileUrl: "https://files.example.com/cv.pdf" },

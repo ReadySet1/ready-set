@@ -308,10 +308,8 @@ export async function POST(request: Request) {
         console.error("Could not refetch application with files for email notification.");
         // Handle this case - maybe send email with initial data?
     } else {
-        const htmlBody = buildJobApplicationEmailHtml(
-          applicationWithFiles,
-          applicationWithFiles.fileUploads ?? [],
-        );
+        const { fileUploads, ...applicationFields } = applicationWithFiles;
+        const htmlBody = buildJobApplicationEmailHtml(applicationFields, fileUploads);
 
         try {
           await sendEmail({
