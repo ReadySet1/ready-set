@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 import Link from "next/link";
 
 interface StatProps {
@@ -33,13 +33,10 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
 };
 
 const CateringAbout: React.FC = () => {
-  const topStats = [
+  const stats = [
     { value: "2019", label: "Founded", delay: 0 },
     { value: "350+", label: "Restaurants Served", delay: 100 },
     { value: "338K+", label: "Deliveries Completed", delay: 200 },
-  ];
-
-  const bottomStats = [
     { value: "200+", label: "Professional Drivers", delay: 300 },
     { value: "98%", label: "On-Time Delivery Rate", delay: 400 },
   ];
@@ -57,20 +54,20 @@ const CateringAbout: React.FC = () => {
             transition={{ duration: 0.6 }}
           >
             {/* Image */}
-            <div className="relative mb-8 overflow-hidden rounded-3xl">
+            <div className="relative overflow-hidden rounded-3xl">
               <Image
-                src={getCloudinaryUrl("food/catering-about")}
+                src={getCloudinaryUrl("food/catering-about-v2", { version: ASSET_CACHE_VERSION })}
                 alt="Restaurant owners reviewing catering orders"
-                width={800}
-                height={600}
+                width={1245}
+                height={703}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 className="h-auto w-full object-cover"
-                priority
               />
             </div>
 
-            {/* Text above stats */}
+            {/* Caption below image */}
             <motion.p
-              className="mb-8 text-center font-[Montserrat] text-base font-medium text-gray-700 md:text-lg"
+              className="mt-6 text-center font-[Montserrat] text-sm font-medium leading-relaxed text-gray-700 sm:text-base md:text-lg"
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -79,30 +76,6 @@ const CateringAbout: React.FC = () => {
               Since 2019, we&apos;ve completed over 338,000 successful catering
               deliveries from 350+ restaurants.
             </motion.p>
-
-            {/* Stats - Top Row (3 cards) */}
-            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {topStats.map((stat, index) => (
-                <StatCard
-                  key={index}
-                  value={stat.value}
-                  label={stat.label}
-                  delay={stat.delay}
-                />
-              ))}
-            </div>
-
-            {/* Stats - Bottom Row (2 cards) */}
-            <div className="grid grid-cols-1 gap-4 sm:max-w-[66%] sm:grid-cols-2">
-              {bottomStats.map((stat, index) => (
-                <StatCard
-                  key={index}
-                  value={stat.value}
-                  label={stat.label}
-                  delay={stat.delay}
-                />
-              ))}
-            </div>
           </motion.div>
 
           {/* Right Column - Content */}
@@ -125,16 +98,6 @@ const CateringAbout: React.FC = () => {
                 hundreds of restaurants and catering brands to ensure every
                 order arrives on time and perfectly presented.
               </p>
-
-              <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
-                <strong>
-                  We're not a marketplace or broker — we don't take customer
-                  orders or list you on apps.
-                </strong>{" "}
-                Instead, we act as your behind-the-scenes delivery partner,
-                managing every step from pickup to setup so your team can focus
-                on the food and the experience.
-              </p>
             </div>
 
             {/* How Our Service Works Button */}
@@ -146,12 +109,24 @@ const CateringAbout: React.FC = () => {
             >
               <Link
                 href="/vendor-hero"
-                className="inline-block rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
+                className="inline-block rounded-full bg-yellow-400 px-14 py-5 font-[Montserrat] text-xl font-extrabold text-gray-800 shadow-md transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
               >
                 How Our Service Works
               </Link>
             </motion.div>
           </motion.div>
+        </div>
+
+        {/* Stats - Full Width Below Two-Column Grid */}
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {stats.map((stat, index) => (
+            <StatCard
+              key={index}
+              value={stat.value}
+              label={stat.label}
+              delay={stat.delay}
+            />
+          ))}
         </div>
       </div>
     </div>
