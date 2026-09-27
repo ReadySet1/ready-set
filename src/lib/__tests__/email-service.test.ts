@@ -524,7 +524,7 @@ describe("EmailService", () => {
         await EmailService.sendFormSubmissionNotification(data);
 
         const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
-        expect(lastCall.to).toBe("info@ready-set.co");
+        expect(lastCall.to).toBe("info@readysetllc.com");
       });
     });
 

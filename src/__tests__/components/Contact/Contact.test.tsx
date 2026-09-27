@@ -85,9 +85,9 @@ describe("Contact Component", () => {
   it("displays the contact email address", () => {
     render(<Contact />);
 
-    const emailLink = screen.getByText("info@ready-set.co");
+    const emailLink = screen.getByText("info@readysetllc.com");
     expect(emailLink).toBeInTheDocument();
-    expect(emailLink).toHaveAttribute("href", "mailto:info@ready-set.co");
+    expect(emailLink).toHaveAttribute("href", "mailto:info@readysetllc.com");
   });
 
   it("displays the contact form with all required fields", () => {
