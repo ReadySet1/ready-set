@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sendEmail from '@/app/actions/email';
 import { withAuth } from '@/lib/auth-middleware';
 import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
+import { CONTACT_EMAIL } from '@/config/contact';
 
 export async function POST(request: NextRequest) {
   const blocked = devOnlyGuard();
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await sendEmail({
       name: 'Test User',
-      email: 'info@ready-set.co',
+      email: CONTACT_EMAIL,
       message: 'Test message',
       phone: '1234567890', // Optional
     });

@@ -5,6 +5,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "@/config/contact";
 
 interface FormInputs {
   name: string;
@@ -128,7 +129,7 @@ const Contact = () => {
           <h3>Ways to Connect</h3>
           <ul>
             <li>
-              Email: info@ready-set.co - For general inquiries and quote
+              Email: {CONTACT_EMAIL} - For general inquiries and quote
               requests
             </li>
             <li>
@@ -227,10 +228,10 @@ const Contact = () => {
                     </h3>
                     <p className="text-base text-body-color dark:text-dark-6">
                       <a
-                        href="mailto:info@ready-set.co"
+                        href={CONTACT_MAILTO}
                         className="hover:underline"
                       >
-                        info@ready-set.co
+                        {CONTACT_EMAIL}
                       </a>
                     </p>
                   </div>
@@ -279,10 +280,10 @@ const Contact = () => {
                           slightly longer processing time. If this is urgent,
                           please email us directly at{" "}
                           <a
-                            href="mailto:info@ready-set.co"
+                            href={CONTACT_MAILTO}
                             className="font-medium underline hover:text-yellow-600"
                           >
-                            info@ready-set.co
+                            {CONTACT_EMAIL}
                           </a>
                           .
                         </p>

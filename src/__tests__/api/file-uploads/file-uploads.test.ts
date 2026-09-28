@@ -1,6 +1,6 @@
 // src/__tests__/api/file-uploads/file-uploads.test.ts
 
-import { GET, POST } from '@/app/api/file-uploads/route';
+import { POST } from '@/app/api/file-uploads/route';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { FileValidator, UploadErrorHandler } from '@/lib/upload-error-handler';
@@ -94,7 +94,7 @@ describe('/api/file-uploads API', () => {
       remove: jest.fn().mockResolvedValue({ data: null, error: null }),
     };
 
-    // Override storage methods for file upload tests (GET endpoint uses regular supabase client)
+    // Override storage methods on the regular supabase client
     mockSupabaseClient.storage.from = jest.fn(() => mockStorageBucket);
 
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
@@ -185,145 +185,6 @@ describe('/api/file-uploads API', () => {
     jest.mocked(prisma).$transaction = jest.fn().mockRejectedValue(
       new Error('MOCK_ERROR: Database transactions are not allowed in tests. Use mocked models instead.')
     ) as any;
-  });
-
-  describe('GET /api/file-uploads - Get File URL', () => {
-    describe('✅ Successful URL Generation', () => {
-      it('should return signed URL for private files', async () => {
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123', email: 'user@example.com' } },
-          error: null,
-        });
-
-        // Use the stable mockStorageBucket object instead of chaining from storage.from()
-        mockStorageBucket.createSignedUrl.mockResolvedValue({
-          data: { signedUrl: 'https://signed.url/file.pdf?token=abc123' },
-          error: null,
-        });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf',
-          { authorization: 'Bearer valid-token' }
-        );
-
-        const response = await GET(request);
-        const data = await expectSuccessResponse(response, 200);
-
-        expect(data.url).toBe('https://signed.url/file.pdf?token=abc123');
-        expect(data.isPublic).toBe(false);
-        expect(data.expiresIn).toBe('30 minutes');
-      });
-
-      it('should fallback to public URL if signed URL fails', async () => {
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        });
-
-        // Use the stable mockStorageBucket object
-        mockStorageBucket.createSignedUrl.mockResolvedValue({
-          data: null,
-          error: { message: 'Bucket not configured for private access' },
-        });
-
-        mockStorageBucket.getPublicUrl.mockReturnValue({
-          data: { publicUrl: 'https://public.url/file.pdf' },
-        });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf',
-          { authorization: 'Bearer valid-token' }
-        );
-
-        const response = await GET(request);
-        const data = await expectSuccessResponse(response, 200);
-
-        expect(data.url).toBe('https://public.url/file.pdf');
-        expect(data.isPublic).toBe(true);
-      });
-    });
-
-    describe('🔐 Authentication Tests', () => {
-      it('should return 401 for missing authorization header', async () => {
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf'
-        );
-
-        const response = await GET(request);
-        await expectUnauthorized(
-          response,
-          /Invalid authorization header/i
-        );
-      });
-
-      it('should return 401 for invalid Bearer token format', async () => {
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf',
-          { authorization: 'InvalidFormat token' }
-        );
-
-        const response = await GET(request);
-        await expectUnauthorized(response);
-      });
-
-      it('should return 401 for invalid token', async () => {
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: null },
-          error: { message: 'Invalid token' },
-        });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf',
-          { authorization: 'Bearer invalid-token' }
-        );
-
-        const response = await GET(request);
-        await expectUnauthorized(response);
-      });
-    });
-
-    describe('✏️ Validation Tests', () => {
-      it('should return 400 for missing path parameter', async () => {
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        });
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads',
-          { authorization: 'Bearer valid-token' }
-        );
-
-        const response = await GET(request);
-        await expectErrorResponse(response, 400, /Path parameter is required/i);
-      });
-    });
-
-    describe('❌ Error Handling', () => {
-      it('should handle storage service errors', async () => {
-        mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        });
-
-        // Use the stable mockStorageBucket object
-        mockStorageBucket.createSignedUrl.mockRejectedValue(
-          new Error('Storage service unavailable')
-        );
-
-        const request = createGetRequest(
-          'http://localhost:3000/api/file-uploads?path=documents/file.pdf',
-          { authorization: 'Bearer valid-token' }
-        );
-
-        const response = await GET(request);
-        await expectErrorResponse(
-          response,
-          500,
-          /Failed to generate file URL/i
-        );
-      });
-    });
   });
 
   describe('POST /api/file-uploads - Upload File', () => {

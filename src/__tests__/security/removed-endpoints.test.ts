@@ -23,3 +23,12 @@ describe('removed unauthenticated endpoints', () => {
     expect(existsSync(path.join(process.cwd(), relative))).toBe(false);
   });
 });
+
+describe('removed handlers on routes that still exist', () => {
+  // GET /api/file-uploads?path= signed any storage path for any logged-in
+  // user, with no ownership check. Only its own tests ever called it.
+  it('GET /api/file-uploads is gone', async () => {
+    const route = await import('@/app/api/file-uploads/route');
+    expect(route).not.toHaveProperty('GET');
+  });
+});

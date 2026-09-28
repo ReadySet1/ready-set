@@ -7,6 +7,7 @@ import {
   DeliveryFormData,
 } from "@/components/Logistics/QuoteRequest/types";
 import DOMPurify from "isomorphic-dompurify";
+import { CONTACT_EMAIL } from "@/config/contact";
 
 // Lazy initialization to avoid build-time errors when API key is not set
 const getResendClient = () => {
@@ -136,7 +137,7 @@ export class EmailService {
       }
 
       return await resend.emails.send({
-        to: process.env.NOTIFICATION_RECIPIENT || 'info@ready-set.co',
+        to: process.env.NOTIFICATION_RECIPIENT || CONTACT_EMAIL,
         from: 'Ready Set Website <updates@updates.readysetllc.com>',
         subject: `New ${formTypeDisplay} Delivery Quote Request - ${companyName}`,
         html: htmlContent,

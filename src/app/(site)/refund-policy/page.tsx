@@ -1,6 +1,7 @@
 // app/refund-policy/page.tsx
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { CONTACT_EMAIL, CONTACT_MAILTO } from '@/config/contact'
 
 export const metadata: Metadata = {
   title: 'Refund Policy | Ready Set Group',
@@ -84,8 +85,8 @@ export default function RefundPolicy() {
       <section className="mb-12">
         <h2 className="text-3xl font-semibold mb-6">How to Request a Refund</h2>
         <p className="mb-4">Email our Customer Support Team at{' '}
-          <a href="mailto:info@ready-set.co" className="text-blue-600 hover:text-blue-800">
-            info@ready-set.co
+          <a href={CONTACT_MAILTO} className="text-blue-600 hover:text-blue-800">
+            {CONTACT_EMAIL}
           </a> with:
         </p>
         <ul className="list-disc pl-6 space-y-2 mb-4">
@@ -124,7 +125,7 @@ export default function RefundPolicy() {
           166 Geary St. STE 1500 #1937<br />
           San Francisco, CA 94108<br />
           <a href="tel:+14152266872" className="text-blue-600 hover:text-blue-800">(415) 226-6872</a><br />
-          <a href="mailto:info@ready-set.co" className="text-blue-600 hover:text-blue-800">info@ready-set.co</a>
+          <a href={CONTACT_MAILTO} className="text-blue-600 hover:text-blue-800">{CONTACT_EMAIL}</a>
         </address>
       </section>
     </div>

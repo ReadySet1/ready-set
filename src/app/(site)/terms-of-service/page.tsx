@@ -1,6 +1,7 @@
 // app/terms-of-service/page.tsx
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { CONTACT_EMAIL, CONTACT_MAILTO } from '@/config/contact'
 
 export const metadata: Metadata = {
   title: 'Terms of Service | Ready Set Group',
@@ -106,7 +107,7 @@ export default function TermsOfService() {
           166 Geary St. STE 1500 #1937<br />
           San Francisco, CA 94108<br />
           <a href="tel:+14152266872" className="text-blue-600 hover:text-blue-800">(415) 226-6872</a><br />
-          <a href="mailto:info@ready-set.co" className="text-blue-600 hover:text-blue-800">info@ready-set.co</a>
+          <a href={CONTACT_MAILTO} className="text-blue-600 hover:text-blue-800">{CONTACT_EMAIL}</a>
         </address>
       </section>
 
