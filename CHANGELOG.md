@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1](https://github.com/ReadySet1/ready-set/compare/v2.9.0...v2.9.1) (2026-09-28)
+
+
+### Fixed
+
+* **job-applications:** harden the admin email builder after review ([4f3718c](https://github.com/ReadySet1/ready-set/commit/4f3718c4c49b05007cb4df40e31e739a9e4fc232))
+
+
+### Security
+
+* **file-uploads:** remove GET handler that signed any storage path ([13de574](https://github.com/ReadySet1/ready-set/commit/13de57423c6fafb01aa339255635cb310fa17b18))
+* **job-applications:** escape applicant fields in the admin email ([6c64d4e](https://github.com/ReadySet1/ready-set/commit/6c64d4e26b62c24dcbd2a4849524497c08a96c47))
+* **job-applications:** only attach files uploaded in the applicant's own session ([7eb6799](https://github.com/ReadySet1/ready-set/commit/7eb67992acffbb9818169e0833b00e6fe509826a))
+
 ## [2.9.0](https://github.com/ReadySet1/ready-set/compare/v2.8.0...v2.9.0) (2026-09-25)
 
 
