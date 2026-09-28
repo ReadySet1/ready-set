@@ -3,6 +3,17 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.1",
+      "date": "2026-09-28",
+      "title": "Release 2.9.1",
+      "summary": "",
+      "changes": [],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.1"
+      }
+    },
+    {
       "version": "2.9.0",
       "date": "2026-09-25",
       "title": "A new catering page and forms you can count on",
