@@ -45,6 +45,7 @@ jest.mock("@/lib/db/prisma", () => ({
     },
     profile: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     fileUpload: {
       create: jest.fn(),
@@ -178,6 +179,9 @@ describe("/api/catering-requests", () => {
       email: mockUser.email,
       name: "Test User",
     });
+
+    // Default: caller is a regular client
+    mockPrisma.profile.findFirst.mockResolvedValue({ type: "CLIENT" });
 
     // Default: successful catering request creation
     mockPrisma.cateringRequest.create.mockResolvedValue(mockCateringRequest);
@@ -636,26 +640,94 @@ describe("/api/catering-requests", () => {
       );
     });
 
-    it("should use clientId from request when in admin mode", async () => {
+    describe("clientId attribution", () => {
       const dataWithClientId = {
         ...validCateringData,
         clientId: "admin-specified-client-id",
       };
 
-      const request = createPostRequest(
-        "http://localhost:3000/api/catering-requests",
-        dataWithClientId
+      it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK"])(
+        "should create the order for clientId when the caller is %s",
+        async (type) => {
+          mockPrisma.profile.findFirst.mockResolvedValue({ type });
+
+          const request = createPostRequest(
+            "http://localhost:3000/api/catering-requests",
+            dataWithClientId
+          );
+
+          const response = await POST(request);
+
+          expect(response.status).toBe(201);
+          expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                userId: "admin-specified-client-id",
+              }),
+            })
+          );
+        }
       );
 
-      await POST(request);
+      it.each(["CLIENT", "VENDOR", "DRIVER"])(
+        "should reject clientId with 403 when the caller is %s",
+        async (type) => {
+          mockPrisma.profile.findFirst.mockResolvedValue({ type });
 
-      expect(mockPrisma.cateringRequest.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            userId: "admin-specified-client-id",
-          }),
-        })
+          const request = createPostRequest(
+            "http://localhost:3000/api/catering-requests",
+            dataWithClientId
+          );
+
+          const response = await POST(request);
+
+          await expectForbidden(response);
+          expect(mockPrisma.cateringRequest.create).not.toHaveBeenCalled();
+        }
       );
+
+      it("should reject clientId when the caller has no active profile", async () => {
+        mockPrisma.profile.findFirst.mockResolvedValue(null);
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/catering-requests",
+          dataWithClientId
+        );
+
+        const response = await POST(request);
+
+        await expectForbidden(response);
+        expect(mockPrisma.cateringRequest.create).not.toHaveBeenCalled();
+      });
+
+      it("should resolve the caller's role excluding soft-deleted profiles", async () => {
+        mockPrisma.profile.findFirst.mockResolvedValue({ type: "ADMIN" });
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/catering-requests",
+          dataWithClientId
+        );
+
+        await POST(request);
+
+        expect(mockPrisma.profile.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: mockUser.id, deletedAt: null },
+          })
+        );
+      });
+
+      it("should allow a clientId equal to the caller's own id without a role lookup", async () => {
+        const request = createPostRequest(
+          "http://localhost:3000/api/catering-requests",
+          { ...validCateringData, clientId: mockUser.id }
+        );
+
+        const response = await POST(request);
+
+        expect(response.status).toBe(201);
+        expect(mockPrisma.profile.findFirst).not.toHaveBeenCalled();
+      });
     });
 
     it("should set status to ACTIVE for new orders", async () => {
@@ -759,7 +831,8 @@ describe("/api/catering-requests", () => {
       );
 
       const response = await POST(request);
-      await expectServerError(response);
+      const data = await expectServerError(response);
+      expect(JSON.stringify(data)).not.toContain("Database connection failed");
     });
 
     it("should convert dates and times to UTC", async () => {
