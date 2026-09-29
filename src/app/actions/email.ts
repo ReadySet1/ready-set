@@ -6,6 +6,7 @@ import * as cheerio from "cheerio";
 import { SpamProtectionManager, extractClientIp } from "@/lib/spam-protection";
 import { verifyRecaptchaToken } from "@/lib/recaptcha";
 import { headers } from "next/headers";
+import { CONTACT_EMAIL } from "@/config/contact";
 
 interface FormInputs {
   name: string;
@@ -176,7 +177,7 @@ const sendEmailUnsafe = async (data: FormInputs): Promise<SendEmailResult> => {
   }
 
   // Validate recipient address
-  const recipient = process.env.NOTIFICATION_RECIPIENT || "info@readysetllc.com";
+  const recipient = process.env.NOTIFICATION_RECIPIENT || CONTACT_EMAIL;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
     console.error("Invalid recipient email address:", recipient);
     return fail("config", GENERIC_SEND_ERROR);

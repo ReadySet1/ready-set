@@ -19,9 +19,10 @@
  */
 import * as Sentry from "@sentry/nextjs";
 import { getSentryEnvironment } from "@/lib/monitoring/sentry-filters";
+import { CONTACT_EMAIL } from "@/config/contact";
 
 export const DEFAULT_ORDER_NOTIFICATION_RECIPIENTS = [
-  "info@readysetllc.com",
+  CONTACT_EMAIL,
   "austin@readysetllc.com",
 ] as const;
 
