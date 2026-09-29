@@ -184,3 +184,49 @@ describe("startDriverShift — one open shift per driver", () => {
     expect(result).toEqual({ success: false, error: "connection reset" });
   });
 });
+
+/**
+ * 2026-08-20 León drive: an inactive driver started a shift and completed a
+ * delivery, but POST /api/tracking/locations requires is_active = true and
+ * rejected every GPS point. Invariant: an inactive (or soft-deleted) driver
+ * cannot start a shift. The check lives inside the INSERT statement, so it
+ * costs no extra round trip and can't race a deactivation.
+ */
+describe("startDriverShift — inactive drivers cannot start a shift", () => {
+  it("only inserts the shift for an active, non-deleted driver row", async () => {
+    mockQueryRaw.mockImplementation((sql: string) =>
+      Promise.resolve(isOpenShiftLookup(sql) ? [] : [{ id: NEW_SHIFT_ID }]),
+    );
+
+    await startDriverShift(DRIVER_ID, startLocation);
+
+    const [insertSql] = insertCalls()[0]!;
+    const sql = String(insertSql);
+    expect(sql).toMatch(/FROM drivers\s+WHERE id = \$1::uuid\s+AND is_active = true\s+AND deleted_at IS NULL/);
+    // The on-duty flip must not run when no shift row was inserted.
+    expect(sql).toMatch(/AND EXISTS \(SELECT 1 FROM new_shift\)/);
+  });
+
+  it("refuses to start a shift when the insert finds no active driver row", async () => {
+    // Open-shift lookup: none. Guarded INSERT: no row (driver inactive).
+    mockQueryRaw.mockResolvedValue([]);
+
+    const result = await startDriverShift(DRIVER_ID, startLocation);
+
+    expect(result.success).toBe(false);
+    expect(result.shiftId).toBeUndefined();
+    expect(result.error).toMatch(/inactive/i);
+    expect(result.error).toMatch(/dispatch/i);
+  });
+
+  it("still resumes an inactive driver's already-open shift so it can be ended", async () => {
+    mockQueryRaw.mockImplementation((sql: string) =>
+      Promise.resolve(isOpenShiftLookup(sql) ? [{ id: EXISTING_SHIFT_ID }] : []),
+    );
+
+    const result = await startDriverShift(DRIVER_ID, startLocation);
+
+    expect(result).toEqual({ success: true, shiftId: EXISTING_SHIFT_ID, resumed: true });
+    expect(insertCalls()).toHaveLength(0);
+  });
+});

@@ -105,6 +105,10 @@ export async function startDriverShift(
     // One statement inserts the shift and flips the driver row on duty
     // (atomically, one round trip); the unique index still rejects a second
     // open shift, failing the whole statement.
+    //
+    // The INSERT only produces a row for an active, non-deleted driver:
+    // location writes require is_active = true, so a shift started by an
+    // inactive driver would record no GPS at all (2026-08-20 León drive).
     let newShiftId: string | undefined;
     try {
       const inserted = await prisma.$queryRawUnsafe<{ id: string }[]>(`
@@ -115,13 +119,18 @@ export async function startDriverShift(
             start_location,
             status,
             notes
-          ) VALUES (
+          )
+          SELECT
             $1::uuid,
             NOW(),
             ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
             'active',
-            $4
-          ) RETURNING id
+            $4::text
+          FROM drivers
+          WHERE id = $1::uuid
+            AND is_active = true
+            AND deleted_at IS NULL
+          RETURNING id
         ), on_duty AS (
           UPDATE drivers
           SET
@@ -132,6 +141,7 @@ export async function startDriverShift(
             last_location_update = NOW(),
             updated_at = NOW()
           WHERE id = $1::uuid
+            AND EXISTS (SELECT 1 FROM new_shift)
         )
         SELECT id FROM new_shift
       `,
@@ -152,6 +162,13 @@ export async function startDriverShift(
         shiftId: winnerShiftId,
       });
       return { success: true, shiftId: winnerShiftId, resumed: true };
+    }
+
+    if (!newShiftId) {
+      return {
+        success: false,
+        error: 'Your driver account is inactive. Contact dispatch to reactivate it before starting a shift.',
+      };
     }
 
     revalidatePath('/admin/tracking');
