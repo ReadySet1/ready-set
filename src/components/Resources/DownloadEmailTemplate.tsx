@@ -1,6 +1,8 @@
 // src/components/Email/DownloadEmailTemplate.tsx
 import * as React from 'react';
 import { encode } from 'he';
+import { EMAIL_LOGO_URL } from '@/utils/email-templates';
+import { siteUrl } from '@/lib/site-url';
 
 interface DownloadEmailTemplateProps {
   firstName: string;
@@ -92,7 +94,7 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
               <tbody>
                 <tr>
                   <td align="center" style={{ padding: '30px 40px', backgroundColor: '#fbd113' }}>
-                    <img src="https://ready-set.co/images/logo/logo.png" alt="Ready Set Logo" width="150" style={{ display: 'block' }} />
+                    <img src={EMAIL_LOGO_URL} alt="Ready Set Logo" width="150" style={{ display: 'block' }} />
                   </td>
                 </tr>
                 <tr>
@@ -126,7 +128,7 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                       <tbody>
                         <tr>
                           <td align="center" style={{ padding: '10px 0 20px' }}>
-                            <a href="https://ready-set.co/contact" style={{
+                            <a href={siteUrl('/contact')} style={{
                               display: 'inline-block',
                               padding: '12px 25px',
                               backgroundColor: '#facc15',
@@ -179,8 +181,8 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                               This email was sent to {userEmail} by Ready Set. If you did not request this download, please disregard this message.
                             </p>
                             <p style={{ margin: '10px 0 0', color: '#c4c2bd', fontSize: '12px' }}>
-                              <a href="https://ready-set.co/unsubscribe" style={{ color: '#fbd113' }}>Unsubscribe</a> |
-                              <a href="https://ready-set.co/privacy-policy" style={{ color: '#fbd113' }}>Privacy Policy</a>
+                              <a href={siteUrl('/unsubscribe')} style={{ color: '#fbd113' }}>Unsubscribe</a> |
+                              <a href={siteUrl('/privacy-policy')} style={{ color: '#fbd113' }}>Privacy Policy</a>
                             </p>
                           </td>
                         </tr>
