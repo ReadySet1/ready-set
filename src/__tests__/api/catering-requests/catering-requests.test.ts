@@ -28,6 +28,7 @@ jest.mock('@/lib/db/prisma', () => ({
     },
     profile: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     fileUpload: {
       create: jest.fn(),
@@ -251,6 +252,8 @@ describe('/api/catering-requests API', () => {
           error: null,
         });
 
+        (prisma.profile.findFirst as jest.Mock).mockResolvedValue({ type: 'ADMIN' });
+
         (validateUserNotSoftDeleted as jest.Mock).mockResolvedValue({
           isValid: true,
         });
@@ -409,6 +412,8 @@ describe('/api/catering-requests API', () => {
           data: { user: { id: 'admin-123' } },
           error: null,
         });
+
+        (prisma.profile.findFirst as jest.Mock).mockResolvedValue({ type: 'ADMIN' });
 
         (validateUserNotSoftDeleted as jest.Mock).mockResolvedValue({
           isValid: false,
