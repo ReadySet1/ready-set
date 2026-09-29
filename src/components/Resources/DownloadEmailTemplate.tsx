@@ -17,7 +17,7 @@ interface DownloadEmailTemplateProps {
  * - Only allows specific whitelisted hostnames to prevent URL redirection attacks
  * - Encodes URL for safe HTML attribute usage
  */
-const validateDownloadUrl = (url: string): string => {
+export const validateDownloadUrl = (url: string): string => {
   try {
     const parsedUrl = new URL(url);
 
@@ -29,9 +29,8 @@ const validateDownloadUrl = (url: string): string => {
 
     // Hostname allowlist: Only allow trusted domains
     const allowedHosts = [
-      'ready-set.co',
-      'www.ready-set.co',
-      'jdjlkt28jx.ufs.sh', // Uploadfly file storage for resources
+      'jdjlkt28jx.ufs.sh', // Uploadfly — static resources in Data/Resources.ts
+      'cdn.sanity.io',      // Sanity file assets — guides resolved by getGuideBySlug
     ];
 
     if (!allowedHosts.includes(parsedUrl.hostname)) {
