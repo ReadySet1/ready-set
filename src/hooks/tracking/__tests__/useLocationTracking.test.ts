@@ -1464,4 +1464,154 @@ describe('useLocationTracking', () => {
       }
     });
   });
+
+  // 2026-08-20 León drive: every location POST was rejected (403) for a whole
+  // shift and the driver saw nothing. Server rejections must surface to the
+  // driver once they repeat; transient noise (429, network drops) must not.
+  describe('server rejection alert (locationSyncError)', () => {
+    // startTracking already POSTs the initial fixes, so tests can't equate
+    // "N watch callbacks" with "N POSTs". Instead the server answers from a
+    // status queue; once it's drained it answers 429, which never counts as a
+    // rejection and closes the client throttle so no further POSTs go out.
+    const respondWith = (statuses: number[]) => {
+      const queue = [...statuses];
+      postLocationHandler = () => {
+        const status = queue.shift() ?? 429;
+        return okJson(status < 300 ? { success: true } : { error: `HTTP ${status}` }, status);
+      };
+      return () => queue.length;
+    };
+
+    const startAndSend = async (points: number) => {
+      const hook = renderHook(() => useLocationTracking());
+      await act(async () => {
+        hook.result.current.startTracking();
+      });
+      for (let i = 0; i < points; i++) {
+        await act(async () => {
+          await mockWatchCallback(mockPosition);
+        });
+      }
+      return hook;
+    };
+
+    it('is null while location POSTs succeed', async () => {
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(locationPostCalls().length).toBeGreaterThan(0));
+      expect(result.current.locationSyncError).toBeNull();
+    });
+
+    it('stays null for fewer than 3 consecutive server rejections', async () => {
+      const remaining = respondWith([403, 403]);
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(remaining()).toBe(0));
+      expect(result.current.locationSyncError).toBeNull();
+    });
+
+    it('tells the driver to contact dispatch after 3 consecutive 403s', async () => {
+      postLocationHandler = () => okJson({ error: 'Driver not found or access denied' }, 403);
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+      expect(result.current.locationSyncError).toMatch(/location isn.t being saved/i);
+      expect(result.current.locationSyncError).toMatch(/dispatch/i);
+    });
+
+    it('tells the driver to sign in again after 3 consecutive 401s', async () => {
+      postLocationHandler = () => okJson({ error: 'Unauthorized' }, 401);
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+      expect(result.current.locationSyncError).toMatch(/sign in/i);
+    });
+
+    it('reports repeated server errors (5xx) too', async () => {
+      postLocationHandler = () => okJson({ error: 'Internal error' }, 500);
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+      expect(result.current.locationSyncError).toMatch(/location isn.t being saved/i);
+    });
+
+    it('clears as soon as a location POST succeeds again', async () => {
+      postLocationHandler = () => okJson({ error: 'Driver not found or access denied' }, 403);
+      const { result } = await startAndSend(3);
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+
+      postLocationHandler = () => okJson({ success: true }, 201);
+      await act(async () => {
+        await mockWatchCallback(mockPosition);
+      });
+
+      await waitFor(() => expect(result.current.locationSyncError).toBeNull());
+    });
+
+    // A success closes the client throttle, and the fake clock is frozen, so
+    // advance system time (without firing timers) past the sync interval
+    // before each point. One tracking session throughout: stopTracking also
+    // resets the count, and using it here would hide a missing success reset.
+    const sendUntilDrained = async (remaining: () => number) => {
+      const hook = await startAndSend(0);
+      for (let i = 0; i < 10 && remaining() > 0; i++) {
+        jest.setSystemTime(Date.now() + 60_000);
+        await act(async () => {
+          await mockWatchCallback(mockPosition);
+        });
+      }
+      expect(remaining()).toBe(0);
+      return hook;
+    };
+
+    it('resets the count on success, so failures must be consecutive', async () => {
+      const remaining = respondWith([403, 403, 201, 403, 403]);
+
+      const { result } = await sendUntilDrained(remaining);
+
+      expect(result.current.locationSyncError).toBeNull();
+    });
+
+    it('alerts when a success is followed by 3 new consecutive rejections', async () => {
+      const remaining = respondWith([403, 403, 201, 403, 403, 403]);
+
+      const { result } = await sendUntilDrained(remaining);
+
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+    });
+
+    it('does not count rate limiting (429) as a rejection', async () => {
+      postLocationHandler = () => okJson({ error: 'Rate limit exceeded' }, 429);
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(locationPostCalls().length).toBeGreaterThan(0));
+      expect(result.current.locationSyncError).toBeNull();
+    });
+
+    it('does not count network failures (the offline queue already covers them)', async () => {
+      postLocationHandler = () => Promise.reject(new Error('Network error'));
+
+      const { result } = await startAndSend(3);
+
+      await waitFor(() => expect(locationPostCalls().length).toBeGreaterThanOrEqual(3));
+      expect(result.current.locationSyncError).toBeNull();
+    });
+
+    it('clears when tracking stops', async () => {
+      postLocationHandler = () => okJson({ error: 'Driver not found or access denied' }, 403);
+      const { result } = await startAndSend(3);
+      await waitFor(() => expect(result.current.locationSyncError).not.toBeNull());
+
+      act(() => {
+        result.current.stopTracking();
+      });
+
+      expect(result.current.locationSyncError).toBeNull();
+    });
+  });
 });

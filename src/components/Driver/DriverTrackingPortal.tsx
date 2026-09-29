@@ -126,6 +126,7 @@ export default function DriverTrackingPortal() {
     currentLocation,
     accuracy,
     locationError,
+    locationSyncError,
     isRealtimeConnected,
     connectionMode,
     permissionState,
@@ -403,6 +404,7 @@ export default function DriverTrackingPortal() {
         {(
           [
             ["location", locationError],
+            ["location-sync", locationSyncError],
             ["shift", shiftError],
             ["deliveries", deliveriesError],
           ] as Array<[string, string | null | undefined]>
