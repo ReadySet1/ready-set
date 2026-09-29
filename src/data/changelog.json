@@ -3,6 +3,26 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.1",
+      "date": "2026-09-28",
+      "title": "Safer job applications",
+      "summary": "Job applications now keep your details and attachments safer, and our contact email is up to date.",
+      "changes": [
+        {
+          "text": "Files you attach to a job application are only ever sent with your own application.",
+          "type": "improved"
+        },
+        {
+          "text": "Emails to our contact address now reach us at info@readysetllc.com.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.1"
+      }
+    },
+    {
       "version": "2.9.0",
       "date": "2026-09-25",
       "title": "A new catering page and forms you can count on",
