@@ -14,6 +14,11 @@ interface UseLocationTrackingReturn {
   isTracking: boolean;
   accuracy: number | null;
   error: string | null;
+  /**
+   * Driver-facing message once the server has rejected several location
+   * POSTs in a row (401/403/5xx). Null while locations are being saved.
+   */
+  locationSyncError: string | null;
   unsyncedCount: number;
   isOnline: boolean;
   permissionState: 'prompt' | 'granted' | 'denied' | 'unknown';
@@ -75,6 +80,22 @@ const MAX_RETRY_ATTEMPTS = 3;
 const OFFLINE_FLUSH_SPACING_MS = 250;
 const OFFLINE_FLUSH_429_BACKOFF_MS = 30_000;
 
+// Consecutive server rejections of live location POSTs before the driver is
+// told. The 2026-08-20 León drive had every point 403'd for a whole shift with
+// nothing on screen. Rate limiting (429) and network drops don't count: the
+// throttle and the offline queue already handle those.
+const SYNC_REJECTION_ALERT_THRESHOLD = 3;
+
+const describeSyncRejection = (status: number): string => {
+  if (status === 401) {
+    return "Your location isn't being saved because your session expired. Sign out and sign in again.";
+  }
+  if (status === 403) {
+    return "Your location isn't being saved. Contact dispatch so they can check your driver account.";
+  }
+  return "Your location isn't being saved (server error). Contact dispatch if this message stays.";
+};
+
 // High accuracy options - for GPS when available
 const HIGH_ACCURACY_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
@@ -94,6 +115,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const [isTracking, setIsTracking] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locationSyncError, setLocationSyncError] = useState<string | null>(null);
+  const consecutiveSyncRejectionsRef = useRef(0);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
@@ -240,7 +263,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // dropped every breadcrumb (driver_locations had no inserts for weeks). A stable
   // API route is deployment-proof. Returns the {success,error} shape callers expect.
   const postLocation = useCallback(
-    async (location: LocationUpdate): Promise<{ success: boolean; error?: string }> => {
+    async (
+      location: LocationUpdate,
+    ): Promise<{ success: boolean; error?: string; status?: number }> => {
       try {
         // GPS fix time (not send time) — offline-replayed points keep their
         // original timestamp because the queue stores full LocationUpdates.
@@ -276,7 +301,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
           } catch {
             /* non-JSON error body */
           }
-          return { success: false, error };
+          // `status` marks a server rejection (vs. a network failure below).
+          return { success: false, error, status: res.status };
         }
         return { success: true };
       } catch (err) {
@@ -398,9 +424,17 @@ export function useLocationTracking(): UseLocationTrackingReturn {
           lastSyncTimeRef.current = now;
           return;
         }
+        if (result.status !== undefined) {
+          consecutiveSyncRejectionsRef.current += 1;
+          if (consecutiveSyncRejectionsRef.current >= SYNC_REJECTION_ALERT_THRESHOLD) {
+            setLocationSyncError(describeSyncRejection(result.status));
+          }
+        }
         throw new Error(result.error || 'Failed to update location');
       }
       lastSyncTimeRef.current = now;
+      consecutiveSyncRejectionsRef.current = 0;
+      setLocationSyncError(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Rate limit')) {
@@ -594,6 +628,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     // Reset cached driver ID so it refreshes on next session
     cachedDriverIdRef.current = null;
     lastSyncTimeRef.current = 0;
+    consecutiveSyncRejectionsRef.current = 0;
+    setLocationSyncError(null);
 
     // Release the screen wake lock.
     void releaseWakeLock();
@@ -886,6 +922,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     isTracking,
     accuracy,
     error,
+    locationSyncError,
     unsyncedCount,
     isOnline,
     permissionState,

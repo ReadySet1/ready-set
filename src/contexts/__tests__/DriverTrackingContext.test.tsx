@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
-import { DriverTrackingProvider } from '../DriverTrackingContext';
+import { render, screen, waitFor } from '@testing-library/react';
+import { DriverTrackingProvider, useDriverTracking } from '../DriverTrackingContext';
 
 // The provider is mounted by the /driver layout, so its effects run on every
 // driver page. These tests pin the web GPS auto-resume behaviour: an active
@@ -155,5 +155,33 @@ describe('DriverTrackingProvider web GPS auto-resume', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(mockStartTracking).not.toHaveBeenCalled();
     expect(mockRequestLocationPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe('DriverTrackingProvider location sync alert', () => {
+  function SyncErrorProbe() {
+    const { locationSyncError } = useDriverTracking();
+    return <div data-testid="sync-error">{locationSyncError ?? 'none'}</div>;
+  }
+
+  const renderProbe = () =>
+    render(
+      <DriverTrackingProvider>
+        <SyncErrorProbe />
+      </DriverTrackingProvider>,
+    );
+
+  it('exposes the tracker locationSyncError to driver pages', () => {
+    resetState({ isTracking: true, locationSyncError: 'Your location isn\'t being saved.' }, activeShift);
+    renderProbe();
+
+    expect(screen.getByTestId('sync-error')).toHaveTextContent("Your location isn't being saved.");
+  });
+
+  it('defaults to null when the tracker reports no sync problem', () => {
+    resetState({ isTracking: true }, activeShift);
+    renderProbe();
+
+    expect(screen.getByTestId('sync-error')).toHaveTextContent('none');
   });
 });
