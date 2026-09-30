@@ -141,16 +141,15 @@ e2e/
 1. `address-county-selection.spec.ts` - County selection validation
 2. `admin-flow.spec.ts` - Admin dashboard navigation
 3. `auth-flow.spec.ts` - Authentication UI flows
-4. `bug-fixes-integration.spec.ts` - Bug regression tests
-5. `order-flow.spec.ts` - Order creation flows
-6. `order-url-encoding.spec.ts` - Special character handling
-7. `user-edit-workflow.spec.ts` - User CRUD operations
-8. `addresses-infinite-loop.spec.ts` - Performance regression test
-9. `client-dashboard.spec.ts` - Client dashboard QA
-10. `data-separation.spec.ts` - Role-based access control
-11. `vendor-dashboard.spec.ts` - Vendor dashboard QA
-12. `softDelete.spec.ts` - User soft delete flows
-13. `test-data-setup.ts` - Database seeding script
+4. `order-flow.spec.ts` - Order creation flows
+5. `order-url-encoding.spec.ts` - Special character handling
+6. `user-edit-workflow.spec.ts` - User CRUD operations
+7. `addresses-infinite-loop.spec.ts` - Performance regression test
+8. `client-dashboard.spec.ts` - Client dashboard QA
+9. `data-separation.spec.ts` - Role-based access control
+10. `vendor-dashboard.spec.ts` - Vendor dashboard QA
+11. `softDelete.spec.ts` - User soft delete flows
+12. `test-data-setup.ts` - Database seeding script
 
 ## Writing Tests
 
