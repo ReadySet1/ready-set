@@ -11,41 +11,27 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-// Test data
-const TEST_ADMIN = {
-  email: 'admin@test.com',
-  password: 'test123',
-  name: 'Test Admin',
-  type: 'ADMIN'
-};
+// Admin tests run as the TEST_ADMIN user through the storageState saved by
+// e2e/auth/setup.ts, so this file carries no admin credentials.
+test.use({ storageState: 'e2e/.auth/admin.json' });
 
 const TEST_USER = {
   email: 'testuser@test.com',
-  password: 'test123',
   name: 'Test User',
   type: 'CLIENT'
 };
 
-const TEST_SUPER_ADMIN = {
-  email: 'superadmin@test.com',
-  password: 'test123',
-  name: 'Test Super Admin',
-  type: 'SUPER_ADMIN'
-};
+// Permanent deletion needs a SUPER_ADMIN, which global setup does not
+// provision. Those tests sign in through the form with credentials read from
+// the environment and skip when they are not set. Never hardcode them here.
+const SUPER_ADMIN_EMAIL = process.env.TEST_SUPER_ADMIN_EMAIL;
+const SUPER_ADMIN_PASSWORD = process.env.TEST_SUPER_ADMIN_PASSWORD;
 
 // Helper functions
-async function loginAsAdmin(page: Page) {
-  await page.goto('/sign-in');
-  await page.fill('input[name="email"]', TEST_ADMIN.email);
-  await page.fill('input[name="password"]', TEST_ADMIN.password);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('/admin/**');
-}
-
 async function loginAsSuperAdmin(page: Page) {
   await page.goto('/sign-in');
-  await page.fill('input[name="email"]', TEST_SUPER_ADMIN.email);
-  await page.fill('input[name="password"]', TEST_SUPER_ADMIN.password);
+  await page.fill('input[name="email"]', SUPER_ADMIN_EMAIL ?? '');
+  await page.fill('input[name="password"]', SUPER_ADMIN_PASSWORD ?? '');
   await page.click('button[type="submit"]');
   await page.waitForURL('/admin/**');
 }
@@ -77,7 +63,6 @@ test.describe('User Soft Delete E2E Tests', () => {
 
   test.describe('Admin Dashboard User Management', () => {
     test('should display users management interface with tabs', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Verify main elements are present
@@ -98,7 +83,6 @@ test.describe('User Soft Delete E2E Tests', () => {
     });
 
     test('should switch between Active and Deleted Users tabs', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Start on Active Users tab
@@ -123,8 +107,6 @@ test.describe('User Soft Delete E2E Tests', () => {
 
   test.describe('Soft Delete Flow', () => {
     test('should successfully move user to trash with reason', async ({ page }) => {
-      await loginAsAdmin(page);
-      
       // Create a test user first
       await createTestUser(page);
       await navigateToUsersPage(page);
@@ -177,7 +159,6 @@ test.describe('User Soft Delete E2E Tests', () => {
     });
 
     test('should prevent deletion of super admin users', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Look for a super admin user (if any exist)
@@ -196,7 +177,6 @@ test.describe('User Soft Delete E2E Tests', () => {
       // This test would require a helpdesk user account
       // For now, we'll test the error handling when permission is denied
       
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // If we had a way to simulate permission errors, we'd test them here
@@ -206,7 +186,6 @@ test.describe('User Soft Delete E2E Tests', () => {
 
   test.describe('User Restoration Flow', () => {
     test('should successfully restore a deleted user', async ({ page }) => {
-      await loginAsAdmin(page);
       
       // First, create and delete a user (setup for restore test)
       await createTestUser(page);
@@ -263,70 +242,8 @@ test.describe('User Soft Delete E2E Tests', () => {
   });
 
   test.describe('Permanent Deletion Flow', () => {
-    test('should permanently delete user as super admin with proper warnings', async ({ page }) => {
-      await loginAsSuperAdmin(page);
-      
-      // Create and soft delete a user first
-      await createTestUser(page);
-      await navigateToUsersPage(page);
-      
-      // Soft delete the user
-      const userRow = await findUserInTable(page, TEST_USER.email);
-      await userRow.hover();
-      await userRow.locator('button[title="Move to Trash"]').click();
-      await page.fill('textarea[placeholder*="e.g., Account violation"]', 'Test deletion for permanent delete');
-      await page.click('button:has-text("Move to Trash")');
-      await expect(page.locator('text*="moved to trash"')).toBeVisible();
-
-      // Go to deleted users tab
-      await page.click('[role="tab"]:has-text("Deleted Users")');
-      
-      const deletedUserRow = await findUserInTable(page, TEST_USER.email);
-      await deletedUserRow.hover();
-      
-      // Click the permanent delete button (should have ShieldAlert icon)
-      await deletedUserRow.locator('button[title="Permanently Delete"]').click();
-
-      // Verify the permanent delete dialog with warnings
-      await expect(page.locator('dialog:has-text("Permanently Delete User")')).toBeVisible();
-      await expect(page.locator('text*="DANGER"')).toBeVisible();
-      await expect(page.locator('text*="cannot be undone"')).toBeVisible();
-      await expect(page.locator('text*="permanently removed"')).toBeVisible();
-      
-      // Verify warning alert
-      await expect(page.locator('[role="alert"]:has-text("Warning")')).toBeVisible();
-      await expect(page.locator('text*="irreversible"')).toBeVisible();
-      await expect(page.locator('text*="GDPR compliance"')).toBeVisible();
-
-      // The permanent delete button should be disabled initially
-      await expect(page.locator('button:has-text("Permanently Delete")')).toBeDisabled();
-
-      // Fill in the required reason (minimum 10 characters)
-      const permanentReason = 'GDPR data deletion request - user requested complete data removal';
-      await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', permanentReason);
-
-      // Verify character count
-      await expect(page.locator(`text*="${permanentReason.length}/10 characters minimum"`)).toBeVisible();
-
-      // Now the button should be enabled
-      await expect(page.locator('button:has-text("Permanently Delete")')).toBeEnabled();
-
-      // Click Permanently Delete button
-      await page.click('button:has-text("Permanently Delete")');
-
-      // Wait for the operation to complete
-      await expect(page.locator('dialog:has-text("Permanently Delete User")')).not.toBeVisible();
-
-      // Verify success message
-      await expect(page.locator('text*="permanently deleted"')).toBeVisible();
-
-      // Verify user is completely gone from deleted users table
-      await expect(await findUserInTable(page, TEST_USER.email)).not.toBeVisible();
-    });
-
     test('should not show permanent delete option for regular admin', async ({ page }) => {
-      await loginAsAdmin(page); // Regular admin, not super admin
-      
+      // Signed in as a regular ADMIN via the file-level storageState.
       // Create and soft delete a user first
       await createTestUser(page);
       await navigateToUsersPage(page);
@@ -349,40 +266,109 @@ test.describe('User Soft Delete E2E Tests', () => {
       await expect(deletedUserRow.locator('button[title="Permanently Delete"]')).not.toBeVisible();
     });
 
-    test('should require minimum character count for permanent deletion reason', async ({ page }) => {
-      await loginAsSuperAdmin(page);
+    test.describe('as super admin', () => {
+      // Start signed out: these tests sign in through the form as a SUPER_ADMIN.
+      test.use({ storageState: { cookies: [], origins: [] } });
+      test.skip(
+        !SUPER_ADMIN_EMAIL || !SUPER_ADMIN_PASSWORD,
+        'TEST_SUPER_ADMIN_EMAIL / TEST_SUPER_ADMIN_PASSWORD not set',
+      );
+
+      test('should permanently delete user as super admin with proper warnings', async ({ page }) => {
+        await loginAsSuperAdmin(page);
       
-      // Setup: create and soft delete a user
-      await createTestUser(page);
-      await navigateToUsersPage(page);
+        // Create and soft delete a user first
+        await createTestUser(page);
+        await navigateToUsersPage(page);
       
-      const userRow = await findUserInTable(page, TEST_USER.email);
-      await userRow.hover();
-      await userRow.locator('button[title="Move to Trash"]').click();
-      await page.fill('textarea[placeholder*="e.g., Account violation"]', 'Test deletion');
-      await page.click('button:has-text("Move to Trash")');
-      await expect(page.locator('text*="moved to trash"')).toBeVisible();
+        // Soft delete the user
+        const userRow = await findUserInTable(page, TEST_USER.email);
+        await userRow.hover();
+        await userRow.locator('button[title="Move to Trash"]').click();
+        await page.fill('textarea[placeholder*="e.g., Account violation"]', 'Test deletion for permanent delete');
+        await page.click('button:has-text("Move to Trash")');
+        await expect(page.locator('text*="moved to trash"')).toBeVisible();
 
-      await page.click('[role="tab"]:has-text("Deleted Users")');
-      const deletedUserRow = await findUserInTable(page, TEST_USER.email);
-      await deletedUserRow.hover();
-      await deletedUserRow.locator('button[title="Permanently Delete"]').click();
+        // Go to deleted users tab
+        await page.click('[role="tab"]:has-text("Deleted Users")');
+      
+        const deletedUserRow = await findUserInTable(page, TEST_USER.email);
+        await deletedUserRow.hover();
+      
+        // Click the permanent delete button (should have ShieldAlert icon)
+        await deletedUserRow.locator('button[title="Permanently Delete"]').click();
 
-      // Try with short reason (should keep button disabled)
-      await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', 'short');
-      await expect(page.locator('text*="4/10 characters minimum"')).toBeVisible();
-      await expect(page.locator('button:has-text("Permanently Delete")')).toBeDisabled();
+        // Verify the permanent delete dialog with warnings
+        await expect(page.locator('dialog:has-text("Permanently Delete User")')).toBeVisible();
+        await expect(page.locator('text*="DANGER"')).toBeVisible();
+        await expect(page.locator('text*="cannot be undone"')).toBeVisible();
+        await expect(page.locator('text*="permanently removed"')).toBeVisible();
+      
+        // Verify warning alert
+        await expect(page.locator('[role="alert"]:has-text("Warning")')).toBeVisible();
+        await expect(page.locator('text*="irreversible"')).toBeVisible();
+        await expect(page.locator('text*="GDPR compliance"')).toBeVisible();
 
-      // Clear and try with exact minimum (should enable)
-      await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', '1234567890');
-      await expect(page.locator('text*="10/10 characters minimum"')).toBeVisible();
-      await expect(page.locator('button:has-text("Permanently Delete")')).toBeEnabled();
+        // The permanent delete button should be disabled initially
+        await expect(page.locator('button:has-text("Permanently Delete")')).toBeDisabled();
+
+        // Fill in the required reason (minimum 10 characters)
+        const permanentReason = 'GDPR data deletion request - user requested complete data removal';
+        await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', permanentReason);
+
+        // Verify character count
+        await expect(page.locator(`text*="${permanentReason.length}/10 characters minimum"`)).toBeVisible();
+
+        // Now the button should be enabled
+        await expect(page.locator('button:has-text("Permanently Delete")')).toBeEnabled();
+
+        // Click Permanently Delete button
+        await page.click('button:has-text("Permanently Delete")');
+
+        // Wait for the operation to complete
+        await expect(page.locator('dialog:has-text("Permanently Delete User")')).not.toBeVisible();
+
+        // Verify success message
+        await expect(page.locator('text*="permanently deleted"')).toBeVisible();
+
+        // Verify user is completely gone from deleted users table
+        await expect(await findUserInTable(page, TEST_USER.email)).not.toBeVisible();
+      });
+
+      test('should require minimum character count for permanent deletion reason', async ({ page }) => {
+        await loginAsSuperAdmin(page);
+      
+        // Setup: create and soft delete a user
+        await createTestUser(page);
+        await navigateToUsersPage(page);
+      
+        const userRow = await findUserInTable(page, TEST_USER.email);
+        await userRow.hover();
+        await userRow.locator('button[title="Move to Trash"]').click();
+        await page.fill('textarea[placeholder*="e.g., Account violation"]', 'Test deletion');
+        await page.click('button:has-text("Move to Trash")');
+        await expect(page.locator('text*="moved to trash"')).toBeVisible();
+
+        await page.click('[role="tab"]:has-text("Deleted Users")');
+        const deletedUserRow = await findUserInTable(page, TEST_USER.email);
+        await deletedUserRow.hover();
+        await deletedUserRow.locator('button[title="Permanently Delete"]').click();
+
+        // Try with short reason (should keep button disabled)
+        await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', 'short');
+        await expect(page.locator('text*="4/10 characters minimum"')).toBeVisible();
+        await expect(page.locator('button:has-text("Permanently Delete")')).toBeDisabled();
+
+        // Clear and try with exact minimum (should enable)
+        await page.fill('textarea[placeholder*="e.g., GDPR data deletion"]', '1234567890');
+        await expect(page.locator('text*="10/10 characters minimum"')).toBeVisible();
+        await expect(page.locator('button:has-text("Permanently Delete")')).toBeEnabled();
+      });
     });
   });
 
   test.describe('Search and Filter Functionality', () => {
     test('should search in both active and deleted users', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Test search in active users
@@ -405,7 +391,6 @@ test.describe('User Soft Delete E2E Tests', () => {
     });
 
     test('should filter by user type in both tabs', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Test type filter on active users
@@ -431,7 +416,6 @@ test.describe('User Soft Delete E2E Tests', () => {
   test.describe('Error Handling and Edge Cases', () => {
     test('should handle network errors gracefully', async ({ page }) => {
       // This test would involve intercepting network requests and simulating failures
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Intercept API calls and make them fail
@@ -450,14 +434,12 @@ test.describe('User Soft Delete E2E Tests', () => {
     test('should prevent concurrent operations on same user', async ({ page }) => {
       // This would test the UI behavior when multiple operations are attempted
       // on the same user simultaneously
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Implementation would depend on actual concurrency handling
     });
 
     test('should maintain state when switching tabs', async ({ page }) => {
-      await loginAsAdmin(page);
       await navigateToUsersPage(page);
 
       // Set some filters and search

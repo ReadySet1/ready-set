@@ -13,8 +13,20 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   /* Optimize workers for CI - increased from 1 to 2 for better performance */
   workers: process.env.CI ? 2 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters
+   * CI writes html + json so a report exists even when the run is cut short
+   * by globalTimeout. The JSON goes to test-results/ because the html
+   * reporter owns and clears playwright-report/. */
+  reporter: process.env.CI
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: 'test-results/results.json' }],
+      ]
+    : 'html',
+  /* CI only: stop the whole run gracefully before the job's timeout-minutes
+   * kills it, so reporters still flush. Keep below the CI job limit. */
+  globalTimeout: process.env.CI ? 25 * 60 * 1000 : undefined,
   /**
    * Global setup for authentication - runs once before all tests
    *
@@ -80,9 +92,11 @@ export default defineConfig({
         ]),
   ],
 
-  /* Run your local dev server before starting the tests */
+  /* CI serves the production build made by the "Build application" step
+   * (`next start`, port 3000) so pages are not compiled on demand; locally we
+   * keep the dev server. */
   webServer: {
-    command: 'pnpm dev',
+    command: process.env.CI ? 'pnpm start' : 'pnpm dev',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes for Next.js to start

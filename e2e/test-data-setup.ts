@@ -11,15 +11,15 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Test user data
+// Test user data. Only Prisma profile rows are created here: no Supabase auth
+// user and no password. Sign-in credentials for E2E live in the TEST_*_EMAIL /
+// TEST_*_PASSWORD env vars (see e2e/auth/setup.ts), never in this file.
 const testUsers = [
   {
     email: 'test-client@example.com',
-    password: 'TestPassword123!',
     role: 'CLIENT',
     firstName: 'Test',
     lastName: 'Client',
@@ -27,7 +27,6 @@ const testUsers = [
   },
   {
     email: 'test-vendor@example.com',
-    password: 'TestPassword123!',
     role: 'VENDOR',
     firstName: 'Test',
     lastName: 'Vendor',
@@ -114,9 +113,6 @@ async function createTestUsers() {
         console.log(`User ${userData.email} already exists, skipping...`);
         continue;
       }
-
-      // Hash password
-      const hashedPassword = await hash(userData.password, 12);
 
       // Create user
       const user = await prisma.profile.create({

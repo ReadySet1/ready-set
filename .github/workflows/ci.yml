@@ -221,9 +221,14 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Increased timeout: build (~5min) + server startup (~2min) + 119 tests at ~10s each
-    timeout-minutes: 25
-    continue-on-error: true # Non-blocking: Tests require secrets configuration
+    # Budget: install + build (~8-10 min) + Playwright globalTimeout (25 min,
+    # see playwright.config.ts) + report uploads, with margin. Keep this above
+    # build time + globalTimeout so Playwright stops first and still writes its
+    # reports; the job-level kill would lose them.
+    timeout-minutes: 45
+    # Non-blocking while the suite is still red: the run step below now fails
+    # honestly on test failures. Drop this once the E2E suite is green.
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -248,19 +253,6 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build application
-        run: |
-          pnpm prisma generate
-          pnpm exec next build
-        env:
-          NODE_OPTIONS: '--max-old-space-size=6144'
-          SKIP_TYPECHECK: 'true'
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
-          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
-          NEXT_PUBLIC_SANITY_DATASET: test
 
       - name: Validate GitHub Secrets
         id: check-secrets
@@ -320,19 +312,27 @@ jobs:
           echo "✅ All required secrets are configured"
           echo "secrets_configured=true" >> $GITHUB_OUTPUT
 
+      # Playwright serves this build with `next start` in CI (see
+      # playwright.config.ts webServer). NEXT_PUBLIC_* values are inlined at
+      # build time, so the build must see the REAL test project, not fakes.
+      - name: Build application
+        if: steps.check-secrets.outputs.secrets_configured == 'true'
+        run: pnpm exec next build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
+          SKIP_TYPECHECK: 'true'
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
+          NEXT_PUBLIC_SANITY_DATASET: test
+
+      # No shell timeout and no `|| exit 0`: Playwright's CI globalTimeout ends
+      # the run gracefully (reports still written), and a failing suite shows
+      # red. The job stays non-blocking via job-level continue-on-error.
       - name: Run E2E tests
         if: steps.check-secrets.outputs.secrets_configured == 'true'
-        run: |
-          timeout 1080 pnpm test:e2e || {
-            EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⚠️  E2E tests timed out after 18 minutes"
-              echo "This is non-blocking but should be investigated"
-              exit 0
-            fi
-            echo "E2E tests completed with exit code: $EXIT_CODE"
-            exit 0
-          }
+        run: pnpm test:e2e
         env:
           CI: true
           # Supabase Test Project (use secrets directly)
@@ -348,6 +348,9 @@ jobs:
           TEST_DRIVER_PASSWORD: ${{ secrets.TEST_DRIVER_PASSWORD }}
           TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          # Optional: softDelete.spec.ts super-admin tests skip when unset.
+          TEST_SUPER_ADMIN_EMAIL: ${{ secrets.TEST_SUPER_ADMIN_EMAIL }}
+          TEST_SUPER_ADMIN_PASSWORD: ${{ secrets.TEST_SUPER_ADMIN_PASSWORD }}
 
       - name: E2E Tests Skipped
         if: steps.check-secrets.outputs.secrets_configured != 'true'

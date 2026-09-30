@@ -12,35 +12,12 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-// Test configuration
-const TEST_USER = {
-  email: 'emmanuel@alanis.dev',
-  password: 'Spark2026@',
-};
-
 /**
- * Helper function to login and navigate to the admin demo calculator
+ * Navigate to the admin demo calculator. The admin session comes from the
+ * storageState saved by e2e/auth/setup.ts (TEST_ADMIN_* env), so there is no
+ * UI login here and no credentials in this file.
  */
-async function loginAndNavigateToAdminDemoCalculator(page: Page): Promise<void> {
-  // Navigate to sign-in page
-  await page.goto('/sign-in');
-
-  // Wait for the form to be ready
-  await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 15000 });
-
-  // Fill in credentials
-  await page.fill('input[name="email"], input[type="email"]', TEST_USER.email);
-  await page.fill('input[name="password"], input[type="password"]', TEST_USER.password);
-
-  // Submit form
-  await page.click('button[type="submit"]');
-
-  // Wait for successful authentication
-  await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
-    timeout: 30000,
-  });
-
-  // Navigate to admin demo calculator
+async function navigateToAdminDemoCalculator(page: Page): Promise<void> {
   await page.goto('/admin/calculator/demo');
 
   // Wait for the calculator to load
@@ -48,11 +25,13 @@ async function loginAndNavigateToAdminDemoCalculator(page: Page): Promise<void> 
 }
 
 test.describe('Admin Demo Calculator', () => {
-  // Increase timeout for these tests since login takes time
+  // Signed in as the TEST_ADMIN user via the session saved by global setup.
+  test.use({ storageState: 'e2e/.auth/admin.json' });
+
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page }) => {
-    await loginAndNavigateToAdminDemoCalculator(page);
+    await navigateToAdminDemoCalculator(page);
   });
 
   test('1. Calculator page loads successfully with authentication', async ({ page }) => {
