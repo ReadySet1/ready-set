@@ -20,6 +20,11 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 // Reuse the driver session created by e2e/auth/setup.ts
 test.use({ storageState: 'e2e/.auth/driver.json' });
 
+// Every test here drives the same shared driver account's shift, so run them
+// in order in one worker. 'default' (not 'serial') keeps later tests running
+// after a failure.
+test.describe.configure({ mode: 'default' });
+
 // The driver portal acquires geolocation, loads shift state, and (on a dev
 // server) cold-compiles routes on first hit — give each test headroom beyond
 // the default 30s so the settle waits don't collide with the test timeout.

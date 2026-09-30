@@ -11,8 +11,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only - reduced from 2 to 1 to save time */
   retries: process.env.CI ? 1 : 0,
-  /* Optimize workers for CI - increased from 1 to 2 for better performance */
-  workers: process.env.CI ? 2 : undefined,
+  /* CI serves a production build, so 4 workers (one per runner vCPU) fit.
+   * Specs that mutate shared account state run in order via
+   * test.describe.configure({ mode: 'default' }). */
+  workers: process.env.CI ? 4 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters
    * CI writes html + json so a report exists even when the run is cut short
    * by globalTimeout. The JSON goes to test-results/ because the html
