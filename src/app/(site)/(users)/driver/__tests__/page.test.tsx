@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
 import DriverPage from '../page';
@@ -40,9 +40,27 @@ jest.mock('@/components/Driver/DriverDeliveryList', () => ({
   DriverDeliveryList: () => <div data-testid="driver-delivery-list" />,
 }));
 jest.mock('@/components/Driver/ui/DriverProfileSheet', () => ({
-  DriverProfileSheet: ({ driverName }: { driverName: string }) => (
-    <div data-testid="driver-profile-sheet">{driverName}</div>
+  DriverProfileSheet: ({
+    driverName,
+    onSignOut,
+  }: {
+    driverName: string;
+    onSignOut: () => void;
+  }) => (
+    <div data-testid="driver-profile-sheet">
+      {driverName}
+      <button type="button" onClick={onSignOut}>
+        Sign out
+      </button>
+    </div>
   ),
+}));
+
+// Sign-out goes through the shared helper (server cookie clear + a
+// never-redirecting destination inside the native shell).
+const mockPerformSignOut = jest.fn();
+jest.mock('@/lib/auth/sign-out', () => ({
+  performSignOut: (...args: unknown[]) => mockPerformSignOut(...args),
 }));
 
 const mockProfileResponse = {
@@ -192,6 +210,20 @@ describe('DriverPage (redesigned home)', () => {
       });
       // The driver-record lookup only fed the removed stats panel.
       expect(global.fetch).not.toHaveBeenCalledWith('/api/tracking/drivers?limit=1');
+    });
+  });
+
+  describe('sign out', () => {
+    it('signs out through the shared helper and runs the UserContext logout as cleanup', async () => {
+      const user = mockAuthenticatedUser({ role: UserType.DRIVER, name: 'John Driver' });
+      renderPage(<DriverPage />, { user });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+      await waitFor(() => expect(mockPerformSignOut).toHaveBeenCalledTimes(1));
+      const [{ cleanup }] = mockPerformSignOut.mock.calls[0];
+      await cleanup();
+      expect(user.logout).toHaveBeenCalledTimes(1);
     });
   });
 
