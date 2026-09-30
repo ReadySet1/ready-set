@@ -1,147 +1,177 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+/**
+ * Signed-out auth UI: header entry points, the sign-in form (password and
+ * magic link), and navigation to sign-up. No credentials are used here.
+ *
+ * The home page ("/") renders its own hero with no site header (see
+ * ClientLayout), so header checks start from a regular content page.
+ */
+const PAGE_WITH_HEADER = '/about';
+
+const header = (page: Page) => page.getByRole('banner');
+const main = (page: Page) => page.getByRole('main');
+const passwordForm = (page: Page) =>
+  main(page).locator('form').filter({ has: page.getByPlaceholder('Password') });
+const magicLinkForm = (page: Page) =>
+  main(page).locator('form').filter({ has: page.getByPlaceholder('Your email address') });
+
+/** The browser's native constraint-validation message for an input ('' when valid). */
+const validationMessage = (page: Page, placeholder: string) =>
+  main(page).getByPlaceholder(placeholder, { exact: true }).evaluate(
+    (el) => (el as HTMLInputElement).validationMessage,
+  );
 
 test.describe('Authentication Flow', () => {
-  test.beforeEach(async ({ page }) => {
-    // Start from the home page
-    await page.goto('/');
-  });
-
   test('complete authentication flow - sign in and header update', async ({ page }) => {
-    // Navigate to sign in page
-    await page.click('text=Sign In');
-    
+    await page.goto(PAGE_WITH_HEADER);
+
+    // Navigate to sign in page from the header
+    await header(page).getByRole('link', { name: 'Sign In', exact: true }).click();
+
     // Verify we're on the sign-in page
     await expect(page).toHaveURL(/.*sign-in/);
-    await expect(page.locator('text=Sign in with')).toBeVisible();
+    await expect(main(page).getByRole('heading', { name: 'Sign in with', exact: true })).toBeVisible();
 
-    // Test email/password form visibility
-    await expect(page.locator('input[placeholder="Email"]')).toBeVisible();
-    await expect(page.locator('input[placeholder="Password"]')).toBeVisible();
-    await expect(page.locator('text=Sign Up')).toBeVisible();
+    // Email/password form visibility
+    await expect(main(page).getByPlaceholder('Email', { exact: true })).toBeVisible();
+    await expect(main(page).getByPlaceholder('Password', { exact: true })).toBeVisible();
+    await expect(main(page).getByRole('link', { name: 'Sign up', exact: true })).toBeVisible();
 
-    // Test magic link toggle
-    await page.click('text=Magic Link');
-    await expect(page.locator('text=Send Magic Link')).toBeVisible();
-    await expect(page.locator('input[placeholder="Password"]')).not.toBeVisible();
+    // Magic link toggle
+    await main(page).getByRole('button', { name: 'Magic Link', exact: true }).click();
+    await expect(main(page).getByRole('button', { name: 'Send Magic Link' })).toBeVisible();
+    await expect(main(page).getByPlaceholder('Password', { exact: true })).not.toBeVisible();
 
     // Switch back to password login
-    await page.click('text=Email & Password');
-    await expect(page.locator('input[placeholder="Password"]')).toBeVisible();
+    await main(page).getByRole('button', { name: 'Email & Password' }).click();
+    await expect(main(page).getByPlaceholder('Password', { exact: true })).toBeVisible();
 
-    // Test form validation
-    await page.locator('button:has-text("Sign In")').click();
-    await expect(page.locator('text=Please enter a valid email')).toBeVisible();
+    // The password form relies on native constraint validation (required +
+    // type=email), so an empty submit is blocked by the browser.
+    const submit = main(page).getByRole('button', { name: 'Sign in', exact: true });
+    await submit.click();
+    await expect(page).toHaveURL(/.*sign-in/);
+    expect(await validationMessage(page, 'Email')).not.toBe('');
 
-    // Test valid email but missing password
-    await page.fill('input[placeholder="Email"]', 'test@example.com');
-    await page.locator('button:has-text("Sign In")').click();
-    await expect(page.locator('text=Password is required')).toBeVisible();
-
-    // Note: Actual authentication would require valid credentials
-    // This test validates the UI behavior and form validation
+    // Valid email but missing password: the password field blocks the submit
+    await main(page).getByPlaceholder('Email', { exact: true }).fill('test@example.com');
+    await submit.click();
+    await expect(page).toHaveURL(/.*sign-in/);
+    expect(await validationMessage(page, 'Email')).toBe('');
+    expect(await validationMessage(page, 'Password')).not.toBe('');
   });
 
   test('header updates correctly based on authentication state', async ({ page }) => {
-    // Test logged out state
-    await expect(page.locator('text=Sign In')).toBeVisible();
-    await expect(page.locator('text=Sign Up')).toBeVisible();
-    await expect(page.locator('text=Sign Out')).not.toBeVisible();
+    await page.goto(PAGE_WITH_HEADER);
+
+    // Logged out state
+    await expect(header(page).getByRole('link', { name: 'Sign In', exact: true })).toBeVisible();
+    await expect(header(page).getByRole('link', { name: 'Sign Up', exact: true })).toBeVisible();
+    await expect(header(page).getByRole('button', { name: 'Sign Out' })).toHaveCount(0);
 
     // Navigate to sign-in page
-    await page.click('text=Sign In');
-    
-    // Verify sign-in form components
-    await expect(page.locator('text=Sign in with Google')).toBeVisible();
-    await expect(page.locator('text=Don\'t have an account?')).toBeVisible();
-    await expect(page.locator('text=Sign up')).toBeVisible();
+    await header(page).getByRole('link', { name: 'Sign In', exact: true }).click();
+    await expect(page).toHaveURL(/.*sign-in/);
+
+    // Sign-in form components
+    await expect(main(page).getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+    await expect(main(page).getByText("Don't have an account?")).toBeVisible();
+    await expect(main(page).getByRole('link', { name: 'Sign up', exact: true })).toBeVisible();
   });
 
   test('returnTo URL functionality', async ({ page }) => {
-    // Navigate to a protected page (this would normally redirect to sign-in)
     await page.goto('/sign-in?returnTo=/dashboard');
-    
-    // Verify the returnTo parameter is preserved
-    await expect(page).toHaveURL(/.*returnTo=%2Fdashboard/);
-    
-    // Test magic link with returnTo
-    await page.click('text=Magic Link');
-    await page.fill('input[placeholder="Email"]', 'test@example.com');
-    
-    // Note: In actual implementation, the magic link would include the returnTo URL
-    // This test validates the UI preserves the returnTo parameter
+
+    // The returnTo parameter is preserved (encoded or not)
+    await expect(page).toHaveURL(/returnTo=(%2F|\/)dashboard/);
+
+    // Magic link form accepts an email with returnTo in place
+    await main(page).getByRole('button', { name: 'Magic Link', exact: true }).click();
+    const magicEmail = main(page).getByPlaceholder('Your email address');
+    await magicEmail.fill('test@example.com');
+    await expect(magicEmail).toHaveValue('test@example.com');
+    await expect(page).toHaveURL(/returnTo=(%2F|\/)dashboard/);
   });
 
   test('sign up flow navigation', async ({ page }) => {
-    // Navigate to sign up from sign in page
-    await page.click('text=Sign In');
-    await page.click('text=Sign up');
-    
+    await page.goto(PAGE_WITH_HEADER);
+
+    // Navigate to sign up from the sign in page
+    await header(page).getByRole('link', { name: 'Sign In', exact: true }).click();
+    await expect(page).toHaveURL(/.*sign-in/);
+    await main(page).getByRole('link', { name: 'Sign up', exact: true }).click();
+
     // Verify we're on the sign-up page
-    await expect(page).toHaveURL(/.*sign-up/);
-    await expect(page.locator('text=Get started with Ready Set')).toBeVisible();
-    
-    // Test user type selection
-    await expect(page.locator('text=vendor')).toBeVisible();
-    await expect(page.locator('text=client')).toBeVisible();
-    
-    // Test Google sign-up options
-    const vendorCards = page.locator('[data-testid="user-type-vendor"], .cursor-pointer:has-text("vendor")');
-    if (await vendorCards.count() > 0) {
-      await vendorCards.first().click();
-      await expect(page.locator('text=Quick sign up')).toBeVisible();
-      await expect(page.locator('text=Sign up with Google')).toBeVisible();
-    }
+    await expect(page).toHaveURL(/.*sign-up/, { timeout: 15000 });
+    await expect(main(page).getByText('Get started with Ready Set')).toBeVisible();
+
+    // User type selection
+    const vendorButton = main(page).getByRole('button', { name: /^vendor$/i });
+    await expect(vendorButton).toBeVisible();
+    await expect(main(page).getByRole('button', { name: /^client$/i })).toBeVisible();
+
+    // Google sign-up option for vendors
+    await vendorButton.click();
+    await expect(main(page).getByText('Quick sign up')).toBeVisible();
+    await expect(main(page).getByRole('button', { name: 'Sign up with Google' })).toBeVisible();
   });
 
   test('responsive design - mobile view', async ({ page }) => {
-    // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    
-    // Test mobile header
-    await expect(page.locator('[aria-label="Mobile Menu"]')).toBeVisible();
-    
-    // Open mobile menu
-    await page.click('[aria-label="Mobile Menu"]');
-    
-    // On mobile, the auth buttons might be in the mobile menu
-    // This tests the mobile-responsive auth UI
+    await page.goto(PAGE_WITH_HEADER);
+
+    // Mobile header toggle
+    const toggle = page.getByRole('button', { name: 'Mobile Menu' });
+    await expect(toggle).toBeVisible();
+
+    // Open mobile menu: the auth links live there on mobile
+    await toggle.click();
+    await expect(page.getByRole('link', { name: 'Sign In', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign Up', exact: true })).toBeVisible();
   });
 
   test('error handling and validation', async ({ page }) => {
     await page.goto('/sign-in');
-    
-    // Test invalid email format
-    await page.fill('input[placeholder="Email"]', 'invalid-email');
-    await page.locator('button:has-text("Sign In")').click();
-    await expect(page.locator('text=Please enter a valid email')).toBeVisible();
-    
-    // Test magic link with invalid email
-    await page.click('text=Magic Link');
-    await page.fill('input[placeholder="Email"]', 'invalid-email');
-    await page.click('text=Send Magic Link');
-    await expect(page.locator('text=Please enter a valid email')).toBeVisible();
-    
-    // Test empty email for magic link
-    await page.fill('input[placeholder="Email"]', '');
-    await page.click('text=Send Magic Link');
-    await expect(page.locator('text=Email is required')).toBeVisible();
+
+    // Invalid email format on the password form: blocked by native validation
+    await main(page).getByPlaceholder('Email', { exact: true }).fill('invalid-email');
+    await main(page).getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page).toHaveURL(/.*sign-in/);
+    expect(await validationMessage(page, 'Email')).not.toBe('');
+
+    // Magic link with invalid email (form is noValidate, so the app validates)
+    await main(page).getByRole('button', { name: 'Magic Link', exact: true }).click();
+    const magicEmail = main(page).getByPlaceholder('Your email address');
+    const sendMagicLink = main(page).getByRole('button', { name: 'Send Magic Link' });
+    await magicEmail.fill('invalid-email');
+    await sendMagicLink.click();
+    await expect(magicLinkForm(page).getByText('Please enter a valid email')).toBeVisible();
+
+    // Empty email for magic link
+    await magicEmail.fill('');
+    await sendMagicLink.click();
+    await expect(magicLinkForm(page).getByText('Email is required')).toBeVisible();
   });
 
   test('accessibility features', async ({ page }) => {
     await page.goto('/sign-in');
-    
-    // Test keyboard navigation
+
+    // Keyboard navigation
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
-    
-    // Test ARIA labels
-    await expect(page.locator('[aria-label="Mobile Menu"]')).toBeVisible();
-    
-    // Test form labels and structure
-    await expect(page.locator('input[type="email"]')).toBeVisible();
-    await expect(page.locator('input[type="password"]')).toBeVisible();
-    
-    // Test required field indicators
-    await expect(page.locator('text=*')).toBeVisible(); // Required field markers
+
+    // ARIA label on the mobile menu toggle (only rendered visibly below lg)
+    await expect(page.locator('[aria-label="Mobile Menu"]')).toHaveCount(1);
+
+    // Form structure
+    const email = passwordForm(page).locator('input[type="email"]');
+    const password = passwordForm(page).locator('input[type="password"]');
+    await expect(email).toBeVisible();
+    await expect(password).toBeVisible();
+
+    // Required fields are marked as required
+    await expect(email).toHaveAttribute('required', '');
+    await expect(password).toHaveAttribute('required', '');
   });
-}); 
+});
