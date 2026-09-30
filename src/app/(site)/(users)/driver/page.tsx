@@ -11,8 +11,7 @@ import {
 } from "lucide-react";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { useUser } from "@/contexts/UserContext";
-import { clearAuthCookies } from "@/utils/auth/cookies";
-import { createClient } from "@/utils/supabase/client";
+import { performSignOut } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
 import {
   DriverCard,
@@ -25,7 +24,6 @@ import { useDriverDeliveriesFeed } from "@/hooks/driver/useDriverDeliveriesFeed"
 
 export default function DriverHomePage() {
   const { logout } = useUser();
-  const supabase = createClient();
   const { isShiftActive, currentShift } = useDriverTracking();
 
   // Single source for the deliveries list AND the "N active" count below, so
@@ -88,17 +86,9 @@ export default function DriverHomePage() {
     ? Math.floor((now.getTime() - new Date(currentShift.startTime).getTime()) / 1000)
     : 0;
 
-  const handleSignOut = async () => {
-    try {
-      clearAuthCookies();
-      await supabase.auth.signOut();
-      await logout?.();
-    } catch (err) {
-      console.error("Error signing out:", err);
-    } finally {
-      window.location.href = "/sign-in";
-    }
-  };
+  // Server cookie clear + a never-redirecting destination inside the native
+  // shell (a 307 on a top-level WKWebView load bounces the driver to Safari).
+  const handleSignOut = () => performSignOut({ cleanup: () => logout?.() });
 
   const header = (
     <div className="flex items-start gap-3">
