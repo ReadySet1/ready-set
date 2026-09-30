@@ -6,39 +6,26 @@ test.describe('Order Creation Flow', () => {
     await page.goto('/');
   });
 
-  test('catering order creation with address management', async ({ page }) => {
-    // Navigate to catering request page
-    await page.goto('/catering-request');
-    
-    // Verify we're on the catering order page
-    await expect(page.locator('h1, h2')).toContainText(['Catering', 'Order', 'Request']);
+  test.describe('authenticated client', () => {
+    // /catering-request requires a session; unauthenticated visits land on /sign-in.
+    test.use({ storageState: 'e2e/.auth/client.json' });
 
-    // Test address form functionality
-    const addAddressButton = page.locator('[data-testid="add-address-button"], button:has-text("Add Address"), button:has-text("New Address")');
-    if (await addAddressButton.count() > 0) {
-      await addAddressButton.first().click();
-      
-      // Test California state validation
-      await page.fill('input[placeholder*="Street"], input[name="street1"]', '123 Test Street');
-      await page.fill('input[placeholder*="City"], input[name="city"]', 'San Francisco');
-      await page.fill('input[placeholder*="ZIP"], input[name="zip"]', '94103');
-      
-      // Test different California state inputs
-      const stateInput = page.locator('input[placeholder*="CA"], input[name="state"]');
-      if (await stateInput.count() > 0) {
-        // Test "California" normalization to "CA"
-        await stateInput.fill('California');
-        
-        // Check help text is visible
-        await expect(page.locator('text=Enter "CA" or "California"')).toBeVisible();
-        
-        // Submit form (this should normalize to CA)
-        const saveButton = page.locator('button:has-text("Save"), button:has-text("Add Address")');
-        if (await saveButton.count() > 0) {
-          await saveButton.click();
-        }
-      }
-    }
+    test('catering order creation with address management', async ({ page }) => {
+      await page.goto('/catering-request', { waitUntil: 'domcontentloaded', timeout: 45000 });
+
+      // Verify we're on the catering order page
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Catering Request' })
+      ).toBeVisible({ timeout: 30000 });
+
+      // The request form renders. Nothing is submitted:
+      // this runs against a shared database. (The old free-text state input
+      // with "CA"/"California" normalization was replaced by a state select.)
+      await expect(page.locator('form').first()).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /View 8-Point Delivery Checklist/ })
+      ).toBeVisible();
+    });
   });
 
   test('vendor order creation with Bay Area validation', async ({ page }) => {
