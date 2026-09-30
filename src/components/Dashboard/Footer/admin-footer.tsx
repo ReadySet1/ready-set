@@ -8,12 +8,11 @@ interface AdminFooterProps {
 }
 
 export function AdminFooter({ className }: AdminFooterProps) {
-  // Filter out the main navigation links we want in the footer
+  // Main menu minus Home, and minus links that already have their own column
+  // (Resources: /free-resources + /blog; Contact Us: /contact)
+  const excludedPaths = new Set(["/", "/blog", "/free-resources", "/contact"]);
   const footerLinks = menuData.filter(
-    (item: MenuItem) => 
-      item.id !== 7 && // Remove Sign In
-      item.id !== 8 && // Remove Sign Up
-      item.id !== 1    // Remove Home
+    (item: MenuItem) => !excludedPaths.has(item.path ?? ""),
   );
 
   return (
@@ -78,14 +77,6 @@ export function AdminFooter({ className }: AdminFooterProps) {
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Contact Form
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/help"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Help Center
                 </Link>
               </li>
             </ul>
