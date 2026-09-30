@@ -12,8 +12,8 @@
 import { test, expect, Page } from '@playwright/test';
 
 test.describe('Edit Order Flow', () => {
-  // Skip auth setup if global setup handles it
-  test.use({ storageState: '.auth/admin.json' });
+  // Admin session saved by global setup (paths resolve from the repo root).
+  test.use({ storageState: 'e2e/.auth/admin.json' });
 
   test.beforeEach(async ({ page }) => {
     // Navigate to the admin orders page
