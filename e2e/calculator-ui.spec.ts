@@ -40,15 +40,24 @@ test.describe('Calculator UI Loading Verification', () => {
 
   // Store console errors to check at the end of each test
   let consoleErrors: string[] = [];
+  // "Failed to load resource" console errors carry no URL, so record the
+  // failing responses too and print them when the console check fails.
+  let failedResponses: string[] = [];
 
   test.beforeEach(async ({ page }) => {
     // Reset console errors array
     consoleErrors = [];
+    failedResponses = [];
 
     // Capture console errors
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         consoleErrors.push(msg.text());
+      }
+    });
+    page.on('response', (response) => {
+      if (response.status() >= 400) {
+        failedResponses.push(`${response.status()} ${response.request().method()} ${response.url()}`);
       }
     });
 
@@ -118,8 +127,12 @@ test.describe('Calculator UI Loading Verification', () => {
     // Assert no critical console errors
     if (criticalErrors.length > 0) {
       console.log('Console errors found:', criticalErrors);
+      console.log('Failed responses:', failedResponses);
     }
-    expect(criticalErrors).toHaveLength(0);
+    expect(
+      criticalErrors,
+      `console errors: ${JSON.stringify(criticalErrors)}; failed responses: ${JSON.stringify(failedResponses)}`,
+    ).toHaveLength(0);
   });
 
   test('4. All input fields render correctly', async ({ page }) => {
@@ -358,7 +371,7 @@ test.describe('Calculator UI Loading Verification', () => {
     await expect(page.locator('text=Ready to Calculate')).not.toBeVisible({ timeout: 5000 });
 
     // Check for result sections
-    const driverPaymentsSection = page.locator('text=Driver Payments');
+    const driverPaymentsSection = page.getByText('Driver Payments', { exact: true });
     await expect(driverPaymentsSection).toBeVisible({ timeout: 5000 });
 
     // Verify total value is displayed
@@ -496,7 +509,7 @@ test.describe('Calculator UI Loading Verification', () => {
       await expect(page.locator('text=Ready to Calculate')).not.toBeVisible({ timeout: 5000 });
 
       // Check for driver payments section
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
     } else {
       // CaterValley not in database yet - this is OK for now
       // Close dropdown and log
@@ -550,7 +563,7 @@ test.describe('Calculator UI Loading Verification', () => {
       await resultsTab.click();
 
       // Verify calculation results are displayed
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
 
       // Check for the configuration name in results
       // The results should reflect CaterValley pricing
@@ -622,7 +635,7 @@ test.describe('Ready Set Flat Fee Pricing Verification', () => {
       await resultsTab.click();
 
       // Verify calculation results are displayed
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
 
       // The flat fee for tier 2 should be $70
       // Check the results content contains reasonable values
@@ -670,7 +683,7 @@ test.describe('Ready Set Flat Fee Pricing Verification', () => {
       // Go to Results and note the total
       const resultsTab = page.locator('[role="tab"]:has-text("Results")');
       await resultsTab.click();
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
       const result5Miles = await page.textContent('[role="tabpanel"]');
 
       // Go back to Input and test with 10 miles
@@ -730,7 +743,7 @@ test.describe('Ready Set Flat Fee Pricing Verification', () => {
       await resultsTab.click();
 
       // Verify calculation results are displayed
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
 
       // The results should show mileage charge
       // For tier 3 (headcount 50-74, food $600-899): flat fee $90 + 5 miles × $3 = $105 total delivery
@@ -780,7 +793,7 @@ test.describe('Ready Set Flat Fee Pricing Verification', () => {
       await resultsTab.click();
 
       // Verify calculation results are displayed
-      await expect(page.locator('text=Driver Payments')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Driver Payments', { exact: true })).toBeVisible({ timeout: 5000 });
 
       // HY Food Company should use the same flat fee pricing as Ready Set
       const resultsContent = await page.textContent('[role="tabpanel"]');
