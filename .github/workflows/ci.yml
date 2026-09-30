@@ -132,45 +132,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-jest-
 
-      - name: Run unit tests with threshold check
+      - name: Run unit tests
         run: |
-          # Run tests and capture JSON output
+          # `|| true` only so the JSON summary is always written; the gate is
+          # the explicit check below. Any failed test or crashed suite fails
+          # the job. (The old 95% pass-rate threshold let ~460 failures
+          # through; 7 real failures sat hidden in brokerSyncService.test.ts.)
           pnpm test:ci --json --outputFile=jest-results.json --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit || true
 
-          # Extract test results
-          if [ -f jest-results.json ]; then
-            PASSED=$(jq '.numPassedTests // 0' jest-results.json)
-            FAILED=$(jq '.numFailedTests // 0' jest-results.json)
-            PENDING=$(jq '.numPendingTests // 0' jest-results.json)
-            TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
-
-            # Calculate run tests (excluding skipped/pending)
-            RUN_TESTS=$((PASSED + FAILED))
-
-            if [ "$RUN_TESTS" -gt 0 ]; then
-              PASS_RATE=$(echo "scale=2; $PASSED * 100 / $RUN_TESTS" | bc)
-              echo "📊 Pass rate: $PASS_RATE% ($PASSED/$RUN_TESTS executed tests)"
-              echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING"
-
-              # REA-285: Threshold enforced at 95%
-              THRESHOLD=95
-              if (( $(echo "$PASS_RATE < $THRESHOLD" | bc -l) )); then
-                echo "❌ Pass rate ${PASS_RATE}% is below ${THRESHOLD}% threshold"
-                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
-                echo "THRESHOLD=$THRESHOLD" >> $GITHUB_ENV
-                exit 1
-              else
-                echo "✅ Pass rate ${PASS_RATE}% meets ${THRESHOLD}% threshold"
-                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
-              fi
-            else
-              echo "⚠️  No tests found or tests failed to run"
-              exit 1
-            fi
-          else
-            echo "⚠️  jest-results.json not found - tests may have crashed"
+          if [ ! -f jest-results.json ]; then
+            echo "❌ jest-results.json not found - tests may have crashed"
             exit 1
           fi
+
+          PASSED=$(jq '.numPassedTests // 0' jest-results.json)
+          FAILED=$(jq '.numFailedTests // 0' jest-results.json)
+          PENDING=$(jq '.numPendingTests // 0' jest-results.json)
+          TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
+          BROKEN_SUITES=$(jq '.numRuntimeErrorTestSuites // 0' jest-results.json)
+          echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING | Suites that failed to run: $BROKEN_SUITES"
+
+          if [ "$((PASSED + FAILED))" -eq 0 ]; then
+            echo "❌ No tests ran"
+            exit 1
+          fi
+          if [ "$FAILED" -gt 0 ] || [ "$BROKEN_SUITES" -gt 0 ]; then
+            echo "❌ Failing tests:"
+            jq -r '.testResults[] | select(.status == "failed") | "  - \(.name)"' jest-results.json
+            exit 1
+          fi
+          echo "✅ All $PASSED executed tests passed"
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
@@ -216,7 +207,7 @@ jobs:
             echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
             echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
             echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🎯 Threshold | 95% |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Gate | 0 failures |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -298,6 +289,21 @@ jobs:
           if [ -z "${{ secrets.TEST_VENDOR_PASSWORD }}" ]; then
             MISSING_SECRETS+=("TEST_VENDOR_PASSWORD")
           fi
+          # e2e/auth/setup.ts also requires driver + admin logins. Without
+          # these checks the global setup crashed and `|| exit 0` hid it: no
+          # E2E test has actually run in CI.
+          if [ -z "${{ secrets.TEST_DRIVER_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_DRIVER_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_DRIVER_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_DRIVER_PASSWORD")
+          fi
+          if [ -z "${{ secrets.TEST_ADMIN_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_ADMIN_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_ADMIN_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_ADMIN_PASSWORD")
+          fi
 
           if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
             echo "⚠️  WARNING: Missing required GitHub secrets (E2E tests will be skipped):"
@@ -338,7 +344,11 @@ jobs:
           TEST_CLIENT_PASSWORD: ${{ secrets.TEST_CLIENT_PASSWORD }}
           TEST_VENDOR_EMAIL: ${{ secrets.TEST_VENDOR_EMAIL }}
           TEST_VENDOR_PASSWORD: ${{ secrets.TEST_VENDOR_PASSWORD }}
-      
+          TEST_DRIVER_EMAIL: ${{ secrets.TEST_DRIVER_EMAIL }}
+          TEST_DRIVER_PASSWORD: ${{ secrets.TEST_DRIVER_PASSWORD }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+
       - name: E2E Tests Skipped
         if: steps.check-secrets.outputs.secrets_configured != 'true'
         run: |
