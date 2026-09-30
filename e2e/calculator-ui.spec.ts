@@ -16,36 +16,12 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-// Test configuration
-const TEST_USER = {
-  email: 'emmanuel@alanis.dev',
-  password: 'Spark2026@',
-};
-
 /**
- * Helper function to login and navigate to the calculator
+ * Navigate to the calculator. The admin session comes from the storageState
+ * saved by e2e/auth/setup.ts (TEST_ADMIN_* env), so there is no UI login here
+ * and no credentials in this file.
  */
-async function loginAndNavigateToCalculator(page: Page): Promise<void> {
-  // Navigate to sign-in page
-  await page.goto('/sign-in');
-
-  // Wait for the form to be ready
-  await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 15000 });
-
-  // Fill in credentials
-  await page.fill('input[name="email"], input[type="email"]', TEST_USER.email);
-  await page.fill('input[name="password"], input[type="password"]', TEST_USER.password);
-
-  // Submit form
-  await page.click('button[type="submit"]');
-
-  // Wait for successful authentication (redirect to an authenticated route)
-  // Don't use networkidle as it may never fire due to realtime connections
-  await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
-    timeout: 30000,
-  });
-
-  // Navigate to calculator
+async function navigateToCalculator(page: Page): Promise<void> {
   await page.goto('/admin/calculator');
 
   // Wait for the page to load by checking for key elements
@@ -56,8 +32,10 @@ async function loginAndNavigateToCalculator(page: Page): Promise<void> {
   ]);
 }
 
+// Every test in this file runs as the TEST_ADMIN user.
+test.use({ storageState: 'e2e/.auth/admin.json' });
+
 test.describe('Calculator UI Loading Verification', () => {
-  // Increase timeout for these tests since login takes time
   test.setTimeout(60000);
 
   // Store console errors to check at the end of each test
@@ -74,8 +52,7 @@ test.describe('Calculator UI Loading Verification', () => {
       }
     });
 
-    // Login and navigate to calculator
-    await loginAndNavigateToCalculator(page);
+    await navigateToCalculator(page);
   });
 
   test('1. Calculator page loads successfully', async ({ page }) => {
@@ -590,7 +567,6 @@ test.describe('Calculator UI Loading Verification', () => {
 });
 
 test.describe('Ready Set Flat Fee Pricing Verification', () => {
-  // Increase timeout for these tests since login takes time
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page }) => {
@@ -601,8 +577,7 @@ test.describe('Ready Set Flat Fee Pricing Verification', () => {
       }
     });
 
-    // Login and navigate to calculator
-    await loginAndNavigateToCalculator(page);
+    await navigateToCalculator(page);
   });
 
   test('13. Ready Set Food config uses flat fee pricing', async ({ page }) => {

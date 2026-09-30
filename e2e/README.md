@@ -102,11 +102,11 @@ test.withRole('my test', async ({ authenticatedPage, role }) => {
 
 Test data is managed through:
 - **Setup Script**: `e2e/test-data-setup.ts` creates test users and data
-- **Test Users**:
-  - `test-client@example.com` (CLIENT role) — password `TestPassword123!`
-  - `test-vendor@example.com` (VENDOR role) — password `TestPassword123!`
-  - `driver.test@example.com` (DRIVER role) — password `TestDriver123!`
-  - `admin.test@example.com` (ADMIN role) — password `TestAdmin123!`
+- **Test Users** (passwords live only in `.env.test` / CI secrets as `TEST_*_PASSWORD`):
+  - `test-client@example.com` (CLIENT role)
+  - `test-vendor@example.com` (VENDOR role)
+  - `driver.test@example.com` (DRIVER role)
+  - `admin.test@example.com` (ADMIN role)
 - **Seeded driver delivery**: `createDriverDeliveryData()` assigns an active
   catering delivery to the driver so the shift-workflow specs render the
   "Active deliveries" section.
@@ -227,10 +227,23 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 
 # Test User Credentials (for authentication setup)
 TEST_CLIENT_EMAIL=test-client@example.com
-TEST_CLIENT_PASSWORD=TestPassword123!
+TEST_CLIENT_PASSWORD=<client-password>
 TEST_VENDOR_EMAIL=test-vendor@example.com
-TEST_VENDOR_PASSWORD=TestPassword123!
+TEST_VENDOR_PASSWORD=<vendor-password>
+TEST_DRIVER_EMAIL=driver.test@example.com
+TEST_DRIVER_PASSWORD=<driver-password>
+TEST_ADMIN_EMAIL=admin.test@example.com
+TEST_ADMIN_PASSWORD=<admin-password>
+
+# Optional: softDelete.spec.ts super-admin tests skip when unset
+TEST_SUPER_ADMIN_EMAIL=
+TEST_SUPER_ADMIN_PASSWORD=
 ```
+
+Specs never hardcode credentials. A spec that needs a signed-in user uses the
+session saved by global setup (`test.use({ storageState: 'e2e/.auth/admin.json' })`
+or the fixtures in `e2e/fixtures/auth.fixture.ts`). A test that must drive the
+sign-in form reads `process.env.TEST_*` and skips when it is unset.
 
 **Security Note:** Never commit `.env.test` to version control. The `.env.test.example` file is provided as a template.
 
@@ -240,11 +253,17 @@ E2E tests run automatically in CI on:
 - Pull requests to `main` or `development`
 - Pushes to `main` or `development`
 
-**CI Optimizations:**
-- Runs only Chromium (fastest browser)
-- Uses 2 parallel workers
-- 10-minute timeout (down from 20 minutes)
-- Uploads test reports and screenshots on failure
+**How the CI job runs:**
+- Builds the app once with the real test project env (`NEXT_PUBLIC_*` is inlined
+  at build time), then Playwright serves it with `pnpm start` (`next start`).
+  Locally, Playwright still starts `pnpm dev`.
+- Runs only Chromium with 2 workers
+- Playwright `globalTimeout` (25 min, CI only) ends the run gracefully so the
+  `list`, `html` and `json` (`playwright-report/results.json`) reporters still
+  write; the job limit (45 min) sits above build time + that budget
+- A failing suite marks the step red; the job is non-blocking
+  (`continue-on-error`) until the suite is green
+- Always uploads `playwright-report/` and `test-results/`
 
 ### Setting Up GitHub Secrets
 
@@ -262,9 +281,12 @@ E2E tests in CI require the following GitHub secrets. To set them up:
    | `TEST_SUPABASE_URL` | Supabase test project URL | `https://xxxxx.supabase.co` |
    | `TEST_SUPABASE_ANON_KEY` | Supabase test project anonymous key | `eyJhbGc...` (starts with eyJ) |
    | `TEST_CLIENT_EMAIL` | Test client user email | `test-client@example.com` |
-   | `TEST_CLIENT_PASSWORD` | Test client user password | `TestPassword123!` |
+   | `TEST_CLIENT_PASSWORD` | Test client user password | (secret) |
    | `TEST_VENDOR_EMAIL` | Test vendor user email | `test-vendor@example.com` |
-   | `TEST_VENDOR_PASSWORD` | Test vendor user password | `TestPassword123!` |
+   | `TEST_VENDOR_PASSWORD` | Test vendor user password | (secret) |
+   | `TEST_DRIVER_EMAIL` / `TEST_DRIVER_PASSWORD` | Test driver login | (secret) |
+   | `TEST_ADMIN_EMAIL` / `TEST_ADMIN_PASSWORD` | Test admin login | (secret) |
+   | `TEST_SUPER_ADMIN_EMAIL` / `TEST_SUPER_ADMIN_PASSWORD` | Optional super-admin login | (secret) |
 
 3. **Verify Secrets Are Set**
    - Secrets should appear in the list (values are hidden)
