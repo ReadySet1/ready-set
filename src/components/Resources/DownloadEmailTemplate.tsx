@@ -31,9 +31,9 @@ export const validateDownloadUrl = (url: string): string => {
     const allowedHosts = [
       'jdjlkt28jx.ufs.sh', // Uploadfly — static resources in Data/Resources.ts
       'cdn.sanity.io',      // Sanity file assets — guides resolved by getGuideBySlug
-    ];
+    ] as const;
 
-    if (!allowedHosts.includes(parsedUrl.hostname)) {
+    if (!(allowedHosts as readonly string[]).includes(parsedUrl.hostname)) {
       console.error(`Blocked unsafe hostname in download URL: ${parsedUrl.hostname}`);
       return '#'; // Return safe default
     }
