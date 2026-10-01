@@ -29,20 +29,25 @@ try {
 // =============================================================================
 
 /**
+ * Every label the dashboard's connection indicator can show
+ * (AdminTrackingDashboard.tsx).
+ */
+const CONNECTION_STATUS = /^(Live Data|Disconnected|SSE Fallback|Connecting\.\.\.)$/;
+
+function connectionStatus(page: Page) {
+  return page.getByText(CONNECTION_STATUS).first();
+}
+
+/**
  * Helper to wait for dashboard to fully load
  */
-async function waitForDashboardLoad(page: Page) {
-  // Wait for either the loading state to finish or the content to appear
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-  // Wait for the main tracking dashboard content
-  const dashboardLoaded = await Promise.race([
-    page.locator('text=Driver Tracking').waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-    page.locator('text=Live Data').waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-    page.locator('text=Disconnected').waitFor({ state: 'visible', timeout: 10000 }).then(() => true),
-  ]).catch(() => false);
-
-  return dashboardLoaded;
+async function waitForDashboardLoad(page: Page): Promise<boolean> {
+  // The dashboard streams and polls continuously, so 'networkidle' never
+  // settles. Wait for the connection indicator, which renders once it mounts.
+  return connectionStatus(page)
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
 }
 
 /**
@@ -104,8 +109,7 @@ test.describe('View Active Drivers', () => {
     await waitForDashboardLoad(page);
 
     // Connection status indicator should be visible
-    const connectionStatus = page.locator('text=Live Data, text=Disconnected');
-    await expect(connectionStatus.first()).toBeVisible();
+    await expect(connectionStatus(page)).toBeVisible();
 
     // Control buttons should be present
     const refreshButton = page.locator('button:has-text("Refresh")');
@@ -560,8 +564,7 @@ adminTest.describe('Authenticated Admin Monitoring', () => {
     await waitForDashboardLoad(authenticatedPage);
 
     // Verify connection status
-    const connectionStatus = authenticatedPage.locator('text=Live Data, text=Disconnected');
-    await expect(connectionStatus.first()).toBeVisible();
+    await expect(connectionStatus(authenticatedPage)).toBeVisible();
 
     // Verify dashboard components loaded
     const tabs = authenticatedPage.locator('[role="tab"]');
@@ -574,12 +577,12 @@ adminTest.describe('Authenticated Admin Monitoring', () => {
     await navigateToTab(authenticatedPage, 'drivers');
 
     // Admin should see driver search and filter controls
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search drivers"]');
-    if (await searchInput.count() > 0) {
-      await searchInput.fill('test');
-      await authenticatedPage.waitForTimeout(300);
-      await searchInput.clear();
-    }
+    const searchInput = authenticatedPage.getByPlaceholder('Search drivers...');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('test');
+    await expect(searchInput).toHaveValue('test');
+    await searchInput.clear();
+    await expect(searchInput).toHaveValue('');
   });
 
   adminTest('should manage deliveries as admin', async ({ authenticatedPage }) => {
@@ -591,9 +594,10 @@ adminTest.describe('Authenticated Admin Monitoring', () => {
     const deliveryPanel = authenticatedPage.locator('text=Delivery Management');
     await expect(deliveryPanel).toBeVisible();
 
-    // Check for available drivers section
-    const availableDrivers = authenticatedPage.locator('text=Available Drivers');
-    await expect(availableDrivers).toBeVisible();
+    // Check for available drivers section. Its title is a skeleton until the
+    // drivers query resolves, so allow for the data load.
+    const availableDrivers = authenticatedPage.getByText(/^Available Drivers \(\d+\)$/);
+    await expect(availableDrivers).toBeVisible({ timeout: 15000 });
   });
 
   adminTest('should view live map as admin', async ({ authenticatedPage }) => {
