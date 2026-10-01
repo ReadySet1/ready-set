@@ -7,11 +7,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { hasAdminRole } from "@/lib/auth/admin-role";
 import ArchiveClient from "./ArchiveClient";
-
-interface AppMetadata {
-  role?: string;
-}
 
 export default async function ArchivePage() {
   // Check authentication and authorization
@@ -24,10 +21,7 @@ export default async function ArchivePage() {
     redirect("/sign-in");
   }
 
-  const isAdmin = (user.app_metadata as AppMetadata)?.role === "admin";
-  const isSuperAdmin = (user.app_metadata as AppMetadata)?.role === "super_admin";
-
-  if (!isAdmin && !isSuperAdmin) {
+  if (!(await hasAdminRole(user.id))) {
     redirect("/admin");
   }
 

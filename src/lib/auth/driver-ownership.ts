@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { prisma } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
 import { getUserRole } from '@/lib/auth';
+import { isAdminRole } from '@/lib/auth/admin-role';
 
 /**
  * Driver ↔ auth-user linkage.
@@ -75,11 +76,6 @@ async function getActionCallerId(): Promise<string | null> {
   return user?.id ?? null;
 }
 
-function isPrivilegedRole(role: string | null | undefined): boolean {
-  const upper = role?.toUpperCase();
-  return upper === 'ADMIN' || upper === 'SUPER_ADMIN';
-}
-
 /**
  * Resolve the authenticated caller of a server action. Server actions are
  * plain POST endpoints — every action that reads or mutates driver data must
@@ -91,7 +87,7 @@ export async function getActionCaller(): Promise<ActionCaller | null> {
   if (!userId) return null;
 
   const role = await getUserRole(userId);
-  return { userId, isPrivileged: isPrivilegedRole(role) };
+  return { userId, isPrivileged: isAdminRole(role) };
 }
 
 export interface DriverActionAuthorization {
@@ -128,7 +124,7 @@ export async function authorizeDriverAction(
   );
   const [role, owned] = await Promise.all([getUserRole(userId), ownership]);
 
-  const caller: ActionCaller = { userId, isPrivileged: isPrivilegedRole(role) };
+  const caller: ActionCaller = { userId, isPrivileged: isAdminRole(role) };
   if (caller.isPrivileged) return { allowed: true, caller };
   if (!owned.ok) throw owned.error;
   return { allowed: owned.owns, caller };
