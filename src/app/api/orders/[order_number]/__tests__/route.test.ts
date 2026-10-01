@@ -928,4 +928,82 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(historyCreate).not.toHaveBeenCalled();
     });
   });
+
+  // #517 requires at least one of headcount / orderTotal when a catering order
+  // is created; an edit must not be able to restore the forbidden state.
+  describe('Catering edit keeps at least one of headcount / orderTotal', () => {
+    const PAIR_MESSAGE = 'Provide at least one: Headcount or Order Total.';
+    const params = () => Promise.resolve({ order_number: 'CAT-001' });
+
+    it('rejects clearing both headcount and orderTotal in one PATCH', async () => {
+      setupMocks({ headcount: 50, orderTotal: 250 });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(
+        createPatchRequest({ headcount: null, orderTotal: null }),
+        { params: params() },
+      );
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe(PAIR_MESSAGE);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects clearing headcount when the saved order has no orderTotal', async () => {
+      setupMocks({ headcount: 50, orderTotal: null });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ headcount: null }), { params: params() });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe(PAIR_MESSAGE);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('treats a saved $0.00 orderTotal (the column default) as missing', async () => {
+      setupMocks({ headcount: 50, orderTotal: 0 });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ headcount: null }), { params: params() });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe(PAIR_MESSAGE);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an orderTotal of 0, matching the create-time rule', async () => {
+      setupMocks({ headcount: 50, orderTotal: 250 });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ orderTotal: 0 }), { params: params() });
+
+      expect(response.status).toBe(400);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('allows clearing headcount while the order keeps an orderTotal', async () => {
+      setupMocks({ headcount: 50, orderTotal: 250 });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ headcount: null }), { params: params() });
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('does not block unrelated edits on a legacy order that already lacks both', async () => {
+      // Pre-#517 rows can hold headcount NULL + orderTotal 0.00. Editing notes on
+      // them must keep working; the rule only guards the pair when it changes.
+      setupMocks({ headcount: null, orderTotal: 0 });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(
+        createPatchRequest({ specialNotes: 'Gate code 4411' }),
+        { params: params() },
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+  });
 });

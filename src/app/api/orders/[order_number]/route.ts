@@ -12,6 +12,8 @@ import type { DeliveryStatusUpdatedPayload } from "@/lib/realtime/schemas";
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
 import {
   cateringUpdateSchema,
+  CATERING_PAIR_MESSAGE,
+  leavesCateringPairEmpty,
   onDemandUpdateSchema,
   addressUpdateSchema,
   isTerminalStatus,
@@ -559,6 +561,10 @@ export async function PATCH(
         );
       }
       validatedFields = result.data as Record<string, unknown>;
+
+      if (orderType === 'catering' && leavesCateringPairEmpty(existingOrder as any, validatedFields)) {
+        return NextResponse.json({ message: CATERING_PAIR_MESSAGE }, { status: 400 });
+      }
     }
 
     // Build the update data
