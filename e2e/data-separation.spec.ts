@@ -1,200 +1,159 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * Data separation and role-based access control for the unified dashboard.
+ *
+ * CLIENT and VENDOR users share one dashboard at /client (/vendor redirects
+ * there). The page resolves the caller server-side, titles itself by role and
+ * loads only that user's orders. Admins and drivers are bounced to their own
+ * dashboards; anonymous visitors are sent to /sign-in.
+ *
+ * Each describe block runs under the session that global setup saved for that
+ * role (e2e/.auth/<role>.json).
+ */
+
+// The dashboard title is the <h1> rendered by components/Common/Breadcrumb.
+const dashboardTitle = (page: Page) => page.getByRole('heading', { level: 1 });
+
+// Vendor-only quick action on the unified dashboard.
+const vendorEstimatorLink = (page: Page) => page.locator('a[href="/client/calculator"]');
+
+async function expectDashboardStructure(page: Page) {
+  await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recent Orders' })).toBeVisible();
+}
 
 test.describe('Data Separation and Role-Based Access Control', () => {
-  test('CLIENT role data isolation - Verify CLIENT cannot access VENDOR data', async ({ page }) => {
-    // Test that when logged in as CLIENT, user can only see CLIENT-appropriate content
-    await page.goto('/client');
+  test.describe('as CLIENT', () => {
+    test.use({ storageState: 'e2e/.auth/client.json' });
 
-    // Verify CLIENT dashboard shows correct title
-    await expect(page.locator('[data-testid="breadcrumb"]')).toContainText('Client Dashboard');
-    await expect(page.locator('[data-testid="breadcrumb"]')).not.toContainText('Vendor Dashboard');
+    test('CLIENT role data isolation - Verify CLIENT cannot access VENDOR data', async ({ page }) => {
+      await page.goto('/client');
 
-    // Verify CLIENT sees CLIENT-appropriate dashboard structure
-    await expect(page.locator('text=Active Orders')).toBeVisible();
-    await expect(page.locator('text=Recent Orders')).toBeVisible();
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+      await expect(dashboardTitle(page)).not.toContainText('Vendor');
+      await expectDashboardStructure(page);
 
-    // Test that CLIENT dashboard fetches data using their user ID only
-    // In a real implementation, this would verify API calls include the correct user ID
-
-    // Verify that CLIENT cannot navigate to vendor-specific routes
-    // (This would test that direct navigation to /vendor routes redirects or shows access denied)
-  });
-
-  test('VENDOR role data isolation - Verify VENDOR cannot access CLIENT data', async ({ page }) => {
-    // Test that when logged in as VENDOR, user can only see VENDOR-appropriate content
-    await page.goto('/client');
-
-    // Verify VENDOR dashboard shows correct title
-    await expect(page.locator('[data-testid="breadcrumb"]')).toContainText('Vendor Dashboard');
-    await expect(page.locator('[data-testid="breadcrumb"]')).not.toContainText('Client Dashboard');
-
-    // Verify VENDOR sees VENDOR-appropriate dashboard structure
-    await expect(page.locator('text=Active Orders')).toBeVisible();
-    await expect(page.locator('text=Recent Orders')).toBeVisible();
-
-    // Test that VENDOR dashboard fetches data using their user ID only
-    // In a real implementation, this would verify API calls include the correct user ID
-
-    // Verify that VENDOR cannot navigate to client-specific routes
-    // (This would test that direct navigation to /client routes redirects or shows access denied)
-  });
-
-  test('Role-based URL protection - Verify unauthorized access is prevented', async ({ page }) => {
-    // Test that users cannot access dashboards they're not authorized for
-
-    // Test accessing client dashboard without proper role
-    await page.goto('/client');
-    // Should either redirect to sign-in or show appropriate error/access denied
-
-    // Test accessing vendor dashboard without proper role
-    await page.goto('/vendor');
-    // Should either redirect to sign-in or show appropriate error/access denied
-
-    // In a real implementation, this would test that:
-    // - Unauthenticated users are redirected to sign-in
-    // - Authenticated users with wrong roles get access denied
-    // - API endpoints return 403 for unauthorized roles
-  });
-
-  test('Data filtering in shared components - Verify proper data isolation', async ({ page }) => {
-    // Test that shared dashboard components properly filter data by user role
-
-    // Navigate to the unified dashboard
-    await page.goto('/client');
-
-    // Verify that the dashboard correctly identifies the user role
-    // and shows the appropriate title
-    const breadcrumb = page.locator('[data-testid="breadcrumb"]');
-    const breadcrumbText = await breadcrumb.textContent();
-
-    if (breadcrumbText?.includes('Client')) {
-      // If showing Client Dashboard, verify client-appropriate content
-      await expect(page.locator('text=Active Orders')).toBeVisible();
-      await expect(page.locator('text=Recent Orders')).toBeVisible();
-
-      // Verify that the data shown is filtered to the current user's orders only
-      // In a real implementation, this would check that API responses only include current user data
-
-    } else if (breadcrumbText?.includes('Vendor')) {
-      // If showing Vendor Dashboard, verify vendor-appropriate content
-      await expect(page.locator('text=Active Orders')).toBeVisible();
-      await expect(page.locator('text=Recent Orders')).toBeVisible();
-
-      // Verify that the data shown is filtered to the current user's orders only
-      // In a real implementation, this would check that API responses only include current user data
-    }
-
-    // Test that the dashboard handles the case where no data exists for the user
-    const noDataMessage = page.locator('text=You haven\'t placed any orders yet, Place Your First Order');
-    if (await noDataMessage.count() > 0) {
-      // If no data exists, should show appropriate empty state
-      await expect(noDataMessage).toBeVisible();
-    }
-  });
-
-  test('Session persistence and role consistency - Verify role persists across navigation', async ({ page }) => {
-    // Test that user role is maintained consistently across page navigation
-
-    // Start at the dashboard
-    await page.goto('/client');
-
-    // Get the current role from the breadcrumb
-    const breadcrumb = page.locator('[data-testid="breadcrumb"]');
-    const initialRole = await breadcrumb.textContent();
-
-    // Navigate to a different page (e.g., profile)
-    await page.click('a[href="/profile"]');
-    await expect(page).toHaveURL(/.*profile/);
-
-    // Navigate back to dashboard
-    await page.goto('/client');
-
-    // Verify the role is still consistent
-    const breadcrumbAfter = page.locator('[data-testid="breadcrumb"]');
-    const roleAfter = await breadcrumbAfter.textContent();
-    expect(roleAfter).toBe(initialRole);
-
-    // Test that role-appropriate content is still shown
-    if (initialRole?.includes('Client')) {
-      await expect(page.locator('text=Active Orders')).toBeVisible();
-    } else if (initialRole?.includes('Vendor')) {
-      await expect(page.locator('text=Active Orders')).toBeVisible();
-    }
-  });
-
-  test('API endpoint security - Verify role-based data filtering in API responses', async ({ page }) => {
-    // Test that API endpoints properly filter data based on user role
-    // Note: This would typically be tested with API mocking or by examining network requests
-
-    await page.goto('/client');
-
-    // In a real implementation, this would:
-    // 1. Monitor network requests to verify user ID is included in API calls
-    // 2. Verify that API responses only contain data for the authenticated user
-    // 3. Test that unauthorized API calls return appropriate error responses
-
-    // For now, we verify that the dashboard loads without errors
-    // and shows appropriate role-based content
-    await expect(page.locator('text=Active Orders')).toBeVisible();
-
-    // Test that no console errors occur during data loading
-    const errors: string[] = [];
-    page.on('pageerror', (error) => {
-      errors.push(error.message);
+      // The vendor-only delivery cost estimator must not be offered to a client.
+      await expect(vendorEstimatorLink(page)).toHaveCount(0);
     });
 
-    await page.waitForLoadState('networkidle');
-    expect(errors).toHaveLength(0);
+    test('Data filtering in shared components - Verify proper data isolation', async ({ page }) => {
+      await page.goto('/client');
+
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+      await expectDashboardStructure(page);
+
+      // With no orders of their own, the user sees the empty state rather than
+      // anybody else's orders.
+      const emptyState = page.getByText("You haven't placed any orders yet");
+      if ((await emptyState.count()) > 0) {
+        await expect(emptyState).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Place Your First Order' })).toBeVisible();
+      }
+    });
+
+    test('Session persistence and role consistency - Verify role persists across navigation', async ({ page }) => {
+      await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+
+      // Client-side navigation; /profile may still be compiling on a dev server.
+      await page.locator('a[href="/profile"]', { hasText: 'Update Profile' }).click();
+      await expect(page).toHaveURL(/\/profile/, { timeout: 15000 });
+
+      await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+    });
+
+    test('API endpoint security - Verify role-based data filtering in API responses', async ({ page }) => {
+      // Listen before navigating so errors thrown during the first render count.
+      const errors: string[] = [];
+      page.on('pageerror', (error) => {
+        errors.push(error.message);
+      });
+
+      await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+      await page.waitForLoadState('load');
+
+      expect(errors).toHaveLength(0);
+    });
+
+    test('Cross-contamination prevention - Verify no data leakage between roles', async ({ page }) => {
+      await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+
+      await page.goto('/profile');
+      await page.goto('/client');
+
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+      await expect(vendorEstimatorLink(page)).toHaveCount(0);
+    });
+
+    test('Role verification in dashboard actions - Verify actions are role-appropriate', async ({ page }) => {
+      await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
+
+      const quickActions = [
+        { href: '/catering-request', text: 'New Catering Order' },
+        { href: '/client/orders/new', text: 'New On-Demand Order' },
+        { href: '/addresses', text: 'Manage Addresses' },
+        { href: '/profile', text: 'Update Profile' },
+        { href: '/contact', text: 'Contact Us' },
+      ];
+
+      for (const action of quickActions) {
+        const actionElement = page.locator(`a[href="${action.href}"]`, { hasText: action.text });
+        await expect(actionElement).toBeVisible();
+      }
+    });
   });
 
-  test('Cross-contamination prevention - Verify no data leakage between roles', async ({ page }) => {
-    // This test ensures there's no possibility of data from one role appearing in another
+  test.describe('as VENDOR', () => {
+    test.use({ storageState: 'e2e/.auth/vendor.json' });
 
-    // Test multiple navigations to ensure clean state
-    await page.goto('/client');
-    const clientBreadcrumb = await page.locator('[data-testid="breadcrumb"]').textContent();
+    test('VENDOR role data isolation - Verify VENDOR cannot access CLIENT data', async ({ page }) => {
+      await page.goto('/client');
 
-    // Navigate away and back
-    await page.goto('/profile');
-    await page.goto('/client');
+      await expect(dashboardTitle(page)).toHaveText('Vendor Dashboard');
+      await expect(dashboardTitle(page)).not.toContainText('Client');
+      await expectDashboardStructure(page);
 
-    // Verify the role and content remain consistent
-    const breadcrumbAfter = await page.locator('[data-testid="breadcrumb"]').textContent();
-    expect(breadcrumbAfter).toBe(clientBreadcrumb);
+      await expect(vendorEstimatorLink(page)).toBeVisible();
+    });
 
-    // Verify that the dashboard content is still appropriate for the role
-    await expect(page.locator('text=Active Orders')).toBeVisible();
+    test('Legacy /vendor route lands on the unified dashboard', async ({ page }) => {
+      await page.goto('/vendor');
 
-    // In a real implementation, this would also test:
-    // - Clearing of cached data when switching contexts
-    // - No shared state between different user sessions
-    // - Proper cleanup of sensitive data from memory/DOM
+      await expect(page).toHaveURL(/\/client$/);
+      await expect(dashboardTitle(page)).toHaveText('Vendor Dashboard');
+    });
   });
 
-  test('Role verification in dashboard actions - Verify actions are role-appropriate', async ({ page }) => {
-    // Test that dashboard actions work correctly for the user's role
+  test.describe('without a session', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
 
-    await page.goto('/client');
+    test('Role-based URL protection - Verify unauthorized access is prevented', async ({ page }) => {
+      await page.goto('/client');
+      await expect(page).toHaveURL(/\/sign-in/);
 
-    // Verify that the "New Order" action is available and functional
-    const newOrderLink = page.locator('a[href="/catering-request"]').first();
-    await expect(newOrderLink).toBeVisible();
-    await expect(newOrderLink).toContainText('New Order');
+      await page.goto('/vendor');
+      await expect(page).toHaveURL(/\/sign-in/);
+    });
+  });
 
-    // Test that other actions are present and accessible
-    const quickActions = [
-      { href: '/addresses', text: 'Manage Addresses' },
-      { href: '/profile', text: 'Update Profile' },
-      { href: '/contact', text: 'Contact Us' }
-    ];
+  test.describe('as DRIVER', () => {
+    test.use({ storageState: 'e2e/.auth/driver.json' });
 
-    for (const action of quickActions) {
-      const actionElement = page.locator(`a[href="${action.href}"]`).first();
-      await expect(actionElement).toBeVisible();
-      await expect(actionElement).toContainText(action.text);
-    }
+    test('Drivers are redirected away from the client dashboard', async ({ page }) => {
+      // The driver dashboard polls continuously, so don't wait for 'load'.
+      await page.goto('/client', { waitUntil: 'commit' });
 
-    // Verify that actions lead to appropriate destinations
-    // (In a real implementation, this would test actual navigation)
+      await expect(page).toHaveURL(/\/driver/);
+      await expect(page.getByRole('heading', { name: /Client Dashboard|Vendor Dashboard/ })).toHaveCount(0);
+    });
   });
 });
