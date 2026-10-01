@@ -697,24 +697,23 @@ test.describe('Driver Shift Workflow', () => {
         return;
       }
 
-      // Look for map container or map-related elements
-      const mapIndicators = [
-        page.locator('text=Live Map'),
-        page.locator('[class*="mapbox"], [class*="leaflet"], [class*="map"]'),
-        page.locator('canvas'), // Map libraries often use canvas
-      ];
-
-      let hasMap = false;
-      for (const indicator of mapIndicators) {
-        if ((await indicator.count()) > 0) {
-          hasMap = true;
-          break;
-        }
+      // The portal only mounts the map during an active shift. Earlier tests in
+      // this file end the shift, so start one here instead of relying on order;
+      // the file-level afterAll ends it again.
+      const startShiftButton = page.getByRole('button', { name: /start shift/i });
+      if ((await startShiftButton.count()) > 0) {
+        await startShiftButton.click();
       }
+      await expect(page.getByRole('button', { name: /end shift/i })).toBeVisible({
+        timeout: SHIFT_ACTION_TIMEOUT_MS,
+      });
 
-      // Map may only show when location is available
-      // This is a soft assertion
-      expect.soft(hasMap).toBe(true);
+      // DriverLiveMap renders this container once it has a location and a
+      // Mapbox token (CI passes NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to the build);
+      // without one it shows a "Map Error" card instead.
+      await expect(page.getByRole('application', { name: 'Driver live map' })).toBeVisible({
+        timeout: 15000,
+      });
     });
   });
 });
