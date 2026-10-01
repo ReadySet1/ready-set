@@ -70,28 +70,21 @@ export async function PATCH(
       );
     }
 
-    // Update the user in the database
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        type,
-        status,
-        isTemporaryPassword
-      })
-      .eq('id', params.userId)
-      .select();
+    const { userId } = await params;
 
-    if (error) {
-      console.error('Error updating user settings:', error);
-      return NextResponse.json(
-        { error: 'Failed to update user settings' },
-        { status: 500 }
-      );
-    }
+    // Write through Prisma, not the caller's session: RLS only lets a session
+    // update its own row (another user's update silently matched nothing), and
+    // the profiles role guard rejects type changes from end-user sessions.
+    // The caller is verified as SUPER_ADMIN above.
+    const updated = await prisma.profile.update({
+      where: { id: userId },
+      data: { type, status, isTemporaryPassword },
+      select: { id: true, type: true, status: true, isTemporaryPassword: true },
+    });
 
     return NextResponse.json({
       message: 'User settings updated successfully',
-      data: data[0]
+      data: updated
     });
   } catch (error) {
     console.error('Unexpected error:', error);
