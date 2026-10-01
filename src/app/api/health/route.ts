@@ -38,9 +38,10 @@ interface ServiceHealth {
 
 // The app runs on a Hetzner (EU) VPS against a us-east-1 database, so a single
 // round trip has a ~90ms floor and the four sub-checks land around 500-700ms
-// when run concurrently. Thresholds sized for that baseline, not co-location.
+// when run concurrently. Transatlantic spikes past several seconds happen a few
+// times a night, so latency alone only ever degrades the check: 'unhealthy'
+// (HTTP 503) is reserved for a database that cannot be reached at all.
 const DB_HEALTHY_THRESHOLD_MS = 1000;
-const DB_DEGRADED_THRESHOLD_MS = 3000;
 
 /**
  * Test database connectivity and performance
@@ -63,7 +64,7 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
     const responseTime = performance.now() - start;
 
     return {
-      status: responseTime < DB_HEALTHY_THRESHOLD_MS ? 'healthy' : responseTime < DB_DEGRADED_THRESHOLD_MS ? 'degraded' : 'unhealthy',
+      status: responseTime < DB_HEALTHY_THRESHOLD_MS ? 'healthy' : 'degraded',
       responseTime,
       message: 'Database connection successful',
       details: {
