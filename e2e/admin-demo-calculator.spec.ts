@@ -95,11 +95,17 @@ test.describe('Admin Demo Calculator', () => {
 
   test('6. Pricing explanation shows 3 columns (with driver bonus)', async ({ page }) => {
     // Should show First Stop, Additional Stops, AND Driver Bonus
-    await expect(page.locator('text=How Multi-Stop Pricing Works')).toBeVisible();
-    await expect(page.locator('div:has-text("First Stop")').filter({ has: page.locator('text=Included in the base delivery fee') })).toBeVisible();
-    await expect(page.locator('div:has-text("Additional Stops")').filter({ has: page.locator('text=$5.00 per extra stop') })).toBeVisible();
-    // Driver Bonus section SHOULD exist for admin
-    await expect(page.locator('div:has-text("Driver Bonus")').filter({ has: page.locator('text=$2.50 bonus') })).toBeVisible();
+    const heading = page.getByRole('heading', { name: 'How Multi-Stop Pricing Works' });
+    await expect(heading).toBeVisible();
+    const pricing = heading.locator('..');
+
+    await expect(pricing.getByText('First Stop', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/Included in the base delivery fee/)).toBeVisible();
+    await expect(pricing.getByText('Additional Stops', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/\$5\.00 per extra stop/)).toBeVisible();
+    // Driver Bonus column SHOULD exist for admin
+    await expect(pricing.getByText('Driver Bonus', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/\$2\.50 bonus/)).toBeVisible();
   });
 
   test('7. Driver earnings calculation is correct', async ({ page }) => {
@@ -184,28 +190,36 @@ test.describe('Admin Demo Calculator', () => {
     // Wait for calculation
     await page.waitForTimeout(500);
 
+    // Each result card is heading (h3) → CardHeader → Card; scope to the card.
+    const cardFor = (title: string) =>
+      page.getByRole('heading', { name: title }).locator('xpath=../..');
+
     // Bridge toll should appear in customer section
-    const customerBridgeToll = page.locator('text=Customer Charges').locator('..').locator('..').locator('text=Bridge Toll:');
-    await expect(customerBridgeToll).toBeVisible();
+    await expect(cardFor('Customer Charges').getByText('Bridge Toll:')).toBeVisible();
 
     // Bridge toll should also appear in driver section
-    const driverBridgeToll = page.locator('text=Driver Earnings').locator('..').locator('..').locator('text=Bridge Toll:');
-    await expect(driverBridgeToll).toBeVisible();
+    await expect(cardFor('Driver Earnings').getByText('Bridge Toll:')).toBeVisible();
   });
 
   test('11. No console errors on page load', async ({ page }) => {
     const consoleErrors: string[] = [];
 
-    page.on('console', (msg) => {
+    // Load in a fresh tab with the listener attached first. Re-navigating the
+    // beforeEach tab aborts its in-flight Supabase getUser call, which logs a
+    // "Failed to fetch" that has nothing to do with this page.
+    const freshPage = await page.context().newPage();
+    freshPage.on('console', (msg) => {
       if (msg.type() === 'error') {
         consoleErrors.push(msg.text());
       }
     });
 
-    // Navigate again to capture errors
-    await page.goto('/admin/calculator/demo');
-    await page.waitForSelector('h1:has-text("Delivery Cost Calculator")');
-    await page.waitForTimeout(1000);
+    await freshPage.goto('/admin/calculator/demo');
+    await expect(
+      freshPage.getByRole('heading', { name: 'Delivery Cost Calculator' })
+    ).toBeVisible({ timeout: 15000 });
+    await freshPage.waitForTimeout(1000);
+    await freshPage.close();
 
     // Filter out known non-critical errors
     const criticalErrors = consoleErrors.filter(error => {

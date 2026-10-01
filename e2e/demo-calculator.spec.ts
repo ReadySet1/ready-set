@@ -128,12 +128,18 @@ test.describe('Public Demo Calculator', () => {
 
   test('8. Pricing explanation shows only 2 columns (no driver bonus)', async ({ page }) => {
     // Should show First Stop and Additional Stops
-    await expect(page.locator('text=How Multi-Stop Pricing Works')).toBeVisible();
-    await expect(page.locator('div:has-text("First Stop")').filter({ has: page.locator('text=Included in the base delivery fee') })).toBeVisible();
-    await expect(page.locator('div:has-text("Additional Stops")').filter({ has: page.locator('text=$5.00 per extra stop') })).toBeVisible();
+    const heading = page.getByRole('heading', { name: 'How Multi-Stop Pricing Works' });
+    await expect(heading).toBeVisible();
+    const pricing = heading.locator('..');
 
-    // Driver Bonus section should NOT exist
-    await expect(page.locator('div:has-text("Driver Bonus")').filter({ has: page.locator('text=$2.50 bonus') })).not.toBeVisible();
+    await expect(pricing.getByText('First Stop', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/Included in the base delivery fee/)).toBeVisible();
+    await expect(pricing.getByText('Additional Stops', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/\$5\.00 per extra stop/)).toBeVisible();
+
+    // Driver Bonus column should NOT exist
+    await expect(pricing.getByText('Driver Bonus', { exact: true })).toHaveCount(0);
+    await expect(pricing.getByText(/\$2\.50 bonus/)).toHaveCount(0);
   });
 
   test('9. CTA buttons are present and have correct links', async ({ page }) => {
