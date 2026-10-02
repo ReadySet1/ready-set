@@ -5,8 +5,8 @@
     {
       "version": "2.9.2",
       "date": "2026-10-02",
-      "title": "Release 2.9.2",
-      "summary": "",
+      "title": "A driver app that speaks up",
+      "summary": "The driver app now tells you when something is wrong instead of failing quietly, and logging out works as expected.",
       "changes": [
         {
           "text": "Removed broken Sign In, Sign Up and Help Center links from the admin footer.",
