@@ -4,15 +4,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getUserRole } from '@/lib/auth';
+import { isAdminRole } from '@/lib/auth/admin-role';
 import { UploadSecurityManager } from '@/lib/upload-security';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Define proper type for Supabase app_metadata
-interface AppMetadata {
-  role?: string;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,14 +26,14 @@ export async function GET(request: NextRequest) {
 
     // Authorization: Allow if (1) Valid cron secret OR (2) Admin user
     const isValidCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const isAdminUser = user && (user.app_metadata as AppMetadata)?.role === 'admin';
-    const isAuthorized = isValidCronRequest || isAdminUser;
+    const userRole = !isValidCronRequest && user ? await getUserRole(user.id) : null;
+    const isAuthorized = isValidCronRequest || isAdminRole(userRole);
 
     if (!isAuthorized) {
       console.warn('⚠️ Unauthorized quarantine cleanup attempt:', {
         hasAuthHeader: !!authHeader,
         hasUser: !!user,
-        userRole: user ? (user.app_metadata as AppMetadata)?.role : 'none',
+        userRole: userRole ?? 'none',
         timestamp: new Date().toISOString()
       });
 

@@ -2,6 +2,7 @@
 
 import { GET, PATCH } from '@/app/api/users/[userId]/settings/route';
 import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/utils/prismaDB';
 import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import { UserType, UserStatus } from '@/types/prisma';
 import {
@@ -323,23 +324,16 @@ describe('/api/users/[userId]/settings API', () => {
           isTemporaryPassword: false,
         };
 
-        const mockBuilder = mockSupabaseClient.from('profiles');
-
-        // Mock the permission check: .from('profiles').select('type').eq(...).single()
-        // .select() should return this (for chaining), then .single() returns data
-        mockBuilder.single.mockResolvedValueOnce({
+        // Permission check: .from('profiles').select('type').eq(...).single()
+        mockSupabaseClient.from('profiles').single.mockResolvedValueOnce({
           data: { type: UserType.SUPER_ADMIN },
           error: null,
         });
 
-        // Mock the update operation: .from('profiles').update(...).eq(...).select()
-        // The final .select() should return the updated data
-        mockBuilder.select
-          .mockReturnValueOnce(mockBuilder)  // First call in permission check - return this for chaining
-          .mockResolvedValueOnce({            // Second call at end of update - return data
-            data: [updatedUser],
-            error: null,
-          });
+        // The write goes through Prisma: RLS only lets a session update its own
+        // row, and the profiles role guard rejects type changes from end-user
+        // sessions, so a session-client update of another user cannot work.
+        (prisma.profile.update as jest.Mock).mockResolvedValueOnce(updatedUser);
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -353,11 +347,23 @@ describe('/api/users/[userId]/settings API', () => {
             }),
           }
         );
-        const params = { userId: 'user-456' };
+        // Next 15 passes route params as a Promise.
+        const params = Promise.resolve({ userId: 'user-456' });
 
         const response = await PATCH(request, { params });
         const data = await expectSuccessResponse(response, 200);
 
+        expect(prisma.profile.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'user-456' },
+            data: {
+              type: UserType.ADMIN,
+              status: UserStatus.ACTIVE,
+              isTemporaryPassword: false,
+            },
+          })
+        );
+        expect(mockSupabaseClient.from('profiles').update).not.toHaveBeenCalled();
         expect(data.message).toBe('User settings updated successfully');
         expect(data.data.type).toBe(UserType.ADMIN);
         expect(data.data.status).toBe(UserStatus.ACTIVE);
