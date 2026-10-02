@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.2](https://github.com/ReadySet1/ready-set/compare/v2.9.1...v2.9.2) (2026-10-02)
+
+
+### Fixed
+
+* **admin:** remove dead /signin, /signup and /help links from the admin footer ([7bfaf44](https://github.com/ReadySet1/ready-set/commit/7bfaf44e7d0bafedc9c3db9b8d28cc304b1b8813))
+* **admin:** remove dead /signin, /signup and /help links from the admin footer ([aab901e](https://github.com/ReadySet1/ready-set/commit/aab901ee3241a32997d5058105b90a5bf5f21e99))
+* **driver:** log out clears the server session and stays inside the iOS wrapper ([d732822](https://github.com/ReadySet1/ready-set/commit/d732822c7d48325396343b6299e97e7c342491b1))
+* **driver:** log out clears the server session and stays inside the iOS wrapper ([149ffc4](https://github.com/ReadySet1/ready-set/commit/149ffc41d737181cc57625426497c46b454989fd))
+* **health:** return 503 only when the database is unreachable ([ad025a2](https://github.com/ReadySet1/ready-set/commit/ad025a22d549801a9e21db2b751fb2eac5c97209))
+* **health:** return 503 only when the database is unreachable ([a7a406f](https://github.com/ReadySet1/ready-set/commit/a7a406ff4c256bdaf8b9b3352ac847754f2830c4))
+* **tracking:** inactive drivers cannot start a shift ([75bf59c](https://github.com/ReadySet1/ready-set/commit/75bf59c702d717b2dba0203924adb45b7dd34ffb))
+* **tracking:** inactive drivers cannot start a shift ([eefe1ba](https://github.com/ReadySet1/ready-set/commit/eefe1bad19823eecb280f3a0aad271a5d2313cca))
+* **tracking:** tell the driver when the server keeps rejecting their location ([35842c1](https://github.com/ReadySet1/ready-set/commit/35842c1e8f656cdb67561b8cab657d6dc97588c0))
+* **tracking:** tell the driver when the server keeps rejecting their location ([9f67ee2](https://github.com/ReadySet1/ready-set/commit/9f67ee253b6d626cf198f0212a21c3e2b2915861))
+
+
+### Security
+
+* **admin:** require a staff caller in the admin create-order actions ([e4d2c50](https://github.com/ReadySet1/ready-set/commit/e4d2c50edaf42ff51470891d043f7f081c4323a0))
+* bump transitive overrides for advisories published 09-18..09-30 ([856ecd5](https://github.com/ReadySet1/ready-set/commit/856ecd55aca2fa86bd6f57a769dd45e846285278))
+* **catering:** only staff may create orders for another client ([64e540e](https://github.com/ReadySet1/ready-set/commit/64e540eea54c8709bbfdf11f9110978725cd42a1))
+* harden role resolution and profile role writes ([0448b0a](https://github.com/ReadySet1/ready-set/commit/0448b0a2ed30d692d63ecb49afd436ca60a3123f))
+
 ## [2.9.1](https://github.com/ReadySet1/ready-set/compare/v2.9.0...v2.9.1) (2026-09-28)
 
 

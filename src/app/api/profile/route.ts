@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const userType = profile?.type || user.user_metadata?.type || user.user_metadata?.role;
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(userType);
+    // Roles come only from profiles.type.
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(profile?.type ?? '');
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });

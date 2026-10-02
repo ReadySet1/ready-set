@@ -1,4 +1,27 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * /apply sections fade in via framer-motion `whileInView` (once), and a capture
+ * taken mid-fade is either unstable or blank. Scroll the whole page to fire
+ * every entrance animation, wait until no animated element is still
+ * translucent, then return to the top. Callers scroll to their target after.
+ */
+async function revealAllSections(page: Page) {
+  await page.evaluate(async () => {
+    const step = Math.max(200, Math.floor(window.innerHeight / 2));
+    for (let y = 0; y < document.body.scrollHeight; y += step) {
+      window.scrollTo({ top: y, behavior: 'instant' });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  });
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('main [style*="opacity"]')).every(
+      (el) => getComputedStyle(el).opacity === '1',
+    ),
+  );
+  await page.waitForTimeout(300);
+}
 
 /**
  * Visual Regression Tests for Palette Color Changes
@@ -15,6 +38,28 @@ test.describe('Visual Regression - Color Palette', () => {
   test.beforeEach(async ({ page }) => {
     // Set consistent viewport for stable screenshots
     await page.setViewportSize({ width: 1280, height: 720 });
+
+    // CI compares against `next start`; the init script also hides the
+    // `next dev` indicator/overlay (<nextjs-portal>) so baselines made on a dev
+    // server match.
+    await page.addInitScript(() => {
+      // Pre-answer the cookie banner (necessary-only) so it never overlays the
+      // captures or slides in mid-screenshot.
+      window.localStorage.setItem('cookieConsentStatus', 'rejected');
+      window.localStorage.setItem(
+        'cookiePreferences',
+        JSON.stringify({ necessary: true, analytics: false, marketing: false, personalization: false }),
+      );
+      document.addEventListener('DOMContentLoaded', () => {
+        const style = document.createElement('style');
+        // The root layout sets `!scroll-smooth`; smooth scrolling moves the
+        // page between the two captures toHaveScreenshot compares.
+        style.textContent =
+          'nextjs-portal { display: none !important; } ' +
+          'html, html[class] { scroll-behavior: auto !important; }';
+        document.head.appendChild(style);
+      });
+    });
   });
 
   test('Newsletter component - Subscribe button colors', async ({ page }) => {
@@ -41,7 +86,14 @@ test.describe('Visual Regression - Color Palette', () => {
     // Wait for hero section to be visible
     const heroSection = page.locator('section').first();
     await heroSection.waitFor({ state: 'visible' });
-    
+
+    // The hero's floating icons bob forever via framer-motion (JS-driven, so
+    // toHaveScreenshot's CSS-animation freeze can't stop them) and the capture
+    // never stabilises. Pin them at their resting transform.
+    await page.addStyleTag({
+      content: 'section:first-of-type > [class*="lg:block"] { transform: none !important; }',
+    });
+
     // Take screenshot of hero section
     await expect(heroSection).toHaveScreenshot('apply-page-hero.png', {
       maxDiffPixels: 200,
@@ -51,7 +103,8 @@ test.describe('Visual Regression - Color Palette', () => {
   test('Apply page - Position cards with amber accents', async ({ page }) => {
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Scroll to positions section
     await page.evaluate(() => {
       const positionsSection = document.getElementById('positions');
@@ -73,7 +126,8 @@ test.describe('Visual Regression - Color Palette', () => {
   test('Apply page - Application form with amber focus states', async ({ page }) => {
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Scroll to form section
     await page.evaluate(() => {
       const formSection = document.getElementById('apply-now');
@@ -99,7 +153,8 @@ test.describe('Visual Regression - Color Palette', () => {
   test('Catering Modal - Amber gradient header and buttons', async ({ page }) => {
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Scroll to positions section
     await page.evaluate(() => {
       const positionsSection = document.getElementById('positions');
@@ -131,7 +186,8 @@ test.describe('Visual Regression - Color Palette', () => {
   test('VA Modal - Amber gradient header and buttons', async ({ page }) => {
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Scroll to positions section
     await page.evaluate(() => {
       const positionsSection = document.getElementById('positions');
@@ -163,7 +219,8 @@ test.describe('Visual Regression - Color Palette', () => {
   test('File Upload component - Amber hover and focus states', async ({ page }) => {
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Scroll to form section
     await page.evaluate(() => {
       const formSection = document.getElementById('apply-now');
@@ -197,7 +254,8 @@ test.describe('Visual Regression - Color Palette', () => {
     
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Take full page screenshot on mobile
     await expect(page).toHaveScreenshot('apply-page-mobile.png', {
       fullPage: true,
@@ -211,7 +269,8 @@ test.describe('Visual Regression - Color Palette', () => {
     
     await page.goto('/apply');
     await page.waitForLoadState('networkidle');
-    
+    await revealAllSections(page);
+
     // Take full page screenshot on tablet
     await expect(page).toHaveScreenshot('apply-page-tablet.png', {
       fullPage: true,

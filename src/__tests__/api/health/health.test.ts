@@ -372,16 +372,19 @@ describe('GET /api/health - System Health Check', () => {
       expect(data.services.database.status).toBe('healthy');
     });
 
-    it('should report unhealthy above the 3s threshold', async () => {
+    it('should report a slow but reachable database as degraded (HTTP 200), not down', async () => {
+      // EU VPS -> us-east-1 latency spikes past 3s a few times a night; a
+      // reachable database must not page uptime monitoring with a 503
       (prismaPooled.$queryRaw as jest.Mock).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve([{ test: 1 }]), 3100))
       );
 
       const request = createGetRequest('http://localhost:3000/api/health');
       const response = await GET(request);
-      const data = await response.json();
+      const data = await expectSuccessResponse(response, 200);
 
-      expect(data.services.database.status).toBe('unhealthy');
+      expect(data.status).toBe('degraded');
+      expect(data.services.database.status).toBe('degraded');
       expect(data.services.database.responseTime).toBeGreaterThan(3000);
     }, 10000);
 

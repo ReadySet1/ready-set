@@ -12,35 +12,12 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-// Test configuration
-const TEST_USER = {
-  email: 'emmanuel@alanis.dev',
-  password: 'Spark2026@',
-};
-
 /**
- * Helper function to login and navigate to the admin demo calculator
+ * Navigate to the admin demo calculator. The admin session comes from the
+ * storageState saved by e2e/auth/setup.ts (TEST_ADMIN_* env), so there is no
+ * UI login here and no credentials in this file.
  */
-async function loginAndNavigateToAdminDemoCalculator(page: Page): Promise<void> {
-  // Navigate to sign-in page
-  await page.goto('/sign-in');
-
-  // Wait for the form to be ready
-  await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 15000 });
-
-  // Fill in credentials
-  await page.fill('input[name="email"], input[type="email"]', TEST_USER.email);
-  await page.fill('input[name="password"], input[type="password"]', TEST_USER.password);
-
-  // Submit form
-  await page.click('button[type="submit"]');
-
-  // Wait for successful authentication
-  await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
-    timeout: 30000,
-  });
-
-  // Navigate to admin demo calculator
+async function navigateToAdminDemoCalculator(page: Page): Promise<void> {
   await page.goto('/admin/calculator/demo');
 
   // Wait for the calculator to load
@@ -48,11 +25,13 @@ async function loginAndNavigateToAdminDemoCalculator(page: Page): Promise<void> 
 }
 
 test.describe('Admin Demo Calculator', () => {
-  // Increase timeout for these tests since login takes time
+  // Signed in as the TEST_ADMIN user via the session saved by global setup.
+  test.use({ storageState: 'e2e/.auth/admin.json' });
+
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page }) => {
-    await loginAndNavigateToAdminDemoCalculator(page);
+    await navigateToAdminDemoCalculator(page);
   });
 
   test('1. Calculator page loads successfully with authentication', async ({ page }) => {
@@ -116,11 +95,17 @@ test.describe('Admin Demo Calculator', () => {
 
   test('6. Pricing explanation shows 3 columns (with driver bonus)', async ({ page }) => {
     // Should show First Stop, Additional Stops, AND Driver Bonus
-    await expect(page.locator('text=How Multi-Stop Pricing Works')).toBeVisible();
-    await expect(page.locator('div:has-text("First Stop")').filter({ has: page.locator('text=Included in the base delivery fee') })).toBeVisible();
-    await expect(page.locator('div:has-text("Additional Stops")').filter({ has: page.locator('text=$5.00 per extra stop') })).toBeVisible();
-    // Driver Bonus section SHOULD exist for admin
-    await expect(page.locator('div:has-text("Driver Bonus")').filter({ has: page.locator('text=$2.50 bonus') })).toBeVisible();
+    const heading = page.getByRole('heading', { name: 'How Multi-Stop Pricing Works' });
+    await expect(heading).toBeVisible();
+    const pricing = heading.locator('..');
+
+    await expect(pricing.getByText('First Stop', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/Included in the base delivery fee/)).toBeVisible();
+    await expect(pricing.getByText('Additional Stops', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/\$5\.00 per extra stop/)).toBeVisible();
+    // Driver Bonus column SHOULD exist for admin
+    await expect(pricing.getByText('Driver Bonus', { exact: true })).toBeVisible();
+    await expect(pricing.getByText(/\$2\.50 bonus/)).toBeVisible();
   });
 
   test('7. Driver earnings calculation is correct', async ({ page }) => {
@@ -205,28 +190,36 @@ test.describe('Admin Demo Calculator', () => {
     // Wait for calculation
     await page.waitForTimeout(500);
 
+    // Each result card is heading (h3) → CardHeader → Card; scope to the card.
+    const cardFor = (title: string) =>
+      page.getByRole('heading', { name: title }).locator('xpath=../..');
+
     // Bridge toll should appear in customer section
-    const customerBridgeToll = page.locator('text=Customer Charges').locator('..').locator('..').locator('text=Bridge Toll:');
-    await expect(customerBridgeToll).toBeVisible();
+    await expect(cardFor('Customer Charges').getByText('Bridge Toll:')).toBeVisible();
 
     // Bridge toll should also appear in driver section
-    const driverBridgeToll = page.locator('text=Driver Earnings').locator('..').locator('..').locator('text=Bridge Toll:');
-    await expect(driverBridgeToll).toBeVisible();
+    await expect(cardFor('Driver Earnings').getByText('Bridge Toll:')).toBeVisible();
   });
 
   test('11. No console errors on page load', async ({ page }) => {
     const consoleErrors: string[] = [];
 
-    page.on('console', (msg) => {
+    // Load in a fresh tab with the listener attached first. Re-navigating the
+    // beforeEach tab aborts its in-flight Supabase getUser call, which logs a
+    // "Failed to fetch" that has nothing to do with this page.
+    const freshPage = await page.context().newPage();
+    freshPage.on('console', (msg) => {
       if (msg.type() === 'error') {
         consoleErrors.push(msg.text());
       }
     });
 
-    // Navigate again to capture errors
-    await page.goto('/admin/calculator/demo');
-    await page.waitForSelector('h1:has-text("Delivery Cost Calculator")');
-    await page.waitForTimeout(1000);
+    await freshPage.goto('/admin/calculator/demo');
+    await expect(
+      freshPage.getByRole('heading', { name: 'Delivery Cost Calculator' })
+    ).toBeVisible({ timeout: 15000 });
+    await freshPage.waitForTimeout(1000);
+    await freshPage.close();
 
     // Filter out known non-critical errors
     const criticalErrors = consoleErrors.filter(error => {

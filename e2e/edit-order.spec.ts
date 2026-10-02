@@ -7,500 +7,343 @@
  * - Modifying order fields
  * - Saving changes
  * - Verifying updates
+ *
+ * SAFETY: these tests run against the shared rs-dev database and open real
+ * catering orders. Nothing here may change an order: the save tests stub the
+ * PATCH /api/orders/:order_number request with page.route, so the request
+ * never reaches the server. Every other test only opens the dialog and closes
+ * it without saving.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import {
+  test,
+  expect,
+  type Locator,
+  type Page,
+  type Route,
+} from '@playwright/test';
+
+const editOrderButton = (page: Page): Locator =>
+  page.getByRole('button', { name: 'Edit Order' });
+
+/** Status tabs on /admin/catering-orders and the query each one sends. */
+const STATUS_TABS = {
+  new: { label: 'New', query: 'statusFilter=new' },
+  completed: { label: 'Completed', query: 'status=COMPLETED' },
+} as const;
+
+/**
+ * Open /admin/catering-orders on the given status tab. Returns the first order
+ * number the tab's API response lists, or null when the tab is empty. Reading
+ * it from the response avoids racing the table re-render after the tab switch.
+ */
+async function firstOrderOnTab(
+  page: Page,
+  tab: keyof typeof STATUS_TABS
+): Promise<string | null> {
+  const { label, query } = STATUS_TABS[tab];
+
+  await page.goto('/admin/catering-orders', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  const tabButton = page.getByRole('button', { name: label, exact: true });
+  await expect(tabButton).toBeVisible({ timeout: 30000 });
+
+  const tabResponse = page.waitForResponse(
+    (res) => res.url().includes('/api/orders/catering-orders') && res.url().includes(query),
+    { timeout: 30000 }
+  );
+  await tabButton.click();
+  const response = await tabResponse;
+  expect(response.ok(), `GET ${response.url()} -> ${response.status()}`).toBe(true);
+
+  const { orders } = (await response.json()) as { orders: { orderNumber: string }[] };
+  return orders[0]?.orderNumber ?? null;
+}
+
+/** Open the first order on the tab's detail page; returns its order number. */
+async function openFirstOrder(page: Page, tab: keyof typeof STATUS_TABS): Promise<string> {
+  const orderNumber = await firstOrderOnTab(page, tab);
+  test.skip(!orderNumber, `No "${STATUS_TABS[tab].label}" catering orders on this database`);
+  if (!orderNumber) throw new Error('unreachable: test skipped above');
+
+  await page.getByRole('link', { name: orderNumber, exact: true }).click();
+
+  // The detail page renders its sidebar once the order has loaded. SingleOrder
+  // shows "Order Not Found" for ANY failed detail fetch (not only a 404); on a
+  // busy dev server that is usually transient, so reload once before failing.
+  const quickActions = page.getByRole('heading', { name: 'Quick Actions' });
+  const notFound = page.getByRole('heading', { name: 'Order Not Found' });
+  await expect(quickActions.or(notFound)).toBeVisible({ timeout: 45000 });
+  if (await notFound.isVisible()) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+  }
+  await expect(quickActions).toBeVisible({ timeout: 45000 });
+  return orderNumber;
+}
+
+/** Open an editable (pending/confirmed) order and its edit dialog. */
+async function openEditDialog(page: Page): Promise<{ dialog: Locator; orderNumber: string }> {
+  const orderNumber = await openFirstOrder(page, 'new');
+
+  await editOrderButton(page).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({ timeout: 10000 });
+  return { dialog, orderNumber };
+}
+
+/**
+ * The pickup date/time popover trigger. Its text is the formatted date, or
+ * "Select date and time" when empty, so find it through its field label.
+ */
+const pickupDateTrigger = (dialog: Locator): Locator =>
+  dialog
+    .locator('div')
+    // `has` is matched inside each div, so root it at the page, not the dialog.
+    .filter({ has: dialog.page().getByText('Pickup Date & Time', { exact: true }) })
+    .last()
+    .getByRole('button');
+
+/** Stub the order PATCH so nothing is written. Other methods pass through. */
+async function stubOrderPatch(
+  page: Page,
+  respond: (route: Route) => Promise<void>
+): Promise<{ bodies: unknown[] }> {
+  const bodies: unknown[] = [];
+  await page.route(
+    (url) => url.pathname.startsWith('/api/orders/'),
+    async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      bodies.push(route.request().postDataJSON());
+      await respond(route);
+    }
+  );
+  return { bodies };
+}
+
+/** Local-time yyyy-MM-dd, matching react-day-picker's data-day attribute. */
+function isoDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 test.describe('Edit Order Flow', () => {
-  // Skip auth setup if global setup handles it
-  test.use({ storageState: '.auth/admin.json' });
-
-  test.beforeEach(async ({ page }) => {
-    // Navigate to the admin orders page
-    await page.goto('/admin/catering-orders');
-  });
+  // Admin session saved by global setup (paths resolve from the repo root).
+  test.use({ storageState: 'e2e/.auth/admin.json' });
+  // The dev server compiles these pages on first hit; give each test room.
+  test.describe.configure({ timeout: 120000 });
 
   test.describe('Edit Button Visibility', () => {
     test('should show edit button for admin users on order detail page', async ({ page }) => {
-      // Click on the first order in the list
-      const firstOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      await openFirstOrder(page, 'new');
 
-      if (await firstOrderLink.count() > 0) {
-        await firstOrderLink.click();
-
-        // Wait for the order detail page to load
-        await page.waitForLoadState('networkidle');
-
-        // Look for edit button
-        const editButton = page.locator('button:has-text("Edit Order"), button[aria-label*="edit"], [data-testid="edit-order-button"]');
-
-        // Edit button should be visible for admin users
-        if (await editButton.count() > 0) {
-          await expect(editButton.first()).toBeVisible();
-        }
-      }
+      await expect(editOrderButton(page)).toBeVisible();
     });
 
     test('should not show edit button for completed orders', async ({ page }) => {
-      // Navigate to a completed order (if one exists)
-      await page.goto('/admin/catering-orders');
+      await openFirstOrder(page, 'completed');
 
-      // Look for an order with COMPLETED status
-      const completedOrderRow = page.locator('tr:has-text("COMPLETED"), [data-status="COMPLETED"]').first();
-
-      if (await completedOrderRow.count() > 0) {
-        // Click on the order
-        const orderLink = completedOrderRow.locator('a').first();
-        if (await orderLink.count() > 0) {
-          await orderLink.click();
-          await page.waitForLoadState('networkidle');
-
-          // Edit button should not be visible or should be disabled
-          const editButton = page.locator('button:has-text("Edit Order")');
-          if (await editButton.count() > 0) {
-            await expect(editButton).toBeDisabled();
-          }
-        }
-      }
+      // Completed is a terminal status: the Quick Actions card omits the button.
+      await expect(page.getByRole('button', { name: 'Print Order' })).toBeVisible();
+      await expect(editOrderButton(page)).toHaveCount(0);
     });
   });
 
   test.describe('Edit Dialog', () => {
     test('should open edit dialog when clicking edit button', async ({ page }) => {
-      // Navigate to an active order
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
-
-        // Click edit button
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-
-          // Dialog should be visible
-          const dialog = page.locator('[role="dialog"], .dialog, [data-testid="edit-order-dialog"]');
-          await expect(dialog).toBeVisible({ timeout: 5000 });
-
-          // Dialog should have title
-          await expect(page.locator('text=Edit')).toBeVisible();
-        }
-      }
+      await expect(dialog.getByRole('heading', { name: /^Edit .* Order$/ })).toBeVisible();
     });
 
     test('should display all tabs in edit dialog', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
-
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-
-          // Wait for dialog to open
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Check for all tabs
-          await expect(page.locator('button[role="tab"]:has-text("Schedule")')).toBeVisible();
-          await expect(page.locator('button[role="tab"]:has-text("Details")')).toBeVisible();
-          await expect(page.locator('button[role="tab"]:has-text("Addresses")')).toBeVisible();
-          await expect(page.locator('button[role="tab"]:has-text("Pricing")')).toBeVisible();
-          await expect(page.locator('button[role="tab"]:has-text("Notes")')).toBeVisible();
-        }
+      for (const name of ['Schedule', 'Details', 'Addresses', 'Pricing', 'Notes']) {
+        await expect(dialog.getByRole('tab', { name })).toBeVisible();
       }
     });
 
     test('should populate form with existing order data', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog, orderNumber } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
-
-        // Get the order number from the page for comparison
-        const orderNumberText = await page.locator('text=/Order.*#/').textContent();
-
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Dialog description should contain the order number
-          if (orderNumberText) {
-            const orderNumber = orderNumberText.match(/#([A-Z0-9-/]+)/)?.[1];
-            if (orderNumber) {
-              await expect(page.locator(`text=Order #${orderNumber}`)).toBeVisible();
-            }
-          }
-        }
-      }
+      await expect(dialog).toContainText(`Order #${orderNumber}`);
     });
 
     test('should close dialog when clicking Cancel', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Click cancel button
-          const cancelButton = page.locator('[role="dialog"] button:has-text("Cancel")');
-          await cancelButton.click();
-
-          // Dialog should be closed
-          await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
-        }
-      }
+      await expect(dialog).toBeHidden();
     });
   });
 
   test.describe('Edit Form Interactions', () => {
     test('should navigate between tabs', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await dialog.getByRole('tab', { name: 'Addresses' }).click();
+      await expect(dialog.getByText('Pickup Address', { exact: true })).toBeVisible();
+      await expect(dialog.getByText('Delivery Address', { exact: true })).toBeVisible();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Click on Addresses tab
-          const addressesTab = page.locator('button[role="tab"]:has-text("Addresses")');
-          await addressesTab.click();
-
-          // Should show address fields
-          await expect(page.locator('text=Pickup Address')).toBeVisible();
-          await expect(page.locator('text=Delivery Address')).toBeVisible();
-
-          // Click on Pricing tab
-          const pricingTab = page.locator('button[role="tab"]:has-text("Pricing")');
-          await pricingTab.click();
-
-          // Should show pricing fields
-          await expect(page.locator('label:has-text("Order Total")')).toBeVisible();
-        }
-      }
+      await dialog.getByRole('tab', { name: 'Pricing' }).click();
+      await expect(dialog.getByLabel('Order Total ($)')).toBeVisible();
     });
 
     test('should show unsaved changes indicator when form is modified', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
+      const unsaved = dialog.getByText('You have unsaved changes');
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await expect(unsaved).toBeHidden();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
+      await dialog.getByRole('tab', { name: 'Notes' }).click();
+      await dialog.getByLabel('Client Attention / Contact Name').fill(`E2E contact ${Date.now()}`);
 
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+      await expect(unsaved).toBeVisible();
 
-          // Initially should not show unsaved changes
-          await expect(page.locator('text=unsaved changes')).not.toBeVisible();
-
-          // Go to Notes tab and modify a field
-          const notesTab = page.locator('button[role="tab"]:has-text("Notes")');
-          await notesTab.click();
-
-          const clientAttentionInput = page.locator('input[id*="clientAttention"], input[name*="clientAttention"]');
-          if (await clientAttentionInput.count() > 0) {
-            await clientAttentionInput.fill('Test Contact Change');
-
-            // Should show unsaved changes indicator
-            await expect(page.locator('text=unsaved changes')).toBeVisible({ timeout: 3000 });
-          }
-        }
-      }
+      // Discard: close without saving.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
     });
 
     test('should enable Save button when changes are made', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
+      const saveButton = dialog.getByRole('button', { name: 'Save Changes' });
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await expect(saveButton).toBeDisabled();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
+      await dialog.getByRole('tab', { name: 'Notes' }).click();
+      await dialog.getByLabel('Special Notes').fill(`E2E special notes ${Date.now()}`);
 
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+      await expect(saveButton).toBeEnabled();
 
-          // Save button should initially be disabled
-          const saveButton = page.locator('[role="dialog"] button:has-text("Save Changes")');
-          await expect(saveButton).toBeDisabled();
-
-          // Modify a field
-          const notesTab = page.locator('button[role="tab"]:has-text("Notes")');
-          await notesTab.click();
-
-          const specialNotesInput = page.locator('textarea[id*="specialNotes"], textarea[name*="specialNotes"]');
-          if (await specialNotesInput.count() > 0) {
-            await specialNotesInput.fill('Updated special notes for testing');
-
-            // Save button should now be enabled
-            await expect(saveButton).toBeEnabled({ timeout: 3000 });
-          }
-        }
-      }
+      // Discard: close without saving.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
     });
   });
 
   test.describe('Date/Time Picker', () => {
     test('should open date picker for pickup date/time', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await pickupDateTrigger(dialog).click();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Schedule tab should be active by default
-          // Click on the pickup date/time picker button
-          const pickupDateButton = page.locator('[role="dialog"] button:has-text("Select date and time")').first();
-
-          if (await pickupDateButton.count() > 0) {
-            await pickupDateButton.click();
-
-            // Calendar popover should be visible
-            await expect(page.locator('[role="dialog"] .rdp, [role="grid"]')).toBeVisible({ timeout: 3000 });
-          }
-        }
-      }
+      await expect(page.getByRole('grid')).toBeVisible();
     });
 
     test('should block selection of past dates', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await pickupDateTrigger(dialog).click();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
+      const grid = page.getByRole('grid');
+      await expect(grid).toBeVisible();
 
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+      const days = await grid.getByRole('gridcell').evaluateAll((cells) =>
+        cells.map((cell) => ({
+          day: cell.getAttribute('data-day') ?? '',
+          disabled: cell.getAttribute('data-disabled') === 'true',
+        }))
+      );
+      expect(days.length).toBeGreaterThan(0);
 
-          const pickupDateButton = page.locator('[role="dialog"] button:has-text("Select date and time")').first();
-
-          if (await pickupDateButton.count() > 0) {
-            await pickupDateButton.click();
-
-            // Wait for calendar to be visible
-            await page.waitForSelector('[role="grid"]', { timeout: 3000 });
-
-            // Past dates should be disabled (have aria-disabled or disabled class)
-            // Get yesterday's date
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayDay = yesterday.getDate();
-
-            // Look for the button with yesterday's date
-            const yesterdayButton = page.locator(`[role="grid"] button:has-text("${yesterdayDay}")`).first();
-
-            if (await yesterdayButton.count() > 0) {
-              // Should be disabled
-              const isDisabled = await yesterdayButton.getAttribute('disabled') !== null ||
-                await yesterdayButton.getAttribute('aria-disabled') === 'true' ||
-                (await yesterdayButton.getAttribute('class'))?.includes('disabled');
-
-              // Note: This may vary based on the calendar implementation
-              // The test verifies the calendar is functioning, specific disabled state may need adjustment
-            }
-          }
-        }
-      }
+      const today = isoDay(new Date());
+      const enabledPastDays = days.filter((d) => d.day < today && !d.disabled).map((d) => d.day);
+      expect(enabledPastDays).toEqual([]);
     });
   });
 
   test.describe('Save Order Changes', () => {
     test('should save order changes successfully', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      // Stubbed: the real order is never modified.
+      const patch = await stubOrderPatch(page, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' })
+      );
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
+      await dialog.getByRole('tab', { name: 'Notes' }).click();
+      const uniqueNote = `E2E Test Note - ${Date.now()}`;
+      await dialog.getByLabel('Special Notes').fill(uniqueNote);
+      await dialog.getByRole('button', { name: 'Save Changes' }).click();
 
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Modify a field
-          const notesTab = page.locator('button[role="tab"]:has-text("Notes")');
-          await notesTab.click();
-
-          const uniqueNote = `E2E Test Note - ${Date.now()}`;
-          const specialNotesInput = page.locator('textarea[id*="specialNotes"], textarea[name*="specialNotes"]');
-
-          if (await specialNotesInput.count() > 0) {
-            await specialNotesInput.fill(uniqueNote);
-
-            // Click save
-            const saveButton = page.locator('[role="dialog"] button:has-text("Save Changes")');
-            await saveButton.click();
-
-            // Wait for success toast or dialog to close
-            await Promise.race([
-              page.waitForSelector('text=Order updated successfully', { timeout: 5000 }),
-              page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 5000 }),
-            ]);
-
-            // Verify the dialog is closed
-            await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
-          }
-        }
-      }
+      await expect(page.getByText('Order updated successfully!')).toBeVisible();
+      await expect(dialog).toBeHidden();
+      expect(patch.bodies).toHaveLength(1);
+      expect(patch.bodies[0]).toMatchObject({ specialNotes: uniqueNote });
     });
 
     test('should display error toast on save failure', async ({ page }) => {
-      // This test would require mocking API responses
-      // For now, we'll just verify the error handling UI exists
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      // Stubbed failure: nothing reaches the server.
+      await stubOrderPatch(page, (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'E2E simulated save failure' }),
+        })
+      );
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
+      await dialog.getByRole('tab', { name: 'Notes' }).click();
+      await dialog.getByLabel('Special Notes').fill(`E2E failing save ${Date.now()}`);
+      await dialog.getByRole('button', { name: 'Save Changes' }).click();
 
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // The dialog should have error handling in place
-          // This verifies the component structure is correct
-          const saveButton = page.locator('[role="dialog"] button:has-text("Save Changes")');
-          await expect(saveButton).toBeVisible();
-        }
-      }
+      await expect(page.getByText('E2E simulated save failure')).toBeVisible();
+      // The dialog stays open so the admin can retry.
+      await expect(dialog).toBeVisible();
     });
   });
 
   test.describe('On-Demand Order Edit', () => {
-    test('should display on-demand specific fields for on-demand orders', async ({ page }) => {
-      // Navigate to on-demand orders
+    // The admin on-demand detail page (SingleOnDemandOrder) renders no "Edit
+    // Order" button, so EditOrderDialog's on-demand branch is unreachable from
+    // /admin/on-demand-orders/:order_number.
+    test.skip('should display on-demand specific fields for on-demand orders', async ({ page }) => {
       await page.goto('/admin/on-demand-orders');
 
-      const activeOrderLink = page.locator('a[href*="/admin/on-demand-orders/"]').first();
+      const orderLink = page.locator('tbody a[href^="/admin/on-demand-orders/"]').first();
+      await orderLink.click();
+      await editOrderButton(page).click();
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('heading', { name: /On-Demand/ })).toBeVisible();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Dialog title should indicate on-demand
-          await expect(page.locator('text=On-Demand')).toBeVisible();
-
-          // Go to Details tab
-          const detailsTab = page.locator('button[role="tab"]:has-text("Details")');
-          await detailsTab.click();
-
-          // Should show on-demand specific fields
-          await expect(page.locator('label:has-text("Item Delivered")')).toBeVisible();
-          await expect(page.locator('label:has-text("Vehicle Type")')).toBeVisible();
-          await expect(page.locator('text=Package Dimensions')).toBeVisible();
-        }
-      }
+      await dialog.getByRole('tab', { name: 'Details' }).click();
+      await expect(dialog.getByLabel('Item Delivered')).toBeVisible();
+      await expect(dialog.getByText('Vehicle Type')).toBeVisible();
+      await expect(dialog.getByText('Package Dimensions')).toBeVisible();
     });
   });
 
   test.describe('Accessibility', () => {
     test('should have proper ARIA labels and roles', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      await expect(dialog.getByRole('tablist')).toBeVisible();
+      await expect(dialog.getByRole('tab').first()).toBeVisible();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Dialog should have proper role
-          await expect(page.locator('[role="dialog"]')).toBeVisible();
-
-          // Tabs should have proper roles
-          await expect(page.locator('[role="tablist"]')).toBeVisible();
-          await expect(page.locator('[role="tab"]').first()).toBeVisible();
-
-          // Form inputs should have labels
-          const inputs = page.locator('[role="dialog"] input, [role="dialog"] textarea');
-          const inputCount = await inputs.count();
-
-          // Most inputs should have associated labels
-          for (let i = 0; i < Math.min(inputCount, 5); i++) {
-            const input = inputs.nth(i);
-            const id = await input.getAttribute('id');
-            if (id) {
-              const label = page.locator(`label[for="${id}"]`);
-              // Either has a label or is inside a labeled container
-              const hasLabel = await label.count() > 0 ||
-                await input.locator('xpath=ancestor::*[self::label]').count() > 0;
-            }
-          }
-        }
-      }
+      // Form fields are reachable by their visible labels.
+      await dialog.getByRole('tab', { name: 'Notes' }).click();
+      await expect(dialog.getByLabel('Client Attention / Contact Name')).toBeVisible();
+      await expect(dialog.getByLabel('Pickup Notes')).toBeVisible();
+      await expect(dialog.getByLabel('Special Notes')).toBeVisible();
     });
 
     test('should support keyboard navigation', async ({ page }) => {
-      const activeOrderLink = page.locator('a[href*="/admin/catering-orders/"]').first();
+      const { dialog } = await openEditDialog(page);
 
-      if (await activeOrderLink.count() > 0) {
-        await activeOrderLink.click();
-        await page.waitForLoadState('networkidle');
+      // Arrow keys move between tabs once the tab list has focus.
+      await dialog.getByRole('tab', { name: 'Schedule' }).focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(dialog.getByRole('tab', { name: 'Details' })).toBeFocused();
 
-        const editButton = page.locator('button:has-text("Edit Order"), [data-testid="edit-order-button"]').first();
-
-        if (await editButton.count() > 0) {
-          await editButton.click();
-          await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-
-          // Tab through the tabs
-          await page.keyboard.press('Tab');
-          await page.keyboard.press('Tab');
-
-          // Use arrow keys to navigate tabs
-          await page.keyboard.press('ArrowRight');
-          await page.keyboard.press('ArrowRight');
-
-          // Escape should close the dialog
-          await page.keyboard.press('Escape');
-
-          // Dialog should be closed
-          await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
-        }
-      }
+      // Escape closes the dialog.
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
     });
   });
 });

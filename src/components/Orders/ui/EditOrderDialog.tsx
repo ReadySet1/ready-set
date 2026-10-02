@@ -5,7 +5,6 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -52,63 +51,13 @@ import {
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
 import { Order, OrderType, VehicleType } from "@/types/order";
-
-// Form schema for the edit dialog - permissive validation, server will validate strictly
-const editOrderSchema = z.object({
-  // Schedule
-  pickupDateTime: z.date().optional().nullable(),
-  arrivalDateTime: z.date().optional().nullable(),
-
-  // Catering specific
-  brokerage: z.string().optional().nullable(),
-  headcount: z.number().int().positive().optional().nullable(),
-  needHost: z.enum(["YES", "NO"]).optional(),
-  hoursNeeded: z.number().positive().optional().nullable(),
-  numberOfHosts: z.number().int().positive().optional().nullable(),
-
-  // On-demand specific
-  itemDelivered: z.string().optional().nullable(),
-  vehicleType: z.enum(["CAR", "VAN", "TRUCK"]).optional(),
-  length: z.number().positive().optional().nullable(),
-  width: z.number().positive().optional().nullable(),
-  height: z.number().positive().optional().nullable(),
-  weight: z.number().positive().optional().nullable(),
-
-  // Pricing
-  orderTotal: z.number().nonnegative().optional().nullable(),
-  tip: z.number().nonnegative().optional().nullable(),
-  appliedDiscount: z.number().nonnegative().optional().nullable(),
-  deliveryCost: z.number().nonnegative().optional().nullable(),
-
-  // Notes
-  clientAttention: z.string().optional().nullable(),
-  pickupNotes: z.string().optional().nullable(),
-  specialNotes: z.string().optional().nullable(),
-
-  // Addresses - permissive validation, server validates strictly
-  pickupAddress: z.object({
-    street1: z.string(),
-    street2: z.string().optional().nullable(),
-    city: z.string(),
-    state: z.string(),
-    zip: z.string(),
-    county: z.string().optional().nullable(),
-    locationNumber: z.string().optional().nullable(),
-    parkingLoading: z.string().optional().nullable(),
-  }).optional(),
-  deliveryAddress: z.object({
-    street1: z.string(),
-    street2: z.string().optional().nullable(),
-    city: z.string(),
-    state: z.string(),
-    zip: z.string(),
-    county: z.string().optional().nullable(),
-    locationNumber: z.string().optional().nullable(),
-    parkingLoading: z.string().optional().nullable(),
-  }).optional(),
-});
-
-type EditOrderFormData = z.infer<typeof editOrderSchema>;
+import {
+  buildOrderUpdatePayload,
+  editOrderSchema,
+  EditOrderFormData,
+  EditOrderFormInput,
+  toOrderFormValues,
+} from "./edit-order-form";
 
 interface EditOrderDialogProps {
   isOpen: boolean;
@@ -130,58 +79,10 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   const isCatering = order.order_type === "catering";
   const orderTypeLabel = isCatering ? "Catering" : "On-Demand";
 
-  // Parse date strings to Date objects
-  const parseDateTime = (value: string | Date | null | undefined): Date | null => {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-    const parsed = new Date(value);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  };
-
-  const form = useForm<EditOrderFormData>({
+  // Inputs hold the raw typed text; the resolver hands onSubmit parsed numbers.
+  const form = useForm<EditOrderFormInput, unknown, EditOrderFormData>({
     resolver: zodResolver(editOrderSchema),
-    defaultValues: {
-      pickupDateTime: parseDateTime(order.pickupDateTime),
-      arrivalDateTime: parseDateTime(order.arrivalDateTime),
-      brokerage: (order as any).brokerage ?? null,
-      headcount: (order as any).headcount ?? null,
-      needHost: (order as any).needHost ?? "NO",
-      hoursNeeded: (order as any).hoursNeeded ?? null,
-      numberOfHosts: (order as any).numberOfHosts ?? null,
-      itemDelivered: (order as any).itemDelivered ?? null,
-      vehicleType: (order as any).vehicleType ?? "CAR",
-      length: (order as any).length ?? null,
-      width: (order as any).width ?? null,
-      height: (order as any).height ?? null,
-      weight: (order as any).weight ?? null,
-      orderTotal: order.orderTotal ? Number(order.orderTotal) : null,
-      tip: order.tip ? Number(order.tip) : null,
-      appliedDiscount: (order as any).appliedDiscount ? Number((order as any).appliedDiscount) : null,
-      deliveryCost: (order as any).deliveryCost ? Number((order as any).deliveryCost) : null,
-      clientAttention: order.clientAttention ?? null,
-      pickupNotes: order.pickupNotes ?? null,
-      specialNotes: order.specialNotes ?? null,
-      pickupAddress: order.pickupAddress ? {
-        street1: order.pickupAddress.street1 ?? "",
-        street2: order.pickupAddress.street2 ?? null,
-        city: order.pickupAddress.city ?? "",
-        state: order.pickupAddress.state ?? "",
-        zip: order.pickupAddress.zip ?? "",
-        county: order.pickupAddress.county ?? null,
-        locationNumber: order.pickupAddress.locationNumber ?? null,
-        parkingLoading: order.pickupAddress.parkingLoading ?? null,
-      } : undefined,
-      deliveryAddress: order.deliveryAddress ? {
-        street1: order.deliveryAddress.street1 ?? "",
-        street2: order.deliveryAddress.street2 ?? null,
-        city: order.deliveryAddress.city ?? "",
-        state: order.deliveryAddress.state ?? "",
-        zip: order.deliveryAddress.zip ?? "",
-        county: order.deliveryAddress.county ?? null,
-        locationNumber: order.deliveryAddress.locationNumber ?? null,
-        parkingLoading: order.deliveryAddress.parkingLoading ?? null,
-      } : undefined,
-    },
+    defaultValues: toOrderFormValues(order),
   });
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = form;
@@ -199,48 +100,7 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   // Reset form when order changes
   useEffect(() => {
     if (isOpen && order) {
-      form.reset({
-        pickupDateTime: parseDateTime(order.pickupDateTime),
-        arrivalDateTime: parseDateTime(order.arrivalDateTime),
-        brokerage: (order as any).brokerage ?? null,
-        headcount: (order as any).headcount ?? null,
-        needHost: (order as any).needHost ?? "NO",
-        hoursNeeded: (order as any).hoursNeeded ?? null,
-        numberOfHosts: (order as any).numberOfHosts ?? null,
-        itemDelivered: (order as any).itemDelivered ?? null,
-        vehicleType: (order as any).vehicleType ?? "CAR",
-        length: (order as any).length ?? null,
-        width: (order as any).width ?? null,
-        height: (order as any).height ?? null,
-        weight: (order as any).weight ?? null,
-        orderTotal: order.orderTotal ? Number(order.orderTotal) : null,
-        tip: order.tip ? Number(order.tip) : null,
-        appliedDiscount: (order as any).appliedDiscount ? Number((order as any).appliedDiscount) : null,
-        deliveryCost: (order as any).deliveryCost ? Number((order as any).deliveryCost) : null,
-        clientAttention: order.clientAttention ?? null,
-        pickupNotes: order.pickupNotes ?? null,
-        specialNotes: order.specialNotes ?? null,
-        pickupAddress: order.pickupAddress ? {
-          street1: order.pickupAddress.street1 ?? "",
-          street2: order.pickupAddress.street2 ?? null,
-          city: order.pickupAddress.city ?? "",
-          state: order.pickupAddress.state ?? "",
-          zip: order.pickupAddress.zip ?? "",
-          county: order.pickupAddress.county ?? null,
-          locationNumber: order.pickupAddress.locationNumber ?? null,
-          parkingLoading: order.pickupAddress.parkingLoading ?? null,
-        } : undefined,
-        deliveryAddress: order.deliveryAddress ? {
-          street1: order.deliveryAddress.street1 ?? "",
-          street2: order.deliveryAddress.street2 ?? null,
-          city: order.deliveryAddress.city ?? "",
-          state: order.deliveryAddress.state ?? "",
-          zip: order.deliveryAddress.zip ?? "",
-          county: order.deliveryAddress.county ?? null,
-          locationNumber: order.deliveryAddress.locationNumber ?? null,
-          parkingLoading: order.deliveryAddress.parkingLoading ?? null,
-        } : undefined,
-      });
+      form.reset(toOrderFormValues(order));
     }
   }, [isOpen, order, form]);
 
@@ -256,50 +116,7 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
       }
 
       // Build the update payload - only include changed fields
-      const updatePayload: Record<string, unknown> = {};
-
-      // Compare and add changed fields
-      if (data.pickupDateTime !== parseDateTime(order.pickupDateTime)) {
-        updatePayload.pickupDateTime = data.pickupDateTime?.toISOString();
-      }
-      if (data.arrivalDateTime !== parseDateTime(order.arrivalDateTime)) {
-        updatePayload.arrivalDateTime = data.arrivalDateTime?.toISOString();
-      }
-
-      // Add type-specific fields
-      if (isCatering) {
-        if (data.brokerage !== (order as any).brokerage) updatePayload.brokerage = data.brokerage;
-        if (data.headcount !== (order as any).headcount) updatePayload.headcount = data.headcount;
-        if (data.needHost !== (order as any).needHost) updatePayload.needHost = data.needHost;
-        if (data.hoursNeeded !== (order as any).hoursNeeded) updatePayload.hoursNeeded = data.hoursNeeded;
-        if (data.numberOfHosts !== (order as any).numberOfHosts) updatePayload.numberOfHosts = data.numberOfHosts;
-        if (data.appliedDiscount !== Number((order as any).appliedDiscount || 0)) updatePayload.appliedDiscount = data.appliedDiscount;
-        if (data.deliveryCost !== Number((order as any).deliveryCost || 0)) updatePayload.deliveryCost = data.deliveryCost;
-      } else {
-        if (data.itemDelivered !== (order as any).itemDelivered) updatePayload.itemDelivered = data.itemDelivered;
-        if (data.vehicleType !== (order as any).vehicleType) updatePayload.vehicleType = data.vehicleType;
-        if (data.length !== (order as any).length) updatePayload.length = data.length;
-        if (data.width !== (order as any).width) updatePayload.width = data.width;
-        if (data.height !== (order as any).height) updatePayload.height = data.height;
-        if (data.weight !== (order as any).weight) updatePayload.weight = data.weight;
-      }
-
-      // Common pricing fields
-      if (data.orderTotal !== Number(order.orderTotal || 0)) updatePayload.orderTotal = data.orderTotal;
-      if (data.tip !== Number(order.tip || 0)) updatePayload.tip = data.tip;
-
-      // Notes
-      if (data.clientAttention !== order.clientAttention) updatePayload.clientAttention = data.clientAttention;
-      if (data.pickupNotes !== order.pickupNotes) updatePayload.pickupNotes = data.pickupNotes;
-      if (data.specialNotes !== order.specialNotes) updatePayload.specialNotes = data.specialNotes;
-
-      // Addresses - always include if form has data
-      if (data.pickupAddress) {
-        updatePayload.pickupAddress = data.pickupAddress;
-      }
-      if (data.deliveryAddress) {
-        updatePayload.deliveryAddress = data.deliveryAddress;
-      }
+      const updatePayload = buildOrderUpdatePayload(data, order);
 
       // Check if there are any changes
       if (Object.keys(updatePayload).length === 0) {

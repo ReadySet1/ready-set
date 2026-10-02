@@ -4,8 +4,12 @@
  * Verifies the Total Mileage Calculation tool loads correctly,
  * renders all UI components, and handles user interactions.
  *
+ * /admin/mileage-calculator is limited to ADMIN, SUPER_ADMIN and HELPDESK
+ * (see src/app/(backend)/admin/mileage-calculator/page.tsx), so these tests
+ * use the ADMIN session saved by e2e/auth/setup.ts instead of a UI sign-in.
+ *
  * Testing Steps:
- * 1. Navigate to /admin/mileage-calculator (requires auth)
+ * 1. Navigate to /admin/mileage-calculator as an admin
  * 2. Verify page title and layout render
  * 3. Verify form inputs (pickup, drop-off, add/remove stops)
  * 4. Verify tab switching between Calculator and History
@@ -15,38 +19,21 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-const TEST_USER = {
-  email: process.env.E2E_TEST_USER_EMAIL || '',
-  password: process.env.E2E_TEST_USER_PASSWORD || '',
-};
+// Headless Chromium has no GPU, and MileageMap crashes the whole page when
+// WebGL is missing (see the fixme'd test below). Software WebGL lets the rest
+// of the suite exercise the calculator as a real browser would.
+test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
-async function loginAndNavigateToMileageCalc(page: Page): Promise<void> {
-  await page.goto('/sign-in');
+const pageHeading = (page: Page) =>
+  page.getByRole('heading', { level: 1, name: 'Total Mileage Calculation' });
 
-  await page.waitForSelector('input[type="email"], input[name="email"]', {
-    timeout: 15000,
-  });
-
-  await page.fill('input[name="email"], input[type="email"]', TEST_USER.email);
-  await page.fill(
-    'input[name="password"], input[type="password"]',
-    TEST_USER.password,
-  );
-
-  await page.click('button[type="submit"]');
-
-  await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
-    timeout: 30000,
-  });
-
+async function openMileageCalculator(page: Page): Promise<void> {
   await page.goto('/admin/mileage-calculator');
-
-  await page.waitForSelector('h1:has-text("Total Mileage Calculation")', {
-    timeout: 15000,
-  });
+  await expect(pageHeading(page)).toBeVisible({ timeout: 15000 });
 }
 
 test.describe('Mileage Calculator', () => {
+  test.use({ storageState: 'e2e/.auth/admin.json' });
   test.setTimeout(60000);
 
   let consoleErrors: string[] = [];
@@ -59,32 +46,28 @@ test.describe('Mileage Calculator', () => {
       }
     });
 
-    await loginAndNavigateToMileageCalc(page);
+    await openMileageCalculator(page);
   });
 
   test('should display page title and description', async ({ page }) => {
-    await expect(
-      page.locator('h1:has-text("Total Mileage Calculation")'),
-    ).toBeVisible();
+    await expect(pageHeading(page)).toBeVisible();
 
-    await expect(
-      page.locator('text=Calculate driving distance'),
-    ).toBeVisible();
+    await expect(page.getByText('Calculate driving distance')).toBeVisible();
   });
 
   test('should render pickup and drop-off inputs', async ({ page }) => {
-    await expect(page.locator('text=Pickup Location')).toBeVisible();
-    await expect(page.locator('text=Drop-off 1')).toBeVisible();
+    await expect(page.getByText('Pickup Location', { exact: true })).toBeVisible();
+    await expect(page.getByText('Drop-off 1', { exact: true })).toBeVisible();
   });
 
   test('should render the Calculate Mileage button', async ({ page }) => {
-    const calcButton = page.locator('button:has-text("Calculate Mileage")');
+    const calcButton = page.getByRole('button', { name: 'Calculate Mileage' });
     await expect(calcButton).toBeVisible();
     await expect(calcButton).toBeDisabled();
   });
 
   test('should render Add Stop button', async ({ page }) => {
-    const addButton = page.locator('button:has-text("Add Stop")');
+    const addButton = page.getByRole('button', { name: /Add Stop/ });
     await expect(addButton).toBeVisible();
     await expect(addButton).toContainText('1/5');
   });
@@ -92,55 +75,53 @@ test.describe('Mileage Calculator', () => {
   test('should add a second drop-off when Add Stop is clicked', async ({
     page,
   }) => {
-    await page.click('button:has-text("Add Stop")');
+    const addButton = page.getByRole('button', { name: /Add Stop/ });
+    await addButton.click();
 
-    await expect(page.locator('text=Drop-off 2')).toBeVisible();
-    await expect(page.locator('button:has-text("Add Stop")')).toContainText(
-      '2/5',
-    );
+    await expect(page.getByText('Drop-off 2', { exact: true })).toBeVisible();
+    await expect(addButton).toContainText('2/5');
   });
 
   test('should show remove button for extra drop-offs', async ({ page }) => {
-    await page.click('button:has-text("Add Stop")');
+    await page.getByRole('button', { name: /Add Stop/ }).click();
 
-    const removeButtons = page.locator('button[aria-label*="Remove drop-off"]');
-    await expect(removeButtons.first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Remove drop-off/ }).first(),
+    ).toBeVisible();
   });
 
   test('should switch between Mileage Calculator and Recent Calculations tabs', async ({
     page,
   }) => {
-    const calcTab = page.locator('button[role="tab"]:has-text("Mileage Calculator"), button[role="tab"]:has-text("Calculator")');
-    const historyTab = page.locator(
-      'button[role="tab"]:has-text("Recent Calculations"), button[role="tab"]:has-text("Recent")',
-    );
+    const calcTab = page.getByRole('tab', { name: /Calculator/ });
+    const historyTab = page.getByRole('tab', { name: /Recent/ });
 
     await expect(calcTab).toBeVisible();
     await expect(historyTab).toBeVisible();
 
     await historyTab.click();
 
-    await expect(page.locator('text=No calculations yet')).toBeVisible();
+    await expect(page.getByText('No calculations yet')).toBeVisible();
 
     await calcTab.click();
 
-    await expect(page.locator('text=Pickup Location')).toBeVisible();
+    await expect(page.getByText('Pickup Location', { exact: true })).toBeVisible();
   });
 
   test('should show the map container', async ({ page }) => {
+    // Map may or may not render depending on Mapbox token availability.
+    // At minimum the map card (or its fallback message) should exist.
     const mapContainer = page.locator('.mapboxgl-map, [class*="mapbox"]');
-    // Map may or may not render depending on Mapbox token availability
-    // At minimum the map card should exist
-    const mapCard = page.locator('text=Map unavailable').or(mapContainer);
+    const mapCard = page.getByText('Map unavailable').or(mapContainer);
     await expect(mapCard.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should display "No calculation yet" placeholder', async ({ page }) => {
-    await expect(page.locator('text=No calculation yet')).toBeVisible();
+    await expect(page.getByText('No calculation yet')).toBeVisible();
   });
 
   test('should show Google Maps badge', async ({ page }) => {
-    await expect(page.locator('text=Google Maps')).toBeVisible();
+    await expect(page.getByText('Google Maps', { exact: true })).toBeVisible();
   });
 
   test('should not have critical console errors', async () => {
@@ -148,13 +129,44 @@ test.describe('Mileage Calculator', () => {
       (err) =>
         !err.includes('favicon') &&
         !err.includes('hydration') &&
-        !err.includes('Warning:'),
+        !err.includes('Warning:') &&
+        // Third-party analytics script; whether it loads depends on the
+        // network, not on this page.
+        !err.includes('Umami analytics'),
     );
     expect(criticalErrors).toHaveLength(0);
   });
 });
 
+test.describe('Mileage Calculator - Without WebGL', () => {
+  test.use({ storageState: 'e2e/.auth/admin.json' });
+
+  test.fixme(
+    'should still render the calculator when WebGL is unavailable',
+    // App bug: MileageMap calls new mapboxgl.Map() unguarded, so "Failed to
+    // initialize WebGL" bubbles to AuthErrorBoundary and replaces the page.
+    async ({ page }) => {
+      await page.addInitScript(() => {
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (
+          this: HTMLCanvasElement,
+          type: string,
+          ...args: unknown[]
+        ) {
+          if (type.startsWith('webgl') || type === 'experimental-webgl') return null;
+          return (getContext as (...a: unknown[]) => unknown).call(this, type, ...args);
+        } as typeof getContext;
+      });
+
+      await openMileageCalculator(page);
+      await expect(page.getByRole('button', { name: 'Calculate Mileage' })).toBeVisible();
+    },
+  );
+});
+
 test.describe('Mileage Calculator - Auth Gate', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('should redirect unauthenticated users to sign-in', async ({
     page,
   }) => {
@@ -167,12 +179,13 @@ test.describe('Mileage Calculator - Auth Gate', () => {
 });
 
 test.describe('Mileage Calculator - Sidebar Navigation', () => {
+  test.use({ storageState: 'e2e/.auth/admin.json' });
   test.setTimeout(60000);
 
   test('should have Total Mileage Calculation link in sidebar', async ({
     page,
   }) => {
-    await loginAndNavigateToMileageCalc(page);
+    await openMileageCalculator(page);
 
     const sidebarLink = page.locator(
       'a[href="/admin/mileage-calculator"]:has-text("Total Mileage Calculation")',

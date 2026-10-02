@@ -19,7 +19,8 @@ test.describe('Flowers Landing Page', () => {
   });
 
   test('1. Page loads successfully', async ({ page }) => {
-    await expect(page).toHaveTitle(/Floral Delivery/i);
+    // Title changed to "Flower Delivery Services" in the SEO pass (8bdb97e9).
+    await expect(page).toHaveTitle(/Flower Delivery Services/i);
   });
 
   test.describe('FlowerHero Section', () => {
@@ -86,10 +87,15 @@ test.describe('Flowers Landing Page', () => {
     });
 
     test('11. Renders stats grid', async ({ page }) => {
-      await expect(page.locator('text=Founded')).toBeVisible();
-      await expect(page.locator('text=Deliveries Completed')).toBeVisible();
-      await expect(page.locator('text=On-Time Delivery Rate')).toBeVisible();
-      await expect(page.locator('text=Professional Drivers')).toBeVisible();
+      // Exact match: the hero also says "157,000+ Floral Deliveries Completed".
+      for (const label of [
+        'Founded',
+        'Deliveries Completed',
+        'On-Time Delivery Rate',
+        'Professional Drivers',
+      ]) {
+        await expect(page.getByText(label, { exact: true })).toBeVisible();
+      }
     });
 
     test('12. "How Our Service Works" link follows the marketing CTA flag', async ({ page }) => {

@@ -8,15 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/utils/supabase/server';
+import { hasAdminRole } from '@/lib/auth/admin-role';
 import { getArchiveMetrics } from '@/jobs/dataArchiving';
 import { prisma } from '@/utils/prismaDB';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-interface AppMetadata {
-  role?: string;
-}
 
 /**
  * GET - Get archive metrics and status
@@ -29,9 +26,7 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const isAdminUser = user && (user.app_metadata as AppMetadata)?.role === 'admin';
-    const isSuperAdmin = user && (user.app_metadata as AppMetadata)?.role === 'super_admin';
-    const isAuthorized = isAdminUser || isSuperAdmin;
+    const isAuthorized = !!user && (await hasAdminRole(user.id));
 
     if (!isAuthorized) {
       return NextResponse.json(
