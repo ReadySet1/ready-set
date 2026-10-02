@@ -7,12 +7,9 @@
 
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { hasAdminRole } from "@/lib/auth/admin-role";
 import { prisma } from "@/utils/prismaDB";
 import AdminHistoryClient from "./AdminHistoryClient";
-
-interface AppMetadata {
-  role?: string;
-}
 
 interface PageProps {
   params: Promise<{ driverId: string }>;
@@ -31,10 +28,7 @@ export default async function AdminDriverHistoryPage({ params }: PageProps) {
     redirect("/sign-in");
   }
 
-  const isAdmin = (user.app_metadata as AppMetadata)?.role === "admin";
-  const isSuperAdmin = (user.app_metadata as AppMetadata)?.role === "super_admin";
-
-  if (!isAdmin && !isSuperAdmin) {
+  if (!(await hasAdminRole(user.id))) {
     redirect("/admin");
   }
 

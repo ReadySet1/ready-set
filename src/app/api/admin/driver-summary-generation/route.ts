@@ -14,15 +14,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/utils/supabase/server';
+import { getUserRole } from '@/lib/auth';
+import { isAdminRole } from '@/lib/auth/admin-role';
 import { runDriverSummaryGeneration, SummaryGenerationConfig } from '@/jobs/driverSummaryGeneration';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for summary generation
-
-interface AppMetadata {
-  role?: string;
-}
 
 /**
  * GET - Vercel Cron trigger or manual admin invocation
@@ -58,9 +56,8 @@ async function handleGeneration(request: NextRequest) {
 
     // Authorization: Allow if (1) Valid cron secret OR (2) Admin/Super Admin user
     const isValidCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const isAdminUser = user && (user.app_metadata as AppMetadata)?.role === 'admin';
-    const isSuperAdmin = user && (user.app_metadata as AppMetadata)?.role === 'super_admin';
-    const isAuthorized = isValidCronRequest || isAdminUser || isSuperAdmin;
+    const userRole = !isValidCronRequest && user ? await getUserRole(user.id) : null;
+    const isAuthorized = isValidCronRequest || isAdminRole(userRole);
 
     if (!isAuthorized) {
       Sentry.captureMessage('Unauthorized driver summary generation attempt', {
@@ -68,7 +65,7 @@ async function handleGeneration(request: NextRequest) {
         extra: {
           hasAuthHeader: !!authHeader,
           hasUser: !!user,
-          userRole: user ? (user.app_metadata as AppMetadata)?.role : 'none',
+          userRole: userRole ?? 'none',
         },
       });
 

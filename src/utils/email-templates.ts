@@ -7,6 +7,13 @@ import {
 import { escapeHtml } from "@/lib/utils/escape-html";
 
 /**
+ * Logo URL for email templates — explicit `f_png` so Cloudinary never
+ * serves WebP/AVIF, which Outlook and older Gmail clients drop.
+ */
+export const EMAIL_LOGO_URL =
+  'https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/logo/full-logo-dark' as const;
+
+/**
  * Ready Set Brand Colors - Comprehensive Design System
  * Unified across all email templates with full color palette
  */
@@ -99,9 +106,7 @@ export const BRAND_COLORS = {
  * Generate email header with Ready Set branding
  */
 export const generateEmailHeader = (title: string) => {
-  // Use hardcoded public URL for maximum email client compatibility
-  // Email clients often block images from variable URLs or localhost
-  const logoUrl = 'https://res.cloudinary.com/dzm8qcnfd/image/upload/f_png/ready-set/logo/full-logo-dark';
+  const logoUrl = EMAIL_LOGO_URL;
 
   return `
   <div style="background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">

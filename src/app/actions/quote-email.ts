@@ -1,5 +1,7 @@
 "use server";
 
+import { CONTACT_EMAIL } from "@/config/contact";
+
 // Base interfaces for shared fields
 interface BaseFormData {
   // Common vendor info fields
@@ -195,7 +197,7 @@ const sendDeliveryQuoteRequest = async (data: DeliveryFormData) => {
     },
     to: [
       {
-        email: "info@readysetllc.com",
+        email: CONTACT_EMAIL,
         name: "Ready Set",
       },
     ],

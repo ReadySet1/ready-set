@@ -100,8 +100,8 @@ export const cateringUpdateSchema = z.object({
   hoursNeeded: optionalPositiveNumberSchema.nullable(),
   numberOfHosts: optionalPositiveIntSchema.nullable(),
 
-  // Pricing fields
-  orderTotal: optionalNonNegativeNumberSchema.nullable(),
+  // Pricing fields — orderTotal is positive, matching every create path (#517)
+  orderTotal: optionalPositiveNumberSchema.nullable(),
   tip: optionalNonNegativeNumberSchema.nullable(),
   appliedDiscount: optionalNonNegativeNumberSchema.nullable(),
   deliveryCost: optionalNonNegativeNumberSchema.nullable(),
@@ -174,6 +174,31 @@ export interface FieldChange {
   oldValue: unknown;
   newValue: unknown;
   isSignificant: boolean;
+}
+
+export const CATERING_PAIR_MESSAGE = "Provide at least one: Headcount or Order Total.";
+
+/**
+ * Whether a catering update would leave the order with neither a headcount nor
+ * an order total — the state #517 forbids at creation.
+ *
+ * The update is merged over the saved values (`undefined` means "not being
+ * updated"), and a saved total of 0 counts as missing because 0.00 is the
+ * column default. An update that touches neither field is never rejected, so
+ * pre-#517 rows that already lack both can still be edited.
+ */
+export function leavesCateringPairEmpty(
+  existing: { headcount?: unknown; orderTotal?: unknown },
+  update: { headcount?: unknown; orderTotal?: unknown }
+): boolean {
+  if (update.headcount === undefined && update.orderTotal === undefined) return false;
+
+  const headcount = update.headcount !== undefined ? update.headcount : existing.headcount;
+  const orderTotal = update.orderTotal !== undefined ? update.orderTotal : existing.orderTotal;
+
+  const hasHeadcount = headcount != null;
+  const hasOrderTotal = orderTotal != null && Number(orderTotal) > 0;
+  return !hasHeadcount && !hasOrderTotal;
 }
 
 // Helper function to check if a status is terminal

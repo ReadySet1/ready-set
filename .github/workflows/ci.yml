@@ -326,6 +326,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
           NEXT_PUBLIC_SANITY_DATASET: test
+          # Public pk.* token (same variable the image build uses) so the driver
+          # live map renders instead of its "token not configured" card.
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ vars.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN }}
 
       # No shell timeout and no `|| exit 0`: Playwright's CI globalTimeout ends
       # the run gracefully (reports still written), and a failing suite shows
