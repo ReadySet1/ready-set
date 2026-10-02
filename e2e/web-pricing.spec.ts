@@ -15,13 +15,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Web Development Pricing Tool', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the public web pricing tool (no auth required)
-    await page.goto('/demo/web-pricing');
+    // Navigate to the public web pricing tool (no auth required).
+    // Keep the default 'load' wait: package cards only respond to clicks
+    // once React has hydrated. The first hit on a cold dev server compiles
+    // the route, which can exceed the 15s default navigation budget.
+    await page.goto('/demo/web-pricing', { timeout: 45000 });
 
     // Wait for the page to load
-    await page.waitForSelector('h1:has-text("Web Development Pricing")', {
-      timeout: 15000,
-    });
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Web Development Pricing' })
+    ).toBeVisible({ timeout: 30000 });
   });
 
   test('1. Page loads successfully without authentication', async ({ page }) => {
@@ -74,7 +77,7 @@ test.describe('Web Development Pricing Tool', () => {
     // Quote should update
     await expect(page.locator('text=Base package')).toBeVisible();
     await expect(page.locator('text=One-time')).toBeVisible();
-    await expect(page.locator('text=Monthly')).toBeVisible();
+    await expect(page.getByText('Monthly', { exact: true })).toBeVisible();
     await expect(page.locator('text=Year 1 Total')).toBeVisible();
   });
 
@@ -116,7 +119,7 @@ test.describe('Web Development Pricing Tool', () => {
     // Add-on categories should appear
     await expect(page.locator('text=Design').first()).toBeVisible();
     await expect(page.locator('text=Development').first()).toBeVisible();
-    await expect(page.locator('text=Integrations')).toBeVisible();
+    await expect(page.getByText('Integrations', { exact: true })).toBeVisible();
     await expect(page.locator('text=Hosting & Infrastructure')).toBeVisible();
     await expect(page.locator('text=Maintenance & Support')).toBeVisible();
   });
@@ -161,12 +164,13 @@ test.describe('Web Development Pricing Tool', () => {
     await page.waitForTimeout(300);
 
     // ERP Integration should be disabled
-    const erpCheckbox = page.locator('input[id="erp-integration"]');
+    const erpCheckbox = page.locator('#erp-integration');
     await expect(erpCheckbox).toBeDisabled();
 
-    // Should show reason
+    // Should show reason on the ERP row (other e-commerce-only rows show it too)
+    const erpRow = page.locator('div', { has: erpCheckbox }).last();
     await expect(
-      page.locator('text=Not available for this package')
+      erpRow.getByText('Not available for this package')
     ).toBeVisible();
   });
 
@@ -178,7 +182,7 @@ test.describe('Web Development Pricing Tool', () => {
     await page.waitForTimeout(300);
 
     // ERP Integration should be enabled
-    const erpCheckbox = page.locator('input[id="erp-integration"]');
+    const erpCheckbox = page.locator('#erp-integration');
     await expect(erpCheckbox).toBeEnabled();
   });
 
@@ -192,7 +196,7 @@ test.describe('Web Development Pricing Tool', () => {
     await page.waitForTimeout(300);
 
     // Brand Kit should now be disabled (incompatible with Logo Design)
-    const brandKitCheckbox = page.locator('input[id="brand-kit"]');
+    const brandKitCheckbox = page.locator('#brand-kit');
     await expect(brandKitCheckbox).toBeDisabled();
 
     // Should show conflict reason
@@ -224,13 +228,19 @@ test.describe('Web Development Pricing Tool', () => {
   });
 
   test('15. CTA buttons have correct links', async ({ page }) => {
+    // The CTA card lives inside the quote panel, which only renders once a
+    // package is selected.
+    await page.click('text=Marketing Essential');
+
     const contactLink = page.locator('a:has-text("Contact Sales")');
     await expect(contactLink).toBeVisible();
     await expect(contactLink).toHaveAttribute('href', '/contact');
 
-    const scheduleLink = page.locator('a:has-text("Schedule a Call")');
-    await expect(scheduleLink).toBeVisible();
-    await expect(scheduleLink).toHaveAttribute('href', '/sign-up');
+    // "Schedule a Call" is a dialog trigger (embedded booking calendar), not a link.
+    await page.getByRole('button', { name: 'Schedule a Call' }).click();
+    await expect(
+      page.getByRole('dialog').getByText('Schedule a Consultation')
+    ).toBeVisible();
   });
 
   test('16. What\'s Included section is displayed', async ({ page }) => {
@@ -338,6 +348,8 @@ test.describe('Web Development Pricing Tool', () => {
         'ResizeObserver loop',
         'Failed to load resource: net::ERR_BLOCKED_BY_CLIENT',
         'Download the React DevTools',
+        // Third-party analytics host is unreachable from some networks
+        'Failed to load Umami analytics script',
       ];
       return !ignoredPatterns.some((pattern) => error.includes(pattern));
     });
@@ -356,6 +368,9 @@ test.describe('Web Development Pricing Tool', () => {
     // Key elements should still be visible
     await expect(page.locator('text=Choose Your Package')).toBeVisible();
     await expect(page.locator('text=Marketing Essential')).toBeVisible();
+
+    // The quote panel only renders after a package is selected
+    await page.click('text=Marketing Essential');
     await expect(page.locator('text=Your Quote')).toBeVisible();
   });
 

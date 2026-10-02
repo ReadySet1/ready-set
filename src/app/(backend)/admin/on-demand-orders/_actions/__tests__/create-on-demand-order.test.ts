@@ -26,6 +26,8 @@ jest.mock("@/utils/supabase/server", () => ({
   })),
 }));
 
+jest.mock("@/lib/auth/staff-caller", () => ({ getStaffCaller: jest.fn() }));
+
 jest.mock("@/services/orders/notifyOrderCreated");
 jest.mock("@/lib/api/after-response", () => ({
   runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
@@ -68,12 +70,34 @@ const validInput = {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe("createOnDemandOrder — caller authorization", () => {
+  const { prisma } = jest.requireMock("@/lib/db/prisma");
+  const { getStaffCaller } = jest.requireMock("@/lib/auth/staff-caller");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("rejects callers that are not staff (or not signed in) without writing anything", async () => {
+    getStaffCaller.mockResolvedValue(null);
+
+    const result = await createOnDemandOrder(validInput);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/unauthorized/i);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(notifyOrderCreated).not.toHaveBeenCalled();
+  });
+});
+
 describe("createOnDemandOrder — notification dispatch", () => {
   const { prisma } = jest.requireMock("@/lib/db/prisma");
+  const { getStaffCaller } = jest.requireMock("@/lib/auth/staff-caller");
   const NEW_ORDER_ID = "order-od-new-1";
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getStaffCaller.mockResolvedValue({ userId: "admin-1", isPrivileged: true });
     prisma.address.create.mockResolvedValue({ id: "addr-new" });
     prisma.onDemand.create.mockResolvedValue({
       id: NEW_ORDER_ID,

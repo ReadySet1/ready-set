@@ -155,21 +155,9 @@ export async function getUserRole(userId: string): Promise<string | null> {
     return profile.type; // Return role from profile if it exists
   }
 
-  // If not found in profiles (or profile.type is null), check user metadata as a fallback
-  console.warn(`Role not found in profile for user ${userId}, checking auth metadata as fallback.`);
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-
-   if (authError) {
-      console.error("Error fetching auth user data for role:", authError);
-      return null; // Return null if auth data fetch fails
-   }
-   // Explicitly check user_metadata exists before accessing role
-   const roleFromMetadata = authData?.user?.user_metadata?.role;
-   if (roleFromMetadata) {
-              return roleFromMetadata;
-   }
-
-    return null; // Return null if role is not found in either location
+  // Roles come only from profiles.type.
+  console.warn(`Role not found in profile for user ${userId}`);
+  return null;
 }
 
 export async function getCurrentUser() {

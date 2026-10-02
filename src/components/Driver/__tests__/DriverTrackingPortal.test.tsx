@@ -263,6 +263,18 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getByText(/^access denied$/i)).toBeInTheDocument();
   });
 
+  it("shows a banner when the server keeps rejecting location updates", () => {
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        locationSyncError:
+          "Your location isn't being saved. Contact dispatch so they can check your driver account.",
+      }),
+    );
+    renderPortal();
+    expect(screen.getByText(/location isn.t being saved/i)).toBeInTheDocument();
+  });
+
   it("renders one banner per error source even when messages are identical", () => {
     // The banner list is keyed by source slot, not message text — two sources
     // failing with the same wording must not collapse into one banner.

@@ -70,7 +70,8 @@
     "sep7": "Sep 7",
     "sep18": "Sep 18",
     "sep22drive": "Drive Test 9/22",
-    "sep23qa": "Forms QA 9/23"
+    "sep23qa": "Forms QA 9/23",
+    "sep28drive": "Drive Test 9/28"
   },
   "tasks": [
     {
@@ -434,7 +435,7 @@
     },
     {
       "id": "migrate-vercel-to-vps",
-      "status": "progress",
+      "status": "done",
       "title": "Migrate all sites/apps from Vercel → Hetzner VPS",
       "owner": "emmanuel",
       "source": "jun1",
@@ -1014,7 +1015,7 @@
         "critical",
         "bug"
       ],
-      "description": "Found reviewing PR #511: <code>ci.yml</code> wraps <code>pnpm test:e2e</code> in <code>|| exit 0</code> AND the e2e job has <code>continue-on-error: true</code>, so a red e2e suite still shows a green check (PR #511 hides a link that <code>flowers-landing-page.spec.ts</code> test 12 asserts visible, and CI stayed green). Unit tests run with <code>|| true</code> plus a 95% aggregate pass-rate threshold (REA-285). Remove both e2e masking layers and reconsider the unit threshold so test checks actually gate merges."
+      "description": "Found reviewing PR #511: <code>ci.yml</code> wraps <code>pnpm test:e2e</code> in <code>|| exit 0</code> AND the e2e job has <code>continue-on-error: true</code>, so a red e2e suite still shows a green check (PR #511 hides a link that <code>flowers-landing-page.spec.ts</code> test 12 asserts visible, and CI stayed green). Unit tests run with <code>|| true</code> plus a 95% aggregate pass-rate threshold (REA-285). Remove both e2e masking layers and reconsider the unit threshold so test checks actually gate merges.<br><br><strong>2026-09-29 update:</strong> the masking hides more than flaky tests. (1) E2E never runs: Playwright global setup throws <code>Missing required environment variable: TEST_DRIVER_EMAIL</code> (<code>e2e/auth/setup.ts:27</code>), exit 1, masked green on every PR. (2) <code>src/__tests__/services/brokerSyncService.test.ts</code> has 7 real failures on <code>development</code> (stale mocks since <code>8ded4e04</code>, CaterValley sync now goes through a staff-gated server action). Order: add the E2E secrets → fix the broker mocks → remove the masks."
     },
     {
       "id": "calendar-url-dedup",
@@ -1101,11 +1102,11 @@
     },
     {
       "id": "catering-clientid-no-role-check",
-      "status": "open",
+      "status": "done",
       "title": "Catering API: clientId order attribution has no role check",
       "owner": "emmanuel",
       "source": "review",
-      "sourceRef": "#517",
+      "sourceRef": "#598",
       "tags": [
         "critical",
         "bug"
@@ -1205,7 +1206,7 @@
     },
     {
       "id": "driver-inactive-blocks-gps-writes",
-      "status": "new",
+      "status": "done",
       "title": "Inactive driver can run a full shift but every GPS point is rejected",
       "owner": "emmanuel",
       "source": "aug20walk",
@@ -1213,11 +1214,12 @@
         "bug",
         "critical"
       ],
-      "description": "Found on the 2026-08-20 León drive (Fernando, shift <code>3a9c4725</code>, order <code>Test 0820261</code>). He drove on <code>cromo181@yahoo.com</code>, whose <code>drivers</code> row has <code>is_active = false</code>. <code>POST /api/tracking/locations</code> gates its ownership check on <code>AND is_active = true</code> (<code>route.ts:118-125</code>) and <strong>403s every location point</strong> — <code>driver_locations</code> ended with 0 rows, shift mileage 0.00 mi, admin live map blank for the whole shift.<br><br>The gate is <em>inconsistent</em>: starting a shift and advancing every delivery stage worked fine (the <code>is_active</code> check in <code>delivery-actions.ts:36-44</code> only guards admin assignment), so an inactive driver can complete a delivery end-to-end while producing no tracking data at all. Decide the invariant: either an inactive driver cannot start a shift, or location writes stop requiring <code>is_active</code>."
+      "description": "Found on the 2026-08-20 León drive (Fernando, shift <code>3a9c4725</code>, order <code>Test 0820261</code>). He drove on <code>cromo181@yahoo.com</code>, whose <code>drivers</code> row has <code>is_active = false</code>. <code>POST /api/tracking/locations</code> gates its ownership check on <code>AND is_active = true</code> (<code>route.ts:118-125</code>) and <strong>403s every location point</strong> — <code>driver_locations</code> ended with 0 rows, shift mileage 0.00 mi, admin live map blank for the whole shift.<br><br>The gate is <em>inconsistent</em>: starting a shift and advancing every delivery stage worked fine (the <code>is_active</code> check in <code>delivery-actions.ts:36-44</code> only guards admin assignment), so an inactive driver can complete a delivery end-to-end while producing no tracking data at all. Decide the invariant: either an inactive driver cannot start a shift, or location writes stop requiring <code>is_active</code>.",
+      "sourceRef": "#600"
     },
     {
       "id": "driver-tracking-failure-silent",
-      "status": "new",
+      "status": "done",
       "title": "Driver app never surfaces failed location writes",
       "owner": "emmanuel",
       "source": "aug20walk",
@@ -1225,7 +1227,8 @@
         "bug",
         "critical"
       ],
-      "description": "Same 2026-08-20 drive. Fernando granted location permission, saw <strong>no error, warning, or banner</strong>, and completed a full shift believing tracking worked — while every point was being rejected server-side. <code>useLocationTracking.ts:243-253</code> posts to <code>/api/tracking/locations</code> and swallows the non-OK response.<br><br>Needs a visible driver-side state when N consecutive location writes fail (403/401/5xx): persistent banner on the driver screen, and ideally a block or loud warning at shift start. A tracking system that fails silently is worse than one that fails loudly — the whole walk produced no usable data and nobody knew until the DB was inspected the next day."
+      "description": "Same 2026-08-20 drive. Fernando granted location permission, saw <strong>no error, warning, or banner</strong>, and completed a full shift believing tracking worked — while every point was being rejected server-side. <code>useLocationTracking.ts:243-253</code> posts to <code>/api/tracking/locations</code> and swallows the non-OK response.<br><br>Needs a visible driver-side state when N consecutive location writes fail (403/401/5xx): persistent banner on the driver screen, and ideally a block or loud warning at shift start. A tracking system that fails silently is worse than one that fails loudly — the whole walk produced no usable data and nobody knew until the DB was inspected the next day.",
+      "sourceRef": "#601"
     },
     {
       "id": "driver-history-stale-weekly-summaries",
@@ -1471,7 +1474,7 @@
     },
     {
       "id": "pilot-db-backup-workflow",
-      "status": "progress",
+      "status": "done",
       "owner": "fernando",
       "source": "pilot",
       "tags": [
@@ -1565,14 +1568,15 @@
     },
     {
       "id": "admin-actions-null-user",
-      "status": "new",
+      "status": "done",
       "owner": "emmanuel",
       "source": "review",
       "tags": [
         "bug"
       ],
       "title": "createCateringOrder / createOnDemandOrder never reject a null user",
-      "description": "Found in the #534 re-review: both admin server actions call <code>supabase.auth.getUser()</code> but proceed on <code>null</code> (tests pass <code>user: null</code> and expect success). Middleware on <code>/admin/*</code> covers it today; add an explicit caller check."
+      "description": "Found in the #534 re-review: both admin server actions call <code>supabase.auth.getUser()</code> but proceed on <code>null</code> (tests pass <code>user: null</code> and expect success). Middleware on <code>/admin/*</code> covers it today; add an explicit caller check.",
+      "sourceRef": "#599"
     },
     {
       "id": "npm-audit-main-red-again",
@@ -1783,7 +1787,7 @@
     },
     {
       "id": "job-application-file-id-ownership",
-      "status": "progress",
+      "status": "done",
       "title": "Job application: file IDs accepted without an ownership check + 1-year signed links emailed",
       "owner": "emmanuel",
       "source": "review",
@@ -1808,11 +1812,11 @@
     },
     {
       "id": "file-uploads-get-signs-any-path",
-      "status": "progress",
+      "status": "done",
       "title": "GET /api/file-uploads?path= signs any storage path for any logged-in user",
       "owner": "emmanuel",
       "source": "review",
-      "sourceRef": "#590",
+      "sourceRef": "#593",
       "tags": [
         "critical",
         "bug"
@@ -1830,6 +1834,15 @@
         "bug"
       ],
       "description": "Found reviewing #592 (2026-09-28). <code>src/components/Resources/DownloadEmailTemplate.tsx</code> loads its logo from <code>https://ready-set.co/images/logo/logo.png</code> (L95), which returns 405 today, so every live download email shows a broken image; its contact/unsubscribe/privacy links (L129, L182–183) also point at the dead domain. <code>ready-set.co</code> has no MX and is parked at GoDaddy until 2027-03-05, yet L30–31 keep it in the URL allowlist: if it lapses, the next registrant gets a domain our validation trusts. Fix: move links to <code>readysetllc.com</code>, logo to Cloudinary (same approach as #579), drop the dead domain from the allowlist."
+    },
+    {
+      "id": "vps-ashburn-migration",
+      "title": "Move the Dokploy VPS from Germany (ARM) to Hetzner Ashburn (x86 CPX31)",
+      "owner": "emmanuel",
+      "status": "open",
+      "source": "sep28drive",
+      "tags": [],
+      "description": "Driver button actions lag because of distance: phone→VPS 205–280 ms and VPS→prod DB ~100 ms per query. Ashburn puts prod Supabase at 1–3 ms and lets CI drop the 75-min ARM cross-build. Plan: <code>docs/ready-set/specs/2026-09-28-vps-ashburn-migration-plan.md</code>. Est. ~$31/mo vs ~$13 today. <strong>Blocked on Gary:</strong> cost OK + expected concurrent drivers + a 1 h evening window (destino-sf lives on the same box)."
     }
   ]
 }

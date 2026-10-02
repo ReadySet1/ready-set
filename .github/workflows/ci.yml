@@ -132,45 +132,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-jest-
 
-      - name: Run unit tests with threshold check
+      - name: Run unit tests
         run: |
-          # Run tests and capture JSON output
+          # `|| true` only so the JSON summary is always written; the gate is
+          # the explicit check below. Any failed test or crashed suite fails
+          # the job. (The old 95% pass-rate threshold let ~460 failures
+          # through; 7 real failures sat hidden in brokerSyncService.test.ts.)
           pnpm test:ci --json --outputFile=jest-results.json --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit || true
 
-          # Extract test results
-          if [ -f jest-results.json ]; then
-            PASSED=$(jq '.numPassedTests // 0' jest-results.json)
-            FAILED=$(jq '.numFailedTests // 0' jest-results.json)
-            PENDING=$(jq '.numPendingTests // 0' jest-results.json)
-            TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
-
-            # Calculate run tests (excluding skipped/pending)
-            RUN_TESTS=$((PASSED + FAILED))
-
-            if [ "$RUN_TESTS" -gt 0 ]; then
-              PASS_RATE=$(echo "scale=2; $PASSED * 100 / $RUN_TESTS" | bc)
-              echo "📊 Pass rate: $PASS_RATE% ($PASSED/$RUN_TESTS executed tests)"
-              echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING"
-
-              # REA-285: Threshold enforced at 95%
-              THRESHOLD=95
-              if (( $(echo "$PASS_RATE < $THRESHOLD" | bc -l) )); then
-                echo "❌ Pass rate ${PASS_RATE}% is below ${THRESHOLD}% threshold"
-                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
-                echo "THRESHOLD=$THRESHOLD" >> $GITHUB_ENV
-                exit 1
-              else
-                echo "✅ Pass rate ${PASS_RATE}% meets ${THRESHOLD}% threshold"
-                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
-              fi
-            else
-              echo "⚠️  No tests found or tests failed to run"
-              exit 1
-            fi
-          else
-            echo "⚠️  jest-results.json not found - tests may have crashed"
+          if [ ! -f jest-results.json ]; then
+            echo "❌ jest-results.json not found - tests may have crashed"
             exit 1
           fi
+
+          PASSED=$(jq '.numPassedTests // 0' jest-results.json)
+          FAILED=$(jq '.numFailedTests // 0' jest-results.json)
+          PENDING=$(jq '.numPendingTests // 0' jest-results.json)
+          TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
+          BROKEN_SUITES=$(jq '.numRuntimeErrorTestSuites // 0' jest-results.json)
+          echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING | Suites that failed to run: $BROKEN_SUITES"
+
+          if [ "$((PASSED + FAILED))" -eq 0 ]; then
+            echo "❌ No tests ran"
+            exit 1
+          fi
+          if [ "$FAILED" -gt 0 ] || [ "$BROKEN_SUITES" -gt 0 ]; then
+            echo "❌ Failing tests:"
+            jq -r '.testResults[] | select(.status == "failed") | "  - \(.name)"' jest-results.json
+            exit 1
+          fi
+          echo "✅ All $PASSED executed tests passed"
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
@@ -216,7 +207,7 @@ jobs:
             echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
             echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
             echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🎯 Threshold | 95% |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Gate | 0 failures |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -230,9 +221,14 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Increased timeout: build (~5min) + server startup (~2min) + 119 tests at ~10s each
-    timeout-minutes: 25
-    continue-on-error: true # Non-blocking: Tests require secrets configuration
+    # Budget: install + build (~8-10 min) + Playwright globalTimeout (25 min,
+    # see playwright.config.ts) + report uploads, with margin. Keep this above
+    # build time + globalTimeout so Playwright stops first and still writes its
+    # reports; the job-level kill would lose them.
+    timeout-minutes: 45
+    # Non-blocking while the suite is still red: the run step below now fails
+    # honestly on test failures. Drop this once the E2E suite is green.
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -257,19 +253,6 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build application
-        run: |
-          pnpm prisma generate
-          pnpm exec next build
-        env:
-          NODE_OPTIONS: '--max-old-space-size=6144'
-          SKIP_TYPECHECK: 'true'
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
-          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
-          NEXT_PUBLIC_SANITY_DATASET: test
 
       - name: Validate GitHub Secrets
         id: check-secrets
@@ -298,6 +281,21 @@ jobs:
           if [ -z "${{ secrets.TEST_VENDOR_PASSWORD }}" ]; then
             MISSING_SECRETS+=("TEST_VENDOR_PASSWORD")
           fi
+          # e2e/auth/setup.ts also requires driver + admin logins. Without
+          # these checks the global setup crashed and `|| exit 0` hid it: no
+          # E2E test has actually run in CI.
+          if [ -z "${{ secrets.TEST_DRIVER_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_DRIVER_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_DRIVER_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_DRIVER_PASSWORD")
+          fi
+          if [ -z "${{ secrets.TEST_ADMIN_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_ADMIN_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_ADMIN_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_ADMIN_PASSWORD")
+          fi
 
           if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
             echo "⚠️  WARNING: Missing required GitHub secrets (E2E tests will be skipped):"
@@ -314,19 +312,27 @@ jobs:
           echo "✅ All required secrets are configured"
           echo "secrets_configured=true" >> $GITHUB_OUTPUT
 
+      # Playwright serves this build with `next start` in CI (see
+      # playwright.config.ts webServer). NEXT_PUBLIC_* values are inlined at
+      # build time, so the build must see the REAL test project, not fakes.
+      - name: Build application
+        if: steps.check-secrets.outputs.secrets_configured == 'true'
+        run: pnpm exec next build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
+          SKIP_TYPECHECK: 'true'
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
+          NEXT_PUBLIC_SANITY_DATASET: test
+
+      # No shell timeout and no `|| exit 0`: Playwright's CI globalTimeout ends
+      # the run gracefully (reports still written), and a failing suite shows
+      # red. The job stays non-blocking via job-level continue-on-error.
       - name: Run E2E tests
         if: steps.check-secrets.outputs.secrets_configured == 'true'
-        run: |
-          timeout 1080 pnpm test:e2e || {
-            EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⚠️  E2E tests timed out after 18 minutes"
-              echo "This is non-blocking but should be investigated"
-              exit 0
-            fi
-            echo "E2E tests completed with exit code: $EXIT_CODE"
-            exit 0
-          }
+        run: pnpm test:e2e
         env:
           CI: true
           # Supabase Test Project (use secrets directly)
@@ -338,7 +344,14 @@ jobs:
           TEST_CLIENT_PASSWORD: ${{ secrets.TEST_CLIENT_PASSWORD }}
           TEST_VENDOR_EMAIL: ${{ secrets.TEST_VENDOR_EMAIL }}
           TEST_VENDOR_PASSWORD: ${{ secrets.TEST_VENDOR_PASSWORD }}
-      
+          TEST_DRIVER_EMAIL: ${{ secrets.TEST_DRIVER_EMAIL }}
+          TEST_DRIVER_PASSWORD: ${{ secrets.TEST_DRIVER_PASSWORD }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+          # Optional: softDelete.spec.ts super-admin tests skip when unset.
+          TEST_SUPER_ADMIN_EMAIL: ${{ secrets.TEST_SUPER_ADMIN_EMAIL }}
+          TEST_SUPER_ADMIN_PASSWORD: ${{ secrets.TEST_SUPER_ADMIN_PASSWORD }}
+
       - name: E2E Tests Skipped
         if: steps.check-secrets.outputs.secrets_configured != 'true'
         run: |

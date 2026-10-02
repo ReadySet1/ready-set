@@ -22,9 +22,11 @@ import {
   resetAllMocks,
 } from '../helpers/service-test-utils';
 
-// Mock the CaterValley service
-jest.mock('@/services/caterValleyService', () => ({
-  updateCaterValleyOrderStatus: jest.fn(),
+// Mock the service's direct dependency: the staff-gated server action it
+// routes CaterValley sync through (PR #402). Mocking caterValleyService one
+// level down left the action's auth check live, so nothing was ever called.
+jest.mock('@/app/actions/sync-cater-valley-order-status', () => ({
+  syncCaterValleyOrderStatusAction: jest.fn(),
 }));
 
 // Create a mock toast function with attached methods
@@ -54,16 +56,16 @@ jest.mock('react-hot-toast', () => {
 });
 
 // Get mocked functions
-import { updateCaterValleyOrderStatus } from '@/services/caterValleyService';
+import { syncCaterValleyOrderStatusAction } from '@/app/actions/sync-cater-valley-order-status';
 import toast from 'react-hot-toast';
 
-const mockedUpdateCaterValleyOrderStatus = updateCaterValleyOrderStatus as jest.Mock;
+const mockedSyncAction = syncCaterValleyOrderStatusAction as jest.Mock;
 
 describe('BrokerSyncService', () => {
   beforeEach(() => {
     resetAllMocks();
     resetIdCounter();
-    mockedUpdateCaterValleyOrderStatus.mockClear();
+    mockedSyncAction.mockClear();
     mockToastFn.mockClear();
     mockToastSuccess.mockClear();
     mockToastError.mockClear();
@@ -101,7 +103,7 @@ describe('BrokerSyncService', () => {
     it('should identify CaterValley orders by brokerage field', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -109,7 +111,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalledWith(
+      expect(mockedSyncAction).toHaveBeenCalledWith(
         order.orderNumber,
         'CONFIRM'
       );
@@ -120,7 +122,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
 
     it('should not sync for unknown brokers', async () => {
@@ -128,7 +130,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
 
     it('should not sync for on-demand orders (no broker support)', async () => {
@@ -136,7 +138,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
   });
 
@@ -144,7 +146,7 @@ describe('BrokerSyncService', () => {
     it('should map ASSIGNED to CONFIRM for CaterValley', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -152,7 +154,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalledWith(
+      expect(mockedSyncAction).toHaveBeenCalledWith(
         order.orderNumber,
         'CONFIRM'
       );
@@ -161,7 +163,7 @@ describe('BrokerSyncService', () => {
     it('should map CANCELLED to CANCELLED for CaterValley', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -169,7 +171,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.CANCELLED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalledWith(
+      expect(mockedSyncAction).toHaveBeenCalledWith(
         order.orderNumber,
         'CANCELLED'
       );
@@ -178,7 +180,7 @@ describe('BrokerSyncService', () => {
     it('should map COMPLETED to COMPLETED for CaterValley', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -186,7 +188,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.COMPLETED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalledWith(
+      expect(mockedSyncAction).toHaveBeenCalledWith(
         order.orderNumber,
         'COMPLETED'
       );
@@ -198,7 +200,7 @@ describe('BrokerSyncService', () => {
       // PENDING is not mapped to a CaterValley status
       await syncOrderStatusWithBroker(order, OrderStatus.PENDING);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
 
     it('should not sync for ACTIVE status (no mapping)', async () => {
@@ -206,7 +208,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ACTIVE);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
 
     it('should not sync for IN_PROGRESS status (no mapping)', async () => {
@@ -214,7 +216,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.IN_PROGRESS);
 
-      expect(mockedUpdateCaterValleyOrderStatus).not.toHaveBeenCalled();
+      expect(mockedSyncAction).not.toHaveBeenCalled();
     });
   });
 
@@ -222,7 +224,7 @@ describe('BrokerSyncService', () => {
     it('should show warning toast when order not found (404)', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: false,
         orderFound: false,
         statusCode: 404,
@@ -243,7 +245,7 @@ describe('BrokerSyncService', () => {
     it('should show warning toast on sync failure', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: false,
         orderFound: true,
         statusCode: 500,
@@ -263,7 +265,7 @@ describe('BrokerSyncService', () => {
     it('should not show toast on successful sync', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -281,7 +283,7 @@ describe('BrokerSyncService', () => {
     it('should not throw when CaterValley update fails', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: false,
         orderFound: false,
         error: 'Network error',
@@ -296,7 +298,7 @@ describe('BrokerSyncService', () => {
     it('should handle sync failure gracefully without blocking main operation', async () => {
       const order = createCateringOrder({ brokerage: 'CaterValley' });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: false,
         orderFound: true,
         statusCode: 503,
@@ -307,7 +309,7 @@ describe('BrokerSyncService', () => {
       await syncOrderStatusWithBroker(order, OrderStatus.COMPLETED);
 
       // Should have attempted the sync
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalled();
+      expect(mockedSyncAction).toHaveBeenCalled();
     });
 
     it('should log warning for missing configuration', async () => {
@@ -330,7 +332,7 @@ describe('BrokerSyncService', () => {
         orderNumber: 'CV-12345-ABC',
       });
 
-      mockedUpdateCaterValleyOrderStatus.mockResolvedValue({
+      mockedSyncAction.mockResolvedValue({
         success: true,
         orderFound: true,
         response: createCaterValleySuccessResponse(),
@@ -338,7 +340,7 @@ describe('BrokerSyncService', () => {
 
       await syncOrderStatusWithBroker(order, OrderStatus.ASSIGNED);
 
-      expect(mockedUpdateCaterValleyOrderStatus).toHaveBeenCalledWith(
+      expect(mockedSyncAction).toHaveBeenCalledWith(
         'CV-12345-ABC',
         'CONFIRM'
       );

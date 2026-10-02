@@ -25,6 +25,8 @@ interface DriverTrackingContextValue {
   isTracking: boolean;
   accuracy: number | null;
   locationError: string | null;
+  /** Set when the server keeps rejecting location updates (see useLocationTracking). */
+  locationSyncError: string | null;
   isRealtimeConnected: boolean;
   isRealtimeEnabled: boolean;
   connectionMode: 'realtime' | 'rest' | 'hybrid';
@@ -85,6 +87,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     isTracking,
     accuracy,
     error: locationError,
+    locationSyncError = null,
     isRealtimeConnected,
     isRealtimeEnabled,
     connectionMode,
@@ -197,6 +200,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     isTracking,
     accuracy,
     locationError,
+    locationSyncError,
     isRealtimeConnected,
     isRealtimeEnabled,
     connectionMode,

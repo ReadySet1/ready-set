@@ -20,11 +20,51 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 // Reuse the driver session created by e2e/auth/setup.ts
 test.use({ storageState: 'e2e/.auth/driver.json' });
 
+// Every test here drives the same shared driver account's shift, so run them
+// in order in one worker. 'default' (not 'serial') keeps later tests running
+// after a failure.
+test.describe.configure({ mode: 'default' });
+
 // The driver portal acquires geolocation, loads shift state, and (on a dev
 // server) cold-compiles routes on first hit — give each test headroom beyond
 // the default 30s so the settle waits don't collide with the test timeout.
+const TEST_TIMEOUT_MS = 90_000;
+
+// Start/end shift round-trips (server action + DB writes) take ~10-15s on a
+// busy dev server, so a 10s poll reports a failure for a shift that does
+// start or end moments later.
+const SHIFT_ACTION_TIMEOUT_MS = 30_000;
+
 test.beforeEach(() => {
-  test.setTimeout(60_000);
+  test.setTimeout(TEST_TIMEOUT_MS);
+});
+
+// This spec drives the SHARED driver account. Never leave its shift open:
+// an open shift blocks other specs and field testers using the same login.
+test.afterAll(async ({ browser }, testInfo) => {
+  test.setTimeout(TEST_TIMEOUT_MS);
+  const context = await browser.newContext({
+    baseURL: testInfo.project.use.baseURL,
+    storageState: 'e2e/.auth/driver.json',
+    permissions: ['geolocation'],
+    geolocation: TEST_LOCATIONS.start,
+  });
+  try {
+    const page = await context.newPage();
+    await openTrackingPage(page);
+    if (await checkAuthRequired(page)) return;
+
+    const endShiftButton = page.getByRole('button', { name: /end shift/i });
+    if ((await endShiftButton.count()) === 0) return;
+
+    await endShiftButton.click();
+    await expect(
+      page.getByRole('button', { name: /start shift/i }),
+      'afterAll cleanup could not end the shared driver shift'
+    ).toBeVisible({ timeout: SHIFT_ACTION_TIMEOUT_MS });
+  } finally {
+    await context.close();
+  }
 });
 
 // Test coordinates for geolocation simulation
@@ -74,6 +114,22 @@ async function waitForPageReady(page: Page) {
 }
 
 /**
+ * Open the driver tracking portal and wait until it reflects the server's
+ * shift state. The portal renders "Start shift" before its active-shift query
+ * resolves, so without waiting for that response an open shift looks closed.
+ */
+async function openTrackingPage(page: Page) {
+  const activeShiftLoaded = page
+    .waitForResponse((res) => res.url().includes('/api/tracking/shifts/active'), {
+      timeout: 30000,
+    })
+    .catch(() => null); // e.g. redirected to sign-in; checkAuthRequired handles it
+  await page.goto('/driver/tracking');
+  await activeShiftLoaded;
+  await waitForPageReady(page);
+}
+
+/**
  * Helper to check if driver authentication is required
  */
 async function checkAuthRequired(page: Page): Promise<boolean> {
@@ -91,8 +147,7 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       // Navigate to driver tracking page
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       // Check if auth is required - skip if so (auth setup needed)
       if (await checkAuthRequired(page)) {
@@ -109,8 +164,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -137,8 +191,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -161,8 +214,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -188,15 +240,14 @@ test.describe('Driver Shift Workflow', () => {
           (await page.getByText(/on shift/i).count()) > 0;
 
         expect(hasEndButton || hasActiveIndicator).toBe(true);
-      }).toPass({ timeout: 10000 });
+      }).toPass({ timeout: SHIFT_ACTION_TIMEOUT_MS });
     });
 
     test('should display shift started indicator after starting', async ({ page, context }) => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -228,7 +279,7 @@ test.describe('Driver Shift Workflow', () => {
           (await page.getByRole('button', { name: /end shift/i }).count()) > 0 ||
           (await page.getByText(/on shift/i).count()) > 0;
         expect(active).toBe(true);
-      }).toPass({ timeout: 10000 });
+      }).toPass({ timeout: SHIFT_ACTION_TIMEOUT_MS });
     });
   });
 
@@ -237,8 +288,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -258,8 +308,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -289,37 +338,37 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
         return;
       }
 
-      // Get initial coordinates display
-      const initialContent = await page.content();
+      // The portal only watches position during a shift; before one it reads
+      // the location once, so there is nothing to update.
+      if ((await page.getByRole('button', { name: /end shift/i }).count()) === 0) {
+        test.skip(true, 'Location updates stream only during an active shift');
+        return;
+      }
 
-      // Change location
+      // The HealthBar GPS chip shows the fix accuracy in feet, so a new fix
+      // with a different accuracy is visible there.
+      const feet = (meters: number) => `${Math.round(meters * 3.28084)} ft`;
+      await expect(page.getByText(feet(TEST_LOCATIONS.start.accuracy), { exact: true })).toBeVisible();
+
       await setGeolocation(context, TEST_LOCATIONS.enRoute);
 
-      // Wait for location update (may take a few seconds)
-      await page.waitForTimeout(3000);
-
-      // Verify coordinates have updated
-      const updatedContent = await page.content();
-
-      // The new coordinates should be different
-      // Note: This is a soft assertion as UI update timing may vary
-      expect.soft(updatedContent).not.toBe(initialContent);
+      await expect(
+        page.getByText(feet(TEST_LOCATIONS.enRoute.accuracy), { exact: true })
+      ).toBeVisible({ timeout: 15000 });
     });
 
     test('should show connection status (online/offline)', async ({ page, context }) => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -351,8 +400,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -375,8 +423,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -409,8 +456,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -439,8 +485,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.arrival);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -464,8 +509,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.arrival);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -496,8 +540,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -518,8 +561,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -542,15 +584,14 @@ test.describe('Driver Shift Workflow', () => {
           (await page.getByRole('button', { name: /start shift/i }).count()) > 0 ||
           (await page.getByRole('button', { name: /request location|enable location|try again/i }).count()) > 0;
         expect(backToPreShift).toBe(true);
-      }).toPass({ timeout: 10000 });
+      }).toPass({ timeout: SHIFT_ACTION_TIMEOUT_MS });
     });
 
     test('should display shift statistics during active shift', async ({ page, context }) => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -620,8 +661,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -650,8 +690,7 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
-      await page.goto('/driver/tracking');
-      await waitForPageReady(page);
+      await openTrackingPage(page);
 
       if (await checkAuthRequired(page)) {
         test.skip(true, 'Driver authentication required');
@@ -686,8 +725,7 @@ test.describe('Full Shift Workflow Integration', () => {
     await setGeolocation(context, TEST_LOCATIONS.start);
 
     // Step 1: Navigate to driver tracking page
-    await page.goto('/driver/tracking');
-    await waitForPageReady(page);
+    await openTrackingPage(page);
 
     if (await checkAuthRequired(page)) {
       test.skip(true, 'Driver authentication required for full workflow test');
@@ -707,7 +745,7 @@ test.describe('Full Shift Workflow Integration', () => {
     await expect(async () => {
       const endButton = page.getByRole('button', { name: /end shift/i });
       expect(await endButton.count()).toBeGreaterThan(0);
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: SHIFT_ACTION_TIMEOUT_MS });
 
     // Step 3: Simulate location updates
     await setGeolocation(context, TEST_LOCATIONS.enRoute);
@@ -727,6 +765,6 @@ test.describe('Full Shift Workflow Integration', () => {
     await expect(async () => {
       const startButton = page.getByRole('button', { name: /start shift/i });
       expect(await startButton.count()).toBeGreaterThan(0);
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: SHIFT_ACTION_TIMEOUT_MS });
   });
 });

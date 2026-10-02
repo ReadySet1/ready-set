@@ -194,14 +194,15 @@ describe('Driver Tracking Actions', () => {
       expect(result.error).toBe('Database connection failed');
     });
 
-    it('handles empty query result when getting shift ID', async () => {
+    it('fails (inactive driver) when the guarded insert returns no shift row', async () => {
       primeNoOpenShift();
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([]);
 
       const result = await startDriverShift(validDriverId, mockLocationUpdate);
 
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
       expect(result.shiftId).toBeUndefined();
+      expect(result.error).toMatch(/inactive/i);
     });
   });
 

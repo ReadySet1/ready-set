@@ -10,6 +10,7 @@ import { createClient } from '@/utils/supabase/server';
 import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import { siteOrigin } from '@/lib/site-url';
 import { runAfterResponse } from '@/lib/api/after-response';
+import { getStaffCaller } from '@/lib/auth/staff-caller';
 import {
   ClientListItem,
   ActionError,
@@ -230,6 +231,11 @@ export async function getClients(): Promise<ClientListItem[] | ActionError> {
  * Creates a new OnDemand order.
  */
 export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): Promise<CreateOrderResult> {
+  // 0. Server actions are public POST endpoints — only staff may create orders
+  if (!(await getStaffCaller())) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
   // 1. Validate the input data
   const validationResult = createOnDemandOrderSchema.safeParse(formData);
   if (!validationResult.success) {
@@ -247,10 +253,6 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
 
   // Generate a unique order number using UUID
   const orderNumber = data.orderNumber || `OD-${uuidv4()}`;
-
-  // Get Supabase client for session information and file operations
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
   // Extract temp entity ID from form data if it exists
   // This is the temp ID used for file uploads before the order was created
@@ -322,7 +324,7 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
     );
 
     // 3. Update any temporary file associations
-    if (tempEntityId && user) {
+    if (tempEntityId) {
       try {
         // Call the API to update file associations
         const baseUrl = siteOrigin();

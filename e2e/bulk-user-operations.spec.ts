@@ -10,422 +10,224 @@
  * - CSV export
  *
  * Uses the adminTest fixture for authenticated admin access.
+ *
+ * SAFETY: these tests run against the shared rs-dev database, whose users
+ * (including the TEST_* accounts other specs log in with) must never change.
+ * Every mutating bulk action (status change, delete, restore) goes through
+ * BulkConfirmDialog; the tests only open that dialog and then Cancel it —
+ * nothing is ever confirmed. Export is a read-only GET, and the error-path
+ * test stubs the export endpoint so no request reaches the server.
  */
 
+import type { Locator, Page } from '@playwright/test';
 import { adminTest as test, expect } from './fixtures/auth.fixture';
 
+/** "1 user selected" / "9 users selected" text in the floating bulk action bar. */
+const selectionCount = (page: Page): Locator => page.getByText(/^\d+ users? selected$/);
+
+const selectionLabel = (n: number): string => `${n} ${n === 1 ? 'user' : 'users'} selected`;
+
+/** The floating bulk action bar (the element holding both the count and the Clear button). */
+const bulkBar = (page: Page): Locator =>
+  page
+    .locator('div')
+    .filter({ has: selectionCount(page) })
+    .filter({ has: page.getByRole('button', { name: 'Clear', exact: true }) })
+    .last();
+
+/** Selectable row checkboxes (Super Admin rows render a disabled "Cannot select" checkbox). */
+const rowCheckboxes = (page: Page): Locator =>
+  page.locator('tbody').getByRole('checkbox', { name: /^Select (?!all )/ });
+
+const deletedTab = (page: Page): Locator => page.getByRole('tab', { name: 'Deleted Users' });
+
 test.describe('Bulk User Operations', () => {
-  test.beforeEach(async ({ authenticatedPage }) => {
-    // Navigate to the admin users page
-    await authenticatedPage.goto('/admin/users');
+  test.beforeEach(async ({ authenticatedPage: page }) => {
+    // Pre-answer the cookie banner: it is fixed to the bottom of the viewport
+    // and would sit on top of the floating bulk action bar.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem('cookieConsentStatus', 'rejected');
+      } catch {
+        // storage unavailable — the banner just stays visible
+      }
+    });
 
-    // Wait for the page to load
-    await authenticatedPage.waitForLoadState('networkidle');
+    await page.goto('/admin/users');
 
-    // Wait for either the users table or loading state to be present
-    await authenticatedPage
-      .locator('[data-testid="users-table"], table, .loading-skeleton')
-      .first()
-      .waitFor({ state: 'visible', timeout: 15000 });
+    // The page keeps polling, so networkidle never settles: wait for real content.
+    await expect(page.getByRole('heading', { name: 'User Management' })).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(rowCheckboxes(page).first()).toBeVisible({ timeout: 30000 });
   });
 
   test.describe('Selection UI', () => {
-    test('should select a single user via checkbox', async ({ authenticatedPage }) => {
-      // Wait for table rows to load
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
-
-      // Skip if no checkboxes are present (user may not have admin permissions)
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
-
-      // Click the first checkbox
+    test('should select a single user via checkbox', async ({ authenticatedPage: page }) => {
+      const firstCheckbox = rowCheckboxes(page).first();
       await firstCheckbox.click();
 
-      // Verify the bulk action bar appears
-      const bulkActionBar = authenticatedPage.locator(
-        '[data-testid="bulk-action-bar"], .bulk-action-bar, text=/\\d+ selected/i'
-      );
-      await expect(bulkActionBar.first()).toBeVisible({ timeout: 5000 });
-
-      // Verify selection count shows 1
-      await expect(authenticatedPage.locator('text=/1 selected/i').first()).toBeVisible();
+      await expect(firstCheckbox).toBeChecked();
+      await expect(bulkBar(page)).toBeVisible();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
     });
 
-    test('should select all users on page via header checkbox', async ({ authenticatedPage }) => {
-      // Find the header checkbox (select all)
-      const headerCheckbox = authenticatedPage
-        .locator('thead input[type="checkbox"], thead [role="checkbox"]')
-        .first();
+    test('should select all users on page via header checkbox', async ({
+      authenticatedPage: page,
+    }) => {
+      const selectableOnPage = await rowCheckboxes(page).count();
+      expect(selectableOnPage).toBeGreaterThan(0);
 
-      if ((await headerCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
+      await page.getByRole('checkbox', { name: 'Select all users on this page' }).click();
 
-      // Click the select all checkbox
-      await headerCheckbox.click();
-
-      // Verify the bulk action bar shows multiple selected
-      const selectedText = authenticatedPage.locator('text=/\\d+ selected/i');
-      await expect(selectedText.first()).toBeVisible({ timeout: 5000 });
-
-      // Verify multiple users are selected (more than 1)
-      const text = await selectedText.first().textContent();
-      const count = parseInt(text?.match(/(\d+)/)?.[1] || '0', 10);
-      expect(count).toBeGreaterThan(0);
+      await expect(selectionCount(page)).toHaveText(selectionLabel(selectableOnPage));
     });
 
-    test('should deselect user via toggle', async ({ authenticatedPage }) => {
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
+    test('should deselect user via toggle', async ({ authenticatedPage: page }) => {
+      const firstCheckbox = rowCheckboxes(page).first();
 
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
+      await firstCheckbox.click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      // Select the checkbox
       await firstCheckbox.click();
 
-      // Verify selection
-      await expect(
-        authenticatedPage.locator('text=/1 selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Toggle (deselect)
-      await firstCheckbox.click();
-
-      // Wait a moment for the UI to update
-      await authenticatedPage.waitForTimeout(500);
-
-      // Verify the bulk action bar is hidden or shows 0 selected
-      const bulkActionBar = authenticatedPage.locator(
-        '[data-testid="bulk-action-bar"], .bulk-action-bar'
-      );
-
-      // Either the bar should be hidden or show 0 selected
-      const isHidden = await bulkActionBar.isHidden().catch(() => true);
-      const hasZeroSelected = (await authenticatedPage.locator('text=/0 selected/i').count()) > 0;
-
-      expect(isHidden || hasZeroSelected).toBeTruthy();
+      await expect(firstCheckbox).not.toBeChecked();
+      await expect(selectionCount(page)).toBeHidden();
     });
 
-    test('should clear all selections via clear button', async ({ authenticatedPage }) => {
-      // Select first user
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
-
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
-
+    test('should clear all selections via clear button', async ({ authenticatedPage: page }) => {
+      const firstCheckbox = rowCheckboxes(page).first();
       await firstCheckbox.click();
+      await expect(selectionCount(page)).toBeVisible();
 
-      // Wait for selection UI
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
+      await bulkBar(page).getByRole('button', { name: 'Clear', exact: true }).click();
 
-      // Find and click the clear/cancel button
-      const clearButton = authenticatedPage.locator(
-        'button:has-text("Clear"), button:has-text("Cancel"), [data-testid="clear-selection"]'
-      );
-
-      if ((await clearButton.count()) > 0) {
-        await clearButton.first().click();
-
-        // Wait for UI update
-        await authenticatedPage.waitForTimeout(500);
-
-        // Verify selection is cleared
-        const bulkActionBar = authenticatedPage.locator(
-          '[data-testid="bulk-action-bar"], .bulk-action-bar'
-        );
-        const isHidden = await bulkActionBar.isHidden().catch(() => true);
-        expect(isHidden).toBeTruthy();
-      }
+      await expect(selectionCount(page)).toBeHidden();
+      await expect(firstCheckbox).not.toBeChecked();
     });
   });
 
   test.describe('Bulk Status Change', () => {
-    test('should open confirmation dialog when changing status', async ({ authenticatedPage }) => {
-      // Select a user first
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
+    test('should open confirmation dialog when changing status', async ({
+      authenticatedPage: page,
+    }) => {
+      await rowCheckboxes(page).first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
+      await bulkBar(page).getByRole('button', { name: 'Status' }).click();
+      await page.getByRole('menuitem', { name: 'Set Active' }).click();
 
-      await firstCheckbox.click();
+      const dialog = page.getByRole('dialog', { name: 'Change User Status' });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText('Change the status of 1 user to "ACTIVE"');
 
-      // Wait for bulk action bar
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Look for status change dropdown/button
-      const statusButton = authenticatedPage.locator(
-        'button:has-text("Status"), [data-testid="bulk-status-change"], button:has-text("Change Status")'
-      );
-
-      if ((await statusButton.count()) === 0) {
-        console.log('Status change button not found - skipping');
-        return;
-      }
-
-      await statusButton.first().click();
-
-      // Look for status options (Active, Pending, etc.)
-      const statusOption = authenticatedPage.locator(
-        '[role="menuitem"]:has-text("Active"), button:has-text("Active"), [data-testid="status-active"]'
-      );
-
-      if ((await statusOption.count()) > 0) {
-        await statusOption.first().click();
-
-        // Verify confirmation dialog appears
-        const dialog = authenticatedPage.locator(
-          '[role="dialog"], [data-testid="bulk-confirm-dialog"], .dialog-content'
-        );
-        await expect(dialog.first()).toBeVisible({ timeout: 5000 });
-      }
+      // Never confirm on shared data — cancel and make sure nothing ran.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
     });
   });
 
   test.describe('Bulk Delete', () => {
     test('should show confirmation dialog with warning when deleting', async ({
-      authenticatedPage,
+      authenticatedPage: page,
     }) => {
-      // Select a user first
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
+      await rowCheckboxes(page).first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
+      await bulkBar(page).getByRole('button', { name: 'Delete', exact: true }).click();
 
-      await firstCheckbox.click();
+      const dialog = page.getByRole('dialog', { name: 'Move Users to Trash' });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText('This action will affect 1 user');
+      await expect(dialog.getByRole('button', { name: 'Move to Trash' })).toBeVisible();
 
-      // Wait for bulk action bar
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Look for delete button
-      const deleteButton = authenticatedPage.locator(
-        'button:has-text("Delete"), button:has-text("Move to Trash"), [data-testid="bulk-delete"]'
-      );
-
-      if ((await deleteButton.count()) === 0) {
-        console.log('Delete button not found - skipping');
-        return;
-      }
-
-      await deleteButton.first().click();
-
-      // Verify confirmation dialog appears
-      const dialog = authenticatedPage.locator(
-        '[role="dialog"], [data-testid="bulk-confirm-dialog"], [role="alertdialog"]'
-      );
-      await expect(dialog.first()).toBeVisible({ timeout: 5000 });
-
-      // Verify warning content is present
-      const warningText = authenticatedPage.locator(
-        'text=/trash/i, text=/delete/i, text=/remove/i'
-      );
-      await expect(warningText.first()).toBeVisible();
+      // Never confirm on shared data — cancel and make sure nothing ran.
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
     });
   });
 
   test.describe('Bulk Restore (Deleted Users Tab)', () => {
     test('should navigate to deleted users tab and show restore option', async ({
-      authenticatedPage,
+      authenticatedPage: page,
     }) => {
-      // Click on "Deleted Users" tab
-      const deletedTab = authenticatedPage.locator(
-        '[data-testid="deleted-tab"], button:has-text("Deleted"), [role="tab"]:has-text("Deleted")'
+      const deletedUsersResponse = page.waitForResponse(
+        (res) => res.url().includes('/api/users/deleted') && res.request().method() === 'GET',
+        { timeout: 30000 }
       );
+      await deletedTab(page).click();
+      await expect(deletedTab(page)).toHaveAttribute('data-state', 'active');
+      await deletedUsersResponse;
 
-      if ((await deletedTab.count()) === 0) {
-        console.log('Deleted users tab not found - skipping');
-        return;
-      }
+      const deletedRows = rowCheckboxes(page);
+      const emptyState = page.getByRole('heading', { name: 'No Deleted Users Found' });
+      await expect(deletedRows.first().or(emptyState)).toBeVisible({ timeout: 30000 });
 
-      await deletedTab.first().click();
+      test.skip(await emptyState.isVisible(), 'No soft-deleted users on this database');
 
-      // Wait for tab content to load
-      await authenticatedPage.waitForTimeout(1000);
+      await deletedRows.first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      // Check if there are any deleted users
-      const deletedUserCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
-
-      if ((await deletedUserCheckbox.count()) === 0) {
-        console.log('No deleted users available - skipping');
-        return;
-      }
-
-      // Select a deleted user
-      await deletedUserCheckbox.click();
-
-      // Wait for bulk action bar
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Look for restore button
-      const restoreButton = authenticatedPage.locator(
-        'button:has-text("Restore"), [data-testid="bulk-restore"]'
+      // Only check the action is offered — clicking it would open a restore dialog.
+      const restoreButton = bulkBar(page).getByRole('button', { name: 'Restore' });
+      await expect(restoreButton).toBeVisible();
+      await expect(restoreButton).toBeEnabled();
+      await expect(bulkBar(page).getByRole('button', { name: 'Delete', exact: true })).toHaveCount(
+        0
       );
-
-      // Verify restore button is visible
-      await expect(restoreButton.first()).toBeVisible({ timeout: 5000 });
     });
   });
 
   test.describe('CSV Export', () => {
-    test('should trigger export when clicking export button', async ({ authenticatedPage }) => {
-      // Select a user first
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
+    test('should trigger export when clicking export button', async ({
+      authenticatedPage: page,
+    }) => {
+      await rowCheckboxes(page).first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
-
-      await firstCheckbox.click();
-
-      // Wait for bulk action bar
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Look for export button
-      const exportButton = authenticatedPage.locator(
-        'button:has-text("Export"), button:has-text("CSV"), [data-testid="bulk-export"]'
-      );
-
-      if ((await exportButton.count()) === 0) {
-        console.log('Export button not found - skipping');
-        return;
-      }
-
-      // Set up download listener
-      const downloadPromise = authenticatedPage.waitForEvent('download', { timeout: 10000 }).catch(() => null);
-
-      // Click export
-      await exportButton.first().click();
-
-      // Check if download was triggered
+      const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+      await bulkBar(page).getByRole('button', { name: 'Export' }).click();
       const download = await downloadPromise;
 
-      if (download) {
-        // Verify the file has a CSV extension or proper content type
-        const suggestedFilename = download.suggestedFilename();
-        expect(suggestedFilename.toLowerCase()).toContain('csv');
-        console.log(`Download triggered: ${suggestedFilename}`);
-      } else {
-        // Export might show a success toast instead of immediate download
-        const successToast = authenticatedPage.locator(
-          'text=/export/i, text=/download/i, .toast-success'
-        );
-        // Just verify the action was performed without error
-        console.log('Export action completed');
-      }
+      expect(download.suggestedFilename().toLowerCase()).toMatch(/\.csv$/);
     });
   });
 
   test.describe('Selection Persistence', () => {
-    test('should clear selection when switching between tabs', async ({ authenticatedPage }) => {
-      // Select a user in active tab
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
+    test('should clear selection when switching between tabs', async ({
+      authenticatedPage: page,
+    }) => {
+      await rowCheckboxes(page).first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
+      await deletedTab(page).click();
 
-      await firstCheckbox.click();
-
-      // Wait for selection
-      await expect(
-        authenticatedPage.locator('text=/\\d+ selected/i').first()
-      ).toBeVisible({ timeout: 5000 });
-
-      // Switch to deleted tab
-      const deletedTab = authenticatedPage.locator(
-        '[data-testid="deleted-tab"], button:has-text("Deleted"), [role="tab"]:has-text("Deleted")'
-      );
-
-      if ((await deletedTab.count()) === 0) {
-        console.log('Deleted tab not found - skipping');
-        return;
-      }
-
-      await deletedTab.first().click();
-
-      // Wait for tab change
-      await authenticatedPage.waitForTimeout(500);
-
-      // Selection should be cleared
-      const bulkActionBar = authenticatedPage.locator(
-        '[data-testid="bulk-action-bar"], .bulk-action-bar'
-      );
-      const isHidden = await bulkActionBar.isHidden().catch(() => true);
-      expect(isHidden).toBeTruthy();
+      await expect(deletedTab(page)).toHaveAttribute('data-state', 'active');
+      await expect(selectionCount(page)).toBeHidden();
     });
   });
 
   test.describe('Error Handling', () => {
-    test('should show error toast when bulk operation fails', async ({ authenticatedPage }) => {
-      // This test verifies that error handling UI works
-      // We can't easily simulate a server error, so we just verify the UI components exist
-
-      // Select a user first
-      const firstCheckbox = authenticatedPage
-        .locator('tbody input[type="checkbox"], tbody [role="checkbox"]')
-        .first();
-
-      if ((await firstCheckbox.count()) === 0) {
-        test.skip();
-        return;
-      }
-
-      await firstCheckbox.click();
-
-      // Verify that the bulk action UI is responsive and interactive
-      const bulkActionBar = authenticatedPage.locator(
-        '[data-testid="bulk-action-bar"], .bulk-action-bar, text=/\\d+ selected/i'
-      );
-      await expect(bulkActionBar.first()).toBeVisible({ timeout: 5000 });
-
-      // Verify that action buttons are clickable
-      const actionButton = authenticatedPage.locator(
-        '[data-testid="bulk-action-bar"] button, .bulk-action-bar button'
+    test('should show error toast when bulk operation fails', async ({
+      authenticatedPage: page,
+    }) => {
+      // Stub the (read-only) export endpoint with a server error so the failure
+      // path runs without touching any data.
+      await page.route('**/api/users/bulk/export**', (route) =>
+        route.fulfill({ status: 500, json: { error: 'Simulated export failure' } })
       );
 
-      if ((await actionButton.count()) > 0) {
-        await expect(actionButton.first()).toBeEnabled();
-      }
+      await rowCheckboxes(page).first().click();
+      await expect(selectionCount(page)).toHaveText(selectionLabel(1));
 
-      console.log('Error handling UI components verified');
+      await bulkBar(page).getByRole('button', { name: 'Export' }).click();
+
+      await expect(page.getByText('Export failed', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Simulated export failure').first()).toBeVisible();
+      // The bar stays usable after a failure.
+      await expect(bulkBar(page).getByRole('button', { name: 'Export' })).toBeEnabled();
     });
   });
 });
@@ -444,5 +246,8 @@ test.describe('Bulk User Operations - Permissions', () => {
 
     // Either redirect to sign-in or show unauthorized
     expect(signInVisible || unauthorizedVisible).toBeTruthy();
+    await expect(page.getByRole('checkbox', { name: 'Select all users on this page' })).toHaveCount(
+      0
+    );
   });
 });

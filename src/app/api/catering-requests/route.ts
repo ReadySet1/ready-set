@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { Decimal } from "@/types/prisma";
+import { Decimal, UserType } from "@/types/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
@@ -15,6 +15,13 @@ import { runAfterResponse } from "@/lib/api/after-response";
 // Column-limit ceilings (from prisma/schema.prisma)
 const MAX_HEADCOUNT = 2147483647; // INT4 ceiling
 const MAX_DECIMAL_10_2 = new Decimal("99999999.99"); // Decimal(10,2) ceiling
+
+// Roles allowed to create a catering order attributed to another client
+const ORDER_ON_BEHALF_ROLES: UserType[] = [
+  UserType.ADMIN,
+  UserType.SUPER_ADMIN,
+  UserType.HELPDESK,
+];
 
 // Lazy initialization to avoid build-time errors when API key is not set
 const getResendClient = () => {
@@ -148,8 +155,24 @@ export async function POST(request: NextRequest) {
     // Parse the request body
     const data = await request.json();
     
-    // Use the client ID from the request if in admin mode, otherwise use the authenticated user's ID
-    const userId = data.clientId || user.id;
+    // Only staff may create an order on behalf of another client (admin mode).
+    // Everyone else can only create orders for themselves.
+    const isOnBehalfOfAnotherUser = Boolean(data.clientId) && data.clientId !== user.id;
+    if (isOnBehalfOfAnotherUser) {
+      const callerProfile = await prisma.profile.findFirst({
+        where: { id: user.id, deletedAt: null },
+        select: { type: true },
+      });
+
+      if (!callerProfile || !ORDER_ON_BEHALF_ROLES.includes(callerProfile.type)) {
+        return NextResponse.json(
+          { message: "You are not allowed to create orders for another client" },
+          { status: 403 }
+        );
+      }
+    }
+
+    const userId: string = isOnBehalfOfAnotherUser ? data.clientId : user.id;
 
     // Validate that the user is not soft-deleted
     const userValidation = await validateUserNotSoftDeleted(userId);
@@ -445,8 +468,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error processing catering request:", error);
     
+    // Never echo internal error details (DB errors, stack messages) to the client
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Failed to process catering request" },
+      { message: "Failed to process catering request" },
       { status: 500 }
     );
   }
