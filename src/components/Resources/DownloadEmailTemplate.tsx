@@ -1,6 +1,8 @@
 // src/components/Email/DownloadEmailTemplate.tsx
 import * as React from 'react';
 import { encode } from 'he';
+import { EMAIL_LOGO_URL } from '@/utils/email-templates';
+import { siteUrl } from '@/lib/site-url';
 
 interface DownloadEmailTemplateProps {
   firstName: string;
@@ -15,7 +17,7 @@ interface DownloadEmailTemplateProps {
  * - Only allows specific whitelisted hostnames to prevent URL redirection attacks
  * - Encodes URL for safe HTML attribute usage
  */
-const validateDownloadUrl = (url: string): string => {
+export const validateDownloadUrl = (url: string): string => {
   try {
     const parsedUrl = new URL(url);
 
@@ -27,12 +29,11 @@ const validateDownloadUrl = (url: string): string => {
 
     // Hostname allowlist: Only allow trusted domains
     const allowedHosts = [
-      'ready-set.co',
-      'www.ready-set.co',
-      'jdjlkt28jx.ufs.sh', // Uploadfly file storage for resources
-    ];
+      'jdjlkt28jx.ufs.sh', // Uploadfly — static resources in Data/Resources.ts
+      'cdn.sanity.io',      // Sanity file assets — guides resolved by getGuideBySlug
+    ] as const;
 
-    if (!allowedHosts.includes(parsedUrl.hostname)) {
+    if (!(allowedHosts as readonly string[]).includes(parsedUrl.hostname)) {
       console.error(`Blocked unsafe hostname in download URL: ${parsedUrl.hostname}`);
       return '#'; // Return safe default
     }
@@ -92,7 +93,7 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
               <tbody>
                 <tr>
                   <td align="center" style={{ padding: '30px 40px', backgroundColor: '#fbd113' }}>
-                    <img src="https://ready-set.co/images/logo/logo.png" alt="Ready Set Logo" width="150" style={{ display: 'block' }} />
+                    <img src={EMAIL_LOGO_URL} alt="Ready Set Logo" width="150" style={{ display: 'block' }} />
                   </td>
                 </tr>
                 <tr>
@@ -126,7 +127,7 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                       <tbody>
                         <tr>
                           <td align="center" style={{ padding: '10px 0 20px' }}>
-                            <a href="https://ready-set.co/contact" style={{
+                            <a href={siteUrl('/contact')} style={{
                               display: 'inline-block',
                               padding: '12px 25px',
                               backgroundColor: '#facc15',
@@ -179,8 +180,8 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                               This email was sent to {userEmail} by Ready Set. If you did not request this download, please disregard this message.
                             </p>
                             <p style={{ margin: '10px 0 0', color: '#c4c2bd', fontSize: '12px' }}>
-                              <a href="https://ready-set.co/unsubscribe" style={{ color: '#fbd113' }}>Unsubscribe</a> |
-                              <a href="https://ready-set.co/privacy-policy" style={{ color: '#fbd113' }}>Privacy Policy</a>
+                              <a href={siteUrl('/unsubscribe')} style={{ color: '#fbd113' }}>Unsubscribe</a> |
+                              <a href={siteUrl('/privacy-policy')} style={{ color: '#fbd113' }}>Privacy Policy</a>
                             </p>
                           </td>
                         </tr>

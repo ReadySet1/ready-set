@@ -14,6 +14,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "@/config/contact";
 import PricingExamplesSection from "./PricingExamplesSection";
 
 export interface PricingTier {
@@ -478,7 +479,7 @@ const ModernPricingLandingPage = () => {
 
           <div className="grid gap-4 sm:gap-5 md:grid-cols-3 md:gap-6">
             <motion.a
-              href="mailto:info@readysetllc.com"
+              href={CONTACT_MAILTO}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -492,7 +493,7 @@ const ModernPricingLandingPage = () => {
                   Email Us
                 </p>
                 <p className="text-sm font-semibold sm:text-base">
-                  info@readysetllc.com
+                  {CONTACT_EMAIL}
                 </p>
               </div>
             </motion.a>
