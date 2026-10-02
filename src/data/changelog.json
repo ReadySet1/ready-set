@@ -3,6 +3,26 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.3",
+      "date": "2026-10-02",
+      "title": "Release 2.9.3",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Admins can open driver history and the data archive again.",
+          "type": "fixed"
+        },
+        {
+          "text": "Editing an order's headcount, total, tip and other numbers works again.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.3"
+      }
+    },
+    {
       "version": "2.9.2",
       "date": "2026-10-02",
       "title": "A driver app that speaks up",
