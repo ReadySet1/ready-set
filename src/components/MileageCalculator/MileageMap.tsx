@@ -30,19 +30,34 @@ export default function MileageMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  const [webglUnavailable, setWebglUnavailable] = useState(false);
 
   // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current || !MAPBOX_TOKEN) return;
 
+    // Without WebGL the Map constructor throws, and an uncaught error here
+    // would take down the whole page instead of just the map.
+    if (!mapboxgl.supported()) {
+      setWebglUnavailable(true);
+      return;
+    }
+
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-    });
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+      });
+    } catch (error) {
+      console.warn('MileageMap: failed to initialize the map', error);
+      setWebglUnavailable(true);
+      return;
+    }
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
@@ -178,18 +193,23 @@ export default function MileageMap({
   // No token fallback
   if (!MAPBOX_TOKEN) {
     return (
-      <Card className={`border-0 shadow-sm rounded-2xl bg-white/80 ${className}`}>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <MapIcon className="h-8 w-8 text-slate-300 mb-3" />
-          <p className="text-sm text-slate-500">
-            Map unavailable. Add{' '}
-            <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">
-              NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-            </code>{' '}
-            to .env.local
-          </p>
-        </CardContent>
-      </Card>
+      <MapUnavailable className={className}>
+        Map unavailable. Add{' '}
+        <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+        </code>{' '}
+        to .env.local
+      </MapUnavailable>
+    );
+  }
+
+  // WebGL fallback: the rest of the calculator keeps working without the map
+  if (webglUnavailable) {
+    return (
+      <MapUnavailable className={className}>
+        Map unavailable. This browser could not start WebGL, so the route
+        can&apos;t be drawn.
+      </MapUnavailable>
     );
   }
 
@@ -215,6 +235,23 @@ export default function MileageMap({
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function MapUnavailable({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={`border-0 shadow-sm rounded-2xl bg-white/80 ${className}`}>
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+        <MapIcon className="h-8 w-8 text-slate-300 mb-3" />
+        <p className="text-sm text-slate-500">{children}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function createMarkerEl(color: string, label: string, textColor = '#fff'): HTMLDivElement {
   const el = document.createElement('div');

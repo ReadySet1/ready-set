@@ -19,9 +19,9 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-// Headless Chromium has no GPU, and MileageMap crashes the whole page when
-// WebGL is missing (see the fixme'd test below). Software WebGL lets the rest
-// of the suite exercise the calculator as a real browser would.
+// Headless Chromium has no GPU. MileageMap falls back to a "Map unavailable"
+// card when WebGL is missing (covered below); software WebGL lets the rest of
+// the suite exercise the real map as a browser with a GPU would.
 test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
 const pageHeading = (page: Page) =>
@@ -141,10 +141,12 @@ test.describe('Mileage Calculator', () => {
 test.describe('Mileage Calculator - Without WebGL', () => {
   test.use({ storageState: 'e2e/.auth/admin.json' });
 
-  test.fixme(
+  test.setTimeout(60000);
+
+  test(
     'should still render the calculator when WebGL is unavailable',
-    // App bug: MileageMap calls new mapboxgl.Map() unguarded, so "Failed to
-    // initialize WebGL" bubbles to AuthErrorBoundary and replaces the page.
+    // Regression: an unguarded new mapboxgl.Map() used to throw "Failed to
+    // initialize WebGL" into AuthErrorBoundary and replace the whole page.
     async ({ page }) => {
       await page.addInitScript(() => {
         const getContext = HTMLCanvasElement.prototype.getContext;
@@ -160,6 +162,9 @@ test.describe('Mileage Calculator - Without WebGL', () => {
 
       await openMileageCalculator(page);
       await expect(page.getByRole('button', { name: 'Calculate Mileage' })).toBeVisible();
+      await expect(page.getByText('Pickup Location', { exact: true })).toBeVisible();
+      await expect(page.getByText(/Map unavailable.*WebGL/)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('Authentication Error')).toHaveCount(0);
     },
   );
 });
