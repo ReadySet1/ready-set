@@ -233,41 +233,73 @@ describe("useBulkSelection", () => {
     });
   });
 
+  // Deterministic structural checks instead of wall-clock budgets, which
+  // flake on shared CI runners.
   describe("performance", () => {
-    it("should handle large selections efficiently", () => {
-      const { result } = renderHook(() => useBulkSelection());
-      const ids = Array.from({ length: 1000 }, (_, i) => `user-${i}`);
+    const LARGE_N = 10_000;
+    const makeIds = (n: number, prefix = "user") =>
+      Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
 
-      const start = performance.now();
+    it("should select a large batch with a single re-render", () => {
+      let renders = 0;
+      const { result } = renderHook(() => {
+        renders += 1;
+        return useBulkSelection();
+      });
+      const ids = makeIds(LARGE_N);
+      const rendersBefore = renders;
 
       act(() => {
         result.current.selectAll(ids);
       });
 
-      const elapsed = performance.now() - start;
-
-      expect(result.current.selectedCount).toBe(1000);
-      expect(elapsed).toBeLessThan(100); // Should complete in under 100ms
+      // One re-render for the whole batch, not one per id.
+      expect(renders - rendersBefore).toBe(1);
+      expect(result.current.selectedCount).toBe(LARGE_N);
+      expect(result.current.selectedIds).toBeInstanceOf(Set);
+      expect(result.current.selectedIds.size).toBe(LARGE_N);
+      expect(ids.every((id) => result.current.isSelected(id))).toBe(true);
     });
 
-    it("should have O(1) lookup for isSelected", () => {
+    it("should dedupe overlapping large batches", () => {
       const { result } = renderHook(() => useBulkSelection());
-      const ids = Array.from({ length: 1000 }, (_, i) => `user-${i}`);
+      const half = LARGE_N / 2;
 
       act(() => {
-        result.current.selectAll(ids);
+        result.current.selectAll(makeIds(LARGE_N));
+        // Overlaps the first batch entirely and adds `half` new ids.
+        result.current.selectAll(makeIds(LARGE_N + half).slice(half));
       });
 
-      const start = performance.now();
+      expect(result.current.selectedCount).toBe(LARGE_N + half);
+    });
 
-      // Check multiple lookups
-      for (let i = 0; i < 1000; i++) {
-        result.current.isSelected(`user-${i}`);
+    it("should back isSelected with a single Set.has lookup per call", () => {
+      const { result } = renderHook(() => useBulkSelection());
+
+      act(() => {
+        result.current.selectAll(makeIds(LARGE_N));
+      });
+
+      const { selectedIds } = result.current;
+      expect(selectedIds).toBeInstanceOf(Set);
+      const hasSpy = jest.spyOn(selectedIds, "has");
+
+      try {
+        expect(result.current.isSelected("user-0")).toBe(true);
+        expect(result.current.isSelected(`user-${LARGE_N - 1}`)).toBe(true);
+        expect(result.current.isSelected("missing")).toBe(false);
+
+        // Exactly one hash lookup per call: no scan over the selection.
+        expect(hasSpy).toHaveBeenCalledTimes(3);
+        expect(hasSpy.mock.calls).toEqual([
+          ["user-0"],
+          [`user-${LARGE_N - 1}`],
+          ["missing"],
+        ]);
+      } finally {
+        hasSpy.mockRestore();
       }
-
-      const elapsed = performance.now() - start;
-
-      expect(elapsed).toBeLessThan(50); // Should complete in under 50ms
     });
   });
 });
