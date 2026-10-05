@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.4](https://github.com/ReadySet1/ready-set/compare/v2.9.3...v2.9.4) (2026-10-05)
+
+
+### Fixed
+
+* **admin:** show Edit Order on on-demand order details ([faca9e2](https://github.com/ReadySet1/ready-set/commit/faca9e27cf8d737074cb4b2962312384e04e7c12))
+* **admin:** show Edit Order on on-demand order details ([1a01df2](https://github.com/ReadySet1/ready-set/commit/1a01df29f2f6928552f022dd31094eb84488ccad))
+* **dispatch:** broadcast driver assignment to the admin dashboard ([c262bd6](https://github.com/ReadySet1/ready-set/commit/c262bd69bb080c4d0bb23b846a479ff6f50c3e9c))
+* **dispatch:** broadcast driver assignment to the admin dashboard ([aa1bc83](https://github.com/ReadySet1/ready-set/commit/aa1bc837a8dd696e2ed001f4560fe731f7b19fff))
+* **job-applications:** report admin email failures to monitoring ([20490e9](https://github.com/ReadySet1/ready-set/commit/20490e99b6bea1c4e17eef2c0a684127b06d3607))
+* **job-applications:** report admin email failures to monitoring ([3c2ef51](https://github.com/ReadySet1/ready-set/commit/3c2ef51e4e5505c81283fddfec49e33836329e49))
+* **mileage:** show the map fallback when WebGL is unavailable ([422ef23](https://github.com/ReadySet1/ready-set/commit/422ef23ad9c7f2b7056a69077d8f0030e6c18eae))
+* **mileage:** show the map fallback when WebGL is unavailable ([c24b06d](https://github.com/ReadySet1/ready-set/commit/c24b06d6ada76ce4d239a9a16e8c9ee61ecd67ee))
+* self-host Montserrat so builds never fetch Google Fonts ([4516a94](https://github.com/ReadySet1/ready-set/commit/4516a949543b5a5d0e173e13d36b668ec839c721))
+* self-host Montserrat so builds never fetch Google Fonts ([7d57302](https://github.com/ReadySet1/ready-set/commit/7d5730220a28a366e0370744d56622d1ce21a85d))
+
+
+### Security
+
+* override @fastify/busboy to &gt;=3.2.1 (GHSA DoS fixes) ([0ff139c](https://github.com/ReadySet1/ready-set/commit/0ff139cc1ea33199172376248ba6f15613c004ec))
+
 ## [2.9.3](https://github.com/ReadySet1/ready-set/compare/v2.9.2...v2.9.3) (2026-10-02)
 
 
