@@ -18,6 +18,7 @@ import {
   Car,
   Bike,
   Zap,
+  Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "../DriverStatus";
@@ -25,6 +26,8 @@ import OrderDetails from "../ui/OrderDetails";
 import AddressInfo from "../ui/AddressInfo";
 import AdditionalInfo from "../ui/AdditionalInfo";
 import DriverAssignmentDialog from "../ui/DriverAssignmentDialog";
+import EditOrderDialog from "../ui/EditOrderDialog";
+import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "../OrderStatus";
 import { usePathname, useRouter } from "next/navigation";
 import { OrderFilesManager } from "../ui/OrderFiles";
@@ -49,6 +52,7 @@ const STORAGE_BUCKET = "user-assets";
 interface SingleOnDemandOrderProps {
   onDeleteSuccess: () => void;
   showHeader?: boolean;
+  canEditOrder?: boolean;
 }
 
 // Enhanced status config with more detailed styling
@@ -149,9 +153,15 @@ const OrderSkeleton: React.FC = () => (
 const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   onDeleteSuccess,
   showHeader = true,
+  canEditOrder = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
+  const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
+    null,
+  );
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isDriverAssigned, setIsDriverAssigned] = useState(false);
@@ -252,6 +262,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     }
 
     setIsLoading(true);
+    setLoadError(null);
 
     try {
       // Refresh auth session before making the request
@@ -299,6 +310,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         console.error(
           `Order API error (${orderResponse.status}): ${errorText}`,
         );
+        setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
         throw new Error(
           `HTTP error! status: ${orderResponse.status}, details: ${errorText}`,
         );
@@ -386,6 +398,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
     } catch (error) {
       console.error("Error fetching on-demand order:", error);
+      setLoadError((current) => current ?? "failed");
       // Log more details about the error
       if (error instanceof Error) {
         console.error("Error message:", error.message);
@@ -751,10 +764,12 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
             <AlertCircle className="h-8 w-8 text-cyan-500" />
           </div>
           <h2 className="mb-3 text-2xl font-bold text-slate-800">
-            Order Not Found
+            {loadError === "failed" ? "Unable to Load Order" : "Order Not Found"}
           </h2>
           <p className="mb-6 text-slate-500">
-            We couldn't find on-demand order:{" "}
+            {loadError === "failed"
+              ? "Something went wrong while loading on-demand order:"
+              : "We couldn't find on-demand order:"}{" "}
             <span className="font-medium text-slate-700">{orderNumber}</span>
           </p>
           <Button
@@ -1047,6 +1062,18 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                 </h2>
               </div>
               <div className="space-y-3 p-6">
+                {/* Edit Order Button - visible for admin/helpdesk when order is not terminal */}
+                {(canEditOrder || userCanEditOrder()) &&
+                  !TERMINAL_STATUSES.includes(order.status.toUpperCase() as typeof TERMINAL_STATUSES[number]) && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={() => setIsEditDialogOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                    Edit Order
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 hover:bg-slate-50"
@@ -1162,6 +1189,14 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         selectedDriver={selectedDriver}
         onDriverSelection={handleDriverSelection}
         onAssignOrEditDriver={handleAssignOrEditDriver}
+      />
+
+      {/* Edit Order Dialog */}
+      <EditOrderDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        order={order}
+        onSaveSuccess={fetchOrderDetails}
       />
     </div>
   );
