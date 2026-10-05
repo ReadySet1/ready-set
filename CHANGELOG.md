@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.3](https://github.com/ReadySet1/ready-set/compare/v2.9.2...v2.9.3) (2026-10-02)
+
+
+### Fixed
+
+* **admin:** authorize admin pages and APIs from profiles.type ([811bc4c](https://github.com/ReadySet1/ready-set/commit/811bc4c3d244aeb8a533fc1aa5c50fd0f20af938))
+* **orders:** keep headcount or total on catering edits; fix dialog number fields ([12ee1da](https://github.com/ReadySet1/ready-set/commit/12ee1da1e75e9e68e3294c1e06aa17832d27f5a7))
+
 ## [2.9.2](https://github.com/ReadySet1/ready-set/compare/v2.9.1...v2.9.2) (2026-10-02)
 
 
