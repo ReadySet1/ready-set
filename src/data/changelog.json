@@ -3,6 +3,30 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.4",
+      "date": "2026-10-05",
+      "title": "Editing on-demand orders and steadier maps",
+      "summary": "Admins can now edit on-demand orders, the mileage calculator keeps working when a browser cannot draw maps, and order pages update on their own when a driver is assigned.",
+      "changes": [
+        {
+          "text": "Admins can now edit on-demand orders from the order detail page.",
+          "type": "fixed"
+        },
+        {
+          "text": "The mileage calculator now works in browsers that can't show maps; only the route map is hidden.",
+          "type": "fixed"
+        },
+        {
+          "text": "A catering order page now shows the assigned driver as soon as dispatch assigns one, without a reload.",
+          "type": "improved"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.4"
+      }
+    },
+    {
       "version": "2.9.3",
       "date": "2026-10-02",
       "title": "Admin access and order edits fixed",
