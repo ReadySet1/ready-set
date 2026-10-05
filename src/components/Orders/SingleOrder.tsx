@@ -157,6 +157,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
+  const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
+    null,
+  );
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -332,6 +336,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
 
     setIsLoading(true);
+    setLoadError(null);
 
     try {
       const session = await getValidSession();
@@ -374,6 +379,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         console.error(
           `Order API error (${orderResponse.status}): ${errorText}`,
         );
+        setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
         throw new Error(
           `HTTP error! status: ${orderResponse.status}, details: ${errorText}`,
         );
@@ -462,6 +468,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
     } catch (error) {
       console.error("Error fetching order:", error);
+      setLoadError((current) => current ?? "failed");
       // Log more details about the error
       if (error instanceof Error) {
         console.error("Error message:", error.message);
@@ -857,10 +864,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             <AlertCircle className="h-8 w-8 text-slate-400" />
           </div>
           <h2 className="mb-3 text-2xl font-bold text-slate-800">
-            Order Not Found
+            {loadError === "failed" ? "Unable to Load Order" : "Order Not Found"}
           </h2>
           <p className="mb-6 text-slate-500">
-            We couldn't find order:{" "}
+            {loadError === "failed"
+              ? "Something went wrong while loading order:"
+              : "We couldn't find order:"}{" "}
             <span className="font-medium text-slate-700">{orderNumber}</span>
           </p>
           <Button

@@ -84,6 +84,7 @@ const OrderPage = () => {
         <SingleOnDemandOrder
           onDeleteSuccess={handleDeleteSuccess}
           showHeader={false}
+          canEditOrder={true}
         />
       </div>
     </div>
