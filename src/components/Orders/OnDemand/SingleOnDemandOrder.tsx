@@ -256,7 +256,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   }, [supabase]);
 
   // `silent` reloads in place (realtime updates): no loading skeleton, and a
-  // failure keeps the order already on screen instead of an error toast.
+  // failure keeps the order already on screen with no toast or redirect.
   const fetchOrderDetails = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!orderNumber) {
       console.error("No order number available");
@@ -278,6 +278,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
 
       if (sessionError || !session) {
         console.error("Authentication error:", sessionError?.message);
+        if (silent) return;
         toast.error("Authentication error. Please try logging in again.");
         router.push("/sign-in"); // Redirect to login if session is invalid
         return;
@@ -303,7 +304,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
           errorText = JSON.stringify(errorData);
 
           // If unauthorized, redirect to login
-          if (orderResponse.status === 401) {
+          if (orderResponse.status === 401 && !silent) {
             toast.error("Session expired. Please log in again.");
             router.push("/sign-in");
             return;
@@ -401,7 +402,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         setFiles(transformedFiles);
       } catch (fileError) {
         console.error("Error fetching files:", fileError);
-        toast.error("Failed to load order files");
+        if (!silent) {
+          toast.error("Failed to load order files");
+        }
       }
     } catch (error) {
       console.error("Error fetching on-demand order:", error);
