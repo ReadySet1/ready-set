@@ -226,6 +226,263 @@ describe("GET /api/drivers/[driverId]/history", () => {
   });
 });
 
+describe("GET /api/drivers/[driverId]/history — period totals per week", () => {
+  // Weeks (UTC Mondays): 2026-08-10 and 2026-08-17.
+  const RANGE = "?startDate=2026-08-03T00:00:00.000Z&endDate=2026-08-23T23:59:59.000Z";
+
+  function summaryRow(overrides: Record<string, unknown> = {}) {
+    return {
+      weekStart: new Date("2026-08-17T00:00:00.000Z"),
+      weekEnd: new Date("2026-08-23T00:00:00.000Z"),
+      year: 2026,
+      weekNumber: 34,
+      totalShifts: 0,
+      completedShifts: 0,
+      totalShiftHours: 0,
+      totalDeliveries: 0,
+      completedDeliveries: 0,
+      totalMiles: 0,
+      gpsMiles: 0,
+      generatedAt: new Date("2026-08-24T04:00:00.000Z"),
+      updatedAt: new Date("2026-08-24T04:00:00.000Z"),
+      ...overrides,
+    };
+  }
+
+  function shiftRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "shift-0820",
+      shiftStart: new Date("2026-08-20T14:00:00.000Z"),
+      shiftEnd: new Date("2026-08-20T16:30:00.000Z"),
+      status: "completed",
+      totalDistanceMiles: 12.5,
+      gpsDistanceMiles: 12,
+      deliveryCount: 1,
+      updatedAt: new Date("2026-08-20T16:30:00.000Z"),
+      ...overrides,
+    };
+  }
+
+  async function fetchHistory(query = RANGE) {
+    authAs("ADMIN");
+    (mockPrisma.driver.findFirst as jest.Mock).mockResolvedValueOnce(driverRow);
+    return getHistory(historyRequest(DRIVER_ID, query), makeContext(DRIVER_ID));
+  }
+
+  it("uses live shifts for a week whose summary is a stale zero row", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow(),
+    ]);
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([shiftRow()]);
+
+    const res = await fetchHistory();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.summary).toEqual({
+      totalShifts: 1,
+      completedShifts: 1,
+      totalHours: 2.5,
+      totalDeliveries: 1,
+      totalMiles: 12.5,
+      gpsMiles: 12,
+    });
+    // The stale row must not be presented as the week's breakdown either.
+    expect(body.weeklySummaries).toEqual([]);
+  });
+
+  it("uses a fresh summary as is", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow({
+        totalShifts: 2,
+        completedShifts: 2,
+        totalShiftHours: 8,
+        totalDeliveries: 5,
+        completedDeliveries: 5,
+        totalMiles: 40,
+        gpsMiles: 38,
+      }),
+    ]);
+    // Already counted by the summary (written after the shift's last change).
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([shiftRow()]);
+
+    const res = await fetchHistory();
+    const body = await res.json();
+
+    expect(body.summary).toEqual({
+      totalShifts: 2,
+      completedShifts: 2,
+      totalHours: 8,
+      totalDeliveries: 5,
+      totalMiles: 40,
+      gpsMiles: 38,
+    });
+    expect(body.weeklySummaries).toHaveLength(1);
+  });
+
+  it("treats a summary written before a shift change in its week as stale", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow({
+        totalShifts: 1,
+        completedShifts: 1,
+        totalShiftHours: 1,
+        totalDeliveries: 1,
+        totalMiles: 3,
+        gpsMiles: 3,
+      }),
+    ]);
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([
+      shiftRow({ updatedAt: new Date("2026-08-25T10:00:00.000Z") }),
+    ]);
+
+    const body = await (await fetchHistory()).json();
+    expect(body.summary.totalMiles).toBe(12.5);
+    expect(body.summary.totalHours).toBe(2.5);
+  });
+
+  it("sums fresh summaries with live totals for uncovered weeks", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow({
+        weekStart: new Date("2026-08-10T00:00:00.000Z"),
+        weekEnd: new Date("2026-08-16T00:00:00.000Z"),
+        weekNumber: 33,
+        totalShifts: 1,
+        completedShifts: 1,
+        totalShiftHours: 4,
+        totalDeliveries: 3,
+        completedDeliveries: 3,
+        totalMiles: 20,
+        gpsMiles: 19,
+        updatedAt: new Date("2026-08-17T04:00:00.000Z"),
+      }),
+    ]);
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([
+      // Week 2026-08-17: no summary → live.
+      shiftRow(),
+      // Week 2026-08-10: covered by the fresh summary → not added again.
+      shiftRow({
+        id: "shift-0812",
+        shiftStart: new Date("2026-08-12T14:00:00.000Z"),
+        shiftEnd: new Date("2026-08-12T18:00:00.000Z"),
+        totalDistanceMiles: 20,
+        gpsDistanceMiles: 19,
+        deliveryCount: 3,
+        updatedAt: new Date("2026-08-12T18:00:00.000Z"),
+      }),
+    ]);
+
+    const body = await (await fetchHistory()).json();
+
+    expect(body.summary).toEqual({
+      totalShifts: 2,
+      completedShifts: 2,
+      totalHours: 6.5,
+      totalDeliveries: 4,
+      totalMiles: 32.5,
+      gpsMiles: 31,
+    });
+    expect(body.weeklySummaries).toHaveLength(1);
+    expect(body.weeklySummaries[0].weekStart).toBe("2026-08-10T00:00:00.000Z");
+  });
+
+  it("counts delivery rows only outside covered weeks when live shifts report none", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow({
+        weekStart: new Date("2026-08-10T00:00:00.000Z"),
+        weekEnd: new Date("2026-08-16T00:00:00.000Z"),
+        totalDeliveries: 3,
+        updatedAt: new Date("2026-08-17T04:00:00.000Z"),
+      }),
+    ]);
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([
+      shiftRow({ deliveryCount: 0 }),
+    ]);
+    (mockPrisma.delivery.count as jest.Mock).mockResolvedValue(2);
+
+    const body = await (await fetchHistory()).json();
+
+    expect(body.summary.totalDeliveries).toBe(5);
+    expect(mockPrisma.delivery.count).toHaveBeenCalledWith({
+      where: {
+        driverId: DRIVER_ID,
+        createdAt: {
+          gte: new Date("2026-08-03T00:00:00.000Z"),
+          lte: new Date("2026-08-23T23:59:59.000Z"),
+        },
+        deletedAt: null,
+        NOT: [
+          {
+            createdAt: {
+              gte: new Date("2026-08-10T00:00:00.000Z"),
+              lt: new Date("2026-08-17T00:00:00.000Z"),
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("computes everything from live rows when there are no summaries", async () => {
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([
+      shiftRow({ deliveryCount: 0 }),
+    ]);
+    (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
+      {
+        id: "archived-1",
+        shiftStart: new Date("2026-08-11T14:00:00.000Z"),
+        shiftEnd: new Date("2026-08-11T15:00:00.000Z"),
+        status: "completed",
+        totalDistanceMiles: 5,
+        gpsDistanceMiles: 4,
+        deliveryCount: 0,
+        archivedAt: new Date("2026-09-01T00:00:00.000Z"),
+      },
+    ]);
+    (mockPrisma.delivery.count as jest.Mock).mockResolvedValue(4);
+
+    const body = await (await fetchHistory()).json();
+
+    expect(body.summary).toEqual({
+      totalShifts: 2,
+      completedShifts: 2,
+      totalHours: 3.5,
+      totalDeliveries: 4,
+      totalMiles: 17.5,
+      gpsMiles: 16,
+    });
+    expect(body.weeklySummaries).toEqual([]);
+    expect(mockPrisma.delivery.count).toHaveBeenCalledWith({
+      where: {
+        driverId: DRIVER_ID,
+        createdAt: {
+          gte: new Date("2026-08-03T00:00:00.000Z"),
+          lte: new Date("2026-08-23T23:59:59.000Z"),
+        },
+        deletedAt: null,
+      },
+    });
+  });
+
+  it("lists fresh summary weeks and live weeks in the CSV", async () => {
+    (mockPrisma.driverWeeklySummary.findMany as jest.Mock).mockResolvedValue([
+      summaryRow({
+        weekStart: new Date("2026-08-10T00:00:00.000Z"),
+        weekEnd: new Date("2026-08-16T00:00:00.000Z"),
+        weekNumber: 33,
+        totalShifts: 0,
+        updatedAt: new Date("2026-08-17T04:00:00.000Z"),
+      }),
+    ]);
+    (mockPrisma.driverShift.findMany as jest.Mock).mockResolvedValue([shiftRow()]);
+
+    const res = await fetchHistory(`${RANGE}&format=csv`);
+    const lines = (await res.text()).split("\n");
+
+    expect(lines).toContain("Week of 2026-08-17,2026-08-17,2026-08-23,1,1,2.5,1,12.5,12.0");
+    expect(lines).toContain("Week 33 2026,2026-08-10,2026-08-16,0,0,0.0,0,0.0,0.0");
+  });
+});
+
 describe("GET /api/drivers/[driverId]/history/export", () => {
   beforeEach(() => {
     mockGeneratePDF.mockResolvedValue({
