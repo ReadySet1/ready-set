@@ -11,11 +11,25 @@ test.use({ storageState: 'e2e/.auth/client.json' });
 const dashboardHeading = (page: Page) =>
   page.getByRole('heading', { level: 1, name: 'Client Dashboard' });
 
+// Scope dashboard assertions to <main>. The stats/recent-orders/quick-actions
+// block sits in a <Suspense> boundary, so React streams it as a hidden copy
+// (<div hidden id="S:0">, appended after the footer) that a deferred $RC/$RV
+// script later moves into place. React 19.2 throttles that reveal, so for a
+// moment after `load` the DOM holds the visible copy in <main> AND the hidden
+// one outside it. Page-wide text/CSS locators match both and fail strict mode.
+// Same fix as e2e/data-separation.spec.ts (#638).
+const dashboard = (page: Page) => page.getByRole('main');
+
+const statLabel = (page: Page, label: string) =>
+  dashboard(page).getByText(label, { exact: true });
+
 // The value line of each stat card (the breadcrumb h1 also uses .text-2xl.font-bold).
-const statValues = (page: Page) => page.locator('h4.text-2xl.font-bold');
+const statValues = (page: Page) => dashboard(page).locator('h4.text-2xl.font-bold');
+
+const viewAllLink = (page: Page) => dashboard(page).getByRole('link', { name: 'View All' });
 
 const quickActions = (page: Page) =>
-  page
+  dashboard(page)
     .locator('div.overflow-hidden')
     .filter({ has: page.getByRole('heading', { name: 'Quick Actions' }) });
 
@@ -44,12 +58,12 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
   test('2. Visual & Data Integrity - Verify dashboard widgets and data loading', async ({ page }) => {
     await openDashboard(page);
 
-    await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
-    await expect(page.getByText('Completed', { exact: true })).toBeVisible();
-    await expect(page.getByText('Saved Locations', { exact: true })).toBeVisible();
+    await expect(statLabel(page, 'Active Orders')).toBeVisible();
+    await expect(statLabel(page, 'Completed')).toBeVisible();
+    await expect(statLabel(page, 'Saved Locations')).toBeVisible();
 
     await expect(page.getByRole('heading', { name: 'Recent Orders' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View All' })).toBeVisible();
+    await expect(viewAllLink(page)).toBeVisible();
 
     await expect(page.getByRole('heading', { name: 'Quick Actions' })).toBeVisible();
 
@@ -66,9 +80,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await expect(newOrderLink).toBeVisible();
     await expect(newOrderLink).toContainText('New Catering Order');
 
-    const viewAllLink = page.locator('a[href="/client/orders"]');
-    await expect(viewAllLink).toBeVisible();
-    await expect(viewAllLink).toContainText('View All');
+    await expect(viewAllLink(page)).toBeVisible();
+    await expect(viewAllLink(page)).toHaveAttribute('href', '/client/orders');
 
     await expect(actions.locator('a[href="/client/orders/new"]')).toBeVisible();
     await expect(actions.locator('a[href="/addresses"]')).toBeVisible();
@@ -83,8 +96,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
 
     // With orders: each card has a "View Details" link. Without: an empty
     // state offers "Place Your First Order".
-    const viewDetailsLinks = page.getByRole('link', { name: 'View Details' });
-    const placeFirstOrder = page.getByRole('link', { name: 'Place Your First Order' });
+    const viewDetailsLinks = dashboard(page).getByRole('link', { name: 'View Details' });
+    const placeFirstOrder = dashboard(page).getByRole('link', { name: 'Place Your First Order' });
     if ((await viewDetailsLinks.count()) > 0) {
       await expect(viewDetailsLinks.first()).toBeVisible();
     } else {
@@ -97,8 +110,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
 
     await page.setViewportSize({ width: 768, height: 1024 });
     await expect(dashboardHeading(page)).toBeVisible();
-    await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
-    await expect(page.locator('.grid').first()).toBeVisible();
+    await expect(statLabel(page, 'Active Orders')).toBeVisible();
+    await expect(dashboard(page).locator('.grid').first()).toBeVisible();
 
     await page.setViewportSize({ width: 375, height: 667 });
     await expect(dashboardHeading(page)).toBeVisible();
@@ -120,20 +133,20 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
   test('6. Data Loading States - Verify skeleton loading works', async ({ page }) => {
     await openDashboard(page);
 
-    await expect(page.getByText('Active Orders', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(statLabel(page, 'Active Orders')).toBeVisible({ timeout: 10000 });
 
     // No dashboard skeleton should remain once content has loaded.
-    const visibleSkeletons = await page.locator('.animate-pulse:visible').count();
+    const visibleSkeletons = await dashboard(page).locator('.animate-pulse:visible').count();
     expect(visibleSkeletons).toBeLessThanOrEqual(2);
   });
 
   test('7. Error Handling - Verify graceful handling of missing data', async ({ page }) => {
     await openDashboard(page);
 
-    const noOrdersMessage = page.getByText("You haven't placed any orders yet");
+    const noOrdersMessage = dashboard(page).getByText("You haven't placed any orders yet");
     if ((await noOrdersMessage.count()) > 0) {
       await expect(noOrdersMessage).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Place Your First Order' })).toBeVisible();
+      await expect(dashboard(page).getByRole('link', { name: 'Place Your First Order' })).toBeVisible();
     }
 
     for (const stat of await statValues(page).all()) {
@@ -168,8 +181,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await openDashboard(page);
 
     await expect(dashboardHeading(page)).toBeVisible();
-    await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
-    await expect(page.getByText('Completed', { exact: true })).toBeVisible();
+    await expect(statLabel(page, 'Active Orders')).toBeVisible();
+    await expect(statLabel(page, 'Completed')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Orders' })).toBeVisible();
 
     // The vendor-only quick action must not show for a CLIENT.
@@ -194,9 +207,9 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
       await expect(linkElement).toContainText(link.text);
     }
 
-    await expect(page.locator('a[href="/client/orders"]')).toContainText('View All');
+    await expect(viewAllLink(page)).toHaveAttribute('href', '/client/orders');
 
-    const viewDetailsLinks = page.getByRole('link', { name: 'View Details' });
+    const viewDetailsLinks = dashboard(page).getByRole('link', { name: 'View Details' });
     if ((await viewDetailsLinks.count()) > 0) {
       await expect(viewDetailsLinks.first()).toHaveAttribute('href', /^\/order-status\//);
     }
@@ -206,7 +219,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await openDashboard(page);
     await expect(dashboardHeading(page)).toBeVisible();
 
-    await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+    await expect(statLabel(page, 'Active Orders')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Orders' })).toBeVisible();
 
     // Seven stat cards (active, pending, completed, cancelled, saved
@@ -217,7 +230,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
   test('12. Error State Handling - Verify proper error handling for CLIENT dashboard', async ({ page }) => {
     await openDashboard(page);
 
-    const errorMessages = page.getByText(/Something went wrong|Failed to load/);
+    const errorMessages = dashboard(page).getByText(/Something went wrong|Failed to load/);
     for (const error of await errorMessages.all()) {
       const text = (await error.textContent())?.toLowerCase();
       expect(text).not.toContain('undefined');
