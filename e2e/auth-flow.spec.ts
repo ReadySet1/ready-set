@@ -125,9 +125,14 @@ test.describe('Authentication Flow', () => {
     const toggle = page.getByRole('button', { name: 'Mobile Menu' });
     await expect(toggle).toBeVisible();
 
-    // Open mobile menu: the auth links live there on mobile
-    await toggle.click();
-    await expect(page.getByRole('link', { name: 'Sign In', exact: true })).toBeVisible();
+    // Open mobile menu: the auth links live there on mobile. `goto` resolves on
+    // `load`, which can fire before React hydrates the toggle, so a single early
+    // click is a no-op. Retry the click until the menu actually opens.
+    const signIn = page.getByRole('link', { name: 'Sign In', exact: true });
+    await expect(async () => {
+      if (!(await signIn.isVisible())) await toggle.click();
+      await expect(signIn).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
     await expect(page.getByRole('link', { name: 'Sign Up', exact: true })).toBeVisible();
   });
 

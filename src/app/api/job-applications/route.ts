@@ -5,6 +5,49 @@ import { buildJobApplicationEmailHtml } from "@/lib/job-application-email";
 import { resolveOwnedApplicationUploads } from "@/lib/job-application-uploads";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
+import { runAfterResponse } from "@/lib/api/after-response";
+
+const ADMIN_EMAIL_SENTRY_TAGS = {
+  operation: "job_application_admin_email",
+  route: "job_applications",
+};
+
+/**
+ * Email the admins about a new application. Failures are reported to
+ * monitoring with the application id only: never the applicant's PII.
+ */
+async function notifyAdminsOfApplication(jobApplicationId: string): Promise<void> {
+  try {
+    const applicationWithFiles = await prisma.jobApplication.findUnique({
+      where: { id: jobApplicationId, deletedAt: null },
+      include: { fileUploads: true },
+    });
+
+    if (!applicationWithFiles) {
+      console.error("Could not refetch job application for admin email", { jobApplicationId });
+      Sentry.captureMessage("Job application admin email not sent: refetch returned null", {
+        level: "error",
+        tags: ADMIN_EMAIL_SENTRY_TAGS,
+        extra: { jobApplicationId },
+      });
+      return;
+    }
+
+    const { fileUploads, ...applicationFields } = applicationWithFiles;
+    await sendEmail({
+      to: process.env.ADMIN_EMAIL || "apply@readysetllc.com",
+      subject: `New Job Application: ${applicationFields.firstName} ${applicationFields.lastName} - ${applicationFields.position}`,
+      html: buildJobApplicationEmailHtml(applicationFields, fileUploads),
+    });
+  } catch (error) {
+    console.error("Failed to send job application admin email", { jobApplicationId, error });
+    Sentry.captureException(error, {
+      tags: ADMIN_EMAIL_SENTRY_TAGS,
+      extra: { jobApplicationId },
+    });
+  }
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient(); // Regular client for user operations
@@ -296,35 +339,13 @@ export async function POST(request: Request) {
     } else {
           }
 
-    // --- Step 5: Send Notification Email (Adjust to use final paths/URLs) ---
-    const recipient = process.env.ADMIN_EMAIL || "apply@readysetllc.com";
-    const subject = `New Job Application: ${application.firstName} ${application.lastName} - ${application.position}`;
-    
-    // Fetch the application *with* its associated (and now updated) file uploads
-    const applicationWithFiles = await prisma.jobApplication.findUnique({
-        where: { id: application.id },
-        include: { fileUploads: true } // Include the updated FileUploads
-    });
-
-    if (!applicationWithFiles) {
-        console.error("Could not refetch application with files for email notification.");
-        // Handle this case - maybe send email with initial data?
-    } else {
-        const { fileUploads, ...applicationFields } = applicationWithFiles;
-        const htmlBody = buildJobApplicationEmailHtml(applicationFields, fileUploads);
-
-        try {
-          await sendEmail({
-            to: recipient,
-            subject: subject,
-            html: htmlBody,
-          });
-                  } catch (emailError: any) {
-          console.error("Error sending notification email:", {
-            message: emailError.message, recipient, jobApplicationId: application.id, stack: emailError.stack
-          });
-        }
-    } // End if applicationWithFiles
+    // --- Step 5: Notify admins after the response is sent ---
+    // The application is already saved, so the applicant gets success either
+    // way. The send retries inside the shared email helper (up to ~30 s), so
+    // it runs after the response instead of holding the request open.
+    runAfterResponse("job-application-admin-email", () =>
+      notifyAdminsOfApplication(application.id),
+    );
 
     // --- Step 6: Return Success Response ---
     return NextResponse.json({

@@ -3,6 +3,9 @@
 import { POST } from "@/app/api/job-applications/route";
 import { prisma } from "@/utils/prismaDB";
 import { createAdminClient, createClient } from "@/utils/supabase/server";
+import { sendEmail } from "@/utils/email";
+import { runAfterResponse } from "@/lib/api/after-response";
+import * as Sentry from "@sentry/nextjs";
 
 jest.mock("@/utils/prismaDB", () => ({
   prisma: {
@@ -31,6 +34,25 @@ jest.mock("@/lib/job-application-email", () => ({
   buildJobApplicationEmailHtml: jest.fn().mockReturnValue("<p>email</p>"),
 }));
 
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
+// Collect deferred after-response work so tests decide when it runs.
+let deferredWork: Array<() => Promise<unknown>> = [];
+jest.mock("@/lib/api/after-response", () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
+    deferredWork.push(work);
+  }),
+}));
+
+async function flushAfterResponse(): Promise<void> {
+  const work = deferredWork;
+  deferredWork = [];
+  await Promise.all(work.map((fn) => fn()));
+}
+
 const SESSION_ID = "11111111-2222-3333-4444-555555555555";
 const TOKEN = "f".repeat(64);
 
@@ -58,6 +80,7 @@ describe("POST /api/job-applications - upload ownership", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    deferredWork = [];
     single = jest.fn();
     const eq = jest.fn().mockReturnValue({ single });
     const select = jest.fn().mockReturnValue({ eq });
@@ -166,6 +189,130 @@ describe("POST /api/job-applications - upload ownership", () => {
       expect.objectContaining({
         where: { id: "own-file" },
         data: expect.objectContaining({ jobApplicationId: "app-1" }),
+      }),
+    );
+  });
+});
+
+describe("POST /api/job-applications - admin notification email", () => {
+  const PII = ["Ada", "Lovelace", "ada@example.com", "415-555-0100", "resume.pdf"];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    deferredWork = [];
+    (createAdminClient as jest.Mock).mockResolvedValue({ storage: { from: jest.fn() } });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (prisma.jobApplication.create as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      phone: "415-555-0100",
+      position: "Server",
+    });
+    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      phone: "415-555-0100",
+      fileUploads: [{ category: "resume", fileName: "resume.pdf", fileUrl: "https://signed" }],
+    });
+    (sendEmail as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  function sentryPayloads(): string {
+    return JSON.stringify([
+      (Sentry.captureException as jest.Mock).mock.calls.map((call) => call[1]),
+      (Sentry.captureMessage as jest.Mock).mock.calls,
+    ]);
+  }
+
+  it("does not block the response on the admin email", async () => {
+    const response = await POST(
+      buildRequest({ ...baseBody, phone: "415-555-0100" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, id: "app-1" });
+    expect(runAfterResponse).toHaveBeenCalledWith(
+      "job-application-admin-email",
+      expect.any(Function),
+    );
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    await flushAfterResponse();
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(prisma.jobApplication.findUnique).toHaveBeenCalledWith({
+      where: { id: "app-1", deletedAt: null },
+      include: { fileUploads: true },
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("still returns success and reports to Sentry without PII when sendEmail rejects", async () => {
+    const emailError = new Error("Resend unavailable");
+    (sendEmail as jest.Mock).mockRejectedValue(emailError);
+
+    const response = await POST(
+      buildRequest({ ...baseBody, phone: "415-555-0100" }),
+    );
+    await flushAfterResponse();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, id: "app-1" });
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      emailError,
+      expect.objectContaining({
+        tags: expect.objectContaining({ operation: "job_application_admin_email" }),
+        extra: expect.objectContaining({ jobApplicationId: "app-1" }),
+      }),
+    );
+    for (const value of PII) {
+      expect(sentryPayloads()).not.toContain(value);
+    }
+  });
+
+  it("still returns success and reports to Sentry without PII when the refetch returns null", async () => {
+    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const response = await POST(
+      buildRequest({ ...baseBody, phone: "415-555-0100" }),
+    );
+    await flushAfterResponse();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, id: "app-1" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        level: "error",
+        tags: expect.objectContaining({ operation: "job_application_admin_email" }),
+        extra: expect.objectContaining({ jobApplicationId: "app-1" }),
+      }),
+    );
+    for (const value of PII) {
+      expect(sentryPayloads()).not.toContain(value);
+    }
+  });
+
+  it("reports to Sentry when the refetch itself throws", async () => {
+    const dbError = new Error("connection reset");
+    (prisma.jobApplication.findUnique as jest.Mock).mockRejectedValue(dbError);
+
+    const response = await POST(buildRequest(baseBody));
+    await flushAfterResponse();
+
+    expect(response.status).toBe(200);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      dbError,
+      expect.objectContaining({
+        tags: expect.objectContaining({ operation: "job_application_admin_email" }),
+        extra: expect.objectContaining({ jobApplicationId: "app-1" }),
       }),
     );
   });

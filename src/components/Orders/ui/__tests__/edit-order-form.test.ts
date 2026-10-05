@@ -87,6 +87,41 @@ describe('buildOrderUpdatePayload', () => {
   });
 });
 
+describe('buildOrderUpdatePayload for an on-demand order', () => {
+  const onDemandOrder = (): Order =>
+    ({
+      id: 'order-456',
+      orderNumber: 'OND001',
+      order_type: 'on_demand',
+      status: 'ACTIVE',
+      pickupDateTime: '2025-02-16T10:00:00Z',
+      arrivalDateTime: '2025-02-16T11:00:00Z',
+      itemDelivered: 'Medical supplies',
+      vehicleType: 'VAN',
+      length: 24,
+      width: 18,
+      height: 12,
+      weight: 50,
+      orderTotal: '100.00',
+      tip: '15.00',
+    }) as unknown as Order;
+
+  it('sends nothing when the form is saved unchanged', () => {
+    expect(submit(onDemandOrder())).toEqual({});
+  });
+
+  it('sends edited on-demand fields', () => {
+    expect(submit(onDemandOrder(), { vehicleType: 'TRUCK', weight: 75 })).toEqual({
+      vehicleType: 'TRUCK',
+      weight: 75,
+    });
+  });
+
+  it('never sends catering-only fields', () => {
+    expect(submit(onDemandOrder(), { headcount: 60, brokerage: 'X' })).toEqual({});
+  });
+});
+
 // `<input type="number" {...register(...)}>` hands react-hook-form the typed
 // text, so the schema receives strings ("60", "") rather than numbers.
 describe('editOrderSchema with raw input strings', () => {

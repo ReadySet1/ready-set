@@ -66,18 +66,23 @@ async function openFirstOrder(page: Page, tab: keyof typeof STATUS_TABS): Promis
   if (!orderNumber) throw new Error('unreachable: test skipped above');
 
   await page.getByRole('link', { name: orderNumber, exact: true }).click();
+  await waitForOrderDetail(page);
+  return orderNumber;
+}
 
-  // The detail page renders its sidebar once the order has loaded. SingleOrder
-  // shows "Order Not Found" for ANY failed detail fetch (not only a 404); on a
-  // busy dev server that is usually transient, so reload once before failing.
+/**
+ * Wait for an order detail page to render its sidebar. A failed detail fetch
+ * other than a 404 shows "Unable to Load Order"; on a busy dev server that is
+ * usually transient, so reload once before failing.
+ */
+async function waitForOrderDetail(page: Page): Promise<void> {
   const quickActions = page.getByRole('heading', { name: 'Quick Actions' });
-  const notFound = page.getByRole('heading', { name: 'Order Not Found' });
-  await expect(quickActions.or(notFound)).toBeVisible({ timeout: 45000 });
-  if (await notFound.isVisible()) {
+  const loadError = page.getByRole('heading', { name: 'Unable to Load Order' });
+  await expect(quickActions.or(loadError)).toBeVisible({ timeout: 45000 });
+  if (await loadError.isVisible()) {
     await page.reload({ waitUntil: 'domcontentloaded' });
   }
   await expect(quickActions).toBeVisible({ timeout: 45000 });
-  return orderNumber;
 }
 
 /** Open an editable (pending/confirmed) order and its edit dialog. */
@@ -299,14 +304,27 @@ test.describe('Edit Order Flow', () => {
   });
 
   test.describe('On-Demand Order Edit', () => {
-    // The admin on-demand detail page (SingleOnDemandOrder) renders no "Edit
-    // Order" button, so EditOrderDialog's on-demand branch is unreachable from
-    // /admin/on-demand-orders/:order_number.
-    test.skip('should display on-demand specific fields for on-demand orders', async ({ page }) => {
-      await page.goto('/admin/on-demand-orders');
+    test('should display on-demand specific fields for on-demand orders', async ({ page }) => {
+      // The list opens on the Active tab, so its first order is editable.
+      const listResponse = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/orders/on-demand-orders') && res.url().includes('status=ACTIVE'),
+        { timeout: 30000 }
+      );
+      await page.goto('/admin/on-demand-orders', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      const response = await listResponse;
+      expect(response.ok(), `GET ${response.url()} -> ${response.status()}`).toBe(true);
 
-      const orderLink = page.locator('tbody a[href^="/admin/on-demand-orders/"]').first();
-      await orderLink.click();
+      const { orders } = (await response.json()) as { orders: { orderNumber: string }[] };
+      const orderNumber = orders[0]?.orderNumber;
+      test.skip(!orderNumber, 'No active on-demand orders on this database');
+      if (!orderNumber) throw new Error('unreachable: test skipped above');
+
+      await page.goto(`/admin/on-demand-orders/${encodeURIComponent(orderNumber)}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
+      await waitForOrderDetail(page);
       await editOrderButton(page).click();
 
       const dialog = page.getByRole('dialog');
