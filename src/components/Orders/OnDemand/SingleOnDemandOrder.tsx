@@ -45,6 +45,7 @@ import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/client-enums";
+import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -254,15 +255,19 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     }
   }, [supabase]);
 
-  const fetchOrderDetails = useCallback(async () => {
+  // `silent` reloads in place (realtime updates): no loading skeleton, and a
+  // failure keeps the order already on screen instead of an error toast.
+  const fetchOrderDetails = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!orderNumber) {
       console.error("No order number available");
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setLoadError(null);
+    if (!silent) {
+      setIsLoading(true);
+      setLoadError(null);
+    }
 
     try {
       // Refresh auth session before making the request
@@ -310,7 +315,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         console.error(
           `Order API error (${orderResponse.status}): ${errorText}`,
         );
-        setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
+        if (!silent) {
+          setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
+        }
         throw new Error(
           `HTTP error! status: ${orderResponse.status}, details: ${errorText}`,
         );
@@ -398,15 +405,19 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
     } catch (error) {
       console.error("Error fetching on-demand order:", error);
-      setLoadError((current) => current ?? "failed");
       // Log more details about the error
       if (error instanceof Error) {
         console.error("Error message:", error.message);
         console.error("Error stack:", error.stack);
       }
-      toast.error("Failed to load order details");
+      if (!silent) {
+        setLoadError((current) => current ?? "failed");
+        toast.error("Failed to load order details");
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, [
     orderNumber,
@@ -418,6 +429,30 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     setIsDriverAssigned,
     setFiles,
   ]);
+
+  // Real-time delivery status for this order, wired like SingleOrder: patch
+  // driverStatus instantly, and reload in place on ASSIGNED so the newly
+  // assigned driver shows up without a page refresh (REA-344).
+  const isActiveOrder =
+    !!order?.status &&
+    !TERMINAL_STATUSES.includes(
+      order.status.toUpperCase() as (typeof TERMINAL_STATUSES)[number],
+    );
+  useDeliveryStatusRealtime({
+    orderId: order?.id,
+    enabled: !!order?.id && isActiveOrder,
+    showNotifications: true,
+    onStatusUpdate: (payload) => {
+      if (payload.orderId !== order?.id) return;
+      setOrder((prev) => {
+        if (!prev || payload.orderId !== prev.id) return prev;
+        return { ...prev, driverStatus: payload.status as DriverStatus };
+      });
+      if (payload.status === "ASSIGNED") {
+        void fetchOrderDetails({ silent: true });
+      }
+    },
+  });
 
   // Fetch order details on mount
   useEffect(() => {
