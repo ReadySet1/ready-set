@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import { Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import ClientLayout from "@/components/Clients/ClientLayout";
 import "../styles/index.css";
@@ -81,11 +81,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-const montserrat = Montserrat({
-  subsets: ["latin"],
+// Self-hosted (Google Fonts' latin subset, variable 300–900) so `next build`
+// never fetches fonts.googleapis.com — that fetch failing used to fail the build.
+const montserrat = localFont({
+  src: "./fonts/Montserrat-Latin-Variable.woff2",
   display: "swap",
   variable: "--font-montserrat",
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  weight: "300 900",
 });
 
 export default function RootLayout({
