@@ -108,6 +108,34 @@ function canBroadcastEvent(eventName: string, userType: string): boolean {
 }
 
 /**
+ * Resolve the signed-in driver's `drivers.id` via /api/auth/session, which
+ * looks it up server-side through the driver-ownership module. Returns
+ * undefined when there is no driver record, the request fails, or the session
+ * belongs to a different user than the one being resolved.
+ */
+async function fetchOwnDriverId(userId: string): Promise<string | undefined> {
+  try {
+    const response = await fetch('/api/auth/session', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return undefined;
+
+    const session = (await response.json()) as {
+      user?: { id?: string; driverId?: string | null } | null;
+    };
+    if (session.user?.id !== userId) return undefined;
+    return session.user.driverId ?? undefined;
+  } catch (error) {
+    realtimeLogger.warn('Driver id lookup via /api/auth/session failed', {
+      error,
+      metadata: { userId },
+    });
+    return undefined;
+  }
+}
+
+/**
  * Fetch user context from database when not provided
  */
 async function fetchUserContext(
@@ -149,24 +177,18 @@ async function fetchUserContext(
 
   const userType = profile.type as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT' | 'VENDOR';
 
-  // If user is a driver, fetch driver ID
+  // If user is a driver, resolve their driver ID through the server. The
+  // browser client has no read access to `drivers` (RLS denies it with a 403),
+  // and the ownership rules (profile_id or legacy user_id) live server-side.
   let driverId: string | undefined;
   if (userType === 'DRIVER') {
-    const { data: driver, error: driverError } = await supabase
-      .from('drivers')
-      .select('id')
-      .eq('profile_id', userId)
-      .single();
-
-    if (driverError || !driver) {
-      realtimeLogger.warn('Driver profile found but no driver record exists', {
-        error: driverError,
-        metadata: { userId },
-      });
+    driverId = await fetchOwnDriverId(userId);
+    if (!driverId) {
       // Don't throw - allow DRIVER user type without driver record
       // They may be a driver in the system but not yet assigned
-    } else {
-      driverId = driver.id;
+      realtimeLogger.warn('Driver profile found but no driver record resolved', {
+        metadata: { userId },
+      });
     }
   }
 
