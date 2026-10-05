@@ -19,6 +19,8 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
 import { recordAndDispatchLifecycleEvent } from "@/lib/services/partnerWebhookService";
+import { broadcastDeliveryStatus } from "@/lib/realtime/server-broadcast";
+import * as Sentry from "@sentry/nextjs";
 import {
   createPostRequest,
   expectSuccessResponse,
@@ -48,6 +50,12 @@ jest.mock("@/lib/services/partnerWebhookService", () => ({
   recordAndDispatchLifecycleEvent: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@sentry/nextjs", () => ({ captureException: jest.fn() }));
+
+jest.mock("@/lib/realtime/server-broadcast", () => ({
+  broadcastDeliveryStatus: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
 const mockPrisma = prisma as any;
 const mockValidateUserNotSoftDeleted = validateUserNotSoftDeleted as jest.MockedFunction<
@@ -55,6 +63,10 @@ const mockValidateUserNotSoftDeleted = validateUserNotSoftDeleted as jest.Mocked
 >;
 const mockRecordLifecycle = recordAndDispatchLifecycleEvent as jest.MockedFunction<
   typeof recordAndDispatchLifecycleEvent
+>;
+const mockSentry = Sentry as unknown as { captureException: jest.Mock };
+const mockBroadcast = broadcastDeliveryStatus as jest.MockedFunction<
+  typeof broadcastDeliveryStatus
 >;
 
 describe("/api/orders/assignDriver", () => {
@@ -473,6 +485,75 @@ describe("/api/orders/assignDriver", () => {
       });
     });
 
+    describe("Delivery mirror address (REA-344)", () => {
+      const orderWithAddress = { ...mockCateringOrder, deliveryAddressId: "address-1" };
+
+      beforeEach(() => {
+        mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+          callback({
+            cateringRequest: {
+              findUnique: jest.fn().mockResolvedValue(orderWithAddress),
+              update: jest.fn().mockResolvedValue({ ...orderWithAddress, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest
+                .fn()
+                .mockResolvedValue({ ...orderWithAddress, status: "ASSIGNED" }),
+            },
+            dispatch: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockDispatch),
+            },
+          }),
+        );
+        mockPrisma.driver = {
+          findFirst: jest.fn().mockResolvedValue({ id: "driver-model-id" }),
+        };
+        mockPrisma.address = {
+          findFirst: jest.fn().mockResolvedValue({ street1: "123 Main St" }),
+        };
+        mockPrisma.delivery = {
+          upsert: jest.fn().mockResolvedValue({ id: "delivery-1" }),
+        };
+      });
+
+      const assign = () =>
+        POST(
+          createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+            orderId: orderWithAddress.id,
+            driverId: mockDriver.id,
+            orderType: "catering",
+          }),
+        );
+
+      it("creates the mirror row with the order's delivery street, not ''", async () => {
+        await expectSuccessResponse(await assign(), 200);
+
+        expect(mockPrisma.address.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: "address-1", deletedAt: null } }),
+        );
+        expect(mockPrisma.delivery.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            create: expect.objectContaining({ deliveryAddress: "123 Main St" }),
+          }),
+        );
+      });
+
+      it("reports a failed mirror upsert to Sentry and still returns 200", async () => {
+        const upsertErr = new Error("upsert failed");
+        mockPrisma.delivery.upsert.mockRejectedValue(upsertErr);
+        const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+        await expectSuccessResponse(await assign(), 200);
+
+        expect(mockSentry.captureException).toHaveBeenCalledWith(
+          upsertErr,
+          expect.objectContaining({
+            tags: expect.objectContaining({ route: "orders/assignDriver" }),
+          }),
+        );
+        consoleSpy.mockRestore();
+      });
+    });
+
     describe("Partner ASSIGNED webhook", () => {
       it("emits the ASSIGNED lifecycle event for a catering assignment", async () => {
         mockPrisma.$transaction.mockImplementation(async (callback: any) => {
@@ -537,6 +618,109 @@ describe("/api/orders/assignDriver", () => {
         await POST(request);
 
         expect(mockRecordLifecycle).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("Realtime ASSIGNED broadcast (REA-344)", () => {
+      const mockAssignTx = (order: any, model: "cateringRequest" | "onDemand") => {
+        const updatedOrder = { ...order, status: "ASSIGNED", driverStatus: "ASSIGNED" };
+        mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+          callback({
+            [model]: {
+              findUnique: jest.fn().mockResolvedValue(order),
+              update: jest.fn().mockResolvedValue(updatedOrder),
+              findUniqueOrThrow: jest.fn().mockResolvedValue(updatedOrder),
+            },
+            dispatch: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockDispatch),
+            },
+          }),
+        );
+      };
+
+      it("broadcasts an ASSIGNED delivery status after a catering assignment", async () => {
+        mockAssignTx(mockCateringOrder, "cateringRequest");
+
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+            orderId: mockCateringOrder.id,
+            driverId: mockDriver.id,
+            orderType: "catering",
+          }),
+        );
+        await expectSuccessResponse(response, 200);
+
+        expect(mockBroadcast).toHaveBeenCalledTimes(1);
+        expect(mockBroadcast).toHaveBeenCalledWith({
+          orderId: mockCateringOrder.id,
+          orderNumber: mockCateringOrder.orderNumber,
+          orderType: "catering",
+          driverId: mockDriver.id,
+          status: "ASSIGNED",
+          driverName: mockDriver.name,
+          timestamp: expect.any(String),
+        });
+      });
+
+      it("broadcasts for an on_demand assignment too", async () => {
+        mockAssignTx(mockOnDemandOrder, "onDemand");
+
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+            orderId: mockOnDemandOrder.id,
+            driverId: mockDriver.id,
+            orderType: "on_demand",
+          }),
+        );
+        await expectSuccessResponse(response, 200);
+
+        expect(mockBroadcast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderId: mockOnDemandOrder.id,
+            orderType: "on_demand",
+            status: "ASSIGNED",
+          }),
+        );
+      });
+
+      it("does NOT broadcast when the assignment fails", async () => {
+        mockPrisma.$transaction.mockRejectedValue(new Error("Transaction failed"));
+
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+            orderId: mockCateringOrder.id,
+            driverId: mockDriver.id,
+            orderType: "catering",
+          }),
+        );
+        await expectServerError(response);
+
+        expect(mockBroadcast).not.toHaveBeenCalled();
+      });
+
+      it("still returns 200 when the broadcast fails", async () => {
+        mockAssignTx(mockCateringOrder, "cateringRequest");
+        mockBroadcast.mockRejectedValueOnce(new Error("realtime down"));
+        const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+        const response = await POST(
+          createPostRequest("http://localhost:3000/api/orders/assignDriver", {
+            orderId: mockCateringOrder.id,
+            driverId: mockDriver.id,
+            orderType: "catering",
+          }),
+        );
+        const data = await expectSuccessResponse(response, 200);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(data.updatedOrder.status).toBe("ASSIGNED");
+        expect(mockBroadcast).toHaveBeenCalledTimes(1);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining("broadcast"),
+          expect.any(Error),
+        );
+        consoleSpy.mockRestore();
       });
     });
 
