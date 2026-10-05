@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 // Decimal class is now under Prisma namespace in Prisma 7
@@ -12,6 +13,8 @@ import {
 import type { OrderStatus, OrderType } from "@/lib/state-machine/transition";
 import { recordAndDispatchLifecycleEvent } from "@/lib/services/partnerWebhookService";
 import { runAfterResponse } from "@/lib/api/after-response";
+import { broadcastDeliveryStatus } from "@/lib/realtime/server-broadcast";
+import type { DeliveryStatusUpdatedPayload } from "@/lib/realtime/schemas";
 
 function serializeData(obj: unknown): number | string | Date | Record<string, unknown> | unknown {
   if (typeof obj === "bigint") {
@@ -173,9 +176,21 @@ export async function POST(request: Request) {
       });
 
       // Upsert the Delivery record so the assignedAt timestamp is captured.
-      // Runs outside the transaction (non-critical) — silent failure is acceptable.
+      // Runs outside the transaction (non-critical): a failure must not fail the
+      // assignment, but it is reported to Sentry instead of only logged.
       try {
         const dbOrderNumber = (result.updatedOrder as any).orderNumber as string;
+        // Same convention as the order PATCH and signature routes: the mirror
+        // carries the order's delivery street, never a blank address.
+        const deliveryAddressId = (result.updatedOrder as any).deliveryAddressId as
+          | string
+          | undefined;
+        const deliveryAddress = deliveryAddressId
+          ? await prisma.address.findFirst({
+              where: { id: deliveryAddressId, deletedAt: null },
+              select: { street1: true },
+            })
+          : null;
         // Resolve Driver model ID from the Profile-based driverId on the dispatch
         const dispatchDriverProfileId = result.dispatch?.driver?.id as string | undefined;
         let deliveryDriverId: string | null = null;
@@ -203,7 +218,7 @@ export async function POST(request: Request) {
           },
           create: {
             orderNumber: dbOrderNumber,
-            deliveryAddress: '',
+            deliveryAddress: deliveryAddress?.street1 ?? '',
             driverId: deliveryDriverId,
             status: 'ASSIGNED',
             assignedAt: new Date(),
@@ -211,6 +226,10 @@ export async function POST(request: Request) {
         });
       } catch (deliveryErr) {
         console.error('Failed to upsert delivery assignedAt:', deliveryErr);
+        Sentry.captureException(deliveryErr, {
+          tags: { operation: 'assign_driver_deliveries_upsert', route: 'orders/assignDriver' },
+          extra: { orderId, orderType },
+        });
       }
 
       // Registry-driven partner ASSIGNED webhook (e.g. CaterCow). Driver
@@ -236,6 +255,26 @@ export async function POST(request: Request) {
             changedBy: user.id ?? null,
             driver,
           }),
+        );
+      }
+
+      // Realtime ASSIGNED broadcast so open order views (useDeliveryStatusRealtime)
+      // reflect the new driver without a reload (REA-344). Fired only after the
+      // assignment committed; deferred and error-logged by runAfterResponse so a
+      // Realtime failure never fails the assignment.
+      const assignedDriver = (result.dispatch as any)?.driver;
+      if (assignedDriver?.id) {
+        const assignedPayload: DeliveryStatusUpdatedPayload = {
+          orderId: (result.updatedOrder as any).id,
+          orderNumber: (result.updatedOrder as any).orderNumber,
+          orderType,
+          driverId: assignedDriver.id,
+          status: 'ASSIGNED',
+          driverName: assignedDriver.name || undefined,
+          timestamp: new Date().toISOString(),
+        };
+        runAfterResponse('Failed to broadcast driver assignment:', () =>
+          broadcastDeliveryStatus(assignedPayload),
         );
       }
 

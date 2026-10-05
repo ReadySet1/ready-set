@@ -1,13 +1,13 @@
 // src/app/api/orders/[order_number]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
 import { notifyDriverOrderCancelled } from "@/services/notifications/driver-cancellation";
 import { DriverStatus } from "@/types/user";
-import { REALTIME_CHANNELS, REALTIME_EVENTS } from "@/lib/realtime/types";
 import type { DeliveryStatusUpdatedPayload } from "@/lib/realtime/schemas";
+import { broadcastDeliveryStatus } from "@/lib/realtime/server-broadcast";
 
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
 import {
@@ -63,46 +63,6 @@ const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
 
 // Terminal `deliveries` mirror statuses — the cancel cascade leaves these alone.
 const TERMINAL_DELIVERY_STATUSES = ['COMPLETED', 'CANCELLED', 'DELIVERED'] as const;
-
-/**
- * Broadcast one delivery-status event on the `driver-status` channel through
- * the Supabase admin client (subscribe → send → always release the channel).
- * Shared by the driver-status progression broadcast and the cancellation
- * alert; callers defer it with runAfterResponse so it never blocks or fails
- * the PATCH.
- */
-async function broadcastDeliveryStatus(payload: DeliveryStatusUpdatedPayload): Promise<void> {
-  const adminSupabase = await createAdminClient();
-  const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
-
-  try {
-    // Subscribe first (required to send)
-    await new Promise<void>((resolve, reject) => {
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          resolve();
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          reject(new Error(`Channel subscription failed: ${status}`));
-        }
-      });
-    });
-
-    const result = await channel.send({
-      type: 'broadcast',
-      event: REALTIME_EVENTS.DELIVERY_STATUS_UPDATED,
-      payload,
-    });
-
-    if (result !== 'ok') {
-      console.warn('Delivery status broadcast returned non-ok result:', result);
-    }
-  } finally {
-    // Always release the channel, even on subscribe/send failure
-    await adminSupabase.removeChannel(channel).catch((cleanupErr) => {
-      console.warn('Failed to remove realtime channel during cleanup:', cleanupErr);
-    });
-  }
-}
 
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
