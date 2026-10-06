@@ -237,7 +237,7 @@ describe('Signed URL Generation', () => {
       });
     });
 
-    it('should handle batch URL generation efficiently', async () => {
+    it('should sign each file in a batch with exactly one storage call', async () => {
       const fileCount = 10;
       const files = Array.from({ length: fileCount }, (_, i) => `file-${i}.pdf`);
 
@@ -248,15 +248,20 @@ describe('Signed URL Generation', () => {
         });
       });
 
-      const startTime = Date.now();
       const urls = await Promise.all(
         files.map(file => getSignedUrl('test-bucket', file))
       );
-      const endTime = Date.now();
 
-      expect(urls).toHaveLength(fileCount);
-      // Should complete in reasonable time (mocked, so should be fast)
-      expect(endTime - startTime).toBeLessThan(1000);
+      // One signing round trip per file: no retries or duplicate requests
+      expect(mockCreateSignedUrl).toHaveBeenCalledTimes(fileCount);
+      files.forEach((file, i) => {
+        expect(mockCreateSignedUrl).toHaveBeenNthCalledWith(i + 1, file, 60);
+      });
+
+      // Each file gets its own URL back, in request order
+      expect(urls).toEqual(
+        files.map((file, i) => `https://storage.example.com/signed/${file}?token=${i}`)
+      );
     });
 
     it('should generate URLs for different file types', async () => {

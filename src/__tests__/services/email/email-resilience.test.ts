@@ -265,27 +265,27 @@ describe('Email API Resilience Tests', () => {
         throw lastError;
       };
 
-      await expect(retryWithBackoff()).resolves.toMatchObject({
-        success: true,
-      });
+      // Fake clock: the backoff is measured exactly, without real waiting
+      jest.useFakeTimers();
+
+      try {
+        const result = retryWithBackoff();
+        await jest.runAllTimersAsync();
+
+        await expect(result).resolves.toMatchObject({
+          success: true,
+        });
+      } finally {
+        jest.useRealTimers();
+      }
 
       // Validate timing between attempts
       expect(attempts.length).toBe(4); // Initial + 3 retries
 
-      // Validate delays (with 20% tolerance for timing inconsistencies)
-      const delay1 = attempts[1] - attempts[0];
-      const delay2 = attempts[2] - attempts[1];
-      const delay3 = attempts[3] - attempts[2];
-
-      expect(delay1).toBeGreaterThanOrEqual(800); // 1s ± 20%
-      expect(delay1).toBeLessThanOrEqual(1200);
-
-      expect(delay2).toBeGreaterThanOrEqual(1600); // 2s ± 20%
-      expect(delay2).toBeLessThanOrEqual(2400);
-
-      expect(delay3).toBeGreaterThanOrEqual(3200); // 4s ± 20%
-      expect(delay3).toBeLessThanOrEqual(4800);
-    }, 15000); // Increase test timeout for delays
+      // Validate delays: 1s, 2s, 4s
+      const delays = attempts.slice(1).map((time, i) => time - attempts[i]!);
+      expect(delays).toEqual([1000, 2000, 4000]);
+    });
 
     it('should add jitter to retry delays to prevent thundering herd', async () => {
       const delays: number[] = [];
@@ -331,19 +331,34 @@ describe('Email API Resilience Tests', () => {
       // Attempt 4: 16s -> capped at 10s
       // Attempt 5: 32s -> capped at 10s
 
-      await retryWithMaxDelay(0);
-      await retryWithMaxDelay(1);
-      await retryWithMaxDelay(2);
+      // Fake clock: the delays are measured exactly, without real waiting
+      jest.useFakeTimers();
 
-      // For attempt 4, should be capped
-      const before = Date.now();
-      await retryWithMaxDelay(4);
-      const actualDelay = Date.now() - before;
+      try {
+        const run = async () => {
+          await retryWithMaxDelay(0);
+          await retryWithMaxDelay(1);
+          await retryWithMaxDelay(2);
 
-      // Should be ~10s, not ~16s
-      expect(actualDelay).toBeGreaterThanOrEqual(9000);
-      expect(actualDelay).toBeLessThanOrEqual(11000);
-    }, 30000);
+          // For attempt 4, should be capped
+          const before = Date.now();
+          await retryWithMaxDelay(4);
+          return Date.now() - before;
+        };
+
+        const result = run();
+        await jest.runAllTimersAsync();
+
+        // Should be 10s, not 16s
+        expect(await result).toBe(maxDelay);
+      } finally {
+        jest.useRealTimers();
+      }
+
+      // The uncapped attempts keep their exponential delays
+      const delays = attempts.slice(1).map((time, i) => time - attempts[i]!);
+      expect(delays).toEqual([1000, 2000, 4000]);
+    });
   });
 
   // ==========================================================================
@@ -390,16 +405,29 @@ describe('Email API Resilience Tests', () => {
         }
       };
 
-      const start = Date.now();
-      await expect(retryWithRateLimit()).resolves.toMatchObject({
-        success: true,
-      });
-      const duration = Date.now() - start;
+      // Fake clock: the wait is measured exactly, without real waiting
+      jest.useFakeTimers();
 
-      // Should wait ~2 seconds
-      expect(duration).toBeGreaterThanOrEqual(1800);
-      expect(duration).toBeLessThanOrEqual(2500);
-    }, 10000);
+      try {
+        const start = Date.now();
+        const result = retryWithRateLimit();
+
+        // Just short of Retry-After: still waiting, no second attempt yet
+        await jest.advanceTimersByTimeAsync(retryAfter * 1000 - 1);
+        expect(rateLimitMock).toHaveBeenCalledTimes(1);
+
+        await jest.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toMatchObject({
+          success: true,
+        });
+
+        // Should wait exactly 2 seconds before the retry
+        expect(rateLimitMock).toHaveBeenCalledTimes(2);
+        expect(Date.now() - start).toBe(retryAfter * 1000);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
     it('should parse X-RateLimit headers correctly', async () => {
       const rateLimitError = {

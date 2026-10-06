@@ -279,23 +279,27 @@ describe('CaterValley API Resilience Tests', () => {
         }
       };
 
-      await expect(webhookWithRetry()).resolves.toMatchObject({
-        success: true,
-        attempts: 3,
-      });
+      // Fake clock: the backoff is measured exactly, without real waiting
+      jest.useFakeTimers();
+
+      try {
+        const result = webhookWithRetry();
+        await jest.runAllTimersAsync();
+
+        await expect(result).resolves.toMatchObject({
+          success: true,
+          attempts: 3,
+        });
+      } finally {
+        jest.useRealTimers();
+      }
 
       expect(attemptCount).toBe(3);
 
-      // Validate exponential backoff delays
-      const delay1 = attempts[1] - attempts[0];
-      const delay2 = attempts[2] - attempts[1];
-
-      expect(delay1).toBeGreaterThanOrEqual(800); // 1s ± 20%
-      expect(delay1).toBeLessThanOrEqual(1200);
-
-      expect(delay2).toBeGreaterThanOrEqual(1600); // 2s ± 20%
-      expect(delay2).toBeLessThanOrEqual(2400);
-    }, 10000);
+      // Validate exponential backoff delays: 1s, then 2s
+      const delays = attempts.slice(1).map((time, i) => time - attempts[i]!);
+      expect(delays).toEqual([1000, 2000]);
+    });
 
     it('should NOT retry on non-retryable errors (400, 401, 403)', async () => {
       const isNonRetryableError = (error: Error): boolean => {
@@ -565,17 +569,20 @@ describe('CaterValley API Resilience Tests', () => {
 
       global.fetch = mockFetch;
 
-      const startTime = Date.now();
       const response = await fetch(CATER_VALLEY_API_URL, {
         method: 'OPTIONS',
         headers: {
           'partner': PARTNER_HEADER,
         },
       });
-      const latencyMs = Date.now() - startTime;
 
       expect(response.ok).toBe(true);
-      expect(latencyMs).toBeLessThan(5000);
+      // A single preflight carrying the partner header
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(CATER_VALLEY_API_URL, {
+        method: 'OPTIONS',
+        headers: { partner: PARTNER_HEADER },
+      });
     });
 
     it('should handle connection test timeout', async () => {
