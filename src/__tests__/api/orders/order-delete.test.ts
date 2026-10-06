@@ -1,9 +1,25 @@
 // src/__tests__/api/orders/order-delete.test.ts
+//
+// DELETE /api/orders/delete (REA-342). The route is thin: admin auth,
+// parameter validation, one call into the shared order-deletion service, and
+// the response shape OrderHeader.tsx reads. What a delete actually does is
+// covered by src/lib/services/__tests__/order-deletion.test.ts.
 
+jest.mock('@/utils/prismaDB', () => ({ prisma: { $transaction: jest.fn() } }));
+jest.mock('@/utils/supabase/server', () => ({
+  createClient: jest.fn(),
+  createAdminClient: jest.fn(),
+}));
+jest.mock('@/lib/auth-middleware', () => ({ withAuth: jest.fn() }));
+jest.mock('@/lib/services/order-deletion', () => ({
+  ...jest.requireActual('@/lib/services/order-deletion'),
+  softDeleteOrder: jest.fn(),
+}));
+
+import { NextResponse } from 'next/server';
 import { DELETE } from '@/app/api/orders/delete/route';
-import { prisma } from '@/utils/prismaDB';
-import { createClient } from '@/utils/supabase/server';
-import { UserType } from '@/types/prisma';
+import { withAuth } from '@/lib/auth-middleware';
+import { softDeleteOrder } from '@/lib/services/order-deletion';
 import {
   createDeleteRequest,
   expectSuccessResponse,
@@ -12,345 +28,225 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
-// Mock dependencies
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
-    profile: {
-      findUnique: jest.fn(),
-    },
-    cateringRequest: {
-      findUnique: jest.fn(),
-      delete: jest.fn(),
-    },
-    onDemand: {
-      findUnique: jest.fn(),
-      delete: jest.fn(),
-    },
-    $transaction: jest.fn(),
-  },
-}));
+const mockedWithAuth = withAuth as jest.Mock;
+const mockedSoftDelete = softDeleteOrder as jest.Mock;
 
-jest.mock('@/utils/supabase/server', () => ({
-  createClient: jest.fn(),
-}));
+const ORDER_ID = '11111111-1111-4111-8111-111111111111';
+const ADMIN_ID = '22222222-2222-4222-8222-222222222222';
+const DELETED_AT = new Date('2026-10-06T12:00:00.000Z');
+const URL_BASE = 'http://localhost:3000/api/orders/delete';
+
+const authAs = (type: string, id = ADMIN_ID) => ({
+  success: true,
+  context: { user: { id, email: 'admin@rs.com', type } },
+});
+const authRejected = (status: number, error: string) => ({
+  success: false,
+  response: NextResponse.json({ error }, { status }),
+  context: {},
+});
+
+const deleted = (overrides: Record<string, unknown> = {}) => ({
+  outcome: 'DELETED',
+  orderType: 'catering',
+  orderId: ORDER_ID,
+  orderNumber: 'CAT-001',
+  deletedAt: DELETED_AT,
+  deletedBy: ADMIN_ID,
+  deletedDispatches: 2,
+  deletedFiles: 1,
+  orphanedFiles: [],
+  ...overrides,
+});
 
 describe('DELETE /api/orders/delete - Delete Order', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    storage: {
-      from: jest.fn().mockReturnThis(),
-      list: jest.fn(),
-      remove: jest.fn(),
-    },
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
-    (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    mockedSoftDelete.mockResolvedValue(deleted());
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  describe('✅ Successful Deletion', () => {
-    it('should delete catering order with associated data', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'admin-123' } },
-      });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
-
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
-        id: 'order-1',
-        orderNumber: 'CATER-001',
-      });
-
-      // Mock the transaction
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
-          fileUpload: {
-            findMany: jest.fn().mockResolvedValue([]),
-            deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-          },
-          cateringRequest: {
-            delete: jest.fn().mockResolvedValue({ id: 'order-1' }),
-          },
-        };
-        return callback(mockTx);
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
+  describe('Successful soft delete', () => {
+    it('soft-deletes a catering order and reports deletedAt / deletedBy', async () => {
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
       );
-
-      const response = await DELETE(request);
       const data = await expectSuccessResponse(response, 200);
 
+      expect(mockedSoftDelete).toHaveBeenCalledWith(
+        { orderType: 'catering', orderId: ORDER_ID },
+        { deletedBy: ADMIN_ID, reason: null },
+      );
       expect(data.success).toBe(true);
       expect(data.message).toMatch(/deleted successfully/i);
-      expect(data.details).toHaveProperty('deletedDispatches');
-      expect(data.details).toHaveProperty('deletedFiles');
-      expect(data.details).toHaveProperty('deletedOrder');
+      expect(data.details).toEqual({
+        deletedOrder: 1,
+        orderId: ORDER_ID,
+        orderNumber: 'CAT-001',
+        deletedAt: DELETED_AT.toISOString(),
+        deletedBy: ADMIN_ID,
+        deletedDispatches: 2,
+        deletedFiles: 1,
+        orphanedFiles: [],
+      });
     });
 
-    it('should delete on-demand order by ADMIN', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'admin-456' } },
-      });
+    it('maps orderType=onDemand to the on-demand table', async () => {
+      mockedSoftDelete.mockResolvedValue(deleted({ orderType: 'on_demand', orderNumber: 'OD-002' }));
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.ADMIN,
-      });
-
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.onDemand.findUnique as jest.Mock).mockResolvedValue({
-        id: 'order-2',
-        orderNumber: 'OD-002',
-      });
-
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
-          fileUpload: {
-            findMany: jest.fn().mockResolvedValue([]),
-            deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-          },
-          onDemand: {
-            delete: jest.fn().mockResolvedValue({ id: 'order-2' }),
-          },
-        };
-        return callback(mockTx);
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-2&orderType=onDemand'
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=onDemand`),
       );
-
-      const response = await DELETE(request);
       const data = await expectSuccessResponse(response, 200);
 
+      expect(mockedSoftDelete).toHaveBeenCalledWith(
+        { orderType: 'on_demand', orderId: ORDER_ID },
+        expect.objectContaining({ deletedBy: ADMIN_ID }),
+      );
       expect(data.success).toBe(true);
     });
-  });
 
-  describe('🔐 Authentication Tests', () => {
-    it('should return 401 when user is not authenticated', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: null },
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
+    it('passes an optional deletion reason through', async () => {
+      await DELETE(
+        createDeleteRequest(
+          `${URL_BASE}?orderId=${ORDER_ID}&orderType=catering&reason=Duplicate%20order`,
+        ),
       );
 
-      const response = await DELETE(request);
-      await expectUnauthorized(response);
-    });
-  });
-
-  describe('🔒 Authorization Tests', () => {
-    beforeEach(() => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
+      expect(mockedSoftDelete).toHaveBeenCalledWith(expect.anything(), {
+        deletedBy: ADMIN_ID,
+        reason: 'Duplicate order',
       });
-    });
-
-    it('should return 403 when CLIENT tries to delete order', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.CLIENT,
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectForbidden(response, /Only administrators can delete orders/i);
-    });
-
-    it('should return 403 when VENDOR tries to delete order', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.VENDOR,
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectForbidden(response);
-    });
-
-    it('should return 403 when DRIVER tries to delete order', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.DRIVER,
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectForbidden(response);
-    });
-
-    it('should return 403 when HELPDESK tries to delete order', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.HELPDESK,
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectForbidden(response);
     });
   });
 
-  describe('✏️ Validation Tests', () => {
-    beforeEach(() => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'admin-123' } },
-      });
+  describe('Files left behind in storage', () => {
+    it('does not report full success when a storage object could not be removed', async () => {
+      const orphan = {
+        fileId: 'file-1',
+        fileName: 'menu.pdf',
+        bucket: 'fileUploader',
+        paths: ['orders/catering/x/menu.pdf'],
+        reason: 'REMOVE_FAILED',
+        detail: 'permission denied',
+      };
+      mockedSoftDelete.mockResolvedValue(deleted({ orphanedFiles: [orphan] }));
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
+      );
+      const data = await expectSuccessResponse(response, 200);
+
+      expect(data.success).toBe(false);
+      expect(data.partial).toBe(true);
+      expect(data.error).toMatch(/1 file could not be removed from storage/i);
+      expect(data.details.deletedOrder).toBe(1);
+      expect(data.details.orphanedFiles).toEqual([orphan]);
+    });
+  });
+
+  describe('Authentication and authorization', () => {
+    it('requires ADMIN or SUPER_ADMIN through withAuth', async () => {
+      await DELETE(createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`));
+
+      expect(mockedWithAuth).toHaveBeenCalledWith(expect.anything(), {
+        allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+        requireAuth: true,
       });
     });
 
-    it('should return 400 when orderId is missing', async () => {
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderType=catering'
+    it('returns 401 for unauthenticated requests and deletes nothing', async () => {
+      mockedWithAuth.mockResolvedValue(authRejected(401, 'Authentication required'));
+
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
       );
 
-      const response = await DELETE(request);
+      const data = await expectUnauthorized(response, /Unauthorized.*logged in/i);
+      expect(data.success).toBe(false);
+      expect(mockedSoftDelete).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when withAuth rejects the caller role and deletes nothing', async () => {
+      mockedWithAuth.mockResolvedValue(authRejected(403, 'Insufficient permissions'));
+
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
+      );
+
+      const data = await expectForbidden(response, /Only administrators can delete orders/i);
+      expect(data.success).toBe(false);
+      expect(mockedSoftDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Validation', () => {
+    it.each([
+      ['orderId', `${URL_BASE}?orderType=catering`],
+      ['orderType', `${URL_BASE}?orderId=${ORDER_ID}`],
+      ['both parameters', URL_BASE],
+    ])('returns 400 when %s is missing', async (_label, url) => {
+      const response = await DELETE(createDeleteRequest(url));
+
       await expectErrorResponse(response, 400, /Missing required parameters/i);
+      expect(mockedSoftDelete).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when orderType is missing', async () => {
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1'
+    it('returns 400 for an invalid orderType', async () => {
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=invalid`),
       );
 
-      const response = await DELETE(request);
-      await expectErrorResponse(response, 400, /Missing required parameters/i);
-    });
-
-    it('should return 400 when both parameters are missing', async () => {
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete'
-      );
-
-      const response = await DELETE(request);
-      await expectErrorResponse(response, 400, /Missing required parameters/i);
-    });
-
-    it('should return 400 when orderType is invalid', async () => {
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=invalid'
-      );
-
-      const response = await DELETE(request);
-      await expectErrorResponse(response, 400, /Invalid orderType/i);
-    });
-
-    it('should accept valid orderType: catering', async () => {
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
-        id: 'order-1',
-      });
-
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          fileUpload: {
-            findMany: jest.fn().mockResolvedValue([]),
-            deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-          },
-          cateringRequest: {
-            delete: jest.fn().mockResolvedValue({ id: 'order-1' }),
-          },
-        };
-        return callback(mockTx);
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectSuccessResponse(response, 200);
-    });
-
-    it('should accept valid orderType: onDemand', async () => {
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.onDemand.findUnique as jest.Mock).mockResolvedValue({
-        id: 'order-2',
-      });
-
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          fileUpload: {
-            findMany: jest.fn().mockResolvedValue([]),
-            deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-          },
-          onDemand: {
-            delete: jest.fn().mockResolvedValue({ id: 'order-2' }),
-          },
-        };
-        return callback(mockTx);
-      });
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-2&orderType=onDemand'
-      );
-
-      const response = await DELETE(request);
-      await expectSuccessResponse(response, 200);
+      await expectErrorResponse(response, 400, /Invalid orderType.*Must be 'catering' or 'onDemand'/i);
+      expect(mockedSoftDelete).not.toHaveBeenCalled();
     });
   });
 
-  describe('❌ Error Handling', () => {
-    beforeEach(() => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'admin-123' } },
-      });
+  describe('Missing and already-deleted orders', () => {
+    it('returns 404 when the order does not exist', async () => {
+      mockedSoftDelete.mockResolvedValue({ outcome: 'NOT_FOUND' });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
+      );
+
+      const data = await expectErrorResponse(response, 404, /not found/i);
+      expect(data.success).toBe(false);
     });
 
-    it('should return 404 when order is not found', async () => {
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.onDemand.findUnique as jest.Mock).mockResolvedValue(null);
-
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=nonexistent&orderType=catering'
-      );
-
-      const response = await DELETE(request);
-      await expectErrorResponse(response, 404, /Order.*not found/i);
-    });
-
-    it('should handle database transaction errors', async () => {
-      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
-        id: 'order-1',
+    it('returns 409 when the order was already deleted', async () => {
+      mockedSoftDelete.mockResolvedValue({
+        outcome: 'ALREADY_DELETED',
+        orderType: 'catering',
+        orderId: ORDER_ID,
+        orderNumber: 'CAT-001',
       });
 
-      (prisma.$transaction as jest.Mock).mockRejectedValue(
-        new Error('Transaction failed')
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
       );
 
-      const request = createDeleteRequest(
-        'http://localhost:3000/api/orders/delete?orderId=order-1&orderType=catering'
+      const data = await expectErrorResponse(response, 409, /already been deleted/i);
+      expect(data.success).toBe(false);
+    });
+  });
+
+  describe('Error handling', () => {
+    it('returns 500 without leaking details when the service throws', async () => {
+      mockedSoftDelete.mockRejectedValue(new Error('connection reset by peer'));
+
+      const response = await DELETE(
+        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
       );
 
-      const response = await DELETE(request);
-      await expectErrorResponse(response, 500, /error occurred/i);
+      const data = await expectErrorResponse(response, 500, /error occurred while deleting/i);
+      expect(data.success).toBe(false);
+      expect(JSON.stringify(data)).not.toMatch(/connection reset/);
     });
   });
 });
