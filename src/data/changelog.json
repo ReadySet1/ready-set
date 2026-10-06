@@ -3,6 +3,26 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.9.5",
+      "date": "2026-10-06",
+      "title": "Live order updates and accurate driver history",
+      "summary": "Order pages and lists now refresh on their own when a driver is assigned, and drivers see their real numbers in their history.",
+      "changes": [
+        {
+          "text": "On-demand order pages and the admin order lists now update on their own when a driver is assigned, with no page refresh.",
+          "type": "fixed"
+        },
+        {
+          "text": "Your driver history now shows your real shifts, deliveries, miles and hours instead of zeros.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.9.5"
+      }
+    },
+    {
       "version": "2.9.4",
       "date": "2026-10-05",
       "title": "Editing on-demand orders and steadier maps",
