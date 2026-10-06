@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -59,6 +59,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Order, StatusFilter, UserRole } from "./types";
 import { CateringOrdersTable } from "./CateringOrdersTable";
 import { createClient } from "@/utils/supabase/client";
+import { useOrderListRealtimeRefresh } from "@/hooks/tracking/useOrderListRealtimeRefresh";
 import { Prisma } from "@prisma/client";
 import { CateringRequest, Profile, Address } from "@/types/prisma";
 import { Order as OrderType } from "@/types/order";
@@ -227,6 +228,18 @@ const CateringOrdersPage: React.FC = () => {
     helpdesk: false
   });
 
+  // Live refresh (REA-344): a delivery status event for any catering order
+  // (e.g. a driver assignment) reloads the current page in the background.
+  const [realtimeRefreshTick, setRealtimeRefreshTick] = useState(0);
+  const isBackgroundRefreshRef = useRef(false);
+  useOrderListRealtimeRefresh({
+    orderType: 'catering',
+    onRefresh: () => {
+      isBackgroundRefreshRef.current = true;
+      setRealtimeRefreshTick((tick) => tick + 1);
+    },
+  });
+
   // Grouped status tabs for better organization
   const statusTabs: { value: StatusTabFilter; label: string; description: string }[] = [
     { value: 'all_open', label: 'All Open', description: 'All active orders' },
@@ -238,9 +251,16 @@ const CateringOrdersPage: React.FC = () => {
   ];
 
   useEffect(() => {
+    // A background refresh keeps the current rows on screen (no skeleton) and
+    // keeps them on failure instead of swapping in an error.
+    const isBackgroundRefresh = isBackgroundRefreshRef.current;
+    isBackgroundRefreshRef.current = false;
+
     const fetchOrders = async () => {
-      setIsLoading(true);
-      setError(null);
+      if (!isBackgroundRefresh) {
+        setIsLoading(true);
+        setError(null);
+      }
       try {
         // Construct the query parameters
         const queryParams = new URLSearchParams({
@@ -292,15 +312,19 @@ const CateringOrdersPage: React.FC = () => {
         setOrders(data.orders);
         setTotalPages(data.totalPages);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
+        if (!isBackgroundRefresh) {
+          setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
+        }
         console.error('Error fetching orders:', err);
       } finally {
-        setIsLoading(false);
+        if (!isBackgroundRefresh) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchOrders();
-  }, [page, statusTabFilter, searchTerm, searchField, quickFilter, sortField, sortDirection, limit]);
+  }, [page, statusTabFilter, searchTerm, searchField, quickFilter, sortField, sortDirection, limit, realtimeRefreshTick]);
 
   // New useEffect to fetch user roles
   useEffect(() => {

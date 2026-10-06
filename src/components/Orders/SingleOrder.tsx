@@ -270,6 +270,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
           driverStatus: payload.status as DriverStatus,
         };
       });
+      // A new assignment carries no driver details: reload the order in place
+      // so the driver card fills in without a page refresh (REA-344). Runs
+      // after render, so fetchOrderDetails (declared below) is defined.
+      if (payload.status === "ASSIGNED" && payload.orderId === order?.id) {
+        void fetchOrderDetails({ silent: true });
+      }
     },
   });
 
@@ -328,20 +334,25 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
   }, [supabase, getValidSession]);
 
-  const fetchOrderDetails = useCallback(async () => {
+  // `silent` reloads in place (realtime updates): no loading skeleton, and a
+  // failure keeps the order already on screen with no toast or redirect.
+  const fetchOrderDetails = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!orderNumber) {
       console.error("No order number available");
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setLoadError(null);
+    if (!silent) {
+      setIsLoading(true);
+      setLoadError(null);
+    }
 
     try {
       const session = await getValidSession();
 
       if (!session) {
+        if (silent) return;
         toast.error("Authentication error. Please try logging in again.");
         router.push("/sign-in");
         return;
@@ -367,7 +378,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
           errorText = JSON.stringify(errorData);
 
           // If unauthorized, redirect to login
-          if (orderResponse.status === 401) {
+          if (orderResponse.status === 401 && !silent) {
             toast.error("Session expired. Please log in again.");
             router.push("/sign-in");
             return;
@@ -379,7 +390,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         console.error(
           `Order API error (${orderResponse.status}): ${errorText}`,
         );
-        setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
+        if (!silent) {
+          setLoadError(orderResponse.status === 404 ? "not_found" : "failed");
+        }
         throw new Error(
           `HTTP error! status: ${orderResponse.status}, details: ${errorText}`,
         );
@@ -464,19 +477,25 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         setFiles(transformedFiles);
       } catch (fileError) {
         console.error("Error fetching files:", fileError);
-        toast.error("Failed to load order files");
+        if (!silent) {
+          toast.error("Failed to load order files");
+        }
       }
     } catch (error) {
       console.error("Error fetching order:", error);
-      setLoadError((current) => current ?? "failed");
       // Log more details about the error
       if (error instanceof Error) {
         console.error("Error message:", error.message);
         console.error("Error stack:", error.stack);
       }
-      toast.error("Failed to load order details");
+      if (!silent) {
+        setLoadError((current) => current ?? "failed");
+        toast.error("Failed to load order details");
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, [
     orderNumber,
