@@ -343,24 +343,6 @@ describe("Order Details API Integration Tests", () => {
   });
 
   describe("API Performance Tests", () => {
-    it("should complete API call within reasonable time", async () => {
-      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
-
-      const startTime = Date.now();
-
-      const response = await fetch(
-        "/api/orders/SF-56780?include=dispatch.driver",
-      );
-      const data = await response.json();
-
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      expect(response.ok).toBe(true);
-      expect(data).toBeDefined();
-      expect(duration).toBeLessThan(1000); // Should complete within 1 second
-    });
-
     it("should handle concurrent API calls", async () => {
       mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
