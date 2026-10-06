@@ -45,12 +45,21 @@ export const DeleteCateringOrder: React.FC<DeleteCateringOrderProps> = ({
     try {
       const result: DeleteOrderResult = await deleteCateringOrder(orderId);
       
-      if (result.success) {
-        toast({
-          title: "Order deleted",
-          description: result.message || `Order ${orderNumber} has been successfully deleted.`,
-          variant: "default",
-        });
+      // `partial`: the order is deleted, but some of its files were left in storage.
+      if (result.success || result.partial) {
+        toast(
+          result.partial
+            ? {
+                title: "Order deleted with warnings",
+                description: result.error,
+                variant: "destructive",
+              }
+            : {
+                title: "Order deleted",
+                description: result.message || `Order ${orderNumber} has been successfully deleted.`,
+                variant: "default",
+              },
+        );
         
         // Close the dialog
         setIsOpen(false);
