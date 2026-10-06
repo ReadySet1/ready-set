@@ -256,12 +256,13 @@ E2E tests run automatically in CI on:
 - Builds the app once with the real test project env (`NEXT_PUBLIC_*` is inlined
   at build time), then Playwright serves it with `pnpm start` (`next start`).
   Locally, Playwright still starts `pnpm dev`.
-- Runs only Chromium with 2 workers
+- Runs only Chromium with 4 workers
 - Playwright `globalTimeout` (25 min, CI only) ends the run gracefully so the
   `list`, `html` and `json` (`playwright-report/results.json`) reporters still
   write; the job limit (45 min) sits above build time + that budget
-- A failing suite marks the step red; the job is non-blocking
-  (`continue-on-error`) until the suite is green
+- The job is blocking: a failing suite fails the workflow and the
+  "All Checks Pass" gate. Without the secrets below (forks, Dependabot) the
+  suite is skipped and the job stays green
 - Always uploads `playwright-report/` and `test-results/`
 
 ### Setting Up GitHub Secrets
