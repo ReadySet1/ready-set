@@ -292,6 +292,8 @@ model CateringRequest {
   driverStatus      DriverStatus?
   ezCaterDeliveryId String?          @map("ezcater_delivery_id")
   deletedAt         DateTime?        @db.Timestamptz(6)
+  deletedBy         String?          @db.Uuid
+  deletionReason    String?
   archivedAt        DateTime?        @map("archived_at") @db.Timestamptz(6)
   archiveBatchId    String?          @map("archive_batch_id") @db.Uuid
   deliveryAddress   Address          @relation("CateringDelivery", fields: [deliveryAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -437,6 +439,8 @@ model OnDemand {
   updatedAt         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
   driverStatus      DriverStatus?
   deletedAt         DateTime?      @db.Timestamptz(6)
+  deletedBy         String?        @db.Uuid
+  deletionReason    String?
   archivedAt        DateTime?      @map("archived_at") @db.Timestamptz(6)
   archiveBatchId    String?        @map("archive_batch_id") @db.Uuid
   dispatches        Dispatch[]
