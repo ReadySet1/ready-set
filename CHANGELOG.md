@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.5](https://github.com/ReadySet1/ready-set/compare/v2.9.4...v2.9.5) (2026-10-06)
+
+
+### Fixed
+
+* **admin:** live-update on-demand order details and the orders list on driver assignment ([9e40434](https://github.com/ReadySet1/ready-set/commit/9e4043486d96cb6d6ae96920c8523c1a42751da6))
+* **admin:** live-update on-demand order details and the orders list on driver assignment ([97c9513](https://github.com/ReadySet1/ready-set/commit/97c95132aad407e573984e656260291432fa1691))
+* **orders:** reload the catering order when a driver is assigned ([87a64c2](https://github.com/ReadySet1/ready-set/commit/87a64c2ec1c7f24af1f095e610519a5df04f0bf9))
+
 ## [2.9.4](https://github.com/ReadySet1/ready-set/compare/v2.9.3...v2.9.4) (2026-10-05)
 
 
