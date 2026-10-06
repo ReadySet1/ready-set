@@ -59,6 +59,14 @@ const BulkDeleteOrders: React.FC<BulkDeleteOrdersProps> = ({
         toast.error(`Failed to delete ${result.results.failed.length} orders`);
         console.error("Failed deletions:", result.results.failed);
       }
+
+      const orphanedFiles = result.results.orphanedFiles ?? [];
+      if (orphanedFiles.length > 0) {
+        toast.error(
+          `${orphanedFiles.length} file${orphanedFiles.length === 1 ? "" : "s"} could not be removed from storage`
+        );
+        console.error("Files left in storage:", orphanedFiles);
+      }
       
       onDeleteSuccess();
     } catch (error) {

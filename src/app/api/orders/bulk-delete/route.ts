@@ -1,260 +1,125 @@
-// src/app/api/your-route-path/bulk-delete-orders/route.ts
-// Adjust the path above as needed
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+import {
+  describeOrphanedFiles,
+  softDeleteOrders,
+  type OrphanedFile,
+} from '@/lib/services/order-deletion';
 
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server"; // Assumes this is your server client helper
-import { prisma } from "@/utils/prismaDB";
-import { storage } from "@/utils/supabase/storage"; // Import the new storage utility
-import { UserType } from "@/types/prisma";
-import { PrismaTransaction } from "@/types/prisma-types";
+const MAX_REASON_LENGTH = 500;
 
-// Constants
-const BUCKET_NAME = "fileUploader"; // Replace with your actual bucket name
+const FAILURE_REASONS = {
+  ALREADY_DELETED: 'Order was already deleted',
+  NOT_FOUND: 'Order not found in database',
+  // The underlying error is logged by the service, not sent to the browser.
+  FAILED: 'Unexpected error while deleting the order',
+} as const;
 
-// Helper to create a Supabase client
-async function getSupabaseClient() {
-  return await createClient();
-}
+type FailureCode = keyof typeof FAILURE_REASONS;
 
+/**
+ * POST /api/orders/bulk-delete  { orderNumbers: string[], reason?: string }
+ *
+ * Admin-only soft delete of several orders (REA-343). Always answers 200 with
+ * one result per requested order; `success` is true only when every order was
+ * deleted and no storage object was left behind. What a delete covers lives
+ * in src/lib/services/order-deletion.ts.
+ */
 export async function POST(req: NextRequest) {
+  const auth = await withAuth(req, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!auth.success) {
+    const status = auth.response?.status ?? 401;
+    const message =
+      status === 401
+        ? 'Unauthorized - Must be signed in'
+        : status === 403
+          ? 'Forbidden - Admin permissions required'
+          : 'Authentication error';
+    return NextResponse.json({ message }, { status });
+  }
+
   try {
-    // Initialize Supabase client (for auth check primarily)
-    // Note: The storage utility will create its own client instance internally
-    const supabase = await getSupabaseClient();
+    const body = await req.json().catch(() => null);
+    const orderNumbers: unknown = body?.orderNumbers;
 
-    // Get user session from Supabase
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user || !user.id) {
-      return NextResponse.json(
-        { message: "Unauthorized - Must be signed in" },
-        { status: 401 },
-      );
-    }
-
-    // Get user profile from Prisma
-    const userData = await prisma.profile.findUnique({
-      where: { id: user.id },
-      select: { type: true },
-    });
-
-    // Only allow admins or super_admins
     if (
-      !userData ||
-      (userData.type !== UserType.ADMIN && userData.type !== UserType.SUPER_ADMIN)
+      !Array.isArray(orderNumbers) ||
+      orderNumbers.length === 0 ||
+      !orderNumbers.every((n): n is string => typeof n === 'string' && n.trim() !== '')
     ) {
       return NextResponse.json(
-        { message: "Forbidden - Admin permissions required" },
-        { status: 403 },
-      );
-    }
-
-    // Get order numbers from request body
-    const { orderNumbers } = await req.json();
-
-    if (!Array.isArray(orderNumbers) || orderNumbers.length === 0) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid request format. Expected an array of order numbers.",
-        },
+        { message: 'Invalid request format. Expected an array of order numbers.' },
         { status: 400 },
       );
     }
 
-    const results = {
-      deleted: [] as string[],
-      failed: [] as { orderNumber: string; reason: string }[],
-    };
+    const reason =
+      typeof body.reason === 'string'
+        ? body.reason.trim().slice(0, MAX_REASON_LENGTH) || null
+        : null;
 
-    const BUCKET_NAME = "order-files"; // Define bucket name clearly
+    const outcomes = await softDeleteOrders(orderNumbers, {
+      deletedBy: auth.context.user.id,
+      reason,
+    });
 
-    // Process each order
-    for (const orderNumber of orderNumbers) {
-      try {
-        // Step 1: Identify order type and ID
-        let orderType: "catering" | "on_demand" | null = null;
-        let orderId: string | null = null;
+    const deleted: string[] = [];
+    const failed: { orderNumber: string; code: FailureCode; reason: string }[] = [];
+    const orphanedFiles: ({ orderNumber: string } & OrphanedFile)[] = [];
 
-        const cateringRequest = await prisma.cateringRequest.findUnique({
-          where: { orderNumber: orderNumber },
-          select: { id: true },
-        });
-
-        if (cateringRequest) {
-          orderType = "catering";
-          orderId = cateringRequest.id;
-        } else {
-          const onDemandOrder = await prisma.onDemand.findUnique({
-            where: { orderNumber: orderNumber },
-            select: { id: true },
-          });
-          if (onDemandOrder) {
-            orderType = "on_demand";
-            orderId = onDemandOrder.id;
-          }
-        }
-
-        if (!orderType || !orderId) {
-          results.failed.push({
-            orderNumber,
-            reason: "Order not found in database",
-          });
-          continue; // Skip to the next order number
-        }
-
-        // Step 2: Find all file uploads linked to this order
-        const fileUploads = await prisma.fileUpload.findMany({
-          where:
-            orderType === "catering"
-              ? { cateringRequestId: orderId }
-              : { onDemandId: orderId },
-        });
-
-        // Step 3: Start a transaction for atomic database operations
-        await prisma.$transaction(async (tx: PrismaTransaction) => {
-          // Step 4: Delete associated files from Supabase Storage
-                    for (const file of fileUploads) {
-            let filePath = ""; // The path within the bucket
-
-            // --- CRITICAL: File Path Extraction ---
-            // Attempt to extract the path from a full Supabase URL.
-            // Assumes URL like: https://<proj>.supabase.co/storage/v1/object/public/order-files/path/to/file.ext
-            // Adjust this logic based on the EXACT format of `file.fileUrl` in your database!
-            try {
-              if (!file.fileUrl) {
-                console.warn(
-                  `File record ${file.id} for order ${orderNumber} has no fileUrl.`,
-                );
-                continue; // Skip if no URL
-              }
-              const url = new URL(file.fileUrl);
-              const pathParts = url.pathname.split("/");
-              // Find the index of the part *after* the bucket name
-              const bucketNameIndex = pathParts.indexOf(BUCKET_NAME);
-
-              if (
-                bucketNameIndex !== -1 &&
-                bucketNameIndex + 1 < pathParts.length
-              ) {
-                // Join all parts *after* the bucket name
-                filePath = pathParts.slice(bucketNameIndex + 1).join("/");
-                              } else {
-                // Fallback: Maybe the stored URL *is* just the path, or only the filename?
-                // Using the original regex as a less reliable fallback.
-                const simpleMatch = file.fileUrl.match(/\/([^/]+)$/);
-                if (simpleMatch && simpleMatch[1]) {
-                  filePath = simpleMatch[1]; // WARNING: This might just be the filename!
-                  console.warn(
-                    `Using fallback path extraction (likely just filename): ${filePath} for URL: ${file.fileUrl}. Verify this is correct!`,
-                  );
-                } else {
-                  console.error(
-                    `Could not extract valid file path for bucket ${BUCKET_NAME} from URL: ${file.fileUrl}`,
-                  );
-                }
-              }
-            } catch (e) {
-              console.error(
-                `Error parsing fileUrl "${file.fileUrl}" for order ${orderNumber}:`,
-                e,
-              );
-              // Decide if you want to continue or fail the transaction
-              continue; // Skipping this file due to URL parse error
-            }
-            // --- End File Path Extraction ---
-
-            if (filePath) {
-              // Delete from Supabase Storage using the new utility
-              try {
-                                // *** Use the imported storage utility ***
-                // Note: This uses the request's user context. Storage Policies MUST allow deletion.
-                const bucket = await storage.from(BUCKET_NAME);
-                const { error: storageError } = await bucket.remove([filePath]); // Call remove
-
-                if (storageError) {
-                  console.error(
-                    `Storage Error deleting ${filePath} (Order ${orderNumber}):`,
-                    storageError.message,
-                  );
-                  // Decide how to handle storage errors. Should it stop the whole process?
-                  // Throwing an error here would rollback the Prisma transaction.
-                  // For now, we log it and continue deleting DB records, leaving the file potentially orphaned.
-                  // throw new Error(`Failed to delete file ${filePath} from storage: ${storageError.message}`);
-                } else {
-                                  }
-              } catch (err) {
-                // Catch errors from the storage utility call itself (e.g., network issues)
-                console.error(
-                  `Exception during storage deletion for ${filePath} (Order ${orderNumber}):`,
-                  err,
-                );
-                // Again, decide if this should rollback the transaction
-                // throw err;
-              }
-            } else {
-              console.warn(
-                `Skipping storage deletion for file record ${file.id} (Order ${orderNumber}) due to missing/unparsable path from URL: ${file.fileUrl}`,
-              );
-            }
-          } // End loop through files
-
-          // Step 5: Delete all dispatches related to the order
-                    await tx.dispatch.deleteMany({
-            where:
-              orderType === "catering"
-                ? { cateringRequestId: orderId }
-                : { onDemandId: orderId },
-          });
-
-          // Step 6: Delete all file upload records from the database
-                    await tx.fileUpload.deleteMany({
-            where:
-              orderType === "catering"
-                ? { cateringRequestId: orderId }
-                : { onDemandId: orderId },
-          });
-
-          // Step 7: Delete the order itself
-                    if (orderType === "catering") {
-            await tx.cateringRequest.delete({
-              where: { id: orderId },
-            });
-          } else {
-            // 'on_demand'
-            await tx.onDemand.delete({
-              where: { id: orderId },
-            });
-          }
-
-                  }); // End Prisma transaction
-
-        // If transaction was successful
-        results.deleted.push(orderNumber);
-              } catch (error) {
-        // Catch errors during processing of a single order (including transaction failures)
-        console.error(`Error processing order ${orderNumber}:`, error);
-        results.failed.push({
+    const orders = outcomes.map((outcome) => {
+      const { orderNumber } = outcome;
+      if (outcome.outcome !== 'DELETED') {
+        failed.push({
           orderNumber,
-          reason:
-            error instanceof Error ? error.message : "Unknown processing error",
+          code: outcome.outcome,
+          reason: FAILURE_REASONS[outcome.outcome],
         });
-        // Continue to the next order number even if one fails
+        return { orderNumber, outcome: outcome.outcome };
       }
-    } // End loop through orderNumbers
 
-        return NextResponse.json({
-      message: `Bulk deletion attempted. ${results.deleted.length} orders processed for deletion, ${results.failed.length} failed. Check logs and results for details.`,
-      results,
+      deleted.push(orderNumber);
+      for (const orphan of outcome.orphanedFiles) {
+        orphanedFiles.push({ orderNumber, ...orphan });
+      }
+      return {
+        orderNumber,
+        outcome: outcome.outcome,
+        orderId: outcome.orderId,
+        orderType: outcome.orderType,
+        deletedAt: outcome.deletedAt.toISOString(),
+        deletedBy: outcome.deletedBy,
+        deletedDispatches: outcome.deletedDispatches,
+        deletedFiles: outcome.deletedFiles,
+        orphanedFiles: outcome.orphanedFiles.length,
+      };
+    });
+
+    const countFailed = (code: FailureCode) => failed.filter((f) => f.code === code).length;
+    const orphanWarning = describeOrphanedFiles(orphanedFiles.length);
+
+    return NextResponse.json({
+      success: failed.length === 0 && orphanedFiles.length === 0,
+      message:
+        `Bulk deletion attempted. ${deleted.length} orders deleted, ${failed.length} failed.` +
+        (orphanWarning ? ` ${orphanWarning}.` : ''),
+      summary: {
+        requested: outcomes.length,
+        deleted: deleted.length,
+        alreadyDeleted: countFailed('ALREADY_DELETED'),
+        notFound: countFailed('NOT_FOUND'),
+        failed: countFailed('FAILED'),
+        orphanedFiles: orphanedFiles.length,
+      },
+      results: { deleted, failed, orphanedFiles, orders },
     });
   } catch (error) {
-    // Catch broad errors (e.g., request parsing, initial auth check)
-    console.error("Fatal Error in bulk order deletion API:", error);
+    console.error('Fatal Error in bulk order deletion API:', error);
     return NextResponse.json(
-      {
-        message: "Error occurred during bulk order deletion process.",
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
+      { message: 'Error occurred during bulk order deletion process.' },
       { status: 500 },
     );
   }
