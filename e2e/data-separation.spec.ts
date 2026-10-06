@@ -15,11 +15,23 @@ import { test, expect, type Page } from '@playwright/test';
 // The dashboard title is the <h1> rendered by components/Common/Breadcrumb.
 const dashboardTitle = (page: Page) => page.getByRole('heading', { level: 1 });
 
+// Scope dashboard assertions to <main>. The stats/quick-actions block sits in a
+// <Suspense> boundary, so React streams it as a hidden copy
+// (<div hidden id="S:0">, appended after the footer) that a deferred $RC/$RV
+// script later moves into place. React 19.2 throttles that reveal, so for a
+// moment after `load` the DOM holds the visible copy in <main> AND the hidden
+// one outside it. Page-wide text/CSS locators match both and fail strict mode.
+const dashboard = (page: Page) => page.getByRole('main');
+
+const activeOrdersStat = (page: Page) =>
+  dashboard(page).getByText('Active Orders', { exact: true });
+
 // Vendor-only quick action on the unified dashboard.
-const vendorEstimatorLink = (page: Page) => page.locator('a[href="/client/calculator"]');
+const vendorEstimatorLink = (page: Page) =>
+  dashboard(page).locator('a[href="/client/calculator"]');
 
 async function expectDashboardStructure(page: Page) {
-  await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+  await expect(activeOrdersStat(page)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recent Orders' })).toBeVisible();
 }
 
@@ -46,10 +58,10 @@ test.describe('Data Separation and Role-Based Access Control', () => {
 
       // With no orders of their own, the user sees the empty state rather than
       // anybody else's orders.
-      const emptyState = page.getByText("You haven't placed any orders yet");
+      const emptyState = dashboard(page).getByText("You haven't placed any orders yet");
       if ((await emptyState.count()) > 0) {
         await expect(emptyState).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Place Your First Order' })).toBeVisible();
+        await expect(dashboard(page).getByRole('link', { name: 'Place Your First Order' })).toBeVisible();
       }
     });
 
@@ -58,12 +70,12 @@ test.describe('Data Separation and Role-Based Access Control', () => {
       await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
 
       // Client-side navigation; /profile may still be compiling on a dev server.
-      await page.locator('a[href="/profile"]', { hasText: 'Update Profile' }).click();
+      await dashboard(page).getByRole('link', { name: /^Update Profile/ }).click();
       await expect(page).toHaveURL(/\/profile/, { timeout: 15000 });
 
       await page.goto('/client');
       await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
-      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+      await expect(activeOrdersStat(page)).toBeVisible();
     });
 
     test('API endpoint security - Verify role-based data filtering in API responses', async ({ page }) => {
@@ -75,7 +87,7 @@ test.describe('Data Separation and Role-Based Access Control', () => {
 
       await page.goto('/client');
       await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
-      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+      await expect(activeOrdersStat(page)).toBeVisible();
       await page.waitForLoadState('load');
 
       expect(errors).toHaveLength(0);
@@ -89,7 +101,7 @@ test.describe('Data Separation and Role-Based Access Control', () => {
       await page.goto('/client');
 
       await expect(dashboardTitle(page)).toHaveText('Client Dashboard');
-      await expect(page.getByText('Active Orders', { exact: true })).toBeVisible();
+      await expect(activeOrdersStat(page)).toBeVisible();
       await expect(vendorEstimatorLink(page)).toHaveCount(0);
     });
 
@@ -106,8 +118,9 @@ test.describe('Data Separation and Role-Based Access Control', () => {
       ];
 
       for (const action of quickActions) {
-        const actionElement = page.locator(`a[href="${action.href}"]`, { hasText: action.text });
+        const actionElement = dashboard(page).getByRole('link', { name: new RegExp(`^${action.text}`) });
         await expect(actionElement).toBeVisible();
+        await expect(actionElement).toHaveAttribute('href', action.href);
       }
     });
   });

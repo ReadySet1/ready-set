@@ -268,10 +268,11 @@ describe('/api/auth/session GET API', () => {
         mockUser.id
       );
 
-      // Second call: driver query (only for DRIVER type)
+      // Second call: driver lookup via driver-ownership (only for DRIVER type),
+      // which accepts the canonical profile_id or the legacy user_id link
       expect(prisma.$queryRawUnsafe).toHaveBeenNthCalledWith(
         2,
-        expect.stringContaining('SELECT d.id, d.employee_id'),
+        expect.stringMatching(/FROM drivers[\s\S]*profile_id = \$1::uuid OR user_id = \$1::uuid/),
         mockUser.id
       );
     });

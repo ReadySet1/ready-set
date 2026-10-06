@@ -177,9 +177,22 @@ describe('GET /api/auth/session', () => {
       // Second call should be driver query with user ID
       expect(prisma.$queryRawUnsafe).toHaveBeenNthCalledWith(
         2,
-        expect.stringContaining('SELECT d.id, d.employee_id'),
+        expect.stringContaining('FROM drivers'),
         mockUser.id
       );
+    });
+
+    it('resolves the driver via either auth-link column (profile_id or legacy user_id)', async () => {
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
+
+      const request = new NextRequest('http://localhost:3000/api/auth/session');
+      await GET(request);
+
+      const driverSql = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[1][0] as string;
+      expect(driverSql).toContain('profile_id = $1::uuid OR user_id = $1::uuid');
+      expect(driverSql).toContain('deleted_at IS NULL');
     });
   });
 

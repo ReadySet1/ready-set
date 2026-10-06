@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -37,6 +37,7 @@ import { OnDemandOrder, StatusFilter, UserRole, OrderStatus } from "./types";
 import { OnDemandOrdersTable } from "./OnDemandOrdersTable";
 import { OnDemandOrdersPagination } from "./OnDemandOrdersPagination";
 import { createClient } from "@/utils/supabase/client";
+import { useOrderListRealtimeRefresh } from "@/hooks/tracking/useOrderListRealtimeRefresh";
 
 // --- Interface for the API response structure ---
 interface OnDemandOrdersApiResponse {
@@ -142,6 +143,18 @@ const OnDemandOrdersPageNew: React.FC = () => {
     helpdesk: false
   });
 
+  // Live refresh (REA-344): a delivery status event for any on-demand order
+  // (e.g. a driver assignment) reloads the current page in the background.
+  const [realtimeRefreshTick, setRealtimeRefreshTick] = useState(0);
+  const isBackgroundRefreshRef = useRef(false);
+  useOrderListRealtimeRefresh({
+    orderType: 'on_demand',
+    onRefresh: () => {
+      isBackgroundRefreshRef.current = true;
+      setRealtimeRefreshTick((tick) => tick + 1);
+    },
+  });
+
   // Status tabs matching catering orders
   const statusTabs = [
     { value: 'ACTIVE', label: 'Active' },
@@ -152,9 +165,16 @@ const OnDemandOrdersPageNew: React.FC = () => {
 
   // Fetch orders
   useEffect(() => {
+    // A background refresh keeps the current rows on screen (no skeleton) and
+    // keeps them on failure instead of swapping in an error.
+    const isBackgroundRefresh = isBackgroundRefreshRef.current;
+    isBackgroundRefreshRef.current = false;
+
     const fetchOrders = async () => {
-      setIsLoading(true);
-      setError(null);
+      if (!isBackgroundRefresh) {
+        setIsLoading(true);
+        setError(null);
+      }
       try {
         const queryParams = new URLSearchParams({
           page: page.toString(),
@@ -186,10 +206,14 @@ const OnDemandOrdersPageNew: React.FC = () => {
         setOrders(mapToDisplayOrder(data.orders));
         setTotalPages(data.totalPages);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
+        if (!isBackgroundRefresh) {
+          setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
+        }
         console.error('Error fetching orders:', err);
       } finally {
-        setIsLoading(false);
+        if (!isBackgroundRefresh) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -199,7 +223,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [page, statusFilter, searchTerm, sortField, sortDirection, limit]);
+  }, [page, statusFilter, searchTerm, sortField, sortDirection, limit, realtimeRefreshTick]);
 
   // Fetch user roles
   useEffect(() => {

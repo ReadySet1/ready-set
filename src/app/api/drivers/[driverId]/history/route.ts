@@ -28,6 +28,93 @@ interface RouteParams {
   params: Promise<{ driverId: string }>;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+interface PeriodTotals {
+  totalShifts: number;
+  completedShifts: number;
+  totalHours: number;
+  totalDeliveries: number;
+  totalMiles: number;
+  gpsMiles: number;
+}
+
+/** Live or archived shift row; archived rows come from raw SQL. */
+interface HistoryShift {
+  shiftStart: Date | string | null;
+  shiftEnd?: Date | string | null;
+  status?: string | null;
+  totalDistanceMiles?: number | null;
+  gpsDistanceMiles?: number | null;
+  deliveryCount?: number | null;
+  updatedAt?: Date | string | null;
+}
+
+function emptyTotals(): PeriodTotals {
+  return {
+    totalShifts: 0,
+    completedShifts: 0,
+    totalHours: 0,
+    totalDeliveries: 0,
+    totalMiles: 0,
+    gpsMiles: 0,
+  };
+}
+
+function toDate(value: Date | string | null | undefined): Date {
+  return value instanceof Date ? value : new Date(value ?? 0);
+}
+
+/** yyyy-MM-dd of a date in UTC. */
+function dateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * UTC Monday (yyyy-MM-dd) of the week containing `d`. Matches the `@db.Date`
+ * weekStart the summary job writes (Monday-start weeks, server runs in UTC).
+ */
+function utcWeekKey(d: Date): string {
+  const daysSinceMonday = (d.getUTCDay() + 6) % 7;
+  return dateKey(
+    new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysSinceMonday))
+  );
+}
+
+/** Miles are stored as miles on the shift rows, so no unit conversion here. */
+function addShift(totals: PeriodTotals, shift: HistoryShift): void {
+  totals.totalShifts += 1;
+  if (shift.status?.toLowerCase() === 'completed') {
+    totals.completedShifts += 1;
+  }
+  if (shift.shiftStart && shift.shiftEnd) {
+    totals.totalHours +=
+      (toDate(shift.shiftEnd).getTime() - toDate(shift.shiftStart).getTime()) / (1000 * 60 * 60);
+  }
+  totals.totalDeliveries += Number(shift.deliveryCount || 0);
+  totals.totalMiles += Number(shift.totalDistanceMiles || 0);
+  totals.gpsMiles += Number(shift.gpsDistanceMiles || 0);
+}
+
+/**
+ * A weekly summary is fresh when it already accounts for every shift we can
+ * see in its week: it knows about at least as many shifts, and none of the
+ * live shifts changed after the summary was last written. Anything else
+ * (e.g. a zero row written before the week's shifts existed) is stale and
+ * that week is computed from the live rows instead.
+ */
+function isSummaryFresh(
+  summary: { totalShifts: number; updatedAt: Date },
+  weekShifts: HistoryShift[]
+): boolean {
+  if (summary.totalShifts < weekShifts.length) return false;
+  const writtenAt = summary.updatedAt.getTime();
+  return weekShifts.every(
+    shift => !shift.updatedAt || toDate(shift.updatedAt).getTime() <= writtenAt
+  );
+}
+
 /**
  * GET - Get driver history data
  *
@@ -130,6 +217,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
         totalDistanceMiles: true,
         gpsDistanceMiles: true,
         deliveryCount: true,
+        updatedAt: true,
       },
     });
 
@@ -154,17 +242,26 @@ export async function GET(request: NextRequest, context: RouteParams) {
       `;
     }
 
-    // Compute period totals from weekly summaries first
-    const periodSummary = {
-      totalShifts: 0,
-      completedShifts: 0,
-      totalHours: 0,
-      totalDeliveries: 0,
-      totalMiles: 0,
-      gpsMiles: 0,
-    };
+    // Period totals use per-week coverage: a week with a fresh summary takes
+    // the summary; every other week is computed from the live shift rows.
+    const allShifts: HistoryShift[] = [...shifts, ...archivedShifts];
+    const shiftsByWeek = new Map<string, HistoryShift[]>();
+    for (const shift of allShifts) {
+      const key = utcWeekKey(toDate(shift.shiftStart));
+      const bucket = shiftsByWeek.get(key);
+      if (bucket) bucket.push(shift);
+      else shiftsByWeek.set(key, [shift]);
+    }
 
-    for (const summary of summaries) {
+    const freshSummaries = summaries.filter((s: typeof summaries[number]) =>
+      isSummaryFresh(s, shiftsByWeek.get(dateKey(s.weekStart)) ?? [])
+    );
+    const coveredWeeks = new Set(
+      freshSummaries.map((s: typeof summaries[number]) => dateKey(s.weekStart))
+    );
+
+    const periodSummary = emptyTotals();
+    for (const summary of freshSummaries) {
       periodSummary.totalShifts += summary.totalShifts;
       periodSummary.completedShifts += summary.completedShifts;
       periodSummary.totalHours += Number(summary.totalShiftHours);
@@ -173,39 +270,46 @@ export async function GET(request: NextRequest, context: RouteParams) {
       periodSummary.gpsMiles += Number(summary.gpsMiles);
     }
 
-    // Fallback: if weekly summaries are empty, compute from shifts and deliveries directly
-    if (summaries.length === 0) {
-      const allShifts = [...shifts, ...archivedShifts];
-      for (const shift of allShifts) {
-        periodSummary.totalShifts += 1;
-        if (shift.status === 'COMPLETED') {
-          periodSummary.completedShifts += 1;
-        }
-        if (shift.shiftStart && shift.shiftEnd) {
-          const start = shift.shiftStart instanceof Date ? shift.shiftStart : new Date(shift.shiftStart);
-          const end = shift.shiftEnd instanceof Date ? shift.shiftEnd : new Date(shift.shiftEnd);
-          periodSummary.totalHours += (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-        }
-        periodSummary.totalDeliveries += Number(shift.deliveryCount || 0);
-        periodSummary.totalMiles += Number(shift.totalDistanceMiles || 0);
-        periodSummary.gpsMiles += Number(shift.gpsDistanceMiles || 0);
+    const liveTotals = emptyTotals();
+    const liveWeeks = new Map<string, PeriodTotals>();
+    for (const [key, weekShifts] of shiftsByWeek) {
+      if (coveredWeeks.has(key)) continue;
+      const weekTotals = emptyTotals();
+      for (const shift of weekShifts) {
+        addShift(weekTotals, shift);
+        addShift(liveTotals, shift);
       }
-
-      // Also query deliveries directly in case shift deliveryCount is not populated
-      if (periodSummary.totalDeliveries === 0) {
-        const deliveryCount = await prisma.delivery.count({
-          where: {
-            driverId,
-            createdAt: {
-              gte: startDate,
-              lte: endDate,
-            },
-            deletedAt: null,
-          },
-        });
-        periodSummary.totalDeliveries = deliveryCount;
-      }
+      liveWeeks.set(key, weekTotals);
     }
+
+    // Shift deliveryCount may not be populated: count delivery rows for the
+    // part of the range not already covered by a fresh summary.
+    if (liveTotals.totalDeliveries === 0) {
+      const coveredRanges = [...coveredWeeks].map(key => {
+        const weekStart = new Date(`${key}T00:00:00.000Z`);
+        return {
+          createdAt: { gte: weekStart, lt: new Date(weekStart.getTime() + WEEK_MS) },
+        };
+      });
+      liveTotals.totalDeliveries = await prisma.delivery.count({
+        where: {
+          driverId,
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+          deletedAt: null,
+          ...(coveredRanges.length > 0 ? { NOT: coveredRanges } : {}),
+        },
+      });
+    }
+
+    periodSummary.totalShifts += liveTotals.totalShifts;
+    periodSummary.completedShifts += liveTotals.completedShifts;
+    periodSummary.totalHours += liveTotals.totalHours;
+    periodSummary.totalDeliveries += liveTotals.totalDeliveries;
+    periodSummary.totalMiles += liveTotals.totalMiles;
+    periodSummary.gpsMiles += liveTotals.gpsMiles;
 
     // Return CSV format
     if (responseFormat === 'csv') {
@@ -223,18 +327,40 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
       let rows: (string | number)[][];
 
-      if (summaries.length > 0) {
-        rows = summaries.map((s: typeof summaries[number]) => [
-          `Week ${s.weekNumber} ${s.year}`,
-          format(s.weekStart, 'yyyy-MM-dd'),
-          format(s.weekEnd, 'yyyy-MM-dd'),
-          s.totalShifts,
-          s.completedShifts,
-          Number(s.totalShiftHours).toFixed(1),
-          s.totalDeliveries,
-          Number(s.totalMiles).toFixed(1),
-          Number(s.gpsMiles).toFixed(1),
-        ]);
+      if (freshSummaries.length > 0) {
+        const weekRows: Array<{ key: string; row: (string | number)[] }> = [
+          ...freshSummaries.map((s: typeof summaries[number]) => ({
+            key: dateKey(s.weekStart),
+            row: [
+              `Week ${s.weekNumber} ${s.year}`,
+              format(s.weekStart, 'yyyy-MM-dd'),
+              format(s.weekEnd, 'yyyy-MM-dd'),
+              s.totalShifts,
+              s.completedShifts,
+              Number(s.totalShiftHours).toFixed(1),
+              s.totalDeliveries,
+              Number(s.totalMiles).toFixed(1),
+              Number(s.gpsMiles).toFixed(1),
+            ],
+          })),
+          ...[...liveWeeks].map(([key, t]) => ({
+            key,
+            row: [
+              `Week of ${key}`,
+              key,
+              dateKey(new Date(new Date(`${key}T00:00:00.000Z`).getTime() + 6 * DAY_MS)),
+              t.totalShifts,
+              t.completedShifts,
+              t.totalHours.toFixed(1),
+              t.totalDeliveries,
+              t.totalMiles.toFixed(1),
+              t.gpsMiles.toFixed(1),
+            ],
+          })),
+        ];
+        rows = weekRows
+          .sort((a, b) => b.key.localeCompare(a.key))
+          .map(r => r.row);
       } else {
         // Fallback: generate a single summary row from computed period totals
         rows = [[
@@ -280,7 +406,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
         endDate: endDate.toISOString(),
       },
       summary: periodSummary,
-      weeklySummaries: summaries.map((s: typeof summaries[number]) => ({
+      weeklySummaries: freshSummaries.map((s: typeof summaries[number]) => ({
         weekStart: s.weekStart.toISOString(),
         weekEnd: s.weekEnd.toISOString(),
         year: s.year,

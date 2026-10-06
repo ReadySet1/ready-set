@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
+import { getDriverForUser } from '@/lib/auth/driver-ownership';
 
 /**
  * Session endpoint - returns current user session with profile and driver info
@@ -36,20 +37,10 @@ export async function GET(request: NextRequest) {
     let driverId: string | null = null;
 
     if (userType === 'DRIVER') {
-      const driverRecord = await prisma.$queryRawUnsafe<{
-        id: string;
-        employee_id: string;
-      }[]>(`
-        SELECT d.id, d.employee_id
-        FROM drivers d
-        WHERE d.profile_id = $1::uuid
-        AND d.deleted_at IS NULL
-        LIMIT 1
-      `, user.id);
-
-      if (driverRecord[0]) {
-        driverId = driverRecord[0].id;
-      }
+      // Ownership lookup lives in driver-ownership: it accepts the canonical
+      // profile_id and the legacy user_id link, and skips deleted rows.
+      const driver = await getDriverForUser(user.id);
+      driverId = driver?.id ?? null;
     }
 
     const session = {
