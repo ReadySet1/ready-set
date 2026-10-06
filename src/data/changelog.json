@@ -5,11 +5,11 @@
     {
       "version": "2.9.5",
       "date": "2026-10-06",
-      "title": "Release 2.9.5",
-      "summary": "",
+      "title": "Live order updates and accurate driver history",
+      "summary": "Order pages and lists now refresh on their own when a driver is assigned, and drivers see their real numbers in their history.",
       "changes": [
         {
-          "text": "Order details and the orders lists now update on their own when a driver is assigned, with no page refresh.",
+          "text": "On-demand order pages and the admin order lists now update on their own when a driver is assigned, with no page refresh.",
           "type": "fixed"
         },
         {
