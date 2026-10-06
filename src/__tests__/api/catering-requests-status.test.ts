@@ -163,6 +163,25 @@ describe('/api/catering-requests/[orderId]/status API', () => {
       expect(data.error).toBe('Order not found');
     });
 
+    it('should return 404 for a soft-deleted order', async () => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        deletedAt: new Date('2026-10-06T12:00:00Z'),
+      });
+
+      const request = createGetRequest(
+        'http://localhost:3000/api/catering-requests/order-123/status'
+      );
+
+      const response = await GET(request, {
+        params: Promise.resolve({ orderId: 'order-123' }),
+      });
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.error).toBe('Order not found');
+    });
+
     it('should handle database errors', async () => {
       (prisma.cateringRequest.findUnique as jest.Mock).mockRejectedValue(
         new Error('Database error')
@@ -332,6 +351,30 @@ describe('/api/catering-requests/[orderId]/status API', () => {
       });
 
       expect(response.status).toBe(200);
+    });
+
+    it('should return 404 for a soft-deleted order and change nothing', async () => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        deletedAt: new Date('2026-10-06T12:00:00Z'),
+      });
+
+      const request = createPatchRequest(
+        'http://localhost:3000/api/catering-requests/order-123/status',
+        {
+          driverStatus: 'ASSIGNED',
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ orderId: 'order-123' }),
+      });
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.error).toBe('Order not found');
+      expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('should return 404 when order not found', async () => {

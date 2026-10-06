@@ -91,7 +91,9 @@ export async function POST(request: Request) {
           throw new Error("Invalid order type");
         }
 
-        if (!order) {
+        // findUnique bypasses the soft-delete filter: a deleted order must not
+        // get a new dispatch (that would put it back on the driver side).
+        if (!order || order.deletedAt) {
           throw new Error(`${orderType} order not found`);
         }
 
