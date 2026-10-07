@@ -3,6 +3,26 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.10.0",
+      "date": "2026-10-07",
+      "title": "Release 2.10.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Deleting an order no longer removes its attachments and proof-of-delivery photos.",
+          "type": "fixed"
+        },
+        {
+          "text": "Deleting an order now keeps a record of it instead of erasing it, and its files are cleaned up reliably.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.10.0"
+      }
+    },
+    {
       "version": "2.9.5",
       "date": "2026-10-06",
       "title": "Live order updates and accurate driver history",
