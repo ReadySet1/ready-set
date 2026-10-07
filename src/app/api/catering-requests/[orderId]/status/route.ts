@@ -155,7 +155,8 @@ export async function PATCH(
       },
     });
 
-    if (!order) {
+    // findUnique bypasses the soft-delete filter: a deleted order reads as gone.
+    if (!order || order.deletedAt) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -436,6 +437,7 @@ export async function GET(
         arrivalDateTime: true,
         completeDateTime: true,
         updatedAt: true,
+        deletedAt: true,
         dispatches: {
           select: {
             id: true,
@@ -453,7 +455,8 @@ export async function GET(
       },
     });
 
-    if (!order) {
+    // findUnique bypasses the soft-delete filter: a deleted order reads as gone.
+    if (!order || order.deletedAt) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -469,7 +472,8 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      order,
+      // deletedAt was selected only for the guard above; keep it out of the payload.
+      order: { ...order, deletedAt: undefined },
     });
 
   } catch (error) {
