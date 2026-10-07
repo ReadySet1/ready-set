@@ -2,7 +2,9 @@
  * Driver Weekly Summary Generation Job (REA-313)
  *
  * Generates pre-computed weekly aggregates for fast PDF generation and reporting.
- * Runs weekly to compute summaries for the previous week and backfill any missing weeks.
+ * Each run recomputes the current (in-progress) week and the most recent
+ * completed week, backfills missing older weeks, and refreshes any older week
+ * whose shifts or deliveries changed after its summary was last written.
  *
  * Summaries include:
  * - Shift metrics (total, completed, cancelled, hours, break time)
@@ -22,7 +24,7 @@ import {
   format,
   getISOWeek,
   getISOWeekYear,
-  differenceInHours,
+  differenceInMinutes,
   parseISO,
 } from 'date-fns';
 
@@ -30,11 +32,26 @@ import {
 // Configuration
 // ============================================================================
 
-const DEFAULT_WEEKS_TO_BACKFILL = 12; // Backfill up to 12 weeks if missing
+const DEFAULT_WEEKS_TO_BACKFILL = 12; // Backfill up to 12 weeks before the current one
 const DEFAULT_BATCH_SIZE = 50; // Process 50 drivers per batch
 
+/**
+ * `deliveries.status` and `driver_shifts.status` are plain VarChar columns, not
+ * Prisma enums. The orders flow mirrors driver progress into `deliveries` with
+ * the DriverStatus enum's UPPERCASE values ('DELIVERED', 'COMPLETED',
+ * 'CANCELLED') while older rows and the shift table carry lowercase values, so
+ * statuses are compared lowercased against these sets.
+ */
+const COMPLETED_DELIVERY_STATUSES = new Set(['delivered', 'completed']);
+const CANCELLED_DELIVERY_STATUSES = new Set(['cancelled']);
+const COMPLETED_SHIFT_STATUSES = new Set(['completed']);
+const CANCELLED_SHIFT_STATUSES = new Set(['cancelled']);
+
+const normalizeStatus = (status: string | null | undefined): string =>
+  (status ?? '').trim().toLowerCase();
+
 export interface SummaryGenerationConfig {
-  /** Number of weeks to backfill if missing summaries. Default: 12 */
+  /** Number of completed weeks to backfill before the current week. Default: 12 */
   weeksToBackfill?: number;
   /** Number of drivers to process per batch. Default: 50 */
   batchSize?: number;
@@ -42,9 +59,9 @@ export interface SummaryGenerationConfig {
   dryRun?: boolean;
   /** Specific driver IDs to generate summaries for. Default: all active drivers */
   driverIds?: string[];
-  /** Specific week to regenerate (ISO date string for Monday). Default: previous week */
+  /** Specific week to regenerate (ISO date string for Monday). Default: current week + backfill */
   weekStart?: string;
-  /** Force regeneration even if summary exists. Default: false */
+  /** Recompute every selected week even if its summary is fresh. Default: false */
   forceRegenerate?: boolean;
 }
 
@@ -218,7 +235,13 @@ export class DriverSummaryGenerationService {
     });
 
     if (existingSummary && !this.config.forceRegenerate) {
-      return { created: false, updated: false };
+      const needsRefresh =
+        this.isAlwaysRefreshedWeek(weekStart) ||
+        (await this.hasChangesSince(driverId, weekStart, weekEnd, existingSummary.updatedAt));
+
+      if (!needsRefresh) {
+        return { created: false, updated: false };
+      }
     }
 
     // Compute summary data
@@ -351,16 +374,23 @@ export class DriverSummaryGenerationService {
 
     // Compute metrics
     const totalShifts = shifts.length;
-    const completedShifts = shifts.filter(s => s.status === 'completed').length;
-    const cancelledShifts = shifts.filter(s => s.status === 'cancelled').length;
+    const completedShifts = shifts.filter(s =>
+      COMPLETED_SHIFT_STATUSES.has(normalizeStatus(s.status))
+    ).length;
+    const cancelledShifts = shifts.filter(s =>
+      CANCELLED_SHIFT_STATUSES.has(normalizeStatus(s.status))
+    ).length;
 
-    // Calculate total shift hours
+    // Calculate total shift hours, keeping partial hours (a 50-minute shift is
+    // 0.83 h, not 0). Stored as Decimal(10, 2).
     let totalShiftHours = new Decimal(0);
     let totalBreakHours = new Decimal(0);
 
     for (const shift of shifts) {
       if (shift.shiftStart && shift.shiftEnd) {
-        const hours = differenceInHours(shift.shiftEnd, shift.shiftStart);
+        const hours = new Decimal(differenceInMinutes(shift.shiftEnd, shift.shiftStart))
+          .div(60)
+          .toDecimalPlaces(2);
         totalShiftHours = totalShiftHours.plus(hours);
       }
 
@@ -371,10 +401,17 @@ export class DriverSummaryGenerationService {
       }
     }
 
+    totalShiftHours = totalShiftHours.toDecimalPlaces(2);
+    totalBreakHours = totalBreakHours.toDecimalPlaces(2);
+
     // Calculate delivery metrics
     const totalDeliveries = deliveries.length;
-    const completedDeliveries = deliveries.filter(d => d.status === 'delivered').length;
-    const cancelledDeliveries = deliveries.filter(d => d.status === 'cancelled').length;
+    const completedDeliveries = deliveries.filter(d =>
+      COMPLETED_DELIVERY_STATUSES.has(normalizeStatus(d.status))
+    ).length;
+    const cancelledDeliveries = deliveries.filter(d =>
+      CANCELLED_DELIVERY_STATUSES.has(normalizeStatus(d.status))
+    ).length;
 
     // Calculate distance metrics
     let totalMiles = new Decimal(0);
@@ -445,11 +482,11 @@ export class DriverSummaryGenerationService {
       return [startOfWeek(parseISO(this.config.weekStart), { weekStartsOn: 1 })];
     }
 
-    // Generate for previous week and backfill missing weeks
+    // Week 0 is the current (in-progress) week, followed by the backfill weeks.
     const weeks: Date[] = [];
     const now = new Date();
 
-    for (let i = 1; i <= this.config.weeksToBackfill; i++) {
+    for (let i = 0; i <= this.config.weeksToBackfill; i++) {
       const weekStart = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
       weeks.push(weekStart);
     }
@@ -458,23 +495,64 @@ export class DriverSummaryGenerationService {
   }
 
   /**
-   * Parse PostgreSQL interval string to hours
+   * The current week and the most recent completed week are always recomputed:
+   * the current one is still accumulating data and late edits to the previous
+   * one keep landing after Sunday.
+   */
+  private isAlwaysRefreshedWeek(weekStart: Date): boolean {
+    const mostRecentCompletedWeek = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+    return weekStart.getTime() >= mostRecentCompletedWeek.getTime();
+  }
+
+  /**
+   * True when any shift or delivery belonging to the week was written after
+   * `since`. Soft-deleted rows are deliberately included: a deletion bumps
+   * `updatedAt` and must trigger a refresh too.
+   */
+  private async hasChangesSince(
+    driverId: string,
+    weekStart: Date,
+    weekEnd: Date,
+    since: Date
+  ): Promise<boolean> {
+    const [shiftChanges, deliveryChanges] = await Promise.all([
+      prisma.driverShift.aggregate({
+        where: { driverId, shiftStart: { gte: weekStart, lte: weekEnd } },
+        _max: { updatedAt: true },
+      }),
+      prisma.delivery.aggregate({
+        where: { driverId, assignedAt: { gte: weekStart, lte: weekEnd } },
+        _max: { updatedAt: true },
+      }),
+    ]);
+
+    return [shiftChanges._max.updatedAt, deliveryChanges._max.updatedAt].some(
+      changedAt => changedAt !== null && changedAt.getTime() > since.getTime()
+    );
+  }
+
+  /**
+   * Parse a PostgreSQL interval string to fractional hours.
+   * Handles "02:30:00", "1 day 02:30:00", "2 days 01:00:00" and
+   * "2 hours 30 minutes".
    */
   private parseIntervalToHours(interval: string): number {
-    // Handle formats like "02:30:00", "2 hours 30 minutes", etc.
-    const hoursMatch = interval.match(/(\d+):(\d+):(\d+)/);
-    if (hoursMatch) {
-      const hours = parseInt(hoursMatch[1] || '0', 10);
-      const minutes = parseInt(hoursMatch[2] || '0', 10);
-      const seconds = parseInt(hoursMatch[3] || '0', 10);
-      return hours + minutes / 60 + seconds / 3600;
+    let hours = 0;
+
+    const dayMatch = interval.match(/(\d+)\s*day/i);
+    if (dayMatch) hours += parseInt(dayMatch[1] || '0', 10) * 24;
+
+    const clockMatch = interval.match(/(\d+):(\d+):(\d+)/);
+    if (clockMatch) {
+      hours += parseInt(clockMatch[1] || '0', 10);
+      hours += parseInt(clockMatch[2] || '0', 10) / 60;
+      hours += parseInt(clockMatch[3] || '0', 10) / 3600;
+      return hours;
     }
 
     // Fallback for "X hours Y minutes" format
     const hourMatch = interval.match(/(\d+)\s*hour/i);
     const minuteMatch = interval.match(/(\d+)\s*minute/i);
-
-    let hours = 0;
     if (hourMatch) hours += parseInt(hourMatch[1] || '0', 10);
     if (minuteMatch) hours += parseInt(minuteMatch[1] || '0', 10) / 60;
 
