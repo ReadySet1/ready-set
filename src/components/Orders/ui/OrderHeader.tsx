@@ -296,8 +296,8 @@ const OrderHeader: React.FC<OrderHeaderProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Order: {orderNumber}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              order and all associated data including driver assignments and files.
+              This action cannot be undone. The order is removed from every list
+              and its driver assignments are deleted; its files are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
