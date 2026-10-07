@@ -4,9 +4,8 @@
  * - The order row is kept: deletedAt / deletedBy / deletionReason are stamped.
  * - Driver-side rows follow the cancel cascade: dispatch rows are removed and
  *   the live `deliveries` mirror is closed, and an assigned driver is told.
- * - file_uploads rows are removed in the transaction; storage objects are
- *   removed after it commits, from the bucket and path the file really lives
- *   at, and anything left behind is reported as an orphan.
+ * - Files are retained: neither `file_uploads` rows nor storage objects are
+ *   touched. Removal belongs to the purge job (src/jobs/orderPurge.ts).
  * - Missing and already-deleted orders are outcomes, not exceptions.
  */
 
@@ -39,9 +38,9 @@ import { createAdminClient } from '@/utils/supabase/server';
 import { notifyDriverOrderCancelled } from '@/services/notifications/driver-cancellation';
 import { broadcastDeliveryStatus } from '@/lib/realtime/server-broadcast';
 import {
-  parseStorageUrl,
   softDeleteOrder,
   softDeleteOrders,
+  toDeleteOrderActionResult,
 } from '../order-deletion';
 
 const mockedPrisma = prisma as any;
@@ -59,20 +58,11 @@ const makeTx = () => ({
   onDemand: { findFirst: jest.fn(), updateMany: jest.fn() },
   dispatch: { findMany: jest.fn(), deleteMany: jest.fn() },
   delivery: { updateMany: jest.fn() },
+  // Present so a regression that touches files is caught as a call, not a
+  // TypeError.
   fileUpload: { findMany: jest.fn(), deleteMany: jest.fn() },
 });
 let tx: ReturnType<typeof makeTx>;
-
-/** One `remove` mock per bucket, so tests can assert the bucket used. */
-let removeByBucket: Record<string, jest.Mock>;
-let storageFrom: jest.Mock;
-
-/** Default storage behaviour: every requested object is reported removed. */
-const removeEverything = () =>
-  jest.fn(async (paths: string[]) => ({
-    data: paths.map((name) => ({ name })),
-    error: null,
-  }));
 
 const liveOrder = {
   id: ORDER_ID,
@@ -86,58 +76,24 @@ const assignedDispatch = {
   driver: { id: DRIVER_ID, name: 'Dana Driver', contactNumber: '+15550001111' },
 };
 
-/** A live catering order with no driver and no files. */
+/** A live catering order with no driver. */
 const primeLiveCatering = () => {
   tx.cateringRequest.findFirst.mockResolvedValueOnce(liveOrder);
   tx.cateringRequest.updateMany.mockResolvedValue({ count: 1 });
   tx.dispatch.findMany.mockResolvedValue([]);
   tx.dispatch.deleteMany.mockResolvedValue({ count: 0 });
   tx.delivery.updateMany.mockResolvedValue({ count: 0 });
-  tx.fileUpload.findMany.mockResolvedValue([]);
-  tx.fileUpload.deleteMany.mockResolvedValue({ count: 0 });
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
   tx = makeTx();
   mockedPrisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
-
-  removeByBucket = {};
-  storageFrom = jest.fn((bucket: string) => {
-    removeByBucket[bucket] ??= removeEverything();
-    return { remove: removeByBucket[bucket] };
-  });
-  mockedCreateAdminClient.mockResolvedValue({ storage: { from: storageFrom } });
-
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
   jest.restoreAllMocks();
-});
-
-describe('parseStorageUrl', () => {
-  it('reads bucket and full path from a signed URL, dropping the token', () => {
-    expect(
-      parseStorageUrl(
-        'https://proj.supabase.co/storage/v1/object/sign/fileUploader/orders/catering/abc/menu.pdf?token=secret',
-      ),
-    ).toEqual({ bucket: 'fileUploader', path: 'orders/catering/abc/menu.pdf' });
-  });
-
-  it('reads bucket and full path from a public URL and decodes it', () => {
-    expect(
-      parseStorageUrl(
-        'https://proj.supabase.co/storage/v1/object/public/delivery-proofs/deliveries/abc/proof%20one.jpg',
-      ),
-    ).toEqual({ bucket: 'delivery-proofs', path: 'deliveries/abc/proof one.jpg' });
-  });
-
-  it('returns null for anything that is not a storage object URL', () => {
-    expect(parseStorageUrl('https://utfs.io/f/some-key.pdf')).toBeNull();
-    expect(parseStorageUrl('menu.pdf')).toBeNull();
-    expect(parseStorageUrl('')).toBeNull();
-  });
 });
 
 describe('softDeleteOrder', () => {
@@ -157,7 +113,7 @@ describe('softDeleteOrder', () => {
         deletionReason: 'Duplicate order',
       },
     });
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       outcome: 'DELETED',
       orderType: 'catering',
       orderId: ORDER_ID,
@@ -165,8 +121,6 @@ describe('softDeleteOrder', () => {
       deletedAt: expect.any(Date),
       deletedBy: ADMIN_ID,
       deletedDispatches: 0,
-      deletedFiles: 0,
-      orphanedFiles: [],
     });
     // The row is never physically deleted.
     expect((tx.cateringRequest as any).delete).toBeUndefined();
@@ -176,7 +130,6 @@ describe('softDeleteOrder', () => {
     tx.onDemand.findFirst.mockResolvedValueOnce({ ...liveOrder, orderNumber: 'OD-001' });
     tx.onDemand.updateMany.mockResolvedValue({ count: 1 });
     tx.dispatch.findMany.mockResolvedValue([]);
-    tx.fileUpload.findMany.mockResolvedValue([]);
 
     const result = await softDeleteOrder({ orderType: 'on_demand', orderId: ORDER_ID }, ACTOR);
 
@@ -186,8 +139,20 @@ describe('softDeleteOrder', () => {
     });
     expect(tx.cateringRequest.updateMany).not.toHaveBeenCalled();
     expect(tx.dispatch.deleteMany).toHaveBeenCalledWith({ where: { onDemandId: ORDER_ID } });
-    expect(tx.fileUpload.deleteMany).toHaveBeenCalledWith({ where: { onDemandId: ORDER_ID } });
     expect(result).toMatchObject({ outcome: 'DELETED', orderType: 'on_demand', orderNumber: 'OD-001' });
+  });
+
+  it('keeps every file: no file_uploads row is read or deleted and storage is never touched', async () => {
+    primeLiveCatering();
+
+    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
+
+    expect(tx.fileUpload.findMany).not.toHaveBeenCalled();
+    expect(tx.fileUpload.deleteMany).not.toHaveBeenCalled();
+    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ outcome: 'DELETED' });
+    expect(result).not.toHaveProperty('deletedFiles');
+    expect(result).not.toHaveProperty('orphanedFiles');
   });
 
   it('runs the cancel cascade: removes dispatch rows and closes the live deliveries mirror', async () => {
@@ -254,7 +219,6 @@ describe('softDeleteOrder', () => {
     });
     tx.cateringRequest.updateMany.mockResolvedValue({ count: 1 });
     tx.dispatch.findMany.mockResolvedValue([assignedDispatch]);
-    tx.fileUpload.findMany.mockResolvedValue([]);
 
     const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
 
@@ -263,219 +227,16 @@ describe('softDeleteOrder', () => {
     expect(mockedBroadcast).not.toHaveBeenCalled();
   });
 
-  it('removes file rows in the transaction and the objects from fileUploader at their stored path', async () => {
+  it('alerts nobody when the transaction fails', async () => {
     primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      {
-        id: 'file-1',
-        fileName: 'menu.pdf',
-        filePath: `orders/catering/${ORDER_ID}/menu.pdf`,
-        fileUrl: `https://proj.supabase.co/storage/v1/object/sign/fileUploader/orders/catering/${ORDER_ID}/menu.pdf?token=t`,
-      },
-    ]);
-    tx.fileUpload.deleteMany.mockResolvedValue({ count: 1 });
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(tx.fileUpload.deleteMany).toHaveBeenCalledWith({
-      where: { cateringRequestId: ORDER_ID },
-    });
-    expect(storageFrom).toHaveBeenCalledTimes(1);
-    expect(storageFrom).toHaveBeenCalledWith('fileUploader');
-    expect(storageFrom).not.toHaveBeenCalledWith('order-files');
-    expect(removeByBucket.fileUploader).toHaveBeenCalledWith([
-      `orders/catering/${ORDER_ID}/menu.pdf`,
-    ]);
-    expect(result).toMatchObject({ outcome: 'DELETED', deletedFiles: 1, orphanedFiles: [] });
-  });
-
-  it('parses the full path from fileUrl when filePath is missing — never just the file name', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      {
-        id: 'file-1',
-        fileName: 'menu.pdf',
-        filePath: null,
-        fileUrl: `https://proj.supabase.co/storage/v1/object/public/fileUploader/catering_order/${ORDER_ID}/menu.pdf`,
-      },
-    ]);
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(removeByBucket.fileUploader).toHaveBeenCalledWith([
-      `catering_order/${ORDER_ID}/menu.pdf`,
-    ]);
-    expect(removeByBucket.fileUploader).not.toHaveBeenCalledWith(['menu.pdf']);
-    expect(result).toMatchObject({ outcome: 'DELETED', orphanedFiles: [] });
-  });
-
-  it('also tries the fileUrl path when filePath went stale after a move', async () => {
-    primeLiveCatering();
-    const stalePath = 'orders/catering/temp-123/menu.pdf';
-    const movedPath = `catering_order/${ORDER_ID}/menu.pdf`;
-    tx.fileUpload.findMany.mockResolvedValue([
-      {
-        id: 'file-1',
-        fileName: 'menu.pdf',
-        filePath: stalePath,
-        fileUrl: `https://proj.supabase.co/storage/v1/object/public/fileUploader/${movedPath}`,
-      },
-    ]);
-    // Only the moved object exists; the stale path removes nothing.
-    removeByBucket.fileUploader = jest.fn(async () => ({
-      data: [{ name: movedPath }],
-      error: null,
-    }));
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(removeByBucket.fileUploader).toHaveBeenCalledWith([stalePath, movedPath]);
-    expect(result).toMatchObject({ outcome: 'DELETED', orphanedFiles: [] });
-  });
-
-  it('removes proof-of-delivery files from the bucket named in their URL', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      {
-        id: 'file-pod',
-        fileName: 'proof.jpg',
-        filePath: `deliveries/${ORDER_ID}/proof.jpg`,
-        fileUrl: `https://proj.supabase.co/storage/v1/object/public/delivery-proofs/deliveries/${ORDER_ID}/proof.jpg`,
-      },
-    ]);
-
-    await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(storageFrom).toHaveBeenCalledWith('delivery-proofs');
-    expect(removeByBucket['delivery-proofs']).toHaveBeenCalledWith([
-      `deliveries/${ORDER_ID}/proof.jpg`,
-    ]);
-    expect(storageFrom).not.toHaveBeenCalledWith('fileUploader');
-  });
-
-  it('touches storage only after the database transaction has committed', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: 'orders/catering/x/menu.pdf', fileUrl: 'x' },
-    ]);
-    let committed = false;
-    mockedPrisma.$transaction.mockImplementation(async (cb: any) => {
-      const value = await cb(tx);
-      committed = true;
-      return value;
-    });
-    storageFrom.mockImplementation(() => ({
-      remove: jest.fn(async (paths: string[]) => {
-        expect(committed).toBe(true);
-        return { data: paths.map((name) => ({ name })), error: null };
-      }),
-    }));
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(storageFrom).toHaveBeenCalled();
-    expect(result).toMatchObject({ outcome: 'DELETED', orphanedFiles: [] });
-  });
-
-  it('leaves storage alone when the transaction fails', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: 'orders/catering/x/menu.pdf', fileUrl: 'x' },
-    ]);
-    tx.fileUpload.deleteMany.mockRejectedValue(new Error('db down'));
+    tx.dispatch.deleteMany.mockRejectedValue(new Error('db down'));
 
     await expect(
       softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR),
     ).rejects.toThrow('db down');
 
-    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
     expect(mockedNotify).not.toHaveBeenCalled();
-  });
-
-  it('reports a storage error as an orphan instead of swallowing it', async () => {
-    primeLiveCatering();
-    const path = `orders/catering/${ORDER_ID}/menu.pdf`;
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: path, fileUrl: 'x' },
-    ]);
-    removeByBucket.fileUploader = jest.fn(async () => ({
-      data: null,
-      error: { message: 'permission denied' },
-    }));
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(result).toMatchObject({
-      outcome: 'DELETED',
-      deletedFiles: 1,
-      orphanedFiles: [
-        {
-          fileId: 'file-1',
-          fileName: 'menu.pdf',
-          bucket: 'fileUploader',
-          paths: [path],
-          reason: 'REMOVE_FAILED',
-          detail: 'permission denied',
-        },
-      ],
-    });
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('[order-deletion] orphaned storage object'),
-      expect.objectContaining({ orderId: ORDER_ID, fileId: 'file-1', bucket: 'fileUploader' }),
-    );
-  });
-
-  it('reports an orphan when the storage call throws', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: 'orders/catering/x/menu.pdf', fileUrl: 'x' },
-    ]);
-    removeByBucket.fileUploader = jest.fn(async () => {
-      throw new Error('network down');
-    });
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(result).toMatchObject({
-      outcome: 'DELETED',
-      orphanedFiles: [{ fileId: 'file-1', reason: 'REMOVE_FAILED', detail: 'network down' }],
-    });
-  });
-
-  it('reports an orphan when storage did not confirm removing the object', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: 'orders/catering/x/menu.pdf', fileUrl: 'x' },
-      { id: 'file-2', fileName: 'map.pdf', filePath: 'orders/catering/x/map.pdf', fileUrl: 'x' },
-    ]);
-    removeByBucket.fileUploader = jest.fn(async () => ({
-      data: [{ name: 'orders/catering/x/map.pdf' }],
-      error: null,
-    }));
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(result).toMatchObject({
-      outcome: 'DELETED',
-      orphanedFiles: [{ fileId: 'file-1', reason: 'NOT_FOUND_AT_STORED_PATH' }],
-    });
-  });
-
-  it('reports an orphan when no storage path can be worked out, without guessing from the file name', async () => {
-    primeLiveCatering();
-    tx.fileUpload.findMany.mockResolvedValue([
-      { id: 'file-1', fileName: 'menu.pdf', filePath: null, fileUrl: 'https://utfs.io/f/menu.pdf' },
-    ]);
-
-    const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
-
-    expect(storageFrom).not.toHaveBeenCalled();
-    expect(result).toMatchObject({
-      outcome: 'DELETED',
-      orphanedFiles: [
-        { fileId: 'file-1', fileName: 'menu.pdf', bucket: null, paths: [], reason: 'PATH_UNRESOLVED' },
-      ],
-    });
+    expect(mockedBroadcast).not.toHaveBeenCalled();
   });
 
   it('returns NOT_FOUND for an order that does not exist and writes nothing', async () => {
@@ -486,7 +247,6 @@ describe('softDeleteOrder', () => {
     expect(result).toEqual({ outcome: 'NOT_FOUND' });
     expect(tx.cateringRequest.updateMany).not.toHaveBeenCalled();
     expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
-    expect(tx.fileUpload.deleteMany).not.toHaveBeenCalled();
   });
 
   it('returns NOT_FOUND for a malformed id without querying the database', async () => {
@@ -519,7 +279,6 @@ describe('softDeleteOrder', () => {
     });
     expect(tx.cateringRequest.updateMany).not.toHaveBeenCalled();
     expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
-    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
   });
 
   it('returns ALREADY_DELETED when a concurrent delete wins the race', async () => {
@@ -530,7 +289,6 @@ describe('softDeleteOrder', () => {
 
     expect(result).toMatchObject({ outcome: 'ALREADY_DELETED', orderId: ORDER_ID });
     expect(tx.dispatch.deleteMany).not.toHaveBeenCalled();
-    expect(tx.fileUpload.deleteMany).not.toHaveBeenCalled();
   });
 
   it('resolves an order number to an on-demand order when no catering order has it', async () => {
@@ -538,7 +296,6 @@ describe('softDeleteOrder', () => {
     tx.onDemand.findFirst.mockResolvedValueOnce({ ...liveOrder, orderNumber: 'OD-777' });
     tx.onDemand.updateMany.mockResolvedValue({ count: 1 });
     tx.dispatch.findMany.mockResolvedValue([]);
-    tx.fileUpload.findMany.mockResolvedValue([]);
 
     const result = await softDeleteOrder({ orderNumber: 'OD-777' }, ACTOR);
 
@@ -550,6 +307,39 @@ describe('softDeleteOrder', () => {
       orderType: 'on_demand',
       orderId: ORDER_ID,
       orderNumber: 'OD-777',
+    });
+  });
+});
+
+describe('toDeleteOrderActionResult', () => {
+  const identity = { orderType: 'catering' as const, orderId: ORDER_ID, orderNumber: 'CAT-001' };
+
+  it('reports a clean delete as success', () => {
+    expect(
+      toDeleteOrderActionResult(
+        {
+          outcome: 'DELETED',
+          ...identity,
+          deletedAt: new Date(),
+          deletedBy: ADMIN_ID,
+          deletedDispatches: 0,
+        },
+        ORDER_ID,
+      ),
+    ).toEqual({ success: true, message: 'Order deleted successfully' });
+  });
+
+  it('reports a missing order', () => {
+    expect(toDeleteOrderActionResult({ outcome: 'NOT_FOUND' }, ORDER_ID)).toEqual({
+      success: false,
+      error: `Order with ID ${ORDER_ID} not found.`,
+    });
+  });
+
+  it('reports an already-deleted order', () => {
+    expect(toDeleteOrderActionResult({ outcome: 'ALREADY_DELETED', ...identity }, ORDER_ID)).toEqual({
+      success: false,
+      error: 'Order CAT-001 has already been deleted.',
     });
   });
 });
@@ -573,7 +363,6 @@ describe('softDeleteOrders (bulk)', () => {
     tx.onDemand.findFirst.mockResolvedValue(null);
     tx.cateringRequest.updateMany.mockResolvedValue({ count: 1 });
     tx.dispatch.findMany.mockResolvedValue([]);
-    tx.fileUpload.findMany.mockResolvedValue([]);
 
     const results = await softDeleteOrders(
       ['CAT-LIVE', 'CAT-GONE', 'CAT-NOPE', 'CAT-BOOM'],

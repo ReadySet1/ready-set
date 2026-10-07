@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import {
-  describeOrphanedFiles,
-  softDeleteOrder,
-} from '@/lib/services/order-deletion';
+import { softDeleteOrder } from '@/lib/services/order-deletion';
 
 const MAX_REASON_LENGTH = 500;
 
@@ -11,8 +8,8 @@ const MAX_REASON_LENGTH = 500;
  * DELETE /api/orders/delete?orderId=&orderType=catering|onDemand[&reason=]
  *
  * Admin-only soft delete of one order (REA-342). The order row is kept with
- * deletedAt / deletedBy stamped; what else a delete covers lives in
- * src/lib/services/order-deletion.ts.
+ * deletedAt / deletedBy stamped and its files are retained; what else a
+ * delete covers lives in src/lib/services/order-deletion.ts.
  */
 export async function DELETE(req: NextRequest) {
   const auth = await withAuth(req, {
@@ -77,23 +74,7 @@ export async function DELETE(req: NextRequest) {
       deletedAt: result.deletedAt.toISOString(),
       deletedBy: result.deletedBy,
       deletedDispatches: result.deletedDispatches,
-      deletedFiles: result.deletedFiles,
-      orphanedFiles: result.orphanedFiles,
     };
-
-    // The order is deleted either way, but files left in storage are not a
-    // full success: `partial` tells the caller the delete itself went through.
-    const orphanWarning = describeOrphanedFiles(result.orphanedFiles.length);
-    if (orphanWarning) {
-      const message = `Order deleted, but ${orphanWarning}.`;
-      return NextResponse.json({
-        success: false,
-        partial: true,
-        error: message,
-        message,
-        details,
-      });
-    }
 
     return NextResponse.json({
       success: true,

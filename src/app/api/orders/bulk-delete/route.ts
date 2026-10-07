@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import {
-  describeOrphanedFiles,
-  softDeleteOrders,
-  type OrphanedFile,
-} from '@/lib/services/order-deletion';
+import { softDeleteOrders } from '@/lib/services/order-deletion';
 
 const MAX_REASON_LENGTH = 500;
 
@@ -21,9 +17,10 @@ type FailureCode = keyof typeof FAILURE_REASONS;
  * POST /api/orders/bulk-delete  { orderNumbers: string[], reason?: string }
  *
  * Admin-only soft delete of several orders (REA-343). Always answers 200 with
- * one result per requested order; `success` is true only when every order was
- * deleted and no storage object was left behind. What a delete covers lives
- * in src/lib/services/order-deletion.ts.
+ * one result per requested order; `success` is true only when no order
+ * FAILED (an order that was missing or already deleted is reported, not a
+ * failure of the batch). What a delete covers lives in
+ * src/lib/services/order-deletion.ts.
  */
 export async function POST(req: NextRequest) {
   const auth = await withAuth(req, {
@@ -68,7 +65,6 @@ export async function POST(req: NextRequest) {
 
     const deleted: string[] = [];
     const failed: { orderNumber: string; code: FailureCode; reason: string }[] = [];
-    const orphanedFiles: ({ orderNumber: string } & OrphanedFile)[] = [];
 
     const orders = outcomes.map((outcome) => {
       const { orderNumber } = outcome;
@@ -82,9 +78,6 @@ export async function POST(req: NextRequest) {
       }
 
       deleted.push(orderNumber);
-      for (const orphan of outcome.orphanedFiles) {
-        orphanedFiles.push({ orderNumber, ...orphan });
-      }
       return {
         orderNumber,
         outcome: outcome.outcome,
@@ -93,28 +86,22 @@ export async function POST(req: NextRequest) {
         deletedAt: outcome.deletedAt.toISOString(),
         deletedBy: outcome.deletedBy,
         deletedDispatches: outcome.deletedDispatches,
-        deletedFiles: outcome.deletedFiles,
-        orphanedFiles: outcome.orphanedFiles.length,
       };
     });
 
     const countFailed = (code: FailureCode) => failed.filter((f) => f.code === code).length;
-    const orphanWarning = describeOrphanedFiles(orphanedFiles.length);
 
     return NextResponse.json({
-      success: failed.length === 0 && orphanedFiles.length === 0,
-      message:
-        `Bulk deletion attempted. ${deleted.length} orders deleted, ${failed.length} failed.` +
-        (orphanWarning ? ` ${orphanWarning}.` : ''),
+      success: countFailed('FAILED') === 0,
+      message: `Bulk deletion attempted. ${deleted.length} orders deleted, ${failed.length} failed.`,
       summary: {
         requested: outcomes.length,
         deleted: deleted.length,
         alreadyDeleted: countFailed('ALREADY_DELETED'),
         notFound: countFailed('NOT_FOUND'),
         failed: countFailed('FAILED'),
-        orphanedFiles: orphanedFiles.length,
       },
-      results: { deleted, failed, orphanedFiles, orders },
+      results: { deleted, failed, orders },
     });
   } catch (error) {
     console.error('Fatal Error in bulk order deletion API:', error);

@@ -2,9 +2,8 @@
 //
 // POST /api/orders/bulk-delete (REA-343). The route is thin: admin auth, body
 // validation, one call into the shared order-deletion service, and a summary
-// with one result per requested order. What a delete actually does (soft
-// delete, bucket, path, orphans) is covered by
-// src/lib/services/__tests__/order-deletion.test.ts.
+// with one result per requested order. What a delete actually does is covered
+// by src/lib/services/__tests__/order-deletion.test.ts.
 
 jest.mock('@/utils/prismaDB', () => ({ prisma: { $transaction: jest.fn() } }));
 jest.mock('@/utils/supabase/server', () => ({
@@ -54,8 +53,6 @@ const deleted = (orderNumber: string, overrides: Record<string, unknown> = {}) =
   deletedAt: DELETED_AT,
   deletedBy: ADMIN_ID,
   deletedDispatches: 1,
-  deletedFiles: 0,
-  orphanedFiles: [],
   ...overrides,
 });
 
@@ -88,7 +85,6 @@ describe('POST /api/orders/bulk-delete - Bulk Delete Orders', () => {
         alreadyDeleted: 0,
         notFound: 0,
         failed: 0,
-        orphanedFiles: 0,
       });
       // Fields BulkDeleteOrders.tsx reads.
       expect(data.results.deleted).toEqual(['CATER-001', 'OD-002']);
@@ -145,7 +141,6 @@ describe('POST /api/orders/bulk-delete - Bulk Delete Orders', () => {
         alreadyDeleted: 1,
         notFound: 1,
         failed: 1,
-        orphanedFiles: 0,
       });
       expect(data.results.deleted).toEqual(['CATER-001']);
       expect(data.results.failed).toEqual([
@@ -158,32 +153,35 @@ describe('POST /api/orders/bulk-delete - Bulk Delete Orders', () => {
     });
   });
 
-  describe('Files left behind in storage', () => {
-    it('does not report full success and lists every orphan with its order', async () => {
-      const orphan = {
-        fileId: 'file-1',
-        fileName: 'menu.pdf',
-        bucket: 'fileUploader',
-        paths: ['orders/catering/x/menu.pdf'],
-        reason: 'REMOVE_FAILED',
-        detail: 'permission denied',
-      };
+  describe('Batch success', () => {
+    it('stays successful when an order was merely missing or already deleted', async () => {
       mockedSoftDeleteOrders.mockResolvedValue([
-        deleted('CATER-001', { deletedFiles: 1, orphanedFiles: [orphan] }),
-        deleted('CATER-002'),
+        deleted('CATER-001'),
+        { outcome: 'ALREADY_DELETED', orderType: 'catering', orderId: 'id-2', orderNumber: 'CATER-002' },
+        { outcome: 'NOT_FOUND', orderNumber: 'CATER-003' },
       ]);
 
       const response = await POST(
-        createPostRequest(URL, { orderNumbers: ['CATER-001', 'CATER-002'] }),
+        createPostRequest(URL, { orderNumbers: ['CATER-001', 'CATER-002', 'CATER-003'] }),
       );
       const data = await expectSuccessResponse(response, 200);
 
+      expect(data.success).toBe(true);
+      expect(data.summary).toMatchObject({ deleted: 1, alreadyDeleted: 1, notFound: 1, failed: 0 });
+      expect(data.results.failed).toHaveLength(2);
+    });
+
+    it('is not successful when an order FAILED', async () => {
+      mockedSoftDeleteOrders.mockResolvedValue([
+        deleted('CATER-001'),
+        { outcome: 'FAILED', orderNumber: 'CATER-004', reason: 'boom' },
+      ]);
+
+      const response = await POST(createPostRequest(URL, { orderNumbers: ['CATER-001', 'CATER-004'] }));
+      const data = await expectSuccessResponse(response, 200);
+
       expect(data.success).toBe(false);
-      expect(data.summary).toMatchObject({ deleted: 2, failed: 0, orphanedFiles: 1 });
-      expect(data.message).toMatch(/1 file could not be removed from storage/i);
-      // The orders themselves are deleted; only their files need attention.
-      expect(data.results.deleted).toEqual(['CATER-001', 'CATER-002']);
-      expect(data.results.orphanedFiles).toEqual([{ orderNumber: 'CATER-001', ...orphan }]);
+      expect(data.summary).toMatchObject({ deleted: 1, failed: 1 });
     });
   });
 

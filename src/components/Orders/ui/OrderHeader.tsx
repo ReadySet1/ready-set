@@ -124,11 +124,6 @@ const OrderHeader: React.FC<OrderHeaderProps> = ({
         // First close the dialog, then call the success handler
         setIsDeleteDialogOpen(false);
         onDeleteSuccess();
-      } else if (response.ok && data.partial) {
-        // The order is deleted, but some of its files were left in storage.
-        toast.error(data.error || "Order deleted, but some files could not be removed");
-        setIsDeleteDialogOpen(false);
-        onDeleteSuccess();
       } else {
         // Get error message from response when available
         const errorMessage = data.error || "Failed to delete order";

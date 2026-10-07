@@ -45,21 +45,12 @@ export const DeleteOnDemandOrder: React.FC<DeleteOnDemandOrderProps> = ({
     try {
       const result: DeleteOrderResult = await deleteOnDemandOrder(orderId);
 
-      // `partial`: the order is deleted, but some of its files were left in storage.
-      if (result.success || result.partial) {
-        toast(
-          result.partial
-            ? {
-                title: "Order deleted with warnings",
-                description: result.error,
-                variant: "destructive",
-              }
-            : {
-                title: "Order deleted",
-                description: result.message || `Order ${orderNumber} has been successfully deleted.`,
-                variant: "default",
-              },
-        );
+      if (result.success) {
+        toast({
+          title: "Order deleted",
+          description: result.message || `Order ${orderNumber} has been successfully deleted.`,
+          variant: "default",
+        });
 
         // Close the dialog
         setIsOpen(false);
@@ -106,8 +97,8 @@ export const DeleteOnDemandOrder: React.FC<DeleteOnDemandOrderProps> = ({
           <AlertDialogDescription>
             Are you sure you want to delete order <strong>{orderNumber}</strong>?
             <br /><br />
-            This action is permanent and cannot be undone. All associated data including
-            file uploads and dispatch records will be deleted.
+            This action cannot be undone. The order is removed from every list and
+            its dispatch records are deleted; its files are kept.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

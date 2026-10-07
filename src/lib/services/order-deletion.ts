@@ -1,7 +1,5 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/utils/prismaDB';
-import { createAdminClient } from '@/utils/supabase/server';
-import { STORAGE_BUCKETS } from '@/utils/file-service';
 import { runAfterResponse } from '@/lib/api/after-response';
 import { broadcastDeliveryStatus } from '@/lib/realtime/server-broadcast';
 import type { DeliveryStatusUpdatedPayload } from '@/lib/realtime/schemas';
@@ -29,9 +27,10 @@ import {
  *   mirror is closed (CANCELLED) — a leftover ASSIGNED mirror row is what
  *   deadlocks a driver's End Shift. An assigned driver is told on the same
  *   two channels a cancel uses (SMS + realtime CANCELLED).
- * - Files: `file_uploads` rows go in the transaction. Storage cannot join it,
- *   so objects are removed after commit, and anything that could not be
- *   removed is returned and logged as an orphan — never swallowed.
+ * - Files: RETAINED. `file_uploads` rows (order attachments, proof-of-delivery
+ *   photos, pickup signatures) and their storage objects stay with the
+ *   soft-deleted order. Hard deletion and file removal belong to the purge
+ *   job (src/jobs/orderPurge.ts), which runs after the retention window.
  *
  * Missing and already-deleted orders are outcomes, not exceptions.
  */
@@ -49,25 +48,6 @@ export interface OrderDeletionActor {
   reason?: string | null;
 }
 
-export type OrphanReason =
-  /** The storage call returned an error or threw. */
-  | 'REMOVE_FAILED'
-  /** Storage answered without error but did not report the object removed. */
-  | 'NOT_FOUND_AT_STORED_PATH'
-  /** Neither `filePath` nor `fileUrl` yields a storage path. */
-  | 'PATH_UNRESOLVED';
-
-/** A storage object whose `file_uploads` row is gone but which was not removed. */
-export interface OrphanedFile {
-  fileId: string;
-  fileName: string;
-  bucket: string | null;
-  /** Every path tried, in order. Empty when none could be worked out. */
-  paths: string[];
-  reason: OrphanReason;
-  detail?: string;
-}
-
 interface OrderIdentity {
   orderType: DeletableOrderType;
   orderId: string;
@@ -80,8 +60,6 @@ export type OrderDeletionResult =
       deletedAt: Date;
       deletedBy: string;
       deletedDispatches: number;
-      deletedFiles: number;
-      orphanedFiles: OrphanedFile[];
     })
   | (OrderIdentity & { outcome: 'ALREADY_DELETED' })
   | { outcome: 'NOT_FOUND' };
@@ -91,21 +69,9 @@ export type BulkOrderDeletionResult = { orderNumber: string } & (
   | { outcome: 'FAILED'; reason: string }
 );
 
-/**
- * Warning text for a delete that left storage objects behind, or null when
- * none were. Shared by every entry point so none of them reports full
- * success over an orphan.
- */
-export function describeOrphanedFiles(count: number): string | null {
-  if (count <= 0) return null;
-  return `${count} file${count === 1 ? '' : 's'} could not be removed from storage`;
-}
-
 /** What the admin "delete order" server actions hand back to their dialogs. */
 export interface DeleteOrderActionResult {
   success: boolean;
-  /** The order was deleted, but storage objects were left behind. */
-  partial?: boolean;
   error?: string;
   message?: string;
 }
@@ -121,14 +87,6 @@ export function toDeleteOrderActionResult(
     return {
       success: false,
       error: `Order ${result.orderNumber} has already been deleted.`,
-    };
-  }
-  const orphanWarning = describeOrphanedFiles(result.orphanedFiles.length);
-  if (orphanWarning) {
-    return {
-      success: false,
-      partial: true,
-      error: `Order deleted, but ${orphanWarning}.`,
     };
   }
   return { success: true, message: 'Order deleted successfully' };
@@ -154,13 +112,6 @@ interface OrderRow {
   driverStatus: string | null;
 }
 
-interface StoredFile {
-  id: string;
-  fileName: string;
-  filePath: string | null;
-  fileUrl: string;
-}
-
 interface AssignedDriver {
   id: string;
   name: string | null;
@@ -169,127 +120,6 @@ interface AssignedDriver {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-const STORAGE_OBJECT_URL = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/;
-
-/**
- * Bucket and object path from a Supabase Storage object URL (public, signed
- * or authenticated). Returns null for anything else — callers must not fall
- * back to the bare file name, which points at nothing and orphans the object.
- */
-export function parseStorageUrl(
-  fileUrl: string | null | undefined,
-): { bucket: string; path: string } | null {
-  if (!fileUrl) return null;
-  try {
-    // `pathname` excludes the query string, so a signed URL's token is dropped.
-    const match = new URL(fileUrl).pathname.match(STORAGE_OBJECT_URL);
-    if (!match?.[1] || !match[2]) return null;
-    return {
-      bucket: decodeURIComponent(match[1]),
-      path: decodeURIComponent(match[2]),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Where a file lives. The URL names the bucket (order attachments are in
- * `fileUploader`, proof-of-delivery and pickup signatures in
- * `delivery-proofs`); `filePath` is the stored path. Both paths are tried
- * when they differ: the temp-upload move rewrites `fileUrl` but leaves
- * `filePath` pointing at the old location.
- */
-function resolveStorageTarget(file: StoredFile): { bucket: string; paths: string[] } | null {
-  const fromUrl = parseStorageUrl(file.fileUrl);
-  const candidates = [file.filePath, fromUrl?.path]
-    .map((path) => path?.trim().replace(/^\/+/, ''))
-    .filter((path): path is string => !!path);
-  const paths = [...new Set(candidates)];
-  if (paths.length === 0) return null;
-  return { bucket: fromUrl?.bucket ?? STORAGE_BUCKETS.FILE_UPLOADER, paths };
-}
-
-/**
- * Remove the storage objects behind already-deleted `file_uploads` rows.
- * Never throws: every object that was not confirmed removed comes back as an
- * orphan and is logged with enough context to clean it up by hand.
- */
-async function removeStoredFiles(
-  order: OrderIdentity,
-  files: StoredFile[],
-): Promise<OrphanedFile[]> {
-  const orphans: OrphanedFile[] = [];
-  const byBucket = new Map<string, { file: StoredFile; paths: string[] }[]>();
-
-  for (const file of files) {
-    const target = resolveStorageTarget(file);
-    if (!target) {
-      orphans.push({
-        fileId: file.id,
-        fileName: file.fileName,
-        bucket: null,
-        paths: [],
-        reason: 'PATH_UNRESOLVED',
-      });
-      continue;
-    }
-    const entries = byBucket.get(target.bucket) ?? [];
-    entries.push({ file, paths: target.paths });
-    byBucket.set(target.bucket, entries);
-  }
-
-  if (byBucket.size > 0) {
-    // Service-role client, as in the upload and file-delete routes: the
-    // buckets are private and the caller has already been authorised.
-    let storage: Awaited<ReturnType<typeof createAdminClient>>['storage'] | null = null;
-    let clientFailure: string | null = null;
-    try {
-      storage = (await createAdminClient()).storage;
-    } catch (error) {
-      clientFailure = errorMessage(error);
-    }
-
-    for (const [bucket, entries] of byBucket) {
-      let failure = clientFailure;
-      let removed: Set<string> | null = null;
-
-      if (storage) {
-        try {
-          const paths = [...new Set(entries.flatMap((entry) => entry.paths))];
-          const { data, error } = await storage.from(bucket).remove(paths);
-          if (error) {
-            failure = error.message || 'Storage remove failed';
-          } else if (Array.isArray(data)) {
-            removed = new Set(data.map((object) => object.name));
-          }
-        } catch (error) {
-          failure = errorMessage(error);
-        }
-      }
-
-      for (const { file, paths } of entries) {
-        const base = { fileId: file.id, fileName: file.fileName, bucket, paths };
-        if (failure) {
-          orphans.push({ ...base, reason: 'REMOVE_FAILED', detail: failure });
-        } else if (removed && !paths.some((path) => removed.has(path))) {
-          orphans.push({ ...base, reason: 'NOT_FOUND_AT_STORED_PATH' });
-        }
-      }
-    }
-  }
-
-  for (const orphan of orphans) {
-    console.error('[order-deletion] orphaned storage object', {
-      orderId: order.orderId,
-      orderNumber: order.orderNumber,
-      orderType: order.orderType,
-      ...orphan,
-    });
-  }
-  return orphans;
 }
 
 /**
@@ -367,7 +197,7 @@ async function locateOrder(
 /**
  * Soft-delete one order. See the module comment for what that covers.
  * Throws only when the database transaction itself fails; in that case
- * nothing was changed and storage is untouched.
+ * nothing was changed.
  */
 export async function softDeleteOrder(
   ref: OrderRef,
@@ -430,12 +260,6 @@ export async function softDeleteOrder(
       dbOrderNumber: order.orderNumber,
     });
 
-    const files: StoredFile[] = await tx.fileUpload.findMany({
-      where: orderFk,
-      select: { id: true, fileName: true, filePath: true, fileUrl: true },
-    });
-    await tx.fileUpload.deleteMany({ where: orderFk });
-
     return {
       outcome: 'DELETED' as const,
       ...identity,
@@ -443,13 +267,12 @@ export async function softDeleteOrder(
       status: String(order.status),
       driverStatus: order.driverStatus,
       dispatches,
-      files,
     };
   });
 
   if (committed.outcome !== 'DELETED') return committed;
 
-  const { status, driverStatus, dispatches, files, ...deleted } = committed;
+  const { status, driverStatus, dispatches, ...deleted } = committed;
 
   if (!SETTLED_ORDER_STATUSES.includes(status)) {
     const drivers = new Map<string, AssignedDriver>();
@@ -459,14 +282,10 @@ export async function softDeleteOrder(
     alertAssignedDrivers({ ...deleted, driverStatus }, [...drivers.values()]);
   }
 
-  const orphanedFiles = await removeStoredFiles(deleted, files);
-
   return {
     ...deleted,
     deletedBy: actor.deletedBy,
     deletedDispatches: dispatches.length,
-    deletedFiles: files.length,
-    orphanedFiles,
   };
 }
 

@@ -40,8 +40,6 @@ const deleted = (overrides: Record<string, unknown> = {}) => ({
   deletedAt: new Date('2026-10-06T12:00:00.000Z'),
   deletedBy: ADMIN_ID,
   deletedDispatches: 1,
-  deletedFiles: 0,
-  orphanedFiles: [],
   ...overrides,
 });
 
@@ -116,28 +114,6 @@ describe.each([
       success: false,
       error: 'Order CAT 001 has already been deleted.',
     });
-  });
-
-  it('does not report full success when files were left in storage', async () => {
-    mockedSoftDelete.mockResolvedValue(
-      deleted({
-        orderType,
-        orphanedFiles: [
-          { fileId: 'f1', fileName: 'a.pdf', bucket: 'fileUploader', paths: ['x/a.pdf'], reason: 'REMOVE_FAILED' },
-          { fileId: 'f2', fileName: 'b.pdf', bucket: 'fileUploader', paths: ['x/b.pdf'], reason: 'REMOVE_FAILED' },
-        ],
-      }),
-    );
-
-    const result = await action(ORDER_ID);
-
-    expect(result).toEqual({
-      success: false,
-      partial: true,
-      error: 'Order deleted, but 2 files could not be removed from storage.',
-    });
-    // The order is gone from the lists either way.
-    expect(mockedRevalidate).toHaveBeenCalledWith(listPath);
   });
 
   it('returns a generic error when the service throws', async () => {

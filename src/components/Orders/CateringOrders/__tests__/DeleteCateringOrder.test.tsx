@@ -1,7 +1,6 @@
 /**
- * DeleteCateringOrder — how the dialog reports the delete action's result.
- * A `partial` result means the order IS deleted but files were left in
- * storage: the list must still refresh, and the toast must not claim success.
+ * DeleteCateringOrder — how the dialog reports the delete action's result:
+ * a success refreshes the list, a failure keeps the order in it.
  */
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -55,24 +54,6 @@ describe("DeleteCateringOrder", () => {
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Order deleted", variant: "default" }),
     );
-  });
-
-  it("refreshes the list but warns when files were left in storage", async () => {
-    mockDeleteCateringOrder.mockResolvedValue({
-      success: false,
-      partial: true,
-      error: "Order deleted, but 2 files could not be removed from storage.",
-    });
-    const onDeleted = jest.fn();
-
-    await confirmDelete(onDeleted);
-
-    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
-    expect(mockToast).toHaveBeenCalledWith({
-      title: "Order deleted with warnings",
-      description: "Order deleted, but 2 files could not be removed from storage.",
-      variant: "destructive",
-    });
   });
 
   it("keeps the order in the list when the delete failed", async () => {

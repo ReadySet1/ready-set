@@ -54,8 +54,6 @@ const deleted = (overrides: Record<string, unknown> = {}) => ({
   deletedAt: DELETED_AT,
   deletedBy: ADMIN_ID,
   deletedDispatches: 2,
-  deletedFiles: 1,
-  orphanedFiles: [],
   ...overrides,
 });
 
@@ -91,8 +89,6 @@ describe('DELETE /api/orders/delete - Delete Order', () => {
         deletedAt: DELETED_AT.toISOString(),
         deletedBy: ADMIN_ID,
         deletedDispatches: 2,
-        deletedFiles: 1,
-        orphanedFiles: [],
       });
     });
 
@@ -122,31 +118,6 @@ describe('DELETE /api/orders/delete - Delete Order', () => {
         deletedBy: ADMIN_ID,
         reason: 'Duplicate order',
       });
-    });
-  });
-
-  describe('Files left behind in storage', () => {
-    it('does not report full success when a storage object could not be removed', async () => {
-      const orphan = {
-        fileId: 'file-1',
-        fileName: 'menu.pdf',
-        bucket: 'fileUploader',
-        paths: ['orders/catering/x/menu.pdf'],
-        reason: 'REMOVE_FAILED',
-        detail: 'permission denied',
-      };
-      mockedSoftDelete.mockResolvedValue(deleted({ orphanedFiles: [orphan] }));
-
-      const response = await DELETE(
-        createDeleteRequest(`${URL_BASE}?orderId=${ORDER_ID}&orderType=catering`),
-      );
-      const data = await expectSuccessResponse(response, 200);
-
-      expect(data.success).toBe(false);
-      expect(data.partial).toBe(true);
-      expect(data.error).toMatch(/1 file could not be removed from storage/i);
-      expect(data.details.deletedOrder).toBe(1);
-      expect(data.details.orphanedFiles).toEqual([orphan]);
     });
   });
 
