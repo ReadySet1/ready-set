@@ -236,7 +236,13 @@ export class UserSoftDeleteService {
   }
 
   /**
-   * Permanently delete a user (for GDPR compliance after retention period)
+   * Permanently delete a user (for GDPR compliance after retention period).
+   *
+   * No user_audits row is written for a hard delete: user_audits.userId is
+   * NOT NULL with an FK to profiles(id), so a row referencing the erased
+   * profile could never be inserted, and a GDPR erasure must not leave one
+   * behind anyway. The deletion is recorded as a single structured log line
+   * (ids and record counts only, no PII) once the transaction has committed.
    */
   async permanentlyDeleteUser(userId: string): Promise<PermanentDeleteResult> {
     try {
@@ -322,36 +328,6 @@ export class UserSoftDeleteService {
           where: { id: userId },
         });
 
-        // Step 5: Create audit log entry
-        await tx.userAudit.create({
-          data: {
-            userId,
-            action: 'PERMANENT_DELETE',
-            performedBy: existingUser.deletedBy,
-            changes: {
-              before: {
-                id: existingUser.id,
-                email: existingUser.email,
-                type: existingUser.type,
-                deletedAt: existingUser.deletedAt,
-                deletedBy: existingUser.deletedBy,
-              },
-              after: null,
-            },
-            reason: 'User permanently deleted for GDPR compliance',
-            metadata: {
-              operation: 'permanent_delete',
-              timestamp: new Date().toISOString(),
-              affectedRecords: {
-                dispatchesDeleted: deletedDispatches.count,
-                fileUploadsUpdated: updatedFileUploads.count,
-                addressesDeleted: deletedAddresses,
-                addressesUpdated: updatedAddresses,
-              },
-            },
-          },
-        });
-
         return {
           deletedProfile,
           deletedDispatches: deletedDispatches.count,
@@ -360,6 +336,20 @@ export class UserSoftDeleteService {
           updatedAddresses,
         };
       });
+
+      // Step 5: Record the erasure outside the transaction so a failed delete
+      // never logs success. Intentionally no user_audits row (see docblock).
+      console.log(
+        '[AUDIT] Profile hard-deleted:',
+        JSON.stringify({
+          userId,
+          performedBy: existingUser.deletedBy,
+          dispatchesDeleted: result.deletedDispatches,
+          fileUploadsUpdated: result.updatedFileUploads,
+          addressesDeleted: result.deletedAddresses,
+          addressesUpdated: result.updatedAddresses,
+        })
+      );
 
       return {
         success: true,
