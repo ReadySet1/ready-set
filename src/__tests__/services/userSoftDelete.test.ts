@@ -416,24 +416,81 @@ describe('UserSoftDeleteService', () => {
       });
     });
 
-    describe('Transaction Behavior', () => {
-      it('should create PERMANENT_DELETE audit log entry', async () => {
-        const userId = 'user-123';
+    describe('Audit Behavior', () => {
+      let logSpy: jest.SpyInstance;
 
-        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.DRIVER });
+      beforeEach(() => {
+        logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        logSpy.mockRestore();
+      });
+
+      function configureHardDeleteSuccess(userId: string) {
+        configureUserAlreadyDeleted(mockPrisma, {
+          id: userId,
+          type: UserType.DRIVER,
+          email: 'erased@example.com',
+          deletedBy: 'admin-456',
+        });
         configureSuccessfulTransaction(mockPrisma);
 
-        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 0 });
-        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 0 });
+        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 2 });
+        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 3 });
         mockPrisma.address.findMany.mockResolvedValue([]);
         mockPrisma.profile.delete.mockResolvedValue({ id: userId });
-        configureAuditLogSuccess(mockPrisma);
+      }
+
+      function auditLogCalls() {
+        return logSpy.mock.calls.filter(
+          ([message]) => typeof message === 'string' && message.startsWith('[AUDIT]')
+        );
+      }
+
+      it('should NOT write a user_audits row for a hard delete', async () => {
+        // user_audits.userId is NOT NULL with an FK to profiles(id): a row that
+        // references the just-deleted profile can never be inserted, and a
+        // GDPR erasure must not leave a row pointing at the erased user anyway.
+        const userId = 'user-123';
+        configureHardDeleteSuccess(userId);
 
         await service.permanentlyDeleteUser(userId);
 
-        expect(mockPrisma.userAudit.create).toHaveBeenCalled();
-        const auditCall = mockPrisma.userAudit.create.mock.calls[0][0];
-        expect(auditCall.data.action).toBe('PERMANENT_DELETE');
+        expect(mockPrisma.userAudit.create).not.toHaveBeenCalled();
+      });
+
+      it('should emit one structured [AUDIT] log line with ids and counts only', async () => {
+        const userId = 'user-123';
+        configureHardDeleteSuccess(userId);
+
+        await service.permanentlyDeleteUser(userId);
+
+        const calls = auditLogCalls();
+        expect(calls).toHaveLength(1);
+
+        const [message, payload] = calls[0];
+        expect(message).toBe('[AUDIT] Profile hard-deleted:');
+        expect(JSON.parse(payload)).toEqual({
+          userId,
+          performedBy: 'admin-456',
+          dispatchesDeleted: 2,
+          fileUploadsUpdated: 3,
+          addressesDeleted: 0,
+          addressesUpdated: 0,
+        });
+        expect(payload).not.toContain('erased@example.com');
+      });
+
+      it('should not emit the [AUDIT] log line when the transaction fails', async () => {
+        const userId = 'user-123';
+        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.DRIVER });
+        configureTransactionFailure(mockPrisma, new Error('FK violation'));
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(service.permanentlyDeleteUser(userId)).rejects.toThrow('FK violation');
+
+        expect(auditLogCalls()).toHaveLength(0);
       });
     });
   });
