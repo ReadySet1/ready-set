@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0](https://github.com/ReadySet1/ready-set/compare/v2.9.5...v2.10.0) (2026-10-07)
+
+
+### Added
+
+* **orders:** purge job hard-deletes orders past the retention window ([cf5d9e6](https://github.com/ReadySet1/ready-set/commit/cf5d9e6c7202a8d970119e84e9a83e85e39ee089))
+
+
+### Fixed
+
+* **db:** add deletedBy and deletionReason to order tables ([f300a55](https://github.com/ReadySet1/ready-set/commit/f300a55cef771ed939bd6c09b5544db586b3ef8b))
+* **driver-summary:** refresh stale weeks, write the current week, fix status and hour math ([cb92ca9](https://github.com/ReadySet1/ready-set/commit/cb92ca92f0bfaffb0ba5b05f2f17b78077eee663))
+* **driver-summary:** refresh stale weeks, write the current week, fix status and hour math ([d8ab3fb](https://github.com/ReadySet1/ready-set/commit/d8ab3fb9807c438fe5f542c5ca021587cde5e3e1))
+* **orders:** keep an order's files on soft delete ([558b38a](https://github.com/ReadySet1/ready-set/commit/558b38a3d89cdb33e6b24cb5d1345c1e77e922cd))
+* **orders:** route the admin table delete actions through the shared service ([3f6cdd9](https://github.com/ReadySet1/ready-set/commit/3f6cdd9bf0322353811dcb87af08a807f9660735))
+* **orders:** say files are kept in the order header delete dialog ([69e6179](https://github.com/ReadySet1/ready-set/commit/69e617991c448add7118968ff6a181386d03d849))
+* **orders:** soft-delete in bulk and report files left in storage ([1b3afab](https://github.com/ReadySet1/ready-set/commit/1b3afabe95409de29d958500ac140d7d442aa271))
+* **orders:** soft-delete orders instead of erasing them (REA-342, REA-343) ([cee9f33](https://github.com/ReadySet1/ready-set/commit/cee9f33c46233ba17534bc5bf92c3da1401afa88))
+* **orders:** soft-delete orders through a shared deletion service ([14df803](https://github.com/ReadySet1/ready-set/commit/14df803bc97d4ccff73daceeea03938c5784bc05))
+* **orders:** treat soft-deleted orders as not found when assigning or reading status ([cfe3bdf](https://github.com/ReadySet1/ready-set/commit/cfe3bdf671be6a7b410052777405969921eff51a))
+* **tracking:** keep the admin realtime channel alive across the StrictMode double mount ([be78f79](https://github.com/ReadySet1/ready-set/commit/be78f79fac33c4a829b4f200eacae53110e1e286))
+* **tracking:** keep the admin realtime channel alive across the StrictMode double mount ([8167bf1](https://github.com/ReadySet1/ready-set/commit/8167bf198dc05dee8e538fd8043925e15acece5b))
+
 ## [2.9.5](https://github.com/ReadySet1/ready-set/compare/v2.9.4...v2.9.5) (2026-10-06)
 
 
