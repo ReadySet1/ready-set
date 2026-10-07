@@ -97,8 +97,8 @@ export const DeleteCateringOrder: React.FC<DeleteCateringOrderProps> = ({
           <AlertDialogDescription>
             Are you sure you want to delete order <strong>{orderNumber}</strong>?
             <br /><br />
-            This action is permanent and cannot be undone. All associated data including 
-            file uploads and dispatch records will be deleted.
+            This action cannot be undone. The order is removed from every list and
+            its dispatch records are deleted; its files are kept.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

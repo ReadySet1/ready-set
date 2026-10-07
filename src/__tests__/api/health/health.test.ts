@@ -30,6 +30,19 @@ jest.mock('@/lib/auth-middleware', () => ({
   addSecurityHeaders: jest.fn((response) => response),
 }));
 
+// Runs GET on a fake clock (performance.now included), so simulated database
+// latency is exact instead of depending on how loaded the runner is.
+async function getOnFakeClock(request: Parameters<typeof GET>[0]) {
+  jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask'] });
+  try {
+    const pending = GET(request);
+    await jest.runAllTimersAsync();
+    return await pending;
+  } finally {
+    jest.useRealTimers();
+  }
+}
+
 describe('GET /api/health - System Health Check', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -123,7 +136,7 @@ describe('GET /api/health - System Health Check', () => {
 
     it('should run the database sub-checks in parallel, not sequentially', async () => {
       // Each of the 4 DB round trips takes 300ms. Sequential execution would
-      // total ~1200ms (degraded); parallel execution stays around ~300ms.
+      // total 1200ms (degraded); parallel execution takes exactly 300ms.
       const delayed = <T,>(value: T) =>
         new Promise<T>((resolve) => setTimeout(() => resolve(value), 300));
 
@@ -139,11 +152,11 @@ describe('GET /api/health - System Health Check', () => {
       (healthCheck.debugPreparedStatements as jest.Mock).mockImplementation(() => delayed([]));
 
       const request = createGetRequest('http://localhost:3000/api/health');
-      const response = await GET(request);
+      const response = await getOnFakeClock(request);
       const data = await expectSuccessResponse(response, 200);
 
       expect(data.services.database.status).toBe('healthy');
-      expect(data.services.database.responseTime).toBeLessThan(1000);
+      expect(data.services.database.responseTime).toBe(300);
     });
 
     it('should not report Stripe in external services (payments unused)', async () => {
@@ -366,10 +379,11 @@ describe('GET /api/health - System Health Check', () => {
       );
 
       const request = createGetRequest('http://localhost:3000/api/health');
-      const response = await GET(request);
+      const response = await getOnFakeClock(request);
       const data = await response.json();
 
       expect(data.services.database.status).toBe('healthy');
+      expect(data.services.database.responseTime).toBe(600);
     });
 
     it('should report a slow but reachable database as degraded (HTTP 200), not down', async () => {
@@ -380,13 +394,13 @@ describe('GET /api/health - System Health Check', () => {
       );
 
       const request = createGetRequest('http://localhost:3000/api/health');
-      const response = await GET(request);
+      const response = await getOnFakeClock(request);
       const data = await expectSuccessResponse(response, 200);
 
       expect(data.status).toBe('degraded');
       expect(data.services.database.status).toBe('degraded');
-      expect(data.services.database.responseTime).toBeGreaterThan(3000);
-    }, 10000);
+      expect(data.services.database.responseTime).toBe(3100);
+    });
 
     it('should include environment information in database details', async () => {
       process.env.VERCEL = '1';
@@ -435,17 +449,20 @@ describe('HEAD /api/health - Quick Health Check', () => {
       expect(text).toBe('');
     });
 
-    it('should be faster than full health check', async () => {
+    it('should do a single database round trip, unlike the full health check', async () => {
       const request = new Request('http://localhost:3000/api/health', {
         method: 'HEAD',
       });
 
-      const start = performance.now();
-      await HEAD(request);
-      const duration = performance.now() - start;
+      const response = await HEAD(request);
 
-      // HEAD should be very fast (< 100ms typically)
-      expect(duration).toBeLessThan(1000);
+      expect(response.status).toBe(200);
+      // One connectivity query and none of the sub-checks GET runs
+      expect(prismaPooled.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prismaPooled.profile.count).not.toHaveBeenCalled();
+      expect(healthCheck.getConnectionInfo).not.toHaveBeenCalled();
+      expect(healthCheck.debugPreparedStatements).not.toHaveBeenCalled();
+      expect(getErrorMetrics).not.toHaveBeenCalled();
     });
   });
 

@@ -3,6 +3,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 
+// Mock Sanity queries: only the real sitemap (see "Performance and Accessibility") reaches them
+jest.mock('../../sanity/lib/queries', () => ({
+  getAllPosts: jest.fn(),
+}));
+
 // Mock the sitemap function
 jest.mock('../../app/sitemap', () => {
   return jest.fn().mockReturnValue([
@@ -281,18 +286,26 @@ describe('SEO Integration Tests', () => {
   });
 
   describe('Performance and Accessibility', () => {
-    it('should generate sitemap efficiently', async () => {
-      const startTime = Date.now();
-      
-      const sitemap = await import('../../app/sitemap');
-      const sitemapData = sitemap.default();
-      
-      const endTime = Date.now();
-      const executionTime = endTime - startTime;
-      
-      // Should generate quickly (less than 100ms)
-      expect(executionTime).toBeLessThan(100);
-      expect(sitemapData.length).toBeGreaterThan(10);
+    it('should generate sitemap with a single CMS query', async () => {
+      const postCount = 50;
+      const { getAllPosts } = require('../../sanity/lib/queries');
+      (getAllPosts as jest.Mock).mockResolvedValue(
+        Array.from({ length: postCount }, (_, i) => ({
+          _id: `post-${i}`,
+          _updatedAt: '2025-01-01T00:00:00.000Z',
+          slug: `post-${i}`,
+        }))
+      );
+
+      // The real generator, not the module mock above
+      const realSitemap = jest.requireActual('../../app/sitemap').default;
+      const sitemapData: Array<{ url: string }> = await realSitemap();
+
+      // One query covers every post: the cost does not grow with the blog
+      expect(getAllPosts).toHaveBeenCalledTimes(1);
+      const blogPostUrls = sitemapData.filter(entry => entry.url.includes('/blog/'));
+      expect(blogPostUrls).toHaveLength(postCount);
+      expect(sitemapData.length).toBeGreaterThan(postCount + 10);
     });
 
     it('should handle large number of URLs', async () => {

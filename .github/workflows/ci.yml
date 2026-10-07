@@ -226,9 +226,9 @@ jobs:
     # build time + globalTimeout so Playwright stops first and still writes its
     # reports; the job-level kill would lose them.
     timeout-minutes: 45
-    # Non-blocking while the suite is still red: the run step below now fails
-    # honestly on test failures. Drop this once the E2E suite is green.
-    continue-on-error: true
+    # Blocking: a failing suite fails this job, the workflow and the
+    # "All Checks Pass" gate. When the secrets are missing (forks, Dependabot)
+    # the suite is skipped and the job stays green.
 
     steps:
       - name: Checkout code
@@ -332,7 +332,7 @@ jobs:
 
       # No shell timeout and no `|| exit 0`: Playwright's CI globalTimeout ends
       # the run gracefully (reports still written), and a failing suite shows
-      # red. The job stays non-blocking via job-level continue-on-error.
+      # red and blocks the "All Checks Pass" gate.
       - name: Run E2E tests
         if: steps.check-secrets.outputs.secrets_configured == 'true'
         run: pnpm test:e2e
@@ -428,7 +428,7 @@ jobs:
   all-checks-pass:
     name: All Checks Pass
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, unit-tests, build-check]
+    needs: [lint-and-typecheck, unit-tests, e2e-tests, build-check]
     if: always()
 
     steps:
@@ -451,6 +451,15 @@ jobs:
             echo "✅ Unit tests passed (≥95% threshold)"
           fi
 
+          # E2E is blocking. A run skipped for missing secrets still reports
+          # success, so forks and Dependabot PRs are not blocked.
+          if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+            echo "❌ E2E tests failed"
+            FAILED=true
+          else
+            echo "✅ E2E tests passed"
+          fi
+
           # Build check is non-blocking (works with SKIP_ENV_VALIDATION)
           if [[ "${{ needs.build-check.result }}" == "failure" ]]; then
             echo "⚠️  Build check failed (non-blocking)"
@@ -469,4 +478,4 @@ jobs:
           echo "📊 Test Status (REA-285):"
           echo "  - TypeScript: ✅ Type checking enabled"
           echo "  - Unit Tests: ✅ Passing (95% threshold)"
-          echo "  - E2E Tests: ⏸️  Requires secrets configuration"
+          echo "  - E2E Tests: ✅ Passing (skipped when secrets are missing)"

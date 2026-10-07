@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAdminRealtimeTracking } from '../useAdminRealtimeTracking';
 
@@ -983,7 +984,9 @@ describe('useAdminRealtimeTracking', () => {
 
       unmount();
 
-      expect(mockChannelUnsubscribe).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockChannelUnsubscribe).toHaveBeenCalled();
+      });
     });
 
     it('should cleanup channel when feature is disabled', async () => {
@@ -1034,6 +1037,72 @@ describe('useAdminRealtimeTracking', () => {
 
       expect(clearIntervalSpy).toHaveBeenCalled();
       clearIntervalSpy.mockRestore();
+    });
+  });
+
+  describe('StrictMode double mount (REA-367)', () => {
+    /**
+     * Make subscribe resolve on a later tick so the StrictMode
+     * mount -> cleanup -> mount cycle completes while init is in flight.
+     */
+    const deferSubscribe = () => {
+      mockChannelSubscribe.mockImplementation(async (callbacks) => {
+        channelCallbacks = callbacks;
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        callbacks.onConnect?.();
+      });
+    };
+
+    it('keeps the channel alive when the mount effect is double-invoked', async () => {
+      deferSubscribe();
+
+      const { result, unmount } = renderHook(() => useAdminRealtimeTracking(), {
+        wrapper: StrictMode,
+      });
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Let any stale .then() / deferred cleanup branches fire
+      await act(async () => {
+        jest.advanceTimersByTime(50);
+      });
+
+      expect(mockChannelSubscribe).toHaveBeenCalledTimes(1);
+      expect(mockChannelUnsubscribe).not.toHaveBeenCalled();
+      expect(result.current.isRealtimeConnected).toBe(true);
+      expect(result.current.connectionMode).toBe('realtime');
+
+      // A real unmount must still release the channel
+      unmount();
+
+      await waitFor(() => {
+        expect(mockChannelUnsubscribe).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('tears down a channel whose subscribe completes after a real unmount', async () => {
+      deferSubscribe();
+
+      const { unmount } = renderHook(() => useAdminRealtimeTracking(), {
+        wrapper: StrictMode,
+      });
+
+      await waitFor(() => {
+        expect(mockChannelSubscribe).toHaveBeenCalledTimes(1);
+      });
+
+      // Unmount while subscribe is still pending
+      unmount();
+
+      await act(async () => {
+        jest.advanceTimersByTime(50);
+      });
+
+      await waitFor(() => {
+        expect(mockChannelUnsubscribe).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

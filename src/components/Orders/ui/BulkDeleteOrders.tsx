@@ -94,8 +94,8 @@ const BulkDeleteOrders: React.FC<BulkDeleteOrdersProps> = ({
             <AlertDialogDescription>
               Are you sure you want to delete {selectedOrderIds.length} orders?
               <p className="font-semibold text-destructive mt-2">
-                This action is irreversible. All associated files and dispatch
-                information will be permanently deleted.
+                This action cannot be undone. The orders are removed from every
+                list and their dispatch records are deleted; their files are kept.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>

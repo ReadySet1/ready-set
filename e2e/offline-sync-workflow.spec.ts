@@ -317,8 +317,11 @@ async function clearIndexedDB(page: Page): Promise<void> {
 /**
  * Helper to wait for page to load
  */
+// Best-effort settle only: a timeout here is swallowed, so no test depends on
+// the network going idle, and the home page does not reliably get there. Keep
+// the cap short so two waits in one test cannot eat the 30s test timeout.
 async function waitForPageLoad(page: Page) {
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 }
 
 // =============================================================================

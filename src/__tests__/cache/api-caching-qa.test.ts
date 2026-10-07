@@ -22,7 +22,8 @@ import {
   invalidateVendorOrdersCache,
   generateVendorOrdersCacheKey,
   getCacheStats,
-  invalidateAllVendorCache
+  invalidateAllVendorCache,
+  dashboardCache
 } from '@/lib/cache/dashboard-cache';
 
 // Mock performance.now for consistent timing tests
@@ -64,6 +65,11 @@ const mockOrdersData = {
   page: 1,
   limit: 10
 };
+
+// The Map behind the cache, so tests can count lookups instead of timing them.
+// Wall-clock budgets flake on shared CI runners.
+const backingStore = () =>
+  (dashboardCache as unknown as { cache: Map<string, unknown> }).cache;
 
 describe('API Caching System QA', () => {
   beforeEach(() => {
@@ -245,47 +251,72 @@ describe('API Caching System QA', () => {
     });
 
     describe('Performance Impact', () => {
-      it('should provide fast cache access for repeated requests', () => {
+      it('should serve repeated requests with one keyed lookup each', () => {
         const params = {
           startDate: '2024-01-01',
           endDate: '2024-01-31',
           vendorId: 'vendor_123'
         };
 
-        // Set cache once
+        // Set cache once, next to an unrelated entry a scan would also touch
         setDashboardMetricsCache(params, mockMetricsData, 5000);
+        setDashboardMetricsCache({ startDate: '2024-02-01' }, mockMetricsData, 5000);
 
-        // Multiple fast retrievals
-        const startTime = performance.now();
+        const key = generateDashboardMetricsCacheKey(params);
+        const store = backingStore();
+        const sizeBefore = store.size;
+        const getSpy = jest.spyOn(store, 'get');
+        const stringifySpy = jest.spyOn(JSON, 'stringify');
+        const results: unknown[] = [];
 
-        for (let i = 0; i < 100; i++) {
-          getDashboardMetricsCache(params);
+        try {
+          for (let i = 0; i < 100; i++) {
+            results.push(getDashboardMetricsCache(params));
+          }
+
+          // One hash lookup per read, and no payload re-serialisation
+          expect(getSpy.mock.calls).toEqual(Array.from({ length: 100 }, () => [key]));
+          expect(stringifySpy).not.toHaveBeenCalled();
+        } finally {
+          getSpy.mockRestore();
+          stringifySpy.mockRestore();
         }
 
-        const endTime = performance.now();
-        const totalTime = endTime - startTime;
-
-        // Should be very fast (< 5ms for 100 operations)
-        expect(totalTime).toBeLessThan(5);
+        // Hits hand back the stored object itself, not a copy
+        expect(results).toHaveLength(100);
+        expect(results.every(result => result === mockMetricsData)).toBe(true);
+        expect(store.size).toBe(sizeBefore);
       });
 
-      it('should not significantly slow down cache misses', () => {
+      it('should resolve cache misses with one lookup and no writes', () => {
         const nonExistentParams = {
           startDate: 'non-existent',
           endDate: 'non-existent'
         };
 
-        const startTime = performance.now();
+        const key = generateDashboardMetricsCacheKey(nonExistentParams);
+        const store = backingStore();
+        const sizeBefore = store.size;
+        const getSpy = jest.spyOn(store, 'get');
+        const setSpy = jest.spyOn(store, 'set');
+        const results: unknown[] = [];
 
-        for (let i = 0; i < 100; i++) {
-          getDashboardMetricsCache(nonExistentParams);
+        try {
+          for (let i = 0; i < 100; i++) {
+            results.push(getDashboardMetricsCache(nonExistentParams));
+          }
+
+          expect(getSpy.mock.calls).toEqual(Array.from({ length: 100 }, () => [key]));
+          // A miss must not leave an entry behind
+          expect(setSpy).not.toHaveBeenCalled();
+        } finally {
+          getSpy.mockRestore();
+          setSpy.mockRestore();
         }
 
-        const endTime = performance.now();
-        const totalTime = endTime - startTime;
-
-        // Should still be fast for cache misses (< 5ms for 100 operations)
-        expect(totalTime).toBeLessThan(5);
+        expect(results).toHaveLength(100);
+        expect(results.every(result => result === null)).toBe(true);
+        expect(store.size).toBe(sizeBefore);
       });
     });
   });
@@ -530,51 +561,64 @@ describe('API Caching System QA', () => {
   });
 
   describe('Cache Performance Optimization', () => {
-    it('should handle high-frequency cache operations efficiently', () => {
+    it('should keep a single entry under high-frequency overwrites', () => {
       const userId = 'vendor_high_freq';
-      const startTime = performance.now();
+      const key = generateVendorMetricsCacheKey(userId);
+      const sizeBefore = getCacheStats().size;
+      let staleReads = 0;
 
       // Simulate high-frequency operations (1000 operations)
       for (let i = 0; i < 1000; i++) {
         setVendorMetricsCache(userId, { ...mockVendorMetrics, activeOrders: i }, 5000);
-        getVendorMetricsCache(userId);
+        if (getVendorMetricsCache(userId)?.activeOrders !== i) {
+          staleReads++;
+        }
       }
 
-      const endTime = performance.now();
-      const totalTime = endTime - startTime;
+      // Every read sees the write just before it
+      expect(staleReads).toBe(0);
 
-      // Should handle high frequency efficiently (< 100ms for 1000 operations)
-      expect(totalTime).toBeLessThan(100);
+      // Overwrites replace the entry in place instead of growing the cache
+      const stats = getCacheStats();
+      expect(stats.size).toBe(sizeBefore + 1);
+      expect(stats.keys.filter(k => k === key)).toHaveLength(1);
 
       // Final value should be accessible
       const finalData = getVendorMetricsCache(userId);
       expect(finalData?.activeOrders).toBe(999);
     });
 
-    it('should handle many cache entries efficiently', () => {
+    it('should read each of many entries with one keyed lookup', () => {
       const initialStats = getCacheStats();
 
-      // Set many entries
+      // Set many entries, each with its own payload
       for (let i = 0; i < 100; i++) {
-        setVendorMetricsCache(`vendor_${i}`, mockVendorMetrics, 5000);
+        setVendorMetricsCache(`vendor_${i}`, { ...mockVendorMetrics, activeOrders: i }, 5000);
       }
 
       const afterSetStats = getCacheStats();
       expect(afterSetStats.size).toBe(initialStats.size + 100);
 
-      // Verify all entries are retrievable
-      const data50 = getVendorMetricsCache('vendor_50');
-      expect(data50).toEqual(mockVendorMetrics);
+      const store = backingStore();
+      const getSpy = jest.spyOn(store, 'get');
+      const activeOrders: Array<number | undefined> = [];
 
-      // Verify high-volume cache operations complete quickly
-      const startTime = performance.now();
-      for (let i = 0; i < 100; i++) {
-        getVendorMetricsCache(`vendor_${i}`);
+      try {
+        for (let i = 0; i < 100; i++) {
+          activeOrders.push(getVendorMetricsCache(`vendor_${i}`)?.activeOrders);
+        }
+
+        // One hash lookup per read, by its own key: no scan across entries
+        expect(getSpy.mock.calls).toEqual(
+          Array.from({ length: 100 }, (_, i) => [generateVendorMetricsCacheKey(`vendor_${i}`)])
+        );
+      } finally {
+        getSpy.mockRestore();
       }
-      const endTime = performance.now();
 
-      // 100 cache reads should be very fast (< 10ms)
-      expect(endTime - startTime).toBeLessThan(10);
+      // Every entry is retrievable and none collide
+      expect(activeOrders).toEqual(Array.from({ length: 100 }, (_, i) => i));
+      expect(getCacheStats().size).toBe(afterSetStats.size);
     });
   });
 

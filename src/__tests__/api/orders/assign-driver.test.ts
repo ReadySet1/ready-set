@@ -361,6 +361,42 @@ describe('/api/orders/assignDriver POST API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toContain('catering order not found');
     });
+
+    it('treats a soft-deleted order as not found and creates no dispatch', async () => {
+      const dispatchCreate = jest.fn();
+      const dispatchUpdate = jest.fn();
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const mockPrismaContext = {
+          cateringRequest: {
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'order-123',
+              status: 'ACTIVE',
+              deletedAt: new Date('2026-10-06T12:00:00Z'),
+            }),
+          },
+          dispatch: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: dispatchCreate,
+            update: dispatchUpdate,
+          },
+        };
+        return callback(mockPrismaContext);
+      });
+
+      const request = createPostRequest('http://localhost:3000/api/orders/assignDriver', {
+        orderId: 'order-123',
+        driverId: 'driver-456',
+        orderType: 'catering',
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toContain('catering order not found');
+      expect(dispatchCreate).not.toHaveBeenCalled();
+      expect(dispatchUpdate).not.toHaveBeenCalled();
+    });
   });
 
   describe('📦 On-Demand Order Assignment Tests', () => {

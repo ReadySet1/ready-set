@@ -18,23 +18,15 @@ import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import { siteOrigin } from '@/lib/site-url';
 import { runAfterResponse } from '@/lib/api/after-response';
 import { getStaffCaller } from '@/lib/auth/staff-caller';
+import { getActionCaller } from '@/lib/auth/driver-ownership';
+import {
+  softDeleteOrder,
+  toDeleteOrderActionResult,
+  type DeleteOrderActionResult,
+} from '@/lib/services/order-deletion';
 
-// Define UserType enum locally to match schema
-enum UserType {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  CLIENT = 'CLIENT',
-  VENDOR = 'VENDOR',
-  DRIVER = 'DRIVER'
-}
-
-// Define the delete operation result interface
-export interface DeleteOrderResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-}
+// Result of the delete action (shared with the on-demand action)
+export type DeleteOrderResult = DeleteOrderActionResult;
 
 /**
  * Fetches a list of potential clients (Profiles).
@@ -436,190 +428,36 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
 }
 
 /**
- * Deletes a CateringRequest order.
- * Only ADMIN and SUPER_ADMIN users can delete orders.
+ * Soft-deletes a CateringRequest order through the shared order-deletion
+ * service. Only ADMIN and SUPER_ADMIN users can delete orders.
  */
 export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderResult> {
-    
   try {
-    // Get authenticated user from Supabase
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user?.id) {
-      console.error("Unauthorized: No authenticated user");
+    // Server actions are public POST endpoints: authorise the caller here.
+    const caller = await getActionCaller();
+    if (!caller) {
       return { success: false, error: "Unauthorized: You must be logged in to perform this action." };
     }
-
-    // Check if the user is an ADMIN or SUPER_ADMIN
-    const userProfile = await prisma.profile.findUnique({
-      where: { id: user.id },
-      select: { type: true }
-    });
-
-    if (!userProfile || (userProfile.type !== UserType.ADMIN && userProfile.type !== UserType.SUPER_ADMIN)) {
-      console.error(`Unauthorized: User ${user.id} with type ${userProfile?.type} attempted to delete order`);
-      return { 
-        success: false, 
-        error: "Unauthorized: Only Admin or Super Admin can delete catering orders." 
+    if (!caller.isPrivileged) {
+      return {
+        success: false,
+        error: "Unauthorized: Only Admin or Super Admin can delete catering orders."
       };
     }
 
-    // Find the order first to make sure it exists
-    const order = await prisma.cateringRequest.findUnique({
-      where: { id: orderId },
-      include: {
-        fileUploads: true
-      }
-    });
+    const result = await softDeleteOrder(
+      { orderType: 'catering', orderId },
+      { deletedBy: caller.userId },
+    );
 
-    if (!order) {
-      return { success: false, error: `Order with ID ${orderId} not found.` };
+    if (result.outcome === 'DELETED') {
+      revalidatePath('/admin/catering-orders');
+      revalidatePath(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
     }
 
-    // Get file uploads before transaction to ensure we have them for storage deletion
-    const fileUploads = [...order.fileUploads];
-
-    // Perform the deletion in a transaction
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Delete associated dispatches
-      await tx.dispatch.deleteMany({
-        where: { cateringRequestId: orderId }
-      });
-
-      // Delete associated file uploads from database
-      await tx.fileUpload.deleteMany({
-        where: { cateringRequestId: orderId }
-      });
-
-      // Delete the order
-      await tx.cateringRequest.delete({
-        where: { id: orderId }
-      });
-    });
-
-    // Delete files from storage bucket (outside transaction since it's an external service)
-    if (fileUploads.length > 0) {
-      for (const file of fileUploads) {
-        if (file.fileUrl) {
-          try {
-                        
-            // Extract the storage URL parts
-            let bucketName = "fileUploader"; // Default bucket name
-            let filePath = "";
-            let tempFolderPath = "";
-            
-            // Look for patterns in the URL
-            // 1. Check standard format: .../storage/v1/object/public/bucket-name/path
-            const standardPattern = /\/storage\/v1\/object\/public\/([^\/]+)\/(.+?)(?:\?.*)?$/;
-            const standardMatch = file.fileUrl.match(standardPattern);
-            
-            // 2. Check for temp folder pattern: .../temp-[UUID]/...
-            const tempFolderPattern = /(temp-[a-zA-Z0-9]+)/;
-            const tempFolderMatch = file.fileUrl.match(tempFolderPattern);
-            
-            if (standardMatch) {
-              // Standard URL format
-              bucketName = standardMatch?.[1] || "fileUploader";
-              filePath = standardMatch?.[2] || "";
-              
-              // Attempt to delete from standard path
-              if (filePath) {
-                const { error } = await supabase.storage.from(bucketName).remove([filePath]);
-                if (error) {
-                  console.error(`Error deleting file from standard path:`, error);
-                } else {
-                                  }
-              }
-            } 
-            else if (tempFolderMatch) {
-              // This is a temp folder structure
-              tempFolderPath = tempFolderMatch?.[1] || "";
-              bucketName = "fileUploader"; // Most likely bucket for temp uploads
-              
-              
-              // Try several possible path structures
-              const pathAttempts = [];
-              
-              // 1. First attempt: Get everything after the domain including temp folder
-              const url = new URL(file.fileUrl);
-              const fullPath = url.pathname.split('/').slice(1).join('/');
-              pathAttempts.push(fullPath);
-              
-              // 2. Just the temp folder name
-              pathAttempts.push(tempFolderPath);
-              
-              // 3. Try with the file name if we can extract it
-              const pathParts = url.pathname.split('/');
-              const fileName = pathParts[pathParts.length - 1];
-              if (fileName && !fileName.startsWith('temp-')) {
-                pathAttempts.push(`${tempFolderPath}/${fileName}`);
-              }
-              
-              // 4. Look for catering_order subfolder from the screenshot
-              if (url.pathname.includes('catering_order')) {
-                pathAttempts.push(`${tempFolderPath}/catering_order/${fileName}`);
-              }
-              
-              // Try all path combinations
-              let deleteSuccess = false;
-              for (const attemptPath of pathAttempts) {
-                if (!attemptPath) continue;
-                
-                                const { error } = await supabase.storage.from(bucketName).remove([attemptPath]);
-                
-                if (!error) {
-                                    deleteSuccess = true;
-                  break;
-                } else {
-                                  }
-              }
-              
-              if (!deleteSuccess) {
-                console.error(`Failed to delete file after trying multiple paths`);
-              }
-            } 
-            else {
-              // Fallback method
-                            try {
-                const url = new URL(file.fileUrl);
-                filePath = url.pathname.split('/').slice(1).join('/');
-                                
-                const { error } = await supabase.storage.from(bucketName).remove([filePath]);
-                if (error) {
-                  console.error(`Error with fallback path:`, error);
-                } else {
-                                  }
-              } catch (e) {
-                console.error(`Fallback method failed:`, e);
-              }
-            }
-          } catch (error) {
-            console.error(`Error processing file URL ${file.fileUrl}:`, error);
-          }
-        }
-      }
-    }
-
-    // Revalidate relevant paths
-    revalidatePath('/admin/catering-orders');
-    revalidatePath(`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`);
-    
-    return { 
-      success: true,
-      message: "Order and associated data deleted successfully" 
-    };
+    return toDeleteOrderActionResult(result, orderId);
   } catch (error) {
     console.error("Failed to delete catering order:", error);
-    
-    if (error instanceof Error) {
-      console.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-    
     return {
       success: false,
       error: "Database error: Failed to delete catering order."

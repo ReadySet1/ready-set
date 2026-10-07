@@ -620,21 +620,59 @@ describe('API Security Enhancements QA', () => {
   });
 
   describe('Performance Impact of Security Features', () => {
-    it('should not significantly impact performance for normal requests', async () => {
-      const startTime = performance.now();
+    // Counts storage round trips instead of timing the check: wall-clock
+    // budgets flake on shared CI runners.
+    it('should cost one storage round trip per allowed request', async () => {
+      let windowCount = 0;
+      const redisClient = {
+        incr: jest.fn(async () => ++windowCount),
+        expire: jest.fn(async () => 1),
+        get: jest.fn(),
+        set: jest.fn(),
+        setex: jest.fn(),
+        del: jest.fn()
+      };
 
-      // Simulate security checks for a normal request
-      const request = createTestRequest('/api/test-performance');
+      // Fresh module copy, so the swapped storage does not leak into other tests
+      let isolated!: typeof import('@/lib/rate-limiting');
+      jest.isolateModules(() => {
+        isolated = require('@/lib/rate-limiting');
+      });
+      isolated.setupRateLimitStorage(redisClient);
 
-      // Rate limit check (should be fast for first request)
+      // Keep the 1%-of-requests cleanup pass out of the count
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const rateLimitMiddleware = isolated.withRateLimit('API');
+
+        const firstResult = await rateLimitMiddleware(createTestRequest('/api/test-performance'));
+        const secondResult = await rateLimitMiddleware(createTestRequest('/api/test-performance'));
+
+        // Requests should be allowed
+        expect(firstResult).toBeNull();
+        expect(secondResult).toBeNull();
+
+        // One INCR per request; the TTL is only set when the window opens
+        expect(redisClient.incr).toHaveBeenCalledTimes(2);
+        expect(redisClient.expire).toHaveBeenCalledTimes(1);
+        expect(redisClient.incr.mock.calls[0]).toEqual(redisClient.incr.mock.calls[1]);
+
+        // No read-modify-write on the hot path
+        expect(redisClient.get).not.toHaveBeenCalled();
+        expect(redisClient.set).not.toHaveBeenCalled();
+        expect(redisClient.setex).not.toHaveBeenCalled();
+        expect(redisClient.del).not.toHaveBeenCalled();
+      } finally {
+        randomSpy.mockRestore();
+      }
+    });
+
+    it('should allow a normal request on the default storage', async () => {
       const rateLimitMiddleware = withRateLimit('API');
-      const rateLimitResult = await rateLimitMiddleware(request);
 
-      const endTime = performance.now();
-      const securityCheckTime = endTime - startTime;
+      const rateLimitResult = await rateLimitMiddleware(createTestRequest('/api/test-performance'));
 
-      // Security checks should complete quickly (< 10ms for simple checks)
-      expect(securityCheckTime).toBeLessThan(10);
       expect(rateLimitResult).toBeNull(); // Request should be allowed
     });
   });
