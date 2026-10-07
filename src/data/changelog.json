@@ -3,6 +3,34 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.10.0",
+      "date": "2026-10-07",
+      "title": "Safer order deletion and reliable driver summaries",
+      "summary": "Deleted orders are kept on record with their files, driver weekly summaries are accurate again, and the admin live map stays connected.",
+      "changes": [
+        {
+          "text": "Deleting an order now keeps a record of it, along with its attachments, proof-of-delivery photos and signatures, instead of erasing everything.",
+          "type": "fixed"
+        },
+        {
+          "text": "Deleting several orders at once from the admin lists now works the same way and reports anything it could not clean up.",
+          "type": "fixed"
+        },
+        {
+          "text": "Weekly driver summaries now include the current week, refresh weeks that were out of date, and count hours correctly.",
+          "type": "fixed"
+        },
+        {
+          "text": "The admin live tracking map no longer loses its connection shortly after opening.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.10.0"
+      }
+    },
+    {
       "version": "2.9.5",
       "date": "2026-10-06",
       "title": "Live order updates and accurate driver history",
