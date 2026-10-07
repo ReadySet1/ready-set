@@ -251,8 +251,26 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma generate
 
+      # The browser download + apt deps hung for 45 min on 2026-10-07 and ate
+      # the whole job budget without running a test. Cache the browser binaries
+      # (keyed on the lockfile, which pins @playwright/test) and cap each install
+      # step so a slow CDN or apt mirror fails fast instead of silently timing out.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 10
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 5
+        run: pnpm exec playwright install-deps chromium
 
       - name: Validate GitHub Secrets
         id: check-secrets
