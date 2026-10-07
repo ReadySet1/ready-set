@@ -358,12 +358,28 @@ export function useAdminRealtimeTracking(
   // Track if component is mounted to prevent setState after unmount
   const isMountedRef = useRef(true);
 
-  // Set mounted flag to false on unmount
+  // Set the flag inside the effect body (not only at ref creation) so the
+  // StrictMode cleanup -> re-run cycle leaves it true for the live mount.
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  /**
+   * Realtime lifecycle ownership (REA-367).
+   *
+   * Every run of the lifecycle effect gets a generation id; the run whose id
+   * is in `liveGenerationRef` owns the channel. `null` means no live run
+   * (unmounted or Realtime turned off). Under `reactStrictMode` React runs
+   * mount -> cleanup -> mount synchronously with the SAME refs, and the
+   * realtime client dedups channels by name, so a stale run must never tear
+   * down the channel the live run now relies on.
+   */
+  const generationCounterRef = useRef(0);
+  const liveGenerationRef = useRef<number | null>(null);
+  const initInFlightRef = useRef<Promise<void> | null>(null);
 
   // Keep SSE drivers ref up to date (for lookup in Realtime location updates)
   useEffect(() => {
@@ -388,23 +404,27 @@ export function useAdminRealtimeTracking(
    * Prevents state updates after component unmount (race condition fix)
    */
   const cleanupRealtime = useCallback(async () => {
-    if (channelRef.current) {
-      const channelToCleanup = channelRef.current;
+    const channelToCleanup = channelRef.current;
+    if (!channelToCleanup) {
+      return;
+    }
 
-      try {
-        await channelToCleanup.unsubscribe();
+    // Release ownership synchronously so a concurrent init/reconnect never
+    // sees (and keeps) a channel that is already being torn down.
+    channelRef.current = null;
 
-        // Only update state if component is still mounted
-        if (isMountedRef.current) {
-          channelRef.current = null;
-          setIsRealtimeConnected(false);
-          setConnectionMode('sse');
-        }
-      } catch (error) {
-        // Only log if component is still mounted
-        if (isMountedRef.current) {
-          realtimeLogger.error('Admin error unsubscribing from channel', { error });
-        }
+    try {
+      await channelToCleanup.unsubscribe();
+
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsRealtimeConnected(false);
+        setConnectionMode('sse');
+      }
+    } catch (error) {
+      // Only log if component is still mounted
+      if (isMountedRef.current) {
+        realtimeLogger.error('Admin error unsubscribing from channel', { error });
       }
     }
   }, []);
@@ -598,58 +618,57 @@ export function useAdminRealtimeTracking(
   }, [isRealtimeEnabled, useRealtime, cleanupRealtime, initializeRealtime, sseReconnect]);
 
   /**
-   * Initialize Realtime on mount if enabled
-   * Uses cancellation pattern to prevent race conditions
+   * Realtime lifecycle: subscribe while enabled, tear down when disabled,
+   * toggled off or unmounted.
+   *
+   * Race this guards against (REA-367): with `reactStrictMode` the effect
+   * runs mount -> cleanup -> mount in one tick. The old code kicked off an
+   * init per run (and per the former flag-change effect), then the stale
+   * run's post-init check unsubscribed the channel by name, killing the one
+   * the live run had just received from the client's name-based cache. The
+   * channel reached `subscribed`, closed ~1 ms later and never came back.
+   *
+   * - One init at a time: a run that finds a channel (or an init in flight)
+   *   adopts it instead of subscribing again.
+   * - The post-init check only tears down when NO run is live anymore.
+   * - Cleanup is deferred one microtask; the StrictMode re-run happens
+   *   synchronously before that, claims the generation, and the stale
+   *   cleanup sees it is superseded and does nothing. A true unmount or a
+   *   disable has no successor run, so its deferred cleanup proceeds.
    */
   useEffect(() => {
-    let isActive = true;
+    if (!(isRealtimeEnabled && useRealtime)) {
+      return;
+    }
 
-    if (isRealtimeEnabled && useRealtime) {
-      initializeRealtime().then(() => {
-        // If component unmounted or deps changed during init, cleanup
-        if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch((error) => {
-            realtimeLogger.error('Failed to unsubscribe from channel', { error });
-          });
-          channelRef.current = null;
+    const generation = ++generationCounterRef.current;
+    liveGenerationRef.current = generation;
+
+    if (!channelRef.current && !initInFlightRef.current) {
+      initInFlightRef.current = initializeRealtime().then(() => {
+        initInFlightRef.current = null;
+        // Nobody owns Realtime anymore (unmounted / disabled during init):
+        // release the channel that just finished subscribing.
+        if (liveGenerationRef.current === null && channelRef.current) {
+          cleanupRealtime();
         }
       });
     }
 
     return () => {
-      isActive = false;
-      cleanupRealtime();
+      Promise.resolve().then(() => {
+        if (liveGenerationRef.current !== generation) {
+          // A newer run (StrictMode re-run or re-enable) owns the channel now.
+          return;
+        }
+        liveGenerationRef.current = null;
+        cleanupRealtime();
+      });
     };
     // initializeRealtime and cleanupRealtime are stable refs created with useCallback
     // Including them in deps would cause infinite re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRealtimeEnabled, useRealtime]);
-
-  /**
-   * Handle Realtime feature flag or mode changes
-   * Uses cancellation pattern to prevent race conditions
-   */
-  useEffect(() => {
-    let isActive = true;
-
-    if (!isRealtimeEnabled && channelRef.current) {
-      cleanupRealtime();
-    } else if (isRealtimeEnabled && !channelRef.current && useRealtime) {
-      initializeRealtime().then(() => {
-        // If component unmounted or deps changed during init, cleanup
-        if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch((error) => {
-            realtimeLogger.error('Failed to unsubscribe from channel', { error });
-          });
-          channelRef.current = null;
-        }
-      });
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [isRealtimeEnabled, useRealtime, initializeRealtime, cleanupRealtime]);
 
   /**
    * Update connection mode based on Realtime status
