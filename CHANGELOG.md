@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1](https://github.com/ReadySet1/ready-set/compare/v2.10.0...v2.10.1) (2026-10-08)
+
+
+### Fixed
+
+* **driver:** stop asking for location on every run in the Android app ([e6082d2](https://github.com/ReadySet1/ready-set/commit/e6082d2c0246bf652dd301e1d0556034db5ef81d))
+* **driver:** stop asking for location on every run in the Android app ([2771c09](https://github.com/ReadySet1/ready-set/commit/2771c090dbc4d846baa2e4e008a1a46ac480b29f))
+* **orders:** edit order dialog showing wrong time due to timezone mismatch ([bfd314d](https://github.com/ReadySet1/ready-set/commit/bfd314de0cb23f7e37e3e25ee365fb6e105809c2))
+* **users:** stop writing an audit row for a hard-deleted profile ([9dd167c](https://github.com/ReadySet1/ready-set/commit/9dd167c88827ccf3ef7c7ca7eadf0f37bbaf4dd0))
+* **users:** stop writing an audit row for a hard-deleted profile ([84448f6](https://github.com/ReadySet1/ready-set/commit/84448f688f789825da8d792bd2c2f244f7d92609))
+
 ## [2.10.0](https://github.com/ReadySet1/ready-set/compare/v2.9.5...v2.10.0) (2026-10-07)
 
 
