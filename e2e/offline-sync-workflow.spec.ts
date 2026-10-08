@@ -405,30 +405,8 @@ test.describe('Queue Locations While Offline', () => {
     expect(countAfter).toBe(countBefore);
   });
 
-  test('should show offline indicator in driver portal', async ({ page, context }) => {
-    await page.goto('/driver');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Driver portal requires authentication');
-    }
-
-    await waitForPageLoad(page);
-
-    // Go offline
-    await goOffline(context);
-    await page.waitForTimeout(1000);
-
-    // Look for offline indicator
-    const offlineIndicator = page.locator('text=Offline, text=offline, text=Disconnected');
-    const hasOfflineIndicator = await offlineIndicator.count() > 0;
-
-    // Restore online for cleanup
-    await goOnline(context);
-
-    // This test passes if we detected the offline state
-    // The actual UI indicator depends on implementation
-    expect(true).toBe(true);
-  });
+  // The driver-portal offline indicator is covered with a real driver session
+  // in "Authenticated Offline Sync" below.
 });
 
 // =============================================================================
@@ -637,22 +615,25 @@ driverTest.describe('Authenticated Offline Sync', () => {
   });
 
   driverTest('should show offline status in driver portal', async ({ authenticatedPage, authenticatedContext }) => {
-    await authenticatedPage.goto('/driver');
-    await waitForPageLoad(authenticatedPage);
+    // The tracking portal's HealthBar shows Online/Offline. It polls
+    // continuously, so wait for the HealthBar itself, not network idle.
+    await authenticatedPage.goto('/driver/tracking');
+    await expect(authenticatedPage, 'driver session was rejected (redirected away)').toHaveURL(
+      /\/driver\/tracking/
+    );
+    await expect(authenticatedPage.getByText('Online', { exact: true }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
-    // Go offline
     await goOffline(authenticatedContext);
-    await authenticatedPage.waitForTimeout(1000);
+    try {
+      await expect(authenticatedPage.getByText('Offline', { exact: true }).first()).toBeVisible();
+      await expect(authenticatedPage.getByText(/^You.re offline/)).toBeVisible();
+    } finally {
+      await goOnline(authenticatedContext);
+    }
 
-    // Check for offline indicators
-    const offlineElements = authenticatedPage.locator('text=Offline, text=offline, text=Disconnected');
-    const hasOfflineUI = await offlineElements.count() > 0;
-
-    // Restore online
-    await goOnline(authenticatedContext);
-
-    // Pass if we successfully toggled offline without errors
-    expect(true).toBe(true);
+    await expect(authenticatedPage.getByText('Online', { exact: true }).first()).toBeVisible();
   });
 
   driverTest('should display queue count when items pending', async ({ authenticatedPage }) => {
