@@ -116,6 +116,13 @@ describe('capacitor-tracking', () => {
     expect(postedBody().driver_id).toBe('driver-1');
   });
 
+  it('sends the device send time so the server can measure clock skew', async () => {
+    await bridge.startNativeShiftTracking(session());
+    await emitFix();
+
+    expect(postedBody().client_sent_at).toBe(nowMs);
+  });
+
   it('retries the driver-id lookup on later fixes until it succeeds, then caches it', async () => {
     const getDriverId = jest
       .fn()

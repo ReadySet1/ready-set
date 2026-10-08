@@ -299,6 +299,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
             timestamp: Number.isFinite(fixMs)
               ? new Date(fixMs).toISOString()
               : undefined,
+            // Device clock at SEND time (also for offline replays): the server
+            // compares it with its own clock and corrects a skewed phone.
+            client_sent_at: Date.now(),
           }),
         });
         if (res.status === 429) {
