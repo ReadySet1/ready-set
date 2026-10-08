@@ -40,6 +40,17 @@ jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
 }));
 
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
+import { setNativeLocationIssue } from '@/lib/tracking/native-location-issue';
+
+// Native-wrapper gate (card android-location-prompt-every-run). Default: a
+// plain browser, so every pre-existing test exercises the unchanged web path.
+const mockNativeShell = { isNative: false };
+const mockCheckNativeLocationPermission = jest.fn();
+jest.mock('@/lib/tracking/native-shift-tracking', () => ({
+  isCapacitorNative: () => mockNativeShell.isNative,
+  checkNativeLocationPermission: (...args: unknown[]) =>
+    mockCheckNativeLocationPermission(...args),
+}));
 
 
 // Helper to mock navigator properties
@@ -1236,6 +1247,114 @@ describe('useLocationTracking', () => {
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();
       });
+    });
+  });
+
+  describe('Capacitor native wrapper (android-location-prompt-every-run)', () => {
+    beforeEach(() => {
+      mockNativeShell.isNative = true;
+      mockCheckNativeLocationPermission.mockResolvedValue('granted');
+      // Android WebView reports 'prompt' on every run regardless of the OS grant.
+      (navigator.permissions.query as jest.Mock).mockResolvedValue({ state: 'prompt' });
+    });
+
+    afterEach(() => {
+      mockNativeShell.isNative = false;
+      act(() => setNativeLocationIssue(null));
+    });
+
+    it('trusts the native grant: fetches location on mount, no yellow button', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('granted');
+      });
+      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+      expect(mockCheckNativeLocationPermission).toHaveBeenCalledWith({ explain: false });
+    });
+
+    it('keeps the prompt path without touching geolocation when not granted', async () => {
+      mockCheckNativeLocationPermission.mockResolvedValue('not-granted');
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('prompt');
+      });
+      // getCurrentPosition would make the WebView pop the Android dialog.
+      expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+    });
+
+    it('routes the permission request to the in-app explanation, never the OS dialog', async () => {
+      mockCheckNativeLocationPermission.mockResolvedValue('not-granted');
+      const { result } = renderHook(() => useLocationTracking());
+      await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
+
+      let granted: boolean | undefined;
+      await act(async () => {
+        granted = await result.current.requestLocationPermission();
+      });
+
+      expect(granted).toBe(false);
+      expect(mockCheckNativeLocationPermission).toHaveBeenLastCalledWith({ explain: true });
+      expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      expect(result.current.isRequestingPermission).toBe(false);
+    });
+
+    it('picks up a grant made through the explanation and fetches location', async () => {
+      mockCheckNativeLocationPermission.mockResolvedValue('not-granted');
+      const { result } = renderHook(() => useLocationTracking());
+      await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
+
+      act(() => setNativeLocationIssue('permission-needed'));
+      mockCheckNativeLocationPermission.mockResolvedValue('granted');
+      act(() => setNativeLocationIssue(null));
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('granted');
+      });
+      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+    });
+
+    it('falls back to the web flow when the native check has no answer (iOS wrapper)', async () => {
+      mockCheckNativeLocationPermission.mockResolvedValue(null);
+      const originalUserAgent = navigator.userAgent;
+      mockNavigatorProperty(
+        'userAgent',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+      );
+      try {
+        const { result } = renderHook(() => useLocationTracking());
+        await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
+        expect(navigator.permissions.query).not.toHaveBeenCalled();
+        expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      } finally {
+        mockNavigatorProperty('userAgent', originalUserAgent);
+      }
+    });
+  });
+
+  describe('web browsers keep the Permissions API gate', () => {
+    it("shows the request button on 'prompt' and never consults the native bridge", async () => {
+      (navigator.permissions.query as jest.Mock).mockResolvedValue({
+        state: 'prompt',
+        addEventListener: jest.fn(),
+      });
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
+      expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+      expect(mockCheckNativeLocationPermission).not.toHaveBeenCalled();
+    });
+
+    it('still asks the browser when the request button is tapped', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+      await act(async () => {
+        await result.current.requestLocationPermission();
+      });
+      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+      expect(mockCheckNativeLocationPermission).not.toHaveBeenCalled();
     });
   });
 

@@ -8,10 +8,14 @@
 
 const mockStartBridge = jest.fn();
 const mockStopBridge = jest.fn();
+const mockResolveIssue = jest.fn();
+const mockRefresh = jest.fn();
 
 jest.mock('../capacitor-tracking', () => ({
   startNativeShiftTracking: (...args: unknown[]) => mockStartBridge(...args),
   stopNativeShiftTracking: (...args: unknown[]) => mockStopBridge(...args),
+  resolveLocationIssue: (...args: unknown[]) => mockResolveIssue(...args),
+  refreshNativeLocationPermission: (...args: unknown[]) => mockRefresh(...args),
 }));
 
 jest.mock('@/utils/supabase/client', () => ({
@@ -25,7 +29,10 @@ jest.mock('@/utils/supabase/client', () => ({
 }));
 
 import {
+  checkNativeLocationPermission,
   isCapacitorNative,
+  resolveNativeLocationIssue,
+  retryNativeShiftTracking,
   startNativeShiftTrackingForDriver,
   stopNativeShiftTrackingForDriver,
 } from '../native-shift-tracking';
@@ -88,5 +95,36 @@ describe('native-shift-tracking', () => {
     enterNativeShell();
     await stopNativeShiftTrackingForDriver();
     expect(mockStopBridge).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the location-issue action and retries inside the native shell only', async () => {
+    await resolveNativeLocationIssue();
+    await retryNativeShiftTracking();
+    expect(mockResolveIssue).not.toHaveBeenCalled();
+    expect(mockStartBridge).not.toHaveBeenCalled();
+
+    enterNativeShell();
+    fetchMock.mockResolvedValue({ ok: false, status: 401 });
+    await resolveNativeLocationIssue();
+    expect(mockResolveIssue).toHaveBeenCalledTimes(1);
+
+    await retryNativeShiftTracking();
+    expect(mockStartBridge).toHaveBeenCalledTimes(1);
+  });
+
+  it('only reads the native permission inside the native shell', async () => {
+    await expect(checkNativeLocationPermission({ explain: true })).resolves.toBeNull();
+    expect(mockRefresh).not.toHaveBeenCalled();
+
+    enterNativeShell();
+    mockRefresh.mockResolvedValue('granted');
+    await expect(checkNativeLocationPermission({ explain: false })).resolves.toBe('granted');
+    expect(mockRefresh).toHaveBeenCalledWith({ explain: false });
+  });
+
+  it('treats a bridge failure as "no native answer"', async () => {
+    enterNativeShell();
+    mockRefresh.mockRejectedValue(new Error('boom'));
+    await expect(checkNativeLocationPermission({ explain: true })).resolves.toBeNull();
   });
 });

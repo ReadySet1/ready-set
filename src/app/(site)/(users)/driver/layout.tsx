@@ -5,6 +5,7 @@ import { DriverTrackingProvider } from '@/contexts/DriverTrackingContext';
 import { DriverThemeProvider } from '@/components/Driver/ui/DriverThemeProvider';
 import { BottomNav } from '@/components/Driver/ui/BottomNav';
 import { ShiftPill } from '@/components/Driver/ui/ShiftPill';
+import { NativeLocationPrompt } from '@/components/Driver/NativeLocationPrompt';
 
 // Dynamically import LocationSimulator only in development
 // This ensures it's tree-shaken in production builds
@@ -26,6 +27,7 @@ export default function DriverLayout({ children }: DriverLayoutProps) {
         {children}
         <ShiftPill />
         <BottomNav />
+        <NativeLocationPrompt />
         {process.env.NODE_ENV === 'development' && <LocationSimulator />}
       </DriverThemeProvider>
     </DriverTrackingProvider>
