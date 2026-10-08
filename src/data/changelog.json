@@ -3,6 +3,26 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.10.1",
+      "date": "2026-10-08",
+      "title": "Release 2.10.1",
+      "summary": "",
+      "changes": [
+        {
+          "text": "The Android driver app no longer asks for location permission every time you open it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Admins can now permanently delete a user; the deletion no longer fails silently.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.10.1"
+      }
+    },
+    {
       "version": "2.10.0",
       "date": "2026-10-07",
       "title": "Safer order deletion and reliable driver summaries",
