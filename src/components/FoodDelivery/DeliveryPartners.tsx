@@ -109,6 +109,12 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
       alt: "Componere Culinary and Events logo",
       url: "https://www.componere.co/",
     },
+    {
+      name: "Taqueria Los Altos",
+      image: getCloudinaryUrl("food/partners/taquerialosaltos"),
+      alt: "Taqueria Los Altos logo",
+      url: "https://taquerialosaltossf.com/",
+    },
   ];
 
 const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
@@ -176,7 +182,7 @@ const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
               {partners.slice(8).map((partner, index) => (
                 <motion.div
                   key={partner.name}
-                  className="flex w-[calc(50%-12px)] items-center justify-center md:w-[calc(25%-24px)]"
+                  className="flex w-[calc(50%-12px)] items-center justify-center md:w-[calc(25%-24px)] lg:w-[calc(25%-30px)]"
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
