@@ -851,6 +851,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   // vendor/client, null otherwise.
   type EditMode = "full" | "customer" | null;
   const editMode: EditMode = (() => {
+    if (!rolesLoaded) return null;
     if (userCanEditOrder()) return "full";
     if (
       canEditOrder &&
