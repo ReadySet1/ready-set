@@ -201,6 +201,46 @@ describe("CustomerEditOrderDialog", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it("shows error toast for non-409 HTTP errors", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () =>
+        Promise.resolve({ message: "Validation failed" }),
+    });
+
+    renderDialog();
+    const user = userEvent.setup();
+
+    const headcountInput = screen.getByLabelText("Headcount");
+    await user.clear(headcountInput);
+    await user.type(headcountInput, "40");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Validation failed");
+    });
+  });
+
+  it("shows network error toast when fetch rejects", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    const { onSaveSuccess } = renderDialog();
+    const user = userEvent.setup();
+
+    const headcountInput = screen.getByLabelText("Headcount");
+    await user.clear(headcountInput);
+    await user.type(headcountInput, "40");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Network error — please try again",
+      );
+    });
+    expect(onSaveSuccess).not.toHaveBeenCalled();
+  });
+
   it("on 409 response: shows error and calls onSaveSuccess to refresh", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
