@@ -5,15 +5,19 @@
     {
       "version": "2.10.1",
       "date": "2026-10-08",
-      "title": "Release 2.10.1",
-      "summary": "",
+      "title": "Smoother driver start and accurate order times",
+      "summary": "Android drivers go straight to Start shift, editing an order keeps its time, and permanently deleting a user works.",
       "changes": [
         {
           "text": "The Android driver app no longer asks for location permission every time you open it.",
           "type": "fixed"
         },
         {
-          "text": "Admins can now permanently delete a user; the deletion no longer fails silently.",
+          "text": "Editing an order now shows and saves its times in Pacific time, so they no longer shift when you edit.",
+          "type": "fixed"
+        },
+        {
+          "text": "Admins can now permanently delete a user.",
           "type": "fixed"
         }
       ],
