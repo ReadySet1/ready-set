@@ -106,10 +106,11 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
 
     let order: Order | null = null;
 
-    // Try to find catering request (case-insensitive + soft delete filter)
+    // Try to find catering request (case-insensitive + soft delete + ownership filter)
     const cateringRequest = await prisma.cateringRequest.findFirst({
       where: {
         orderNumber: { equals: order_number, mode: 'insensitive' },
+        userId: user.id,
         deletedAt: null,
       },
       include: {
@@ -137,10 +138,11 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
         order_type: "catering",
       };
     } else {
-      // If not found, try to find on-demand order (case-insensitive + soft delete filter)
+      // If not found, try to find on-demand order (case-insensitive + soft delete + ownership filter)
       const onDemandOrder = await prisma.onDemand.findFirst({
         where: {
           orderNumber: { equals: order_number, mode: 'insensitive' },
+          userId: user.id,
           deletedAt: null,
         },
         include: {

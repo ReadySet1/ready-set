@@ -29,7 +29,7 @@ const getResendClient = () => {
 };
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001";
+  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const fromEmail =
   process.env.EMAIL_FROM || "solutions@updates.readysetllc.com";
 
