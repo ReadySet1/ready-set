@@ -7,6 +7,14 @@ import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { setNativePostThrottleMs } from '@/lib/tracking/capacitor-tracking';
 import { createMotionState, nextMotionState } from '@/lib/tracking/motion-state';
 import { readBatteryLevel } from '@/lib/tracking/battery';
+import {
+  checkNativeLocationPermission,
+  isCapacitorNative,
+} from '@/lib/tracking/native-shift-tracking';
+import {
+  getNativeLocationIssue,
+  subscribeNativeLocationIssue,
+} from '@/lib/tracking/native-location-issue';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 
 interface UseLocationTrackingReturn {
@@ -120,6 +128,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
+  // Live mirror for long-lived subscribers (native location-issue listener).
+  const permissionStateRef = useRef(permissionState);
+  permissionStateRef.current = permissionState;
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
@@ -668,6 +679,20 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     setIsRequestingPermission(true);
     setError(null);
 
+    // Native wrapper: getCurrentPosition below would make the WebView pop the
+    // Android permission dialog with no context. If the OS permission is
+    // missing, show the in-app explanation instead (its button is the only path
+    // to the OS dialog) and report not-granted. No native answer (web, iOS
+    // wrapper) → the web flow below, unchanged.
+    if (isCapacitorNative()) {
+      const native = await checkNativeLocationPermission({ explain: true });
+      if (native === 'not-granted') {
+        setPermissionState('prompt');
+        setIsRequestingPermission(false);
+        return false;
+      }
+    }
+
     try {
       // This call MUST be triggered by user interaction for iOS Safari to show the prompt
       const position = await getCurrentPosition();
@@ -733,51 +758,95 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       return;
     }
 
-    // For ALL iOS browsers, we can't reliably check permissions without user interaction
-    // All iOS browsers use WebKit and have the same limitation
-    // Set state to 'prompt' and wait for user to explicitly request
-    if (isIOSBrowser()) {
-      setPermissionState('prompt');
-      // Don't auto-request on iOS - it won't work without user interaction
-      return;
-    }
+    const runWebPermissionCheck = () => {
+      // For ALL iOS browsers, we can't reliably check permissions without user interaction
+      // All iOS browsers use WebKit and have the same limitation
+      // Set state to 'prompt' and wait for user to explicitly request
+      if (isIOSBrowser()) {
+        setPermissionState('prompt');
+        // Don't auto-request on iOS - it won't work without user interaction
+        return;
+      }
 
-    // For other browsers, try to check permission state
-    try {
-      if ('permissions' in navigator && (navigator as any).permissions?.query) {
-        (navigator as any).permissions
-          .query({ name: 'geolocation' as PermissionName })
-          .then((status: PermissionStatus) => {
-            setPermissionState(status.state as 'prompt' | 'granted' | 'denied');
-            if (status.state === 'denied') {
-              setError('Location permission is denied. Enable it in your browser settings.');
-            } else if (status.state === 'granted') {
-              // Permission already granted, get initial location
-              updateLocationManually();
-            }
-            // Listen for permission changes
-            status.addEventListener('change', () => {
+      // For other browsers, try to check permission state
+      try {
+        if ('permissions' in navigator && (navigator as any).permissions?.query) {
+          (navigator as any).permissions
+            .query({ name: 'geolocation' as PermissionName })
+            .then((status: PermissionStatus) => {
               setPermissionState(status.state as 'prompt' | 'granted' | 'denied');
-              if (status.state === 'granted') {
-                setError(null);
+              if (status.state === 'denied') {
+                setError('Location permission is denied. Enable it in your browser settings.');
+              } else if (status.state === 'granted') {
+                // Permission already granted, get initial location
                 updateLocationManually();
               }
+              // Listen for permission changes
+              status.addEventListener('change', () => {
+                setPermissionState(status.state as 'prompt' | 'granted' | 'denied');
+                if (status.state === 'granted') {
+                  setError(null);
+                  updateLocationManually();
+                }
+              });
+            })
+            .catch(() => {
+              // Permissions API not reliable, try getting location directly
+              setPermissionState('unknown');
+              updateLocationManually();
             });
-          })
-          .catch(() => {
-            // Permissions API not reliable, try getting location directly
-            setPermissionState('unknown');
-            updateLocationManually();
-          });
-      } else {
-        // No Permissions API, try getting location directly
+        } else {
+          // No Permissions API, try getting location directly
+          setPermissionState('unknown');
+          updateLocationManually();
+        }
+      } catch {
         setPermissionState('unknown');
         updateLocationManually();
       }
-    } catch {
-      setPermissionState('unknown');
-      updateLocationManually();
+    };
+
+    // Native wrapper: the Android WebView's Permissions API answers 'prompt' on
+    // every run (it doesn't persist web-permission state), which used to park
+    // the driver on the "Request location permission" button even with the OS
+    // permission granted. Trust the native permission instead; never prompt
+    // from here. No native answer (iOS wrapper, bridge failure) → web flow.
+    if (isCapacitorNative()) {
+      let cancelled = false;
+      void checkNativeLocationPermission({ explain: false }).then((native) => {
+        if (cancelled) return;
+        if (native === 'granted') {
+          setPermissionState('granted');
+          updateLocationManually();
+        } else if (native === 'not-granted') {
+          setPermissionState('prompt');
+        } else {
+          runWebPermissionCheck();
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
+
+    runWebPermissionCheck();
+  }, [updateLocationManually]);
+
+  // Native wrapper: when the in-app location explanation closes (the driver
+  // granted via its button, or came back from Settings), re-read the native
+  // permission and pick up the first fix — the WebView fires no permission
+  // 'change' event for an OS-level grant.
+  useEffect(() => {
+    if (!isCapacitorNative()) return;
+    return subscribeNativeLocationIssue(() => {
+      if (getNativeLocationIssue() !== null) return;
+      if (permissionStateRef.current === 'granted') return;
+      void checkNativeLocationPermission({ explain: false }).then((native) => {
+        if (native !== 'granted' || !isMountedRef.current) return;
+        setPermissionState('granted');
+        void updateLocationManually();
+      });
+    });
   }, [updateLocationManually]);
 
   // Cleanup on unmount

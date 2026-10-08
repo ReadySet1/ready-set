@@ -6,27 +6,37 @@
  */
 
 let mockIsNative = true;
+let mockPlatform = 'android';
 const mockAddWatcher = jest.fn();
 const mockRemoveWatcher = jest.fn();
 const mockOpenSettings = jest.fn();
+const mockCheckPermissions = jest.fn();
+const mockRequestPermissions = jest.fn();
 
 jest.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => mockIsNative },
+  Capacitor: {
+    isNativePlatform: () => mockIsNative,
+    getPlatform: () => mockPlatform,
+  },
   registerPlugin: () => ({
     addWatcher: (...args: unknown[]) => mockAddWatcher(...args),
     removeWatcher: (...args: unknown[]) => mockRemoveWatcher(...args),
     openSettings: (...args: unknown[]) => mockOpenSettings(...args),
+    checkPermissions: (...args: unknown[]) => mockCheckPermissions(...args),
+    requestPermissions: (...args: unknown[]) => mockRequestPermissions(...args),
   }),
 }));
 
 type Bridge = typeof import('../capacitor-tracking');
+type IssueStore = typeof import('../native-location-issue');
 type WatcherCallback = (
   location?: Record<string, unknown>,
-  error?: { code?: string },
+  error?: { code?: string; message?: string },
 ) => Promise<void>;
 
 describe('capacitor-tracking', () => {
   let bridge: Bridge;
+  let issues: IssueStore;
   let nowMs: number;
   let watcherCallback: WatcherCallback;
 
@@ -63,6 +73,10 @@ describe('capacitor-tracking', () => {
     jest.resetModules();
     jest.clearAllMocks();
     mockIsNative = true;
+    mockPlatform = 'android';
+    mockCheckPermissions.mockResolvedValue({ location: 'granted' });
+    mockRequestPermissions.mockResolvedValue({ location: 'granted' });
+    window.localStorage.clear();
     nowMs = 1_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => nowMs);
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -74,6 +88,8 @@ describe('capacitor-tracking', () => {
     mockRemoveWatcher.mockResolvedValue(undefined);
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     bridge = require('../capacitor-tracking');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    issues = require('../native-location-issue');
   });
 
   afterEach(() => {
@@ -197,6 +213,228 @@ describe('capacitor-tracking', () => {
       await bridge.startNativeShiftTracking(session());
       await emitFix();
       expect(postedBody()).toHaveProperty('battery_level', null);
+    });
+  });
+
+  describe('location readiness (android-location-prompt-every-run)', () => {
+    /** Let the async error branch of the watcher callback settle. */
+    async function emitError(code: string, message: string) {
+      await watcherCallback(undefined, { code, message });
+      await Promise.resolve();
+    }
+
+    describe('Android', () => {
+      it('starts silently when permission is granted and Location is on', async () => {
+        await bridge.startNativeShiftTracking(session());
+
+        expect(mockCheckPermissions).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher).toHaveBeenCalledTimes(1);
+        // Never let the plugin pop the OS dialog on its own — we already know.
+        expect(mockAddWatcher.mock.calls[0]![0]).toMatchObject({
+          requestPermissions: false,
+        });
+        expect(issues.getNativeLocationIssue()).toBeNull();
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+
+        await emitFix();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('explains instead of prompting when the permission was permanently denied', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'denied' });
+        await bridge.startNativeShiftTracking(session());
+
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+        expect(issues.getNativeLocationIssue()).toBe('permission-blocked');
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+
+        // The explanation's button is the only thing that opens Settings.
+        await bridge.resolveLocationIssue();
+        expect(mockOpenSettings).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+      });
+
+      it('flags Location services off without bouncing the driver to app settings', async () => {
+        await bridge.startNativeShiftTracking(session());
+        await emitError('NOT_AUTHORIZED', 'Location services disabled.');
+
+        expect(issues.getNativeLocationIssue()).toBe('location-off');
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+        // The rejected watcher is torn down so a retry can re-arm.
+        expect(mockRemoveWatcher).toHaveBeenCalledWith({ id: 'watcher-1' });
+
+        // The button re-checks and re-arms (Location turned on meanwhile).
+        await bridge.resolveLocationIssue();
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+        expect(mockAddWatcher).toHaveBeenCalledTimes(2);
+        expect(issues.getNativeLocationIssue()).toBeNull();
+      });
+
+      it('asks for a first-time grant only after the explanation button is tapped', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+        await bridge.startNativeShiftTracking(session());
+
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+        expect(mockRequestPermissions).not.toHaveBeenCalled();
+        expect(issues.getNativeLocationIssue()).toBe('permission-needed');
+
+        // Tap → OS dialog → driver grants → watcher arms without re-asking.
+        mockCheckPermissions.mockResolvedValue({ location: 'granted' });
+        await bridge.resolveLocationIssue();
+        expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher.mock.calls[0]![0]).toMatchObject({
+          requestPermissions: false,
+        });
+        expect(issues.getNativeLocationIssue()).toBeNull();
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+      });
+
+      it('recognises an expired "Only this time" grant on a later run', async () => {
+        await bridge.startNativeShiftTracking(session()); // granted run
+        await bridge.stopNativeShiftTracking();
+
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+        await bridge.startNativeShiftTracking(session());
+
+        expect(issues.getNativeLocationIssue()).toBe('permission-expired');
+        expect(mockAddWatcher).toHaveBeenCalledTimes(1); // only the first run
+      });
+
+      it('falls back to the settings explanation when the OS dialog is denied for good', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+        await bridge.startNativeShiftTracking(session());
+
+        mockCheckPermissions.mockResolvedValue({ location: 'denied' });
+        await bridge.resolveLocationIssue();
+
+        expect(issues.getNativeLocationIssue()).toBe('permission-blocked');
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+      });
+
+      it('keeps offering the OS dialog when it can still be shown', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+        await bridge.startNativeShiftTracking(session());
+
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt-with-rationale' });
+        await bridge.resolveLocationIssue();
+
+        expect(issues.getNativeLocationIssue()).toBe('permission-needed');
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+      });
+
+      it('falls back to the plugin prompt when the permission check is unavailable', async () => {
+        mockCheckPermissions.mockRejectedValue(new Error('not implemented'));
+        await bridge.startNativeShiftTracking(session());
+
+        expect(mockAddWatcher).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher.mock.calls[0]![0]).toMatchObject({
+          requestPermissions: true,
+        });
+      });
+
+      it('grants before any shift (Track screen) without arming a watcher', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+        await expect(
+          bridge.refreshNativeLocationPermission({ explain: true }),
+        ).resolves.toBe('not-granted');
+        expect(issues.getNativeLocationIssue()).toBe('permission-needed');
+
+        mockCheckPermissions.mockResolvedValue({ location: 'granted' });
+        await bridge.resolveLocationIssue();
+
+        expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
+        expect(issues.getNativeLocationIssue()).toBeNull();
+        expect(mockAddWatcher).not.toHaveBeenCalled();
+      });
+
+      describe('refreshNativeLocationPermission (web tracker gate)', () => {
+        it('reports granted without prompting or explaining', async () => {
+          await expect(
+            bridge.refreshNativeLocationPermission({ explain: true }),
+          ).resolves.toBe('granted');
+          expect(issues.getNativeLocationIssue()).toBeNull();
+          expect(mockRequestPermissions).not.toHaveBeenCalled();
+        });
+
+        it('stays quiet when not asked to explain (app launch)', async () => {
+          mockCheckPermissions.mockResolvedValue({ location: 'prompt' });
+          await expect(
+            bridge.refreshNativeLocationPermission({ explain: false }),
+          ).resolves.toBe('not-granted');
+          expect(issues.getNativeLocationIssue()).toBeNull();
+          expect(mockRequestPermissions).not.toHaveBeenCalled();
+        });
+
+        it('clears a stale permission explanation once granted', async () => {
+          issues.setNativeLocationIssue('permission-blocked');
+          await bridge.refreshNativeLocationPermission({ explain: false });
+          expect(issues.getNativeLocationIssue()).toBeNull();
+        });
+
+        it('returns null when the state cannot be read', async () => {
+          mockCheckPermissions.mockRejectedValue(new Error('not implemented'));
+          await expect(
+            bridge.refreshNativeLocationPermission({ explain: true }),
+          ).resolves.toBeNull();
+        });
+      });
+
+      it('clears any pending explanation on stop', async () => {
+        mockCheckPermissions.mockResolvedValue({ location: 'denied' });
+        await bridge.startNativeShiftTracking(session());
+        expect(issues.getNativeLocationIssue()).toBe('permission-blocked');
+
+        await bridge.stopNativeShiftTracking();
+        expect(issues.getNativeLocationIssue()).toBeNull();
+      });
+    });
+
+    describe('iOS', () => {
+      beforeEach(() => {
+        mockPlatform = 'ios';
+      });
+
+      it('keeps the existing start flow (no pre-check, plugin requests permission)', async () => {
+        await bridge.startNativeShiftTracking(session());
+
+        expect(mockCheckPermissions).not.toHaveBeenCalled();
+        expect(mockAddWatcher).toHaveBeenCalledTimes(1);
+        expect(mockAddWatcher.mock.calls[0]![0]).toMatchObject({
+          requestPermissions: true,
+        });
+      });
+
+      it('has no native permission check (falls back to the web flow)', async () => {
+        await expect(
+          bridge.refreshNativeLocationPermission({ explain: true }),
+        ).resolves.toBeNull();
+        expect(mockCheckPermissions).not.toHaveBeenCalled();
+      });
+
+      it('explains a denial before opening Settings', async () => {
+        await bridge.startNativeShiftTracking(session());
+        await emitError('NOT_AUTHORIZED', 'Permission denied.');
+
+        expect(mockOpenSettings).not.toHaveBeenCalled();
+        expect(issues.getNativeLocationIssue()).toBe('permission-blocked');
+
+        await bridge.resolveLocationIssue();
+        expect(mockOpenSettings).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('does nothing in a plain browser', async () => {
+      mockIsNative = false;
+      await bridge.startNativeShiftTracking(session());
+
+      expect(mockCheckPermissions).not.toHaveBeenCalled();
+      expect(mockAddWatcher).not.toHaveBeenCalled();
+      expect(issues.getNativeLocationIssue()).toBeNull();
+      await expect(
+        bridge.refreshNativeLocationPermission({ explain: true }),
+      ).resolves.toBeNull();
     });
   });
 });
