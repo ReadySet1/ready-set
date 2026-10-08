@@ -3,6 +3,30 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.10.1",
+      "date": "2026-10-08",
+      "title": "Smoother driver start and accurate order times",
+      "summary": "Android drivers go straight to Start shift, editing an order keeps its time, and permanently deleting a user works.",
+      "changes": [
+        {
+          "text": "The Android driver app no longer asks for location permission every time you open it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Editing an order now shows and saves its times in Pacific time, so they no longer shift when you edit.",
+          "type": "fixed"
+        },
+        {
+          "text": "Admins can now permanently delete a user.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.10.1"
+      }
+    },
+    {
       "version": "2.10.0",
       "date": "2026-10-07",
       "title": "Safer order deletion and reliable driver summaries",
