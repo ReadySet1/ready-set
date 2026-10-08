@@ -28,7 +28,7 @@ export interface ReturnRequestRow {
   requestedAt: string;
 }
 
-const REASON_LABELS: Record<string, string> = {
+export const RETURN_REASON_LABELS: Record<string, string> = {
   CANNOT_MAKE_PICKUP: "Can't make the pickup",
   VEHICLE_ISSUE: 'Vehicle issue',
   EMERGENCY: 'Emergency',
@@ -170,7 +170,7 @@ export default function ReturnRequestsPanel({ className }: ReturnRequestsPanelPr
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Reason: </span>
-                    {REASON_LABELS[request.reason] ?? request.reason}
+                    {RETURN_REASON_LABELS[request.reason] ?? request.reason}
                   </div>
                   {request.details ? (
                     <div className="text-sm text-muted-foreground italic">
