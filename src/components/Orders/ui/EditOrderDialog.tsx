@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import { utcToLocalTime, setZonedTime, setZonedDate, zonedCalendarDay } from "@/lib/utils/timezone";
 import {
   Dialog,
   DialogContent,
@@ -181,42 +182,39 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           <PopoverContent className="z-[1100] w-auto p-0" align="start" sideOffset={4}>
             <Calendar
               mode="single"
-              selected={value || undefined}
-              onSelect={(date) => {
-                if (!date) {
-                  setValue(fieldName, null);
+              selected={value ? zonedCalendarDay(value) : undefined}
+              defaultMonth={value ? zonedCalendarDay(value) : undefined}
+              onSelect={(day) => {
+                if (!day) {
+                  setValue(fieldName, null, { shouldDirty: true });
                   return;
                 }
-                const currentValue = watch(fieldName);
-                const newDate = new Date(date);
-                if (currentValue) {
-                  newDate.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
-                } else {
-                  newDate.setHours(12, 0, 0, 0);
-                }
-                setValue(fieldName, newDate, { shouldDirty: true });
+                setValue(
+                  fieldName,
+                  setZonedDate(watch(fieldName) ?? null, format(day, "yyyy-MM-dd")),
+                  { shouldDirty: true },
+                );
               }}
               captionLayout="dropdown"
-              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              disabled={(day) =>
+                format(day, "yyyy-MM-dd") < utcToLocalTime(new Date()).date
+              }
             />
             <div className="border-t p-4">
               <div className="flex items-center gap-4">
-                <Label className="min-w-fit">Time</Label>
+                <Label className="min-w-fit">Time (PT)</Label>
                 <Input
                   type="time"
                   className="w-full"
-                  value={value ? format(value, "HH:mm") : ""}
+                  value={value ? utcToLocalTime(value).time : ""}
                   onChange={(e) => {
                     const timeValue = e.target.value;
-                    if (!timeValue || !timeValue.includes(":")) return;
-                    const parts = timeValue.split(":");
-                    const hours = parseInt(parts[0] ?? "0", 10);
-                    const minutes = parseInt(parts[1] ?? "0", 10);
-                    if (isNaN(hours) || isNaN(minutes)) return;
-                    const currentDate = watch(fieldName) || new Date();
-                    const newDate = new Date(currentDate);
-                    newDate.setHours(hours, minutes, 0, 0);
-                    setValue(fieldName, newDate, { shouldDirty: true });
+                    if (!/^\d{2}:\d{2}$/.test(timeValue)) return;
+                    setValue(
+                      fieldName,
+                      setZonedTime(watch(fieldName) ?? new Date(), timeValue),
+                      { shouldDirty: true },
+                    );
                   }}
                 />
               </div>
