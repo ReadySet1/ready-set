@@ -1,14 +1,13 @@
 import {
   customerOrderEditSchema,
   getCustomerEditBlockReason,
-  CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES,
+  CUSTOMER_EDITABLE_ORDER_STATUSES,
   MAX_HEADCOUNT,
   MAX_ORDER_TOTAL,
   type CustomerEditableOrder,
 } from "../customer-order-edit";
 
-// Server-only import — safe in a test file, not in the production module.
-import { POST_PICKUP_DRIVER_STATUSES } from "@/lib/services/return-requests";
+import { ORDER_TRANSITIONS } from "@/lib/state-machine/order-state";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -232,45 +231,31 @@ describe("customerOrderEditSchema", () => {
 // ---------------------------------------------------------------------------
 
 describe("getCustomerEditBlockReason", () => {
-  it("returns null for an editable order", () => {
-    expect(getCustomerEditBlockReason(editableOrder(), "user-1")).toBeNull();
+  // ---- Editable (returns null) -------------------------------------------
+
+  it.each(["PENDING", "CONFIRMED", "ACTIVE"])(
+    "returns null for %s status with null driverStatus",
+    (status) => {
+      expect(
+        getCustomerEditBlockReason(
+          editableOrder({ status, driverStatus: null }),
+          "user-1",
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it("returns null when driverStatus is undefined", () => {
+    const order: CustomerEditableOrder = {
+      order_type: "catering",
+      userId: "user-1",
+      status: "ACTIVE",
+      // driverStatus intentionally omitted
+    };
+    expect(getCustomerEditBlockReason(order, "user-1")).toBeNull();
   });
 
-  it("returns null when driverStatus is null", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: null }),
-        "user-1",
-      ),
-    ).toBeNull();
-  });
-
-  it("returns null when driverStatus is ASSIGNED", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "ASSIGNED" }),
-        "user-1",
-      ),
-    ).toBeNull();
-  });
-
-  it("returns null when driverStatus is EN_ROUTE_TO_VENDOR", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "EN_ROUTE_TO_VENDOR" }),
-        "user-1",
-      ),
-    ).toBeNull();
-  });
-
-  it("returns null when driverStatus is ARRIVED_AT_VENDOR", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "ARRIVED_AT_VENDOR" }),
-        "user-1",
-      ),
-    ).toBeNull();
-  });
+  // ---- NOT_CATERING ------------------------------------------------------
 
   it("returns NOT_CATERING for on_demand orders", () => {
     expect(
@@ -280,6 +265,8 @@ describe("getCustomerEditBlockReason", () => {
       ),
     ).toBe("NOT_CATERING");
   });
+
+  // ---- NOT_OWNER ---------------------------------------------------------
 
   it("returns NOT_OWNER when userId does not match", () => {
     expect(
@@ -296,78 +283,66 @@ describe("getCustomerEditBlockReason", () => {
     ).toBe("NOT_OWNER");
   });
 
-  it("returns TERMINAL_STATUS for COMPLETED", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ status: "COMPLETED" }),
-        "user-1",
-      ),
-    ).toBe("TERMINAL_STATUS");
-  });
+  // ---- STATUS_NOT_EDITABLE -----------------------------------------------
 
-  it("returns TERMINAL_STATUS for DELIVERED", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ status: "DELIVERED" }),
-        "user-1",
-      ),
-    ).toBe("TERMINAL_STATUS");
-  });
+  it.each([
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "DELIVERED",
+    "COMPLETED",
+    "CANCELLED",
+  ])(
+    "returns STATUS_NOT_EDITABLE for %s",
+    (status) => {
+      expect(
+        getCustomerEditBlockReason(
+          editableOrder({ status, driverStatus: null }),
+          "user-1",
+        ),
+      ).toBe("STATUS_NOT_EDITABLE");
+    },
+  );
 
-  it("returns TERMINAL_STATUS for CANCELLED", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ status: "CANCELLED" }),
-        "user-1",
-      ),
-    ).toBe("TERMINAL_STATUS");
-  });
+  // ---- DRIVER_ASSIGNED ---------------------------------------------------
 
-  it("returns ALREADY_PICKED_UP for driverStatus PICKED_UP", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "PICKED_UP" }),
-        "user-1",
-      ),
-    ).toBe("ALREADY_PICKED_UP");
-  });
-
-  it("returns ALREADY_PICKED_UP for driverStatus EN_ROUTE_TO_CLIENT", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "EN_ROUTE_TO_CLIENT" }),
-        "user-1",
-      ),
-    ).toBe("ALREADY_PICKED_UP");
-  });
-
-  it("returns ALREADY_PICKED_UP for driverStatus ARRIVED_TO_CLIENT", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "ARRIVED_TO_CLIENT" }),
-        "user-1",
-      ),
-    ).toBe("ALREADY_PICKED_UP");
-  });
-
-  it("returns ALREADY_PICKED_UP for driverStatus COMPLETED", () => {
-    expect(
-      getCustomerEditBlockReason(
-        editableOrder({ driverStatus: "COMPLETED" }),
-        "user-1",
-      ),
-    ).toBe("ALREADY_PICKED_UP");
-  });
+  it.each([
+    "ASSIGNED",
+    "EN_ROUTE_TO_VENDOR",
+    "ARRIVED_AT_VENDOR",
+    "PICKED_UP",
+    "EN_ROUTE_TO_CLIENT",
+    "ARRIVED_TO_CLIENT",
+    "COMPLETED",
+  ])(
+    "returns DRIVER_ASSIGNED when driverStatus is %s (on an ACTIVE order)",
+    (driverStatus) => {
+      expect(
+        getCustomerEditBlockReason(
+          editableOrder({ status: "ACTIVE", driverStatus }),
+          "user-1",
+        ),
+      ).toBe("DRIVER_ASSIGNED");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
-// Drift guard
+// Drift guard — CUSTOMER_EDITABLE_ORDER_STATUSES vs ORDER_TRANSITIONS
 // ---------------------------------------------------------------------------
 
 describe("drift guard", () => {
-  it("CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES matches POST_PICKUP_DRIVER_STATUSES", () => {
-    expect([...CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES]).toEqual(
-      POST_PICKUP_DRIVER_STATUSES,
-    );
+  it("every editable status can transition to ASSIGNED in ORDER_TRANSITIONS", () => {
+    for (const status of CUSTOMER_EDITABLE_ORDER_STATUSES) {
+      const targets = ORDER_TRANSITIONS[status as keyof typeof ORDER_TRANSITIONS];
+      expect(targets).toContain("ASSIGNED");
+    }
+  });
+
+  it("no non-editable status can transition to ASSIGNED", () => {
+    const editableSet = new Set<string>(CUSTOMER_EDITABLE_ORDER_STATUSES);
+    for (const [status, targets] of Object.entries(ORDER_TRANSITIONS)) {
+      if (editableSet.has(status)) continue;
+      expect(targets).not.toContain("ASSIGNED");
+    }
   });
 });

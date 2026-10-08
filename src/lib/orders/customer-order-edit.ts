@@ -20,15 +20,15 @@ export const MAX_HEADCOUNT = 2_147_483_647; // INT4 ceiling
 export const MAX_ORDER_TOTAL = 99_999_999.99; // Decimal(10,2) ceiling
 
 /**
- * Driver statuses from pickup onward. Mirrors POST_PICKUP_DRIVER_STATUSES
- * from `@/lib/services/return-requests` (server-only module — do not import
- * it here). A drift-guard test asserts the two lists stay in sync.
+ * Order statuses that allow customer editing. These are the three statuses
+ * that precede ASSIGNED in ORDER_TRANSITIONS. Declared locally (not imported
+ * from src/lib/state-machine) to keep this module client-safe; a drift-guard
+ * test pins the list to ORDER_TRANSITIONS.
  */
-export const CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES = [
-  "PICKED_UP",
-  "EN_ROUTE_TO_CLIENT",
-  "ARRIVED_TO_CLIENT",
-  "COMPLETED",
+export const CUSTOMER_EDITABLE_ORDER_STATUSES = [
+  "PENDING",
+  "CONFIRMED",
+  "ACTIVE",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -68,8 +68,8 @@ export type CustomerOrderEdit = z.infer<typeof customerOrderEditSchema>;
 export type CustomerEditBlockReason =
   | "NOT_CATERING"
   | "NOT_OWNER"
-  | "TERMINAL_STATUS"
-  | "ALREADY_PICKED_UP";
+  | "STATUS_NOT_EDITABLE"
+  | "DRIVER_ASSIGNED";
 
 export interface CustomerEditableOrder {
   order_type: "catering" | "on_demand";
@@ -87,21 +87,17 @@ export function getCustomerEditBlockReason(
 
   if (!order.userId || order.userId !== userId) return "NOT_OWNER";
 
+  const upperStatus = order.status.toUpperCase();
   if (
-    TERMINAL_STATUSES.includes(
-      order.status.toUpperCase() as (typeof TERMINAL_STATUSES)[number],
+    !CUSTOMER_EDITABLE_ORDER_STATUSES.includes(
+      upperStatus as (typeof CUSTOMER_EDITABLE_ORDER_STATUSES)[number],
     )
   ) {
-    return "TERMINAL_STATUS";
+    return "STATUS_NOT_EDITABLE";
   }
 
-  if (
-    order.driverStatus &&
-    CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES.includes(
-      order.driverStatus as (typeof CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES)[number],
-    )
-  ) {
-    return "ALREADY_PICKED_UP";
+  if (order.driverStatus != null) {
+    return "DRIVER_ASSIGNED";
   }
 
   return null;

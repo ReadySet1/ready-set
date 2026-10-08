@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
+import { Prisma } from "@prisma/client";
+import { withAuth } from "@/lib/auth-middleware";
 import {
   customerOrderEditSchema,
   getCustomerEditBlockReason,
   CUSTOMER_EDIT_ROLES,
-  CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES,
-  TERMINAL_STATUSES,
+  CUSTOMER_EDITABLE_ORDER_STATUSES,
   leavesCateringPairEmpty,
   CATERING_PAIR_MESSAGE,
 } from "@/lib/orders/customer-order-edit";
@@ -229,39 +230,15 @@ export async function PATCH(
   try {
     const params = await props.params;
 
-    // 1. Auth
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.id) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
+    // 1. Auth + role check
+    const auth = await withAuth(req, {
+      allowedRoles: [...CUSTOMER_EDIT_ROLES],
+      requireAuth: true,
+    });
+    if (!auth.success) return auth.response!;
+    const { user } = auth.context;
 
-    // 2. Role check
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("type, name, email")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const role = String(profile.type).toUpperCase();
-    if (
-      !CUSTOMER_EDIT_ROLES.includes(
-        role as (typeof CUSTOMER_EDIT_ROLES)[number],
-      )
-    ) {
-      return NextResponse.json(
-        { message: "Insufficient permissions" },
-        { status: 403 },
-      );
-    }
-
-    // 3. Parse & validate body
+    // 2. Parse & validate body
     let rawBody: unknown;
     try {
       rawBody = await req.json();
@@ -280,7 +257,7 @@ export async function PATCH(
       );
     }
 
-    // 4. Load the order (ownership enforced in the query)
+    // 3. Load the order (ownership enforced in the query)
     const orderNumber = decodeURIComponent(params.order_number);
     const existing = await prisma.cateringRequest.findFirst({
       where: {
@@ -296,6 +273,7 @@ export async function PATCH(
         headcount: true,
         orderTotal: true,
         userId: true,
+        user: { select: { name: true, email: true } },
       },
     });
 
@@ -306,7 +284,7 @@ export async function PATCH(
       );
     }
 
-    // 5. Editability check
+    // 4. Editability check
     const blockReason = getCustomerEditBlockReason(
       {
         order_type: "catering",
@@ -320,13 +298,17 @@ export async function PATCH(
     );
 
     if (blockReason) {
+      const message =
+        blockReason === "DRIVER_ASSIGNED"
+          ? "A driver is already assigned to this order. Please contact Ready Set for changes."
+          : "This order can no longer be edited";
       return NextResponse.json(
-        { code: "ORDER_NOT_EDITABLE", message: "This order can no longer be edited" },
+        { code: "ORDER_NOT_EDITABLE", message },
         { status: 409 },
       );
     }
 
-    // 6. Pair rule
+    // 5. Pair rule
     if (leavesCateringPairEmpty(existing, parsed.data)) {
       return NextResponse.json(
         { message: CATERING_PAIR_MESSAGE },
@@ -334,8 +316,8 @@ export async function PATCH(
       );
     }
 
-    // 7. Build the data object — only changed fields
-    const data: Record<string, unknown> = {};
+    // 6. Build the data object — only changed fields
+    const data: { headcount?: number | null; orderTotal?: number | null } = {};
     if (parsed.data.headcount !== undefined) {
       if (parsed.data.headcount !== existing.headcount) {
         data.headcount = parsed.data.headcount;
@@ -362,22 +344,75 @@ export async function PATCH(
       });
     }
 
-    // 8. Atomic write — repeat conditions in the WHERE clause
-    const { count } = await prisma.cateringRequest.updateMany({
-      where: {
-        id: existing.id,
-        userId: user.id,
-        deletedAt: null,
-        status: { notIn: [...TERMINAL_STATUSES] },
-        OR: [
-          { driverStatus: null },
-          { driverStatus: { notIn: [...CUSTOMER_EDIT_LOCKED_DRIVER_STATUSES] } },
-        ],
-      },
-      data,
+    // 7. Build audit rows (one per changed field)
+    const formatAuditValue = (
+      field: string,
+      value: number | null | undefined,
+    ): string | null => {
+      if (value == null) return null;
+      return field === "orderTotal" ? value.toFixed(2) : String(value);
+    };
+
+    const auditRows: {
+      cateringRequestId: string;
+      editedBy: string;
+      field: string;
+      oldValue: string | null;
+      newValue: string | null;
+    }[] = [];
+
+    if (data.headcount !== undefined) {
+      auditRows.push({
+        cateringRequestId: existing.id,
+        editedBy: user.id,
+        field: "headcount",
+        oldValue: formatAuditValue("headcount", existing.headcount),
+        newValue: formatAuditValue("headcount", data.headcount),
+      });
+    }
+    if (data.orderTotal !== undefined) {
+      auditRows.push({
+        cateringRequestId: existing.id,
+        editedBy: user.id,
+        field: "orderTotal",
+        oldValue: formatAuditValue(
+          "orderTotal",
+          existing.orderTotal != null ? Number(existing.orderTotal) : null,
+        ),
+        newValue: formatAuditValue("orderTotal", data.orderTotal),
+      });
+    }
+
+    // 8. Atomic write — interactive transaction so audit rows are committed
+    //    with the update or not at all. Compare-and-swap: old values of
+    //    changed fields are in the WHERE clause so a concurrent edit causes
+    //    count=0 instead of logging a stale "old" value.
+    const casWhere: Prisma.CateringRequestWhereInput = {
+      id: existing.id,
+      userId: user.id,
+      deletedAt: null,
+      status: { in: [...CUSTOMER_EDITABLE_ORDER_STATUSES] },
+      driverStatus: null,
+    };
+    if (data.headcount !== undefined) {
+      casWhere.headcount = existing.headcount;
+    }
+    if (data.orderTotal !== undefined) {
+      casWhere.orderTotal = existing.orderTotal;
+    }
+
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const { count } = await tx.cateringRequest.updateMany({
+        where: casWhere,
+        data,
+      });
+      if (count === 0) return { written: false as const };
+
+      await tx.orderEditHistory.createMany({ data: auditRows });
+      return { written: true as const };
     });
 
-    if (count === 0) {
+    if (!result.written) {
       return NextResponse.json(
         { code: "ORDER_NOT_EDITABLE", message: "This order can no longer be edited" },
         { status: 409 },
@@ -422,9 +457,9 @@ export async function PATCH(
       runAfterResponse("customer-order-edit-notification", () =>
         notifyOrderEditedByCustomer({
           orderNumber: existing.orderNumber,
-          editorName: profile.name ?? "Unknown",
-          editorEmail: profile.email ?? user.email ?? "unknown",
-          editorRole: role,
+          editorName: existing.user?.name ?? "Unknown",
+          editorEmail: existing.user?.email ?? user.email ?? "unknown",
+          editorRole: user.type,
           changes,
         }),
       );
