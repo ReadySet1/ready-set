@@ -196,7 +196,7 @@ const CustomerEditOrderDialog: React.FC<CustomerEditOrderDialogProps> = ({
       }
 
       if (!res.ok) {
-        toast.error(body.message ?? "Failed to save changes");
+        toast.error(body.message ?? body.error ?? "Failed to save changes");
         return;
       }
 
@@ -216,8 +216,8 @@ const CustomerEditOrderDialog: React.FC<CustomerEditOrderDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Edit Order</DialogTitle>
           <DialogDescription>
-            Only headcount and order total can be changed here. For anything
-            else, contact Ready Set at{" "}
+            You can update headcount and order total until a driver is assigned.
+            For any other changes, contact Ready Set at{" "}
             <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
               {CONTACT_EMAIL}
             </a>

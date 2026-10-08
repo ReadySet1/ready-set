@@ -296,6 +296,15 @@ describe("Edit Order button on the admin order detail pages", () => {
       mockParams.mockReturnValue({ order_number: "CAT001" });
     });
 
+    it("hides Edit Order while role is still loading, even with canEditOrder=true", async () => {
+      mockUserRole = null; // role not yet resolved
+      mockOrderApi(() => jsonResponse(200, cateringOrder()));
+      renderCatering();
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
     it("still shows Edit Order and opens the dialog with the catering order", async () => {
       mockOrderApi(() => jsonResponse(200, cateringOrder()));
       renderCatering();
@@ -409,6 +418,31 @@ describe("Edit Order button on the admin order detail pages", () => {
           cateringOrder({
             userId: "vendor-owner-id",
             driverStatus: "PICKED_UP",
+          }),
+        ),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
+    it("owner on an ASSIGNED order (driver assigned, not yet picked up) sees no Edit Order button", async () => {
+      mockUserRole = "vendor";
+      mockUserId = "vendor-owner-id";
+      mockOrderApi(() =>
+        jsonResponse(
+          200,
+          cateringOrder({
+            userId: "vendor-owner-id",
+            status: "ACTIVE",
+            driverStatus: "ASSIGNED",
           }),
         ),
       );
