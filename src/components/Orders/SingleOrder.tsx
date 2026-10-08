@@ -31,8 +31,10 @@ import CustomerInfo from "./ui/CustomerInfo";
 import AdditionalInfo from "./ui/AdditionalInfo";
 import DriverAssignmentDialog from "./ui/DriverAssignmentDialog";
 import EditOrderDialog from "./ui/EditOrderDialog";
+import CustomerEditOrderDialog from "./ui/CustomerEditOrderDialog";
 import OrderLocationMap from "./ui/OrderLocationMap";
 import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
+import { getCustomerEditBlockReason } from "@/lib/orders/customer-order-edit";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
@@ -164,6 +166,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCustomerEditDialogOpen, setIsCustomerEditDialogOpen] = useState(false);
   const [isDriverAssigned, setIsDriverAssigned] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
@@ -190,7 +193,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     return decodeURIComponent((pathname ?? "").split("/").pop() || "");
   })();
   const supabase = createClient();
-  const { userRole } = useUser();
+  const { user, userRole } = useUser();
 
   // Cache session per mount cycle to reduce auth lock contention
   const sessionRef = React.useRef<{ session: any; fetchedAt: number } | null>(null);
@@ -844,6 +847,37 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     return userRoles.isAdmin || userRoles.isSuperAdmin || userRoles.isHelpdesk;
   };
 
+  // Derive edit mode: "full" for admin/helpdesk, "customer" for owner
+  // vendor/client, null otherwise.
+  type EditMode = "full" | "customer" | null;
+  const editMode: EditMode = (() => {
+    if (userCanEditOrder()) return "full";
+    if (
+      canEditOrder &&
+      !userRoles.isVendor &&
+      !userRoles.isClient
+    ) {
+      return "full";
+    }
+    if (
+      (userRoles.isVendor || userRoles.isClient) &&
+      user?.id &&
+      order &&
+      getCustomerEditBlockReason(
+        {
+          order_type: order.order_type as "catering" | "on_demand",
+          userId: (order as any).userId ?? null,
+          status: order.status,
+          driverStatus: (order as any).driverStatus ?? null,
+        },
+        user.id,
+      ) === null
+    ) {
+      return "customer";
+    }
+    return null;
+  })();
+
   // Set granular permissions based on user roles
   const effectivePermissions = {
     canViewOrderTitle:
@@ -1248,13 +1282,23 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                 </h2>
               </div>
               <div className="space-y-3 p-6">
-                {/* Edit Order Button - visible for admin/helpdesk when order is not terminal */}
-                {(canEditOrder || userCanEditOrder()) &&
+                {/* Edit Order Button — full dialog for admin/helpdesk, customer dialog for vendor/client owner */}
+                {editMode === "full" &&
                   !TERMINAL_STATUSES.includes(order.status.toUpperCase() as typeof TERMINAL_STATUSES[number]) && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10"
                     onClick={() => setIsEditDialogOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                    Edit Order
+                  </Button>
+                )}
+                {editMode === "customer" && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={() => setIsCustomerEditDialogOpen(true)}
                   >
                     <Pencil className="h-4 w-4 text-primary" />
                     Edit Order
@@ -1316,13 +1360,25 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         onAssignOrEditDriver={handleAssignOrEditDriver}
       />
 
-      {/* Edit Order Dialog */}
-      <EditOrderDialog
-        isOpen={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        order={order}
-        onSaveSuccess={fetchOrderDetails}
-      />
+      {/* Edit Order Dialog — admin/helpdesk full dialog */}
+      {editMode === "full" && (
+        <EditOrderDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          order={order}
+          onSaveSuccess={fetchOrderDetails}
+        />
+      )}
+
+      {/* Customer Edit Order Dialog — vendor/client two-field dialog */}
+      {editMode === "customer" && (
+        <CustomerEditOrderDialog
+          isOpen={isCustomerEditDialogOpen}
+          onOpenChange={setIsCustomerEditDialogOpen}
+          order={order}
+          onSaveSuccess={fetchOrderDetails}
+        />
+      )}
     </div>
   );
 };
