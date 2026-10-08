@@ -57,6 +57,7 @@
     "load-test:driver": "node scripts/load-test/driver-load-test.mjs",
     "test:drive:reset": "dotenv -e .env.local -- tsx scripts/reset-driver-test-drive.ts",
     "driver:account": "dotenv -e .env.local -- tsx scripts/create-driver-account.ts",
+    "driver:account:prod": "dotenv -e .env.prod -- tsx scripts/create-driver-account.ts --prod",
     "db:generate": "dotenv -e .env.local -- npx prisma generate",
     "prisma": "prisma generate",
     "postinstall": "node -e \"if (process.env.PRISMA_SKIP_POSTINSTALL_GENERATE !== 'true' && process.env.CI !== 'true') { try { require('child_process').execSync('prisma generate', { stdio: 'inherit' }); } catch (e) { console.log('Skipping prisma generate in postinstall:', e.message); } }\"",
