@@ -5,6 +5,7 @@ import ScheduleDialog from "../Logistics/Schedule";
 import { FormType } from "../Logistics/QuoteRequest/types";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface BakeryTermsProps {
   onRequestQuote?: (formType: FormType) => void;
@@ -41,7 +42,7 @@ const BakeryTerms = ({
           <ScheduleDialog
             buttonText="Book a Call"
             className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 md:px-6 md:py-3 md:text-lg"
-            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+            calendarUrl={BOOKING_CALENDAR_URL}
           />
         </div>
       </div>
@@ -93,7 +94,7 @@ const BakeryTerms = ({
                 <ScheduleDialog
                   buttonText="Book a Call"
                   className="rounded-lg bg-yellow-400 px-5 py-2.5 text-sm font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:px-6 sm:py-3 sm:text-base"
-                  calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                  calendarUrl={BOOKING_CALENDAR_URL}
                 />
               </div>
             </div>
@@ -161,7 +162,7 @@ const BakeryTerms = ({
           <ScheduleDialog
             buttonText="Hosting Services? Let's Talk"
             className="block w-full rounded-lg bg-yellow-400 px-5 py-2.5 text-center text-sm font-bold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:px-6 sm:text-base md:text-lg"
-            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+            calendarUrl={BOOKING_CALENDAR_URL}
           />
         </div>
       </div>

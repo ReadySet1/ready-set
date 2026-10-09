@@ -1,6 +1,7 @@
 import Image from "next/image";
 import AppointmentDialog from "./Appointment";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface Challenge {
   icon: React.ReactNode;
@@ -104,7 +105,7 @@ const BusinessOverwhelm = () => {
               <div className="mt-6 flex justify-center">
                 <AppointmentDialog
                   buttonVariant="black-small"
-                  calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"
+                  calendarUrl={VA_CONSULTATION_CALENDAR_URL}
                 />
               </div>
             </div>

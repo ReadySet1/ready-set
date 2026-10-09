@@ -9,6 +9,7 @@ import { motion, AnimatePresence, type Variants } from "framer-motion";
 import AppointmentDialog from "../VirtualAssistant/Appointment";
 import dynamic from "next/dynamic";
 import { getPromotionDates } from "@/utils/dates";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 // Framer Motion variants for animations
 const overlayVariants: Variants = {
@@ -56,8 +57,7 @@ const textVariants: Variants = {
 
 const ClientSideConsultationBanner = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const calendarUrl =
-    "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true";
+  const calendarUrl = VA_CONSULTATION_CALENDAR_URL;
   const { formattedDisplay } = getPromotionDates();
 
   useEffect(() => {

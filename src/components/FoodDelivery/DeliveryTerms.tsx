@@ -8,6 +8,7 @@ import ScheduleDialog from "../Logistics/Schedule";
 import { FormType } from "../Logistics/QuoteRequest/types";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface PackageDeliveryProps {
   onRequestQuote?: (formType: FormType) => void;
@@ -50,7 +51,7 @@ const DeliveryTerms = ({ onRequestQuote }: PackageDeliveryProps) => {
               <ScheduleDialog
                 buttonText="Book a Call"
                 className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 md:px-6 md:py-3 md:text-lg"
-                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                calendarUrl={BOOKING_CALENDAR_URL}
               />
             </div>
           </div>

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 const FoodHeader: React.FC = () => {
   const { openForm, DialogForm } = FormManager();
@@ -106,7 +107,7 @@ const FoodHeader: React.FC = () => {
               </motion.button>
               <ScheduleDialog
                 buttonText="Book a Call"
-                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                calendarUrl={BOOKING_CALENDAR_URL}
                 className={heroBtnClasses}
               />
             </motion.div>
