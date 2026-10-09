@@ -69,8 +69,11 @@ export default function DriverStatusList({
       // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = 
-          driver.employeeId.toLowerCase().includes(searchLower) ||
+        // employee_id, vehicle_number and phone_number are nullable columns,
+        // so every field read here must tolerate null.
+        const matchesSearch =
+          driver.name?.toLowerCase().includes(searchLower) ||
+          driver.employeeId?.toLowerCase().includes(searchLower) ||
           driver.vehicleNumber?.toLowerCase().includes(searchLower) ||
           driver.phoneNumber?.includes(searchTerm);
         
@@ -93,7 +96,7 @@ export default function DriverStatusList({
     .sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          return a.employeeId.localeCompare(b.employeeId);
+          return (a.employeeId ?? '').localeCompare(b.employeeId ?? '');
         case 'status':
           if (a.isOnDuty && !b.isOnDuty) return -1;
           if (!a.isOnDuty && b.isOnDuty) return 1;

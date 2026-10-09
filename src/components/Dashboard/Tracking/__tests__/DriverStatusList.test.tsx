@@ -647,6 +647,68 @@ describe('DriverStatusList', () => {
 
       expect(screen.getByText('No drivers match your criteria')).toBeInTheDocument();
     });
+
+    // rs-dev has drivers whose employee_id (and phone/vehicle) columns are
+    // NULL; the live SSE feed passes those nulls straight through.
+    const mockDriverNullIds: TrackedDriver = {
+      ...mockDriver2,
+      id: 'driver-null',
+      employeeId: null,
+      name: 'Test Driver',
+      vehicleNumber: null,
+      phoneNumber: null,
+    };
+
+    it('does not crash when a driver has no employee ID, vehicle or phone', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-input');
+      expect(() =>
+        fireEvent.change(searchInput, { target: { value: 'EMP001' } })
+      ).not.toThrow();
+
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Test Driver')).not.toBeInTheDocument();
+    });
+
+    it('matches drivers by name, case-insensitively', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-input');
+      fireEvent.change(searchInput, { target: { value: 'tEsT' } });
+
+      expect(screen.getByText('Test Driver')).toBeInTheDocument();
+      expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+    });
+
+    it('does not crash sorting by name when a driver has no employee ID', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriver2, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const sortSelect = screen.getByDisplayValue('Sort by Status');
+      expect(() =>
+        fireEvent.change(sortSelect, { target: { value: 'name' } })
+      ).not.toThrow();
+
+      expect(screen.getAllByTestId('card')).toHaveLength(3);
+    });
   });
 
   describe('Status Filter', () => {
