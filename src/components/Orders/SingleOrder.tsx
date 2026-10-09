@@ -52,6 +52,7 @@ import { UserType } from "@/types/user";
 import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
@@ -969,6 +970,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
+                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
                               },
                             )}
                           </span>
@@ -985,6 +987,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 hour12: true,
+                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
                               },
                             )}
                           </span>
