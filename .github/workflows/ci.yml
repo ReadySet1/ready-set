@@ -7,6 +7,16 @@ on:
     branches: [main, development]
   workflow_call:  # Allow this workflow to be called by deploy.yml
 
+# E2E runs share one remote test database and the same test accounts, so
+# overlapping runs on a branch sign each other out and change each other's
+# data. A newer push or merge on the same branch or PR supersedes the older
+# run: cancel it (except on main, whose runs gate deploys). github.workflow
+# is "Deploy" when deploy.yml calls this file, so that run gets its own group
+# and never cancels or deadlocks with the plain CI run for the same push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   NODE_VERSION: '20'
 
