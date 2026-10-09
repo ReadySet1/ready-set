@@ -1213,10 +1213,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                         Email
                       </div>
                       <div className="flex items-center gap-2 text-slate-800">
-                        <Mail className="h-4 w-4 text-slate-400" />
+                        <Mail className="h-4 w-4 shrink-0 text-slate-400" />
                         <a
                           href={`mailto:${order.user.email}`}
-                          className="transition-colors hover:text-blue-600"
+                          className="min-w-0 break-all transition-colors hover:text-blue-600"
                         >
                           {order.user.email}
                         </a>
