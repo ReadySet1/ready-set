@@ -5,6 +5,51 @@ import React, { Component, ReactNode } from "react";
 import { clearAllHydrationData } from "@/utils/auth/hydration";
 import { clearSupabaseCookies } from "@/utils/supabase/client";
 
+/**
+ * Supabase auth-js / app error names that mean the session itself is bad.
+ * `AuthRetryableFetchError` is deliberately excluded: it is a transient network
+ * failure, and clearing auth state for it would sign the user out on a blip.
+ */
+const AUTH_ERROR_NAMES = new Set([
+  "AuthError",
+  "AuthApiError",
+  "AuthSessionMissingError",
+  "AuthInvalidTokenResponseError",
+  "AuthInvalidJwtError",
+  "AuthInvalidCredentialsError",
+  "AuthPKCEGrantCodeExchangeError",
+  "AuthImplicitGrantRedirectError",
+  "AuthErrorBoundary",
+]);
+
+const AUTH_ERROR_STATUSES = new Set([401, 403]);
+
+/** Specific Supabase / JWT failure messages (matched case-insensitively). */
+const AUTH_ERROR_MESSAGE =
+  /auth session missing|invalid refresh token|refresh token not found|refresh token has been revoked|jwt expired|invalid jwt|jwt (?:is )?malformed/i;
+
+/**
+ * Classify an error as auth-related from its name, HTTP status and message.
+ * The stack is intentionally ignored: it routinely contains frames such as
+ * AuthProvider, useAuth or supabase-js, which say nothing about the cause.
+ */
+export function isAuthRelatedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  if (AUTH_ERROR_NAMES.has(error.name)) return true;
+
+  const { status, statusCode } = error as {
+    status?: unknown;
+    statusCode?: unknown;
+  };
+  const httpStatus = typeof status === "number" ? status : statusCode;
+  if (typeof httpStatus === "number" && AUTH_ERROR_STATUSES.has(httpStatus)) {
+    return true;
+  }
+
+  return AUTH_ERROR_MESSAGE.test(error.message);
+}
+
 interface AuthErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
@@ -61,30 +106,12 @@ class AuthErrorBoundary extends Component<
 
     // Check if this looks like an auth-related error
     if (this.isAuthError(error)) {
-            this.handleAuthError();
+      this.handleAuthError();
     }
   }
 
-  private isAuthError = (error: Error): boolean => {
-    const authErrorIndicators = [
-      "auth",
-      "session",
-      "token",
-      "unauthorized",
-      "forbidden",
-      "supabase",
-      "user context",
-      "authentication",
-    ];
-
-    const errorMessage = error.message.toLowerCase();
-    const errorStack = error.stack?.toLowerCase() || "";
-
-    return authErrorIndicators.some(
-      (indicator) =>
-        errorMessage.includes(indicator) || errorStack.includes(indicator),
-    );
-  };
+  private isAuthError = (error: Error | null): boolean =>
+    isAuthRelatedError(error);
 
   private handleAuthError = () => {
     try {
@@ -94,7 +121,6 @@ class AuthErrorBoundary extends Component<
 
       // Attempt automatic retry if under limit
       if (this.state.retryCount < this.maxRetries) {
-        
         this.retryTimeout = setTimeout(
           () => {
             this.setState((prevState) => ({
@@ -106,21 +132,22 @@ class AuthErrorBoundary extends Component<
           },
           1000 * (this.state.retryCount + 1),
         ); // Exponential backoff
-      } else {
-              }
+      }
     } catch (cleanupError) {
       console.error("Error during auth error cleanup:", cleanupError);
     }
   };
 
   private handleManualRetry = () => {
-    
-    // Clear auth state
-    try {
-      clearAllHydrationData();
-      clearSupabaseCookies();
-    } catch (cleanupError) {
-      console.error("Error during manual cleanup:", cleanupError);
+    // Only clear auth state when the failure was auth-related; clearing it for
+    // an ordinary render crash would sign the user out for no reason.
+    if (this.isAuthError(this.state.error)) {
+      try {
+        clearAllHydrationData();
+        clearSupabaseCookies();
+      } catch (cleanupError) {
+        console.error("Error during manual cleanup:", cleanupError);
+      }
     }
 
     // Reset error state
@@ -159,6 +186,7 @@ class AuthErrorBoundary extends Component<
       }
 
       // Default error UI
+      const isAuthFailure = this.isAuthError(this.state.error);
       return (
         <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
@@ -180,11 +208,13 @@ class AuthErrorBoundary extends Component<
               </div>
 
               <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-                Authentication Error
+                {isAuthFailure
+                  ? "Authentication Error"
+                  : "Something went wrong"}
               </h3>
 
               <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-                {this.isAuthError(this.state.error!)
+                {isAuthFailure
                   ? "There was a problem with your authentication. Please try signing in again."
                   : "Something went wrong. Please try again or contact support if the problem persists."}
               </p>
