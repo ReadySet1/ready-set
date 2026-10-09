@@ -204,6 +204,67 @@ describe('Driver Tracking Actions', () => {
       expect(result.shiftId).toBeUndefined();
       expect(result.error).toMatch(/inactive/i);
     });
+
+    describe('resuming an open shift', () => {
+      const primeOpenShift = () =>
+        (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
+
+      it('repairs a drifted driver row so it points at the open shift', async () => {
+        primeOpenShift();
+        (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
+
+        const result = await startDriverShift(validDriverId, mockLocationUpdate);
+
+        expect(result).toEqual({ success: true, shiftId: validShiftId, resumed: true });
+        // No new shift is inserted on resume.
+        expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+
+        const [sql, ...params] = (mockPrisma.$executeRawUnsafe as jest.Mock).mock.calls[0];
+        expect(sql).toContain('UPDATE drivers');
+        expect(sql).toMatch(/current_shift_id = \$2::uuid/);
+        expect(sql).toContain('is_on_duty = true');
+        expect(sql).toMatch(/shift_start_time = COALESCE\(d\.shift_start_time, s\.shift_start\)/);
+        expect(sql).toContain('updated_at = NOW()');
+        // Guarded: only touch a row that has drifted, and only a live driver.
+        expect(sql).toMatch(/d\.current_shift_id IS DISTINCT FROM \$2::uuid/);
+        expect(sql).toContain('d.deleted_at IS NULL');
+        expect(sql).toContain('d.is_active = true');
+        expect(params).toEqual([validDriverId, validShiftId]);
+        expect(revalidatePath).toHaveBeenCalledWith('/admin/tracking');
+      });
+
+      it('skips revalidation when the driver row was already consistent', async () => {
+        primeOpenShift();
+        (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(0);
+
+        const result = await startDriverShift(validDriverId, mockLocationUpdate);
+
+        expect(result).toEqual({ success: true, shiftId: validShiftId, resumed: true });
+        expect(revalidatePath).not.toHaveBeenCalled();
+      });
+
+      it('never repairs the driver row for an unauthorized caller', async () => {
+        primeOpenShift();
+        mockCallerMayActOnDriver.mockResolvedValue(false);
+
+        const result = await startDriverShift(validDriverId, mockLocationUpdate);
+
+        expect(result).toEqual({ success: false, error: 'Access denied' });
+        expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      });
+
+      it('still resumes the shift when the repair write fails', async () => {
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        primeOpenShift();
+        (mockPrisma.$executeRawUnsafe as jest.Mock).mockRejectedValueOnce(new Error('connection reset'));
+
+        const result = await startDriverShift(validDriverId, mockLocationUpdate);
+
+        expect(result).toEqual({ success: true, shiftId: validShiftId, resumed: true });
+        errorSpy.mockRestore();
+      });
+    });
   });
 
   describe('endDriverShift', () => {
