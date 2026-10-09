@@ -83,6 +83,51 @@ export function isDisposableTestOrder(orderNumber: string | null | undefined): b
   return DISPOSABLE_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
+/** driverStatus values that mean "in flight", matching the end-shift guard. */
+export const IN_FLIGHT_DRIVER_STATUSES: readonly string[] = [
+  'EN_ROUTE_TO_VENDOR',
+  'ARRIVED_AT_VENDOR',
+  'PICKED_UP',
+  'EN_ROUTE_TO_CLIENT',
+  'ARRIVED_TO_CLIENT',
+];
+
+/** Order statuses after which a dispatch is history, not pending work. */
+const FINISHED_ORDER_STATUSES: readonly string[] = ['COMPLETED', 'DELIVERED', 'CANCELLED'];
+
+/** The order fields the reset script reads off each of the driver's dispatches. */
+export interface DispatchedOrder {
+  orderNumber: string | null;
+  status: string | null;
+  driverStatus: string | null;
+  pickupDateTime: Date | null;
+  deletedAt: Date | null;
+}
+
+/**
+ * Should the reset script unassign (delete the dispatch of) this order?
+ *
+ *  - Anything that blocks end-shift right now: in flight, or ASSIGNED with a
+ *    pickup already due.
+ *  - Every unfinished disposable test order, whatever its pickup time. A
+ *    future-dated seed is not harmless: re-seeding earlier the same day left
+ *    the superseded order ASSIGNED, it came due mid-walk and deadlocked End
+ *    Shift (2026-09-03).
+ *
+ * Real future-dated assignments are left alone.
+ */
+export function shouldUnassignDispatchedOrder(order: DispatchedOrder | null, now: Date): boolean {
+  if (!order || order.deletedAt) return false;
+  if (order.driverStatus && IN_FLIGHT_DRIVER_STATUSES.includes(order.driverStatus)) return true;
+  if (order.driverStatus === 'ASSIGNED' && order.pickupDateTime !== null && order.pickupDateTime <= now) {
+    return true;
+  }
+  const finished =
+    order.driverStatus === 'COMPLETED' ||
+    (order.status !== null && FINISHED_ORDER_STATUSES.includes(order.status));
+  return !finished && isDisposableTestOrder(order.orderNumber);
+}
+
 /** One real-world stop on a named route preset, with a full postal address. */
 export interface RouteStop {
   /** Human-readable label for logs and previews. */

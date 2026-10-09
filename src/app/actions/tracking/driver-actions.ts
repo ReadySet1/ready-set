@@ -67,6 +67,46 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * Point the driver row back at its open shift when the two have drifted
+ * (e.g. a hand-edited row). The admin dashboard reads
+ * drivers.current_shift_id, so a drifted row shows a working driver as off
+ * duty with no "End shift" button. The guard makes this a no-op write when
+ * the row is already consistent. Best-effort: a failure here must not block
+ * the driver from resuming their shift. Callers must authorize first.
+ */
+async function repairDriverRowForOpenShift(driverId: string, shiftId: string): Promise<void> {
+  try {
+    const repaired = await prisma.$executeRawUnsafe(`
+      UPDATE drivers d
+      SET
+        current_shift_id = $2::uuid,
+        is_on_duty = true,
+        shift_start_time = COALESCE(d.shift_start_time, s.shift_start),
+        updated_at = NOW()
+      FROM driver_shifts s
+      WHERE s.id = $2::uuid
+        AND d.id = $1::uuid
+        AND d.current_shift_id IS DISTINCT FROM $2::uuid
+        AND d.deleted_at IS NULL
+        AND d.is_active = true
+    `, driverId, shiftId);
+    if (repaired > 0) {
+      console.warn('startDriverShift: repaired driver row drifted from open shift', {
+        driverId,
+        shiftId,
+      });
+      revalidatePath('/admin/tracking');
+    }
+  } catch (error) {
+    console.error('startDriverShift: failed to repair driver row on resume', {
+      driverId,
+      shiftId,
+      error,
+    });
+  }
+}
+
+/**
  * Start a new driver shift
  * Creates a new shift record and updates driver status.
  *
@@ -98,6 +138,7 @@ export async function startDriverShift(
     // Application guard: resume an open shift instead of starting a second one.
     const openShiftId = unwrap(await openShiftLookup);
     if (openShiftId) {
+      await repairDriverRowForOpenShift(driverId, openShiftId);
       return { success: true, shiftId: openShiftId, resumed: true };
     }
 
