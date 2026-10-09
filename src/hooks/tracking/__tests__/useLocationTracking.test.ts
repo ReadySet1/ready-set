@@ -394,6 +394,30 @@ describe('useLocationTracking', () => {
       expect(body.timestamp).toBe(new Date(mockPosition.timestamp).toISOString());
     });
 
+    it('includes the device send time (client_sent_at) in the POST body', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      const before = Date.now();
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+
+      await waitFor(() => {
+        expect(locationPostCalls().length).toBeGreaterThan(0);
+      });
+
+      // Epoch ms from the device clock at send time — the server compares it
+      // with its own clock to correct a skewed phone's fix times.
+      const body = JSON.parse(locationPostCalls().pop()![1].body);
+      expect(typeof body.client_sent_at).toBe('number');
+      expect(body.client_sent_at).toBeGreaterThanOrEqual(before);
+      expect(body.client_sent_at).toBeLessThanOrEqual(Date.now());
+    });
+
     it('should trigger offline sync when starting tracking', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
@@ -723,8 +747,14 @@ describe('useLocationTracking', () => {
       expect(body.driver_id).toBe(mockDriverId);
       expect(body.latitude).toBe(unsyncedLocation.coordinates.lat);
       expect(body.longitude).toBe(unsyncedLocation.coordinates.lng);
-      // Replayed points carry their ORIGINAL fix time, not the replay time.
+      // Replayed points carry their ORIGINAL fix time, not the replay time...
       expect(body.timestamp).toBe(unsyncedLocation.timestamp);
+      // ...but client_sent_at is the REPLAY time, so the server measures the
+      // device clock offset at flush time and corrects the old fix with it.
+      expect(typeof body.client_sent_at).toBe('number');
+      expect(body.client_sent_at).toBeGreaterThanOrEqual(
+        Date.parse(unsyncedLocation.timestamp),
+      );
       expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
     });
 

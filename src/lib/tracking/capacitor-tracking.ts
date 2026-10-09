@@ -431,6 +431,9 @@ async function postLocation(
         altitude: location.altitude ?? undefined,
         battery_level: batteryLevel,
         is_moving: motionState.isMoving,
+        // No fix time is sent (server stamps NOW()), but the send time still
+        // lets the server log a skewed device clock.
+        client_sent_at: Date.now(),
       }),
     });
   } catch {
