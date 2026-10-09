@@ -21,6 +21,10 @@ test.use({ storageState: authStatePath('admin') });
 
 test.beforeEach(async ({ page }) => {
   test.skip(!hasAuthState('admin'), missingAuthReason('admin'));
+  // The Overview tab mounts a Mapbox map. On CI it renders WebGL in software
+  // across 4 parallel workers, starving the renderer until clicks time out.
+  // No test here asserts map pixels, so keep Mapbox from loading at all.
+  await page.route(/^https:\/\/[a-z]+\.mapbox\.com\//, (route) => route.abort());
   await openDashboard(page);
 });
 
