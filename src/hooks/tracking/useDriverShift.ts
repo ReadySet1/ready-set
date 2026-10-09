@@ -34,6 +34,8 @@ interface UseDriverShiftReturn {
   error: string | null;
   startShift: (location: LocationUpdate) => Promise<boolean>;
   endShift: (shiftId: string, location: LocationUpdate) => Promise<boolean>;
+  /** Miles driven on the shift ended from this screen (null until one ends). */
+  lastShiftMiles: number | null;
   startBreak: (shiftId: string, breakType?: 'rest' | 'meal' | 'fuel' | 'emergency', location?: LocationUpdate) => Promise<boolean>;
   endBreak: (breakId: string, location?: LocationUpdate) => Promise<boolean>;
   refreshShift: () => Promise<void>;
@@ -43,6 +45,7 @@ export function useDriverShift(): UseDriverShiftReturn {
   const [currentShift, setCurrentShift] = useState<DriverShift | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastShiftMiles, setLastShiftMiles] = useState<number | null>(null);
 
   // Get driver ID from session (simplified)
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -185,6 +188,11 @@ export function useDriverShift(): UseDriverShiftReturn {
       }
 
       setCurrentShift(null);
+      setLastShiftMiles(
+        typeof result.totalMiles === 'number' && Number.isFinite(result.totalMiles)
+          ? result.totalMiles
+          : null,
+      );
       addSentryBreadcrumb('Driver shift ended', {
         shiftId,
       });
@@ -305,6 +313,7 @@ export function useDriverShift(): UseDriverShiftReturn {
     error,
     startShift,
     endShift,
+    lastShiftMiles,
     startBreak,
     endBreak,
     refreshShift

@@ -41,6 +41,7 @@ import {
   geofenceHint,
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
+import { formatMiles } from "@/lib/units";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
   useDeliveryStatusRealtime,
@@ -140,6 +141,7 @@ export default function DriverTrackingPortal() {
     shiftError,
     startShift,
     endShift,
+    lastShiftMiles,
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
@@ -686,6 +688,11 @@ export default function DriverTrackingPortal() {
                   ? "Enable location in your browser settings, then try again."
                   : "We use your location to track your shift and deliveries."}
               </p>
+              {lastShiftMiles != null ? (
+                <p className="mt-3 rounded-full bg-driver-surface-alt px-3 py-1.5 text-[13px] font-semibold text-driver-text">
+                  {`Last shift · ${formatMiles(lastShiftMiles)}`}
+                </p>
+              ) : null}
             </div>
 
             {permissionState === "denied" ? (

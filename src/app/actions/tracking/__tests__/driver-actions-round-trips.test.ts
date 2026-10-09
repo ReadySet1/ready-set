@@ -170,7 +170,7 @@ describe("endDriverShift round trips", () => {
     expect(mockAuthorize).toHaveBeenCalledTimes(1);
 
     shift.resolve(shiftRow);
-    await expect(pending).resolves.toEqual({ success: true });
+    await expect(pending).resolves.toEqual({ success: true, totalMiles: 3 });
     // The shift's driver id is what gets authorized.
     await expect(mockAuthorize.mock.calls[0]![0]).resolves.toBe(DRIVER_ID);
     // No second identity / role lookup for the force check.
@@ -198,7 +198,7 @@ describe("endDriverShift round trips", () => {
 
     await expect(
       endDriverShift(SHIFT_ID, location, undefined, { force: true }),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ success: true, totalMiles: 3 });
     expect(sqlCalls(mockQueryRaw, "end-shift-blockers")).toHaveLength(0);
   });
 
@@ -230,7 +230,7 @@ describe("endDriverShift round trips", () => {
     expect(sqlCalls(mockExecuteRaw, "UPDATE drivers")).toHaveLength(1);
 
     mileage.resolve({ totalMiles: 3, gpsDistanceMiles: 3, mileageSource: "gps", warnings: [] });
-    await expect(pending).resolves.toEqual({ success: true });
+    await expect(pending).resolves.toEqual({ success: true, totalMiles: 3 });
   });
 });
 
