@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Card } from '@/components/ui/card';
 import { AlertTriangleIcon } from 'lucide-react';
@@ -9,6 +9,16 @@ import { cn } from '@/lib/utils';
 import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
 import { DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { distanceToTargetM } from '@/lib/driver/geofence';
+import {
+  buildDirectionsUrl,
+  formatNextStopLabel,
+  parseDirectionsRoute,
+  selectNextStop,
+  shouldRefetchRoute,
+  type NextStop,
+  type RouteRequestKey,
+} from '@/lib/driver/next-stop-guide';
 
 // Ensure Mapbox token is available on the client
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -25,6 +35,64 @@ interface DriverLiveMapProps {
   driverId?: string | null;
   shiftStartedAt?: string | Date | null;
   className?: string;
+}
+
+/** Breadcrumb trail ("Your path"): faded + dashed so it never reads as a
+ *  route to follow (2026-10-06 field report). */
+const TRAIL_COLOR = '#64748b';
+const TRAIL_OPACITY = 0.5;
+const TRAIL_DASH: [number, number] = [1.5, 2];
+/** Route to the next stop: solid, wide, high-contrast with a white casing. */
+const ROUTE_COLOR = '#2563eb';
+const ROUTE_SOURCE_ID = 'next-stop-route';
+const ROUTE_LINE_LAYER_ID = 'next-stop-route-line';
+const ROUTE_CASING_LAYER_ID = 'next-stop-route-casing';
+
+const EMPTY_LINE: GeoJSON.Feature<GeoJSON.LineString> = {
+  type: 'Feature',
+  properties: {},
+  geometry: { type: 'LineString', coordinates: [] },
+};
+
+/** Same token resolution as the admin LiveDriverMap — the public client token,
+ *  never a server secret. */
+function resolveMapboxToken(): string | undefined {
+  const token = mapboxgl.accessToken || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  return token && token !== 'YOUR_MAPBOX_TOKEN_HERE' && token !== 'your_mapbox_access_token'
+    ? token
+    : undefined;
+}
+
+const nextStopKeyOf = (stop: NextStop | null): string | null =>
+  stop ? `${stop.deliveryId}:${stop.kind}:${stop.coordinates[0]},${stop.coordinates[1]}` : null;
+
+/** "Next: Pickup" pill that sits above the target stop's pin. */
+function createNextStopMarkerElement(stop: NextStop): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'next-stop-marker';
+  el.style.pointerEvents = 'none';
+  el.style.display = 'flex';
+  el.style.flexDirection = 'column';
+  el.style.alignItems = 'center';
+  const pill = document.createElement('div');
+  pill.textContent = stop.kind === 'pickup' ? 'Next: Pickup' : 'Next: Drop-off';
+  pill.style.cssText = [
+    `background:${ROUTE_COLOR}`,
+    'color:white',
+    'font-size:11px',
+    'font-weight:700',
+    'line-height:1',
+    'padding:4px 8px',
+    'border-radius:9999px',
+    'border:2px solid white',
+    'box-shadow:0 2px 4px rgba(0,0,0,0.3)',
+    'white-space:nowrap',
+  ].join(';');
+  const pointer = document.createElement('div');
+  pointer.style.cssText = `width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${ROUTE_COLOR};`;
+  el.appendChild(pill);
+  el.appendChild(pointer);
+  return el;
 }
 
 /** Hard cap on trail vertices kept in memory / handed to Mapbox. */
@@ -179,6 +247,19 @@ export default function DriverLiveMap({
   // Signature of the last delivery set we fit the viewport to — fit once per
   // set change, not on every GPS tick (respect the driver's manual pan/zoom).
   const lastBoundsKeyRef = useRef<string | null>(null);
+  // Next-stop guide: target marker, last Directions request (throttle), and
+  // the in-flight request so a newer one (or unmount) can cancel it.
+  const nextStopMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const lastRouteRequestRef = useRef<RouteRequestKey | null>(null);
+  const routeAbortRef = useRef<AbortController | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{
+    targetKey: string;
+    distanceM: number | null;
+    durationS: number | null;
+  } | null>(null);
+
+  const nextStop = useMemo(() => selectNextStop(activeDeliveries), [activeDeliveries]);
+  const nextStopKey = nextStopKeyOf(nextStop);
 
   // Seed the trail from the server once per shift: the DB holds the full
   // recorded route (offline queue + native watcher keep posting while the
@@ -295,11 +376,31 @@ export default function DriverLiveMap({
           id: 'driver-trail-line',
           type: 'line',
           source: 'driver-trail',
+          layout: { 'line-join': 'round' },
           paint: {
-            'line-color': '#2563eb',
-            'line-width': 4,
-            'line-opacity': 0.8,
+            'line-color': TRAIL_COLOR,
+            'line-width': 3,
+            'line-opacity': TRAIL_OPACITY,
+            'line-dasharray': TRAIL_DASH,
           },
+        });
+
+        // Route to the next stop, drawn above the trail: white casing + solid
+        // blue core so it is unmistakably "the way to go".
+        map.addSource(ROUTE_SOURCE_ID, { type: 'geojson', data: EMPTY_LINE });
+        map.addLayer({
+          id: ROUTE_CASING_LAYER_ID,
+          type: 'line',
+          source: ROUTE_SOURCE_ID,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+        });
+        map.addLayer({
+          id: ROUTE_LINE_LAYER_ID,
+          type: 'line',
+          source: ROUTE_SOURCE_ID,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': ROUTE_COLOR, 'line-width': 6, 'line-opacity': 0.95 },
         });
       });
 
@@ -322,6 +423,10 @@ export default function DriverLiveMap({
         pickupMarkersRef.current.clear();
         dropoffMarkersRef.current.clear();
         lastBoundsKeyRef.current = null;
+        nextStopMarkerRef.current = null;
+        lastRouteRequestRef.current = null;
+        routeAbortRef.current?.abort();
+        routeAbortRef.current = null;
       };
     } catch (error) {
       captureException(error, {
@@ -533,6 +638,122 @@ export default function DriverLiveMap({
     }
   }, [activeDeliveries, mapLoaded]);
 
+  // Route to the next stop via Mapbox Directions (same client-side request as
+  // the admin LiveDriverMap). Throttled: refetch only when the next stop
+  // changes or the driver moved past ROUTE_REFETCH_DISTANCE_M. Any failure
+  // clears the line and the label falls back to straight-line distance — the
+  // map itself never breaks. No hand-off to Google Maps/Waze on purpose:
+  // backgrounding the wrapper is exactly where Android drops GPS.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const setRouteLine = (coordinates: [number, number][]) => {
+      const source = mapRef.current?.getSource(ROUTE_SOURCE_ID) as
+        | mapboxgl.GeoJSONSource
+        | undefined;
+      source?.setData({ ...EMPTY_LINE, geometry: { type: 'LineString', coordinates } });
+    };
+
+    if (!nextStop || !nextStopKey) {
+      if (lastRouteRequestRef.current) {
+        routeAbortRef.current?.abort();
+        lastRouteRequestRef.current = null;
+        setRouteLine([]);
+        setRouteInfo(null);
+      }
+      return;
+    }
+
+    const lat = currentLocation?.coordinates.lat;
+    const lng = currentLocation?.coordinates.lng;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const request: RouteRequestKey = { origin: { lat: lat!, lng: lng! }, targetKey: nextStopKey };
+    if (!shouldRefetchRoute(lastRouteRequestRef.current, request)) return;
+    const targetChanged = lastRouteRequestRef.current?.targetKey !== nextStopKey;
+    lastRouteRequestRef.current = request;
+    // Never leave a line pointing at a stop that is no longer next.
+    if (targetChanged) setRouteLine([]);
+
+    const token = resolveMapboxToken();
+    if (!token || typeof fetch !== 'function') return;
+
+    routeAbortRef.current?.abort();
+    const controller = new AbortController();
+    routeAbortRef.current = controller;
+    const url = buildDirectionsUrl(request.origin, nextStop.coordinates, token);
+
+    (async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response?.ok) {
+          throw new Error(`Directions request failed with ${response?.status ?? 'no response'}`);
+        }
+        const route = parseDirectionsRoute(await response.json());
+        if (!route) throw new Error('Directions returned no usable route');
+        if (controller.signal.aborted) return;
+        setRouteLine(route.coordinates);
+        setRouteInfo({ targetKey: nextStopKey, distanceM: route.distanceM, durationS: route.durationS });
+      } catch (error) {
+        if (controller.signal.aborted || (error as Error)?.name === 'AbortError') return;
+        setRouteLine([]);
+        setRouteInfo(null);
+        // Silent by design (mirrors the admin map): a missing route must never break the map.
+        addSentryBreadcrumb('Driver next-stop directions failed', {
+          feature: 'driver-live-map',
+          deliveryId: nextStop.deliveryId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  }, [currentLocation, mapLoaded, nextStop, nextStopKey]);
+
+  // "Next: Pickup / Drop-off" target pill above the stop the driver heads to.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    try {
+      nextStopMarkerRef.current?.remove();
+      nextStopMarkerRef.current = null;
+      if (!nextStop) return;
+      nextStopMarkerRef.current = new mapboxgl.Marker({
+        element: createNextStopMarkerElement(nextStop),
+        anchor: 'bottom',
+        // Clear the stop pin: pickup pins are centered on the point, drop-off
+        // pins stand on it (anchor 'bottom'), so the pill sits higher there.
+        offset: [0, nextStop.kind === 'pickup' ? -16 : -(MARKER_CONFIG.DELIVERY_MARKER_SIZE + 4)],
+      })
+        .setLngLat(nextStop.coordinates)
+        .addTo(map);
+    } catch (error) {
+      captureException(error, {
+        action: 'update-next-stop-marker',
+        feature: 'driver-live-map',
+        component: 'DriverLiveMap',
+      });
+    }
+    // nextStopKey captures every field of nextStop that the marker renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextStopKey, mapLoaded]);
+
+  // Guide label: road distance/ETA from Directions when we have it for the
+  // current target, else an approximate straight-line distance.
+  const nextStopLabel = (() => {
+    if (!nextStop) return null;
+    if (routeInfo && routeInfo.targetKey === nextStopKey && routeInfo.distanceM !== null) {
+      return formatNextStopLabel(nextStop.kind, {
+        distanceM: routeInfo.distanceM,
+        durationS: routeInfo.durationS,
+      });
+    }
+    const straightM = distanceToTargetM(currentLocation?.coordinates, nextStop.coordinates);
+    return formatNextStopLabel(
+      nextStop.kind,
+      straightM === null ? null : { distanceM: straightM, approximate: true },
+    );
+  })();
+
   if (mapError) {
     return (
       <Card className={cn('w-full h-full flex items-center justify-center bg-gray-50', className)}>
@@ -547,11 +768,50 @@ export default function DriverLiveMap({
 
   return (
     <div
-      ref={mapContainerRef}
-      className={cn('w-full h-full rounded-lg overflow-hidden', className)}
+      className={cn('relative w-full h-full rounded-lg overflow-hidden', className)}
       role="application"
       aria-label="Driver live map"
-    />
+    >
+      <div ref={mapContainerRef} className="absolute inset-0" />
+      {/* Top-left keeps clear of the Mapbox logo (bottom-left) and controls
+          (bottom-right); pointer-events-none so pan/zoom pass through. */}
+      <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
+        {nextStopLabel && (
+          <div
+            className="rounded-full px-3 py-1 text-xs font-bold text-white shadow"
+            style={{ backgroundColor: ROUTE_COLOR }}
+            aria-live="polite"
+          >
+            {nextStopLabel}
+          </div>
+        )}
+        <div className="rounded-md bg-white/90 px-2 py-1 text-[11px] font-medium text-gray-700 shadow-sm">
+          {nextStop && (
+            <div className="flex items-center gap-1.5">
+              <svg width="18" height="6" aria-hidden="true">
+                <line x1="1" y1="3" x2="17" y2="3" stroke={ROUTE_COLOR} strokeWidth="4" strokeLinecap="round" />
+              </svg>
+              <span>Route to next stop</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <svg width="18" height="6" aria-hidden="true">
+              <line
+                x1="1"
+                y1="3"
+                x2="17"
+                y2="3"
+                stroke={TRAIL_COLOR}
+                strokeOpacity={TRAIL_OPACITY + 0.2}
+                strokeWidth="3"
+                strokeDasharray="3 3"
+              />
+            </svg>
+            <span>Your path</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -454,9 +454,10 @@ describe('DriverLiveMap', () => {
         );
       });
 
-      // The 4 markers of the stale deliveries are removed from the map
+      // The 4 markers of the stale deliveries are removed from the map, plus
+      // the "Next" target pill (delivery-3 is completed, so there is no next stop)
       await waitFor(() => {
-        expect(mockMarkerRemove).toHaveBeenCalledTimes(4);
+        expect(mockMarkerRemove).toHaveBeenCalledTimes(5);
       });
 
       // And fresh markers are created for delivery-3 at its coordinates
@@ -697,6 +698,132 @@ describe('DriverLiveMap', () => {
       const mapContainer = screen.getByRole('application');
       expect(mapContainer).toHaveAttribute('role', 'application');
       expect(mapContainer).toHaveAttribute('aria-label', 'Driver live map');
+    });
+  });
+
+  describe('Next-stop guide (2026-10-06 field report)', () => {
+    const pickupOnly: DeliveryTracking[] = [
+      {
+        id: 'delivery-1',
+        status: 'ASSIGNED',
+        pickupLocation: { coordinates: [-122.4294, 37.7649] },
+        deliveryLocation: { coordinates: [-122.4094, 37.7849] },
+      } as unknown as DeliveryTracking,
+    ];
+    const directionsBody = {
+      routes: [
+        {
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-122.4194, 37.7749],
+              [-122.4294, 37.7649],
+            ],
+          },
+          distance: 1609.344,
+          duration: 360,
+        },
+      ],
+    };
+    const fetchMock = global.fetch as jest.Mock;
+
+    afterEach(() => {
+      fetchMock.mockReset();
+    });
+
+    const renderLoaded = async (deliveries: DeliveryTracking[] = pickupOnly) => {
+      const utils = render(
+        <DriverLiveMap currentLocation={mockCurrentLocation} activeDeliveries={deliveries} />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      return utils;
+    };
+
+    it('labels the breadcrumb trail as "Your path" in a legend', async () => {
+      await renderLoaded([]);
+      expect(screen.getByText('Your path')).toBeInTheDocument();
+    });
+
+    it('draws the trail faded and dashed so it does not read as a route', async () => {
+      await renderLoaded([]);
+      const trailLayer = mockAddLayer.mock.calls
+        .map((c: any[]) => c[0])
+        .find((l: any) => l.id === 'driver-trail-line');
+      expect(trailLayer.paint['line-dasharray']).toBeDefined();
+      expect(trailLayer.paint['line-opacity']).toBeLessThanOrEqual(0.6);
+    });
+
+    it('requests Directions from the driver to the pickup and draws a solid route', async () => {
+      const setData = jest.fn();
+      mockGetSource.mockReturnValue({ setData });
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+
+      await renderLoaded();
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toContain(
+        'https://api.mapbox.com/directions/v5/mapbox/driving/-122.4194,37.7749;-122.4294,37.7649',
+      );
+      // Public client token only (same as the admin map), URL-encoded.
+      expect(url).toMatch(/[?&]access_token=[^&]+$/);
+
+      const routeLayer = mockAddLayer.mock.calls
+        .map((c: any[]) => c[0])
+        .find((l: any) => l.id === 'next-stop-route-line');
+      expect(routeLayer).toBeDefined();
+      expect(routeLayer.paint['line-dasharray']).toBeUndefined();
+
+      await waitFor(() =>
+        expect(setData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            geometry: expect.objectContaining({ coordinates: directionsBody.routes[0]!.geometry.coordinates }),
+          }),
+        ),
+      );
+      expect(await screen.findByText('Next: Pickup · 1.0 mi · 6 min')).toBeInTheDocument();
+    });
+
+    it('marks the next stop with a distinct target marker', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+      await renderLoaded();
+      await waitFor(() => expect(getMarkerCallsByClass('next-stop-marker')).toHaveLength(1));
+    });
+
+    it('degrades to a straight-line distance when Directions fails, without breaking the map', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+      await renderLoaded();
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(await screen.findByText(/^Next: Pickup · ~[\d.]+ (mi|ft)$/)).toBeInTheDocument();
+      expect(screen.queryByText('Map Error')).not.toBeInTheDocument();
+    });
+
+    it('does not refetch Directions for small GPS movements', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+      const { rerender } = await renderLoaded();
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      await act(async () => {
+        rerender(
+          <DriverLiveMap
+            currentLocation={{
+              ...mockCurrentLocation,
+              coordinates: { lat: 37.7752, lng: -122.4194 }, // ~33 m
+            }}
+            activeDeliveries={pickupOnly}
+          />,
+        );
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows no guide when there is no open stop', async () => {
+      await renderLoaded([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.queryByText(/^Next:/)).not.toBeInTheDocument();
     });
   });
 
