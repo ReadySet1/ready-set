@@ -15,13 +15,15 @@ import {
   MapPinIcon,
   ActivityIcon,
   SearchIcon,
-  FilterIcon
+  FilterIcon,
+  PowerOffIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TrackedDriver } from '@/types/tracking';
 import { isLocationStale } from '@/lib/realtime/stale-detection';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 import { metersToFeet } from '@/lib/units';
+import AdminEndShiftDialog from './AdminEndShiftDialog';
 
 interface LocationData {
   driverId: string;
@@ -43,15 +45,19 @@ interface DriverStatusListProps {
   recentLocations: LocationData[];
   compact?: boolean;
   className?: string;
+  /** Show the admin "End shift" action (ADMIN / SUPER_ADMIN only; the API enforces it too). */
+  canEndShift?: boolean;
 }
 
 export default function DriverStatusList({ 
   drivers, 
   recentLocations, 
   compact = false,
-  className 
+  className,
+  canEndShift = false
 }: DriverStatusListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [endShiftTarget, setEndShiftTarget] = useState<{ shiftId: string; driverName: string } | null>(null);
   const { settings } = useTrackingSettings();
   const staleThresholdMs = settings.staleGpsThresholdSeconds * 1000;
   const [statusFilter, setStatusFilter] = useState<'all' | 'on_duty' | 'off_duty' | 'moving'>('all');
@@ -134,8 +140,13 @@ export default function DriverStatusList({
     return 'poor';
   };
 
+  const getDriverName = (driver: TrackedDriver): string =>
+    driver.name || `Driver #${driver.employeeId || 'Unknown'}`;
+
   const DriverCard = ({ driver }: { driver: TrackedDriver }) => {
     const locationData = getLocationData(driver.id);
+    // Any open shift (active or paused) can be ended — a stuck paused shift too.
+    const endableShiftId = canEndShift ? driver.currentShiftId : undefined;
     const timeSinceUpdate = getTimeSinceUpdate(driver);
     const signalStrength = getSignalStrength(locationData?.accuracy);
     // On duty but no recent GPS fix (app closed / lost signal) → offline, not "stopped".
@@ -161,7 +172,7 @@ export default function DriverStatusList({
                 
                 <div>
                   <h4 className="font-medium">
-                    {driver.name || `Driver #${driver.employeeId || 'Unknown'}`}
+                    {getDriverName(driver)}
                   </h4>
                   {!compact && (
                     <div className="text-sm text-muted-foreground">
@@ -245,6 +256,20 @@ export default function DriverStatusList({
               <div className="text-xs text-muted-foreground">
                 {timeSinceUpdate}
               </div>
+
+              {endableShiftId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() =>
+                    setEndShiftTarget({ shiftId: endableShiftId, driverName: getDriverName(driver) })
+                  }
+                >
+                  <PowerOffIcon className="w-4 h-4 mr-1" />
+                  End shift
+                </Button>
+              )}
             </div>
           </div>
 
@@ -327,6 +352,17 @@ export default function DriverStatusList({
         <div className="text-sm text-muted-foreground text-center">
           Showing {filteredDrivers.length} of {drivers.length} drivers
         </div>
+      )}
+
+      {endShiftTarget && (
+        <AdminEndShiftDialog
+          shiftId={endShiftTarget.shiftId}
+          driverName={endShiftTarget.driverName}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEndShiftTarget(null);
+          }}
+        />
       )}
     </div>
   );

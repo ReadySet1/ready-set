@@ -342,6 +342,30 @@ describe('Driver Tracking Actions', () => {
 
       expect(result.success).toBe(true);
     });
+
+    it('ends a shift without an end location, keeping the last known position', async () => {
+      // Admins end shifts from the dashboard, where there is no device GPS fix.
+      mockGetActionCaller.mockResolvedValue({ userId: 'admin-1', isPrivileged: true });
+      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{
+        driver_id: validDriverId,
+        status: 'active',
+      }]);
+      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
+
+      const result = await endDriverShift(validShiftId, null, undefined, { force: true });
+
+      expect(result.success).toBe(true);
+      const calls = (mockPrisma.$executeRawUnsafe as jest.Mock).mock.calls;
+      const shiftUpdate = calls.find(([sql]) => String(sql).includes('UPDATE driver_shifts'));
+      const driverUpdate = calls.find(([sql]) => String(sql).includes('UPDATE drivers'));
+      // No coordinates are bound; the SQL falls back to the stored position.
+      expect(shiftUpdate?.[2]).toBeNull();
+      expect(shiftUpdate?.[3]).toBeNull();
+      expect(String(shiftUpdate?.[0])).toMatch(/end_location = COALESCE\(/);
+      expect(driverUpdate?.[2]).toBeNull();
+      expect(driverUpdate?.[3]).toBeNull();
+      expect(String(driverUpdate?.[0])).toMatch(/last_known_location = COALESCE\(/);
+    });
   });
 
   describe('updateDriverLocation', () => {

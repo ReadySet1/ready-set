@@ -206,6 +206,8 @@ jest.mock('lucide-react', () => ({
   ActivityIcon: () => <span data-testid="activity-icon">Activity</span>,
   SearchIcon: () => <span data-testid="search-icon">Search</span>,
   FilterIcon: () => <span data-testid="filter-icon">Filter</span>,
+  PowerOffIcon: () => <span data-testid="power-off-icon">PowerOff</span>,
+  Loader2Icon: () => <span data-testid="loader-icon">Loading</span>,
 }));
 
 // Mock cn utility
@@ -814,6 +816,28 @@ describe('DriverStatusList', () => {
       );
 
       expect(screen.getByText('🚶 Walking')).toBeInTheDocument();
+    });
+  });
+  describe('Admin End shift action', () => {
+    const shiftDriver = { ...mockDriver1, currentShiftId: 'shift-uuid-1' } as TrackedDriver;
+
+    it('shows End shift for a driver with an open shift when allowed', () => {
+      render(
+        <DriverStatusList drivers={[shiftDriver]} recentLocations={[]} canEndShift />
+      );
+      expect(screen.getByRole('button', { name: /end shift/i })).toBeInTheDocument();
+    });
+
+    it('hides End shift without the admin permission', () => {
+      render(<DriverStatusList drivers={[shiftDriver]} recentLocations={[]} />);
+      expect(screen.queryByRole('button', { name: /end shift/i })).not.toBeInTheDocument();
+    });
+
+    it('hides End shift when the driver has no open shift', () => {
+      render(
+        <DriverStatusList drivers={[mockOffDutyDriver]} recentLocations={[]} canEndShift />
+      );
+      expect(screen.queryByRole('button', { name: /end shift/i })).not.toBeInTheDocument();
     });
   });
 });

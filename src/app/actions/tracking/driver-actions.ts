@@ -190,11 +190,15 @@ export async function startDriverShift(
 
 /**
  * End the current driver shift
- * Updates shift record with end time and location, calculates total distance
+ * Updates shift record with end time and location, calculates total distance.
+ *
+ * `endLocation` may be null when there is no device fix (an admin ending the
+ * shift from the dashboard): the shift's end point falls back to the driver's
+ * last known position and the driver row's position is left as it was.
  */
 export async function endDriverShift(
   shiftId: string,
-  endLocation: LocationUpdate,
+  endLocation: LocationUpdate | null,
   finalMileage?: number,
   metadata: Record<string, any> = {}
 ): Promise<{
@@ -397,15 +401,18 @@ export async function endDriverShift(
             AND deleted_at IS NULL
         ),
         shift_end = NOW(),
-        end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+        end_location = COALESCE(
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+          (SELECT d.last_known_location FROM drivers d WHERE d.id = driver_shifts.driver_id)
+        ),
         status = 'completed',
         notes = COALESCE(notes, '') || $4,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shiftId,
-      endLocation.coordinates.lng,
-      endLocation.coordinates.lat,
+      endLocation?.coordinates.lng ?? null,
+      endLocation?.coordinates.lat ?? null,
       metadata.notes ? ` ${metadata.notes}` : (finalMileage ? ` [Client reported mileage: ${finalMileage} km]` : '')
     );
 
@@ -417,14 +424,17 @@ export async function endDriverShift(
         is_on_duty = false,
         current_shift_id = NULL,
         shift_start_time = NULL,
-        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        last_location_update = NOW(),
+        last_known_location = COALESCE(
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+          last_known_location
+        ),
+        last_location_update = CASE WHEN $2::float IS NULL THEN last_location_update ELSE NOW() END,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shift?.driver_id,
-      endLocation.coordinates.lng,
-      endLocation.coordinates.lat
+      endLocation?.coordinates.lng ?? null,
+      endLocation?.coordinates.lat ?? null
     );
     releaseDriver.catch(() => {}); // awaited below
 
