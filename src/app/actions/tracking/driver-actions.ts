@@ -208,6 +208,8 @@ export async function endDriverShift(
   activeDeliveries?: number;
   /** The orders keeping the shift open, so the UI can name them. */
   blockingOrders?: BlockingOrder[];
+  /** Shift distance in miles; omitted when the mileage calculation failed. */
+  totalMiles?: number;
 }> {
   try {
     // Get shift info and ensure it is active before proceeding
@@ -441,16 +443,21 @@ export async function endDriverShift(
     // Calculate mileage from GPS trail. If finalMileage is provided (e.g., odometer reading),
     // use validation to compare GPS vs reported values and log discrepancies.
     let totalMiles = finalMileage ?? 0;
+    // Set only when the calculation succeeded, so the driver is never shown
+    // a made-up 0 after a failure.
+    let reportedMiles: number | undefined;
 
     try {
       if (finalMileage == null) {
         // Pure GPS-based calculation
         const result = await calculateShiftMileage(shiftId);
         totalMiles = result.totalMiles;
+        reportedMiles = result.totalMiles;
       } else {
         // Client provided mileage - validate against GPS and store both for audit
         const result = await calculateShiftMileageWithValidation(shiftId, finalMileage);
         totalMiles = result.totalMiles;
+        reportedMiles = result.totalMiles;
 
         // Log any warnings from the calculation
         if (result.warnings.length > 0) {
@@ -496,7 +503,9 @@ export async function endDriverShift(
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
 
-    return { success: true };
+    return typeof reportedMiles === 'number' && Number.isFinite(reportedMiles)
+      ? { success: true, totalMiles: reportedMiles }
+      : { success: true };
   } catch (error) {
     console.error('Error ending driver shift:', error);
     return {

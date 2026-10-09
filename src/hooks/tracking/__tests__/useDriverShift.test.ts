@@ -311,6 +311,25 @@ describe('useDriverShift', () => {
   });
 
   describe('endShift', () => {
+    // C11: the end-shift response carries the shift miles; the hook keeps
+    // them so the tracking screen can show the distance after the shift.
+    it('exposes the ended shift miles from the server response', async () => {
+      setActiveShift(mockShift);
+      endShiftResult = () => okJson({ success: true, totalMiles: 0.62 });
+
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.currentShift).toEqual(mockShift);
+      });
+      expect(result.current.lastShiftMiles).toBeNull();
+
+      await act(async () => {
+        await result.current.endShift(mockShiftId, mockLocation);
+      });
+
+      expect(result.current.lastShiftMiles).toBe(0.62);
+    });
+
     it('should end shift successfully', async () => {
       setActiveShift(mockShift);
 

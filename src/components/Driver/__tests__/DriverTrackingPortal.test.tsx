@@ -860,4 +860,25 @@ describe("DriverTrackingPortal (redesigned)", () => {
       );
     });
   });
+
+  // C11 (2026-08-17 mobile round): after ending the shift the driver saw no
+  // distance at all. The off-shift screen shows the last shift's miles, in
+  // imperial units only.
+  describe("last shift distance", () => {
+    it("shows the ended shift distance in miles", () => {
+      mockUseDriverTracking.mockReturnValue(
+        baseCtx({ currentLocation: sampleLocation, lastShiftMiles: 0.62 }),
+      );
+      renderPortal();
+      expect(screen.getByText(/last shift/i)).toHaveTextContent("0.6 mi");
+    });
+
+    it("shows nothing before any shift has ended", () => {
+      mockUseDriverTracking.mockReturnValue(
+        baseCtx({ currentLocation: sampleLocation, lastShiftMiles: null }),
+      );
+      renderPortal();
+      expect(screen.queryByText(/last shift/i)).not.toBeInTheDocument();
+    });
+  });
 });

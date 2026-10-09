@@ -44,6 +44,8 @@ interface DriverTrackingContextValue {
   shiftError: string | null;
   startShift: (location: LocationUpdate) => Promise<boolean>;
   endShift: (shiftId: string, location: LocationUpdate, finalMileage?: number) => Promise<boolean>;
+  /** Miles driven on the last shift ended this session (null until one ends). */
+  lastShiftMiles: number | null;
 
   // Deliveries
   activeDeliveries: DeliveryTracking[];
@@ -106,6 +108,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     isShiftActive,
     startShift,
     endShift: endShiftBase,
+    lastShiftMiles,
     loading: shiftLoading,
     error: shiftError,
   } = useDriverShift();
@@ -218,6 +221,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     shiftError,
     startShift,
     endShift,
+    lastShiftMiles,
 
     // Deliveries
     activeDeliveries,
