@@ -180,10 +180,10 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 </div>
                 {driverInfo.email && (
                   <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-slate-400" />
+                    <Mail className="h-4 w-4 shrink-0 text-slate-400" />
                     <a
                       href={`mailto:${driverInfo.email}`}
-                      className="font-medium text-blue-600 hover:underline"
+                      className="min-w-0 break-all font-medium text-blue-600 hover:underline"
                     >
                       {driverInfo.email}
                     </a>
@@ -226,11 +226,13 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                   Driver Status
                 </span>
 
-                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+                {/* The Badge primitive is nowrap; let the status wrap so it
+                    stays inside the card on a phone (mobile QA round 1, F3). */}
+                <div className="mb-4 flex max-w-full flex-col items-center gap-3 md:flex-row">
                   <Badge
                     variant="outline"
                     className={cn(
-                      "px-4 py-2 text-lg font-medium",
+                      "h-auto max-w-full justify-center whitespace-normal px-4 py-2 text-center text-base font-medium sm:text-lg",
                       getStatusColor(order.driver_status),
                     )}
                   >
