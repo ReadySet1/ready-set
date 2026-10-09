@@ -24,6 +24,13 @@ export type AdminEndShiftRequest = z.infer<typeof AdminEndShiftRequestSchema>;
 export interface AdminEndShiftOpenOrder {
   orderNumber: string;
   status: string;
+  /**
+   * True when the driver's own End Shift guard will refuse their NEXT shift
+   * over this order: it is started work (mid-delivery), which blocks with no
+   * date window until dispatch reassigns, completes or cancels it.
+   * Not-started work is false (it stops blocking 24h after its pickup).
+   */
+  blocksNextEndShift: boolean;
 }
 
 export interface AdminEndShiftReturnRequest {

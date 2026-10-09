@@ -65,9 +65,21 @@ describe("getAdminEndShiftPreview", () => {
 
   it("lists the driver's open orders and this shift's pending return requests", async () => {
     mockQuery.mockResolvedValueOnce([shiftRow()]).mockResolvedValueOnce([
-      { order_number: "CAT-001", status: "ASSIGNED" },
-      { order_number: "CAT-001", status: "EN_ROUTE_TO_VENDOR" },
-      { order_number: "OD-002", status: "PICKED_UP" },
+      {
+        order_number: "CAT-001",
+        status: "ASSIGNED",
+        blocks_next_end_shift: false,
+      },
+      {
+        order_number: "CAT-001",
+        status: "EN_ROUTE_TO_VENDOR",
+        blocks_next_end_shift: false,
+      },
+      {
+        order_number: "OD-002",
+        status: "PICKED_UP",
+        blocks_next_end_shift: true,
+      },
     ]);
     mockFindRequests.mockResolvedValueOnce([
       {
@@ -91,8 +103,16 @@ describe("getAdminEndShiftPreview", () => {
       },
       // Deduped by order number (first row wins).
       openOrders: [
-        { orderNumber: "CAT-001", status: "ASSIGNED" },
-        { orderNumber: "OD-002", status: "PICKED_UP" },
+        {
+          orderNumber: "CAT-001",
+          status: "ASSIGNED",
+          blocksNextEndShift: false,
+        },
+        {
+          orderNumber: "OD-002",
+          status: "PICKED_UP",
+          blocksNextEndShift: true,
+        },
       ],
       pendingReturnRequests: [
         {
@@ -112,6 +132,139 @@ describe("getAdminEndShiftPreview", () => {
           requestedAt: { gte: SHIFT_START },
         },
       }),
+    );
+  });
+});
+
+/**
+ * blocksNextEndShift — whether a leftover order will stop the driver from
+ * ending their NEXT shift. Mirrors the STARTED-work branch of the end-shift
+ * guard in endDriverShift (driver-actions.ts): started work always blocks,
+ * not-started work only inside a 24h window, PENDING return requests and
+ * cancelled parent orders never block.
+ */
+describe("getAdminEndShiftPreview — blocksNextEndShift", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockFindRequests.mockResolvedValue([]);
+  });
+
+  async function previewWithRows(rows: unknown[]) {
+    mockQuery.mockResolvedValueOnce([shiftRow()]).mockResolvedValueOnce(rows);
+    const preview = await getAdminEndShiftPreview(SHIFT_ID);
+    const sql = String(mockQuery.mock.calls[1]?.[0] ?? "");
+    return { preview, sql };
+  }
+
+  it("flags started work and leaves not-started work unflagged", async () => {
+    const { preview } = await previewWithRows([
+      {
+        order_number: "CAT-010",
+        status: "ASSIGNED",
+        blocks_next_end_shift: false,
+      },
+      {
+        order_number: "CAT-011",
+        status: "EN_ROUTE_TO_CLIENT",
+        blocks_next_end_shift: true,
+      },
+    ]);
+
+    expect(preview?.openOrders).toEqual([
+      { orderNumber: "CAT-010", status: "ASSIGNED", blocksNextEndShift: false },
+      {
+        orderNumber: "CAT-011",
+        status: "EN_ROUTE_TO_CLIENT",
+        blocksNextEndShift: true,
+      },
+    ]);
+  });
+
+  it("treats a missing flag as not blocking", async () => {
+    const { preview } = await previewWithRows([
+      { order_number: "CAT-012", status: "ASSIGNED" },
+    ]);
+
+    expect(preview?.openOrders).toEqual([
+      { orderNumber: "CAT-012", status: "ASSIGNED", blocksNextEndShift: false },
+    ]);
+  });
+
+  it("blocks when either source says so, keeping the first row's status", async () => {
+    const { preview } = await previewWithRows([
+      // deliveries mirror: not started
+      {
+        order_number: "CAT-020",
+        status: "ASSIGNED",
+        blocks_next_end_shift: false,
+      },
+      // dispatch side: already moving
+      {
+        order_number: "CAT-020",
+        status: "PICKED_UP",
+        blocks_next_end_shift: true,
+      },
+      // and the reverse order
+      {
+        order_number: "OD-021",
+        status: "IN_PROGRESS",
+        blocks_next_end_shift: true,
+      },
+      {
+        order_number: "OD-021",
+        status: "ASSIGNED",
+        blocks_next_end_shift: false,
+      },
+    ]);
+
+    expect(preview?.openOrders).toEqual([
+      { orderNumber: "CAT-020", status: "ASSIGNED", blocksNextEndShift: true },
+      {
+        orderNumber: "OD-021",
+        status: "IN_PROGRESS",
+        blocksNextEndShift: true,
+      },
+    ]);
+  });
+
+  it("computes the flag with the guard's started-work conditions", async () => {
+    const { sql } = await previewWithRows([]);
+    const flat = sql.replace(/\s+/g, " ");
+
+    // deliveries mirror: anything outside the not-started set is started work.
+    expect(flat).toContain("UPPER(dl.status) NOT IN ('ASSIGNED','PENDING')");
+    // dispatch side: movement stages on either order type.
+    const movement =
+      "IN ('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')";
+    expect(flat).toContain(`cr."driverStatus" ${movement}`);
+    expect(flat).toContain(`od."driverStatus" ${movement}`);
+    expect(flat).toContain("AS blocks_next_end_shift");
+    // No pickup-time window: not-started work never counts toward the flag.
+    expect(flat).not.toMatch(/pickup/i);
+  });
+
+  it("never flags an order with a PENDING return request", async () => {
+    const { sql } = await previewWithRows([]);
+    const flat = sql.replace(/\s+/g, " ");
+
+    // deliveries mirror joins on order_number, dispatch side on order_id.
+    expect(flat).toMatch(
+      /NOT EXISTS \( SELECT 1 FROM delivery_return_requests rr WHERE rr\.order_number = dl\.order_number AND rr\.status = 'PENDING' \)/,
+    );
+    expect(flat).toMatch(
+      /NOT EXISTS \( SELECT 1 FROM delivery_return_requests rr WHERE rr\.order_id = COALESCE\(cr\.id, od\.id\) AND rr\.status = 'PENDING' \)/,
+    );
+  });
+
+  it("never flags a deliveries row whose parent order is CANCELLED", async () => {
+    const { sql } = await previewWithRows([]);
+    const flat = sql.replace(/\s+/g, " ");
+
+    expect(flat).toMatch(
+      /NOT EXISTS \( SELECT 1 FROM catering_requests xc WHERE xc\."orderNumber" = dl\.order_number AND xc\.status = 'CANCELLED' \)/,
+    );
+    expect(flat).toMatch(
+      /NOT EXISTS \( SELECT 1 FROM on_demand_requests xo WHERE xo\."orderNumber" = dl\.order_number AND xo\.status = 'CANCELLED' \)/,
     );
   });
 });

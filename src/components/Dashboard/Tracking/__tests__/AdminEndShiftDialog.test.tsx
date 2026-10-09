@@ -35,8 +35,8 @@ const preview = {
     driverName: "Fernando Sanchez",
   },
   openOrders: [
-    { orderNumber: "CAT-001", status: "ASSIGNED" },
-    { orderNumber: "OD-002", status: "PICKED_UP" },
+    { orderNumber: "CAT-001", status: "ASSIGNED", blocksNextEndShift: false },
+    { orderNumber: "OD-002", status: "PICKED_UP", blocksNextEndShift: false },
   ],
   pendingReturnRequests: [
     {
@@ -103,6 +103,60 @@ describe("AdminEndShiftDialog", () => {
       `/api/tracking/shifts/${SHIFT_ID}/admin-end`,
       expect.objectContaining({ credentials: "include" }),
     );
+  });
+
+  it("does not warn about the next End Shift when no order blocks it", async () => {
+    mockFetch();
+    renderDialog();
+    await screen.findByText("CAT-001");
+
+    expect(
+      screen.queryByText(/blocks next end shift/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/block .* from ending their next shift/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks started orders and warns they will block the next End Shift", async () => {
+    mockFetch({
+      success: true,
+      data: {
+        ...preview,
+        openOrders: [
+          {
+            orderNumber: "CAT-001",
+            status: "ASSIGNED",
+            blocksNextEndShift: false,
+          },
+          {
+            orderNumber: "OD-002",
+            status: "PICKED_UP",
+            blocksNextEndShift: true,
+          },
+        ],
+      },
+    });
+    renderDialog();
+    await screen.findByText("CAT-001");
+
+    // Only the started order carries the label.
+    const labels = screen.getAllByText(/blocks next end shift/i);
+    expect(labels).toHaveLength(1);
+    expect(screen.getByText("OD-002").closest("li")).toContainElement(
+      labels[0] as HTMLElement,
+    );
+    expect(screen.getByText("CAT-001").closest("li")).not.toHaveTextContent(
+      /blocks next end shift/i,
+    );
+
+    const warning = screen.getByRole("status");
+    expect(warning).toHaveTextContent(
+      /block Fernando Sanchez from ending their next shift/i,
+    );
+    expect(warning).toHaveTextContent(/reassigned, completed, or cancelled/i);
+    // The general copy is still there for the rest.
+    expect(screen.getByText(/nothing is cancelled/i)).toBeInTheDocument();
   });
 
   it("says so when nothing else is open", async () => {

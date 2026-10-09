@@ -66,18 +66,58 @@ async function loadShiftContext(
 }
 
 /**
+ * Driver statuses that count as STARTED work in the end-shift guard
+ * (`endDriverShift`, driver-actions.ts). Compile-time constant.
+ */
+const MOVEMENT_STAGES = `('EN_ROUTE_TO_VENDOR','ARRIVED_AT_VENDOR','PICKED_UP','EN_ROUTE_TO_CLIENT','ARRIVED_TO_CLIENT')`;
+
+/**
  * Every non-terminal order still assigned to the driver, from both places the
  * end-shift guard looks: the `deliveries` mirror (keyed on drivers.id) and
  * dispatches (keyed on the driver's profile id). Deduped by order number.
+ *
+ * `blocks_next_end_shift` mirrors the guard's STARTED-work branch, which
+ * blocks the driver's own End Shift with no date window:
+ *  - deliveries: status outside the not-started set (ASSIGNED/PENDING), unless
+ *    the parent catering/on-demand order is CANCELLED;
+ *  - dispatches: the order's driverStatus is a movement stage.
+ * Both sides exclude orders with a PENDING return request. NOT-STARTED work is
+ * never flagged: it only blocks inside a pickup window that closes 24h after
+ * pickup (END_SHIFT_STALE_PICKUP_HOURS), so it cannot deadlock the next shift
+ * for long.
  */
 async function loadOpenOrders(
   driverId: string,
 ): Promise<AdminEndShiftOpenOrder[]> {
   const rows = await prisma.$queryRawUnsafe<
-    { order_number: string | null; status: string | null }[]
+    {
+      order_number: string | null;
+      status: string | null;
+      blocks_next_end_shift?: boolean | null;
+    }[]
   >(
     `
-    SELECT dl.order_number, dl.status
+    SELECT
+      dl.order_number,
+      dl.status,
+      (
+        UPPER(dl.status) NOT IN ('ASSIGNED','PENDING')
+        AND NOT EXISTS (
+          SELECT 1 FROM delivery_return_requests rr
+          WHERE rr.order_number = dl.order_number
+            AND rr.status = 'PENDING'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM catering_requests xc
+          WHERE xc."orderNumber" = dl.order_number
+            AND xc.status = 'CANCELLED'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM on_demand_requests xo
+          WHERE xo."orderNumber" = dl.order_number
+            AND xo.status = 'CANCELLED'
+        )
+      ) AS blocks_next_end_shift
     FROM deliveries dl
     WHERE dl.driver_id = $1::uuid
       AND dl.deleted_at IS NULL
@@ -86,7 +126,20 @@ async function loadOpenOrders(
     SELECT
       COALESCE(cr."orderNumber", od."orderNumber") AS order_number,
       COALESCE(cr."driverStatus"::text, od."driverStatus"::text,
-               cr.status::text, od.status::text) AS status
+               cr.status::text, od.status::text) AS status,
+      (
+        (
+          (cr.id IS NOT NULL AND cr.status <> 'CANCELLED'
+            AND cr."driverStatus" IN ${MOVEMENT_STAGES})
+          OR (od.id IS NOT NULL AND od.status <> 'CANCELLED'
+            AND od."driverStatus" IN ${MOVEMENT_STAGES})
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM delivery_return_requests rr
+          WHERE rr.order_id = COALESCE(cr.id, od.id)
+            AND rr.status = 'PENDING'
+        )
+      ) AS blocks_next_end_shift
     FROM dispatches di
     LEFT JOIN catering_requests cr
       ON cr.id = di."cateringRequestId" AND cr."deletedAt" IS NULL
@@ -101,17 +154,23 @@ async function loadOpenOrders(
     driverId,
   );
 
-  const seen = new Set<string>();
-  const orders: AdminEndShiftOpenOrder[] = [];
+  // First row's status wins; an order blocks if either source says it does.
+  const byNumber = new Map<string, AdminEndShiftOpenOrder>();
   for (const row of rows) {
-    if (!row.order_number || seen.has(row.order_number)) continue;
-    seen.add(row.order_number);
-    orders.push({
+    if (!row.order_number) continue;
+    const blocks = row.blocks_next_end_shift === true;
+    const existing = byNumber.get(row.order_number);
+    if (existing) {
+      existing.blocksNextEndShift ||= blocks;
+      continue;
+    }
+    byNumber.set(row.order_number, {
       orderNumber: row.order_number,
       status: row.status ?? "UNKNOWN",
+      blocksNextEndShift: blocks,
     });
   }
-  return orders;
+  return [...byNumber.values()];
 }
 
 /** PENDING return requests are keyed on the driver's profile id. */

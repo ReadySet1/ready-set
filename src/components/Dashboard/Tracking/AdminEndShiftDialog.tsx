@@ -25,7 +25,8 @@ import { RETURN_REASON_LABELS } from "./ReturnRequestsPanel";
 /**
  * Confirmation step for ending a driver's shift from /admin/tracking.
  * Shows what happens before anything changes: the shift closes now, orders
- * stay assigned (nothing is cancelled), and this shift's pending return
+ * stay assigned (nothing is cancelled; orders already under way are marked
+ * because they will block the driver's next End Shift), and this shift's pending return
  * requests stay in the review queue unless the admin opts in to void them.
  * A reason is required; it lands in the audit trail and the shift notes.
  */
@@ -126,6 +127,7 @@ export default function AdminEndShiftDialog({
   };
 
   const openOrders = preview?.openOrders ?? [];
+  const blockingCount = openOrders.filter((o) => o.blocksNextEndShift).length;
   const returnRequests = preview?.pendingReturnRequests ?? [];
 
   return (
@@ -178,13 +180,33 @@ export default function AdminEndShiftDialog({
                         key={order.orderNumber}
                         className="flex justify-between gap-2"
                       >
-                        <span className="font-mono">{order.orderNumber}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="font-mono">{order.orderNumber}</span>
+                          {order.blocksNextEndShift && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                              Blocks next End Shift
+                            </span>
+                          )}
+                        </span>
                         <span className="text-muted-foreground">
                           {formatStatus(order.status)}
                         </span>
                       </li>
                     ))}
                   </ul>
+                  {blockingCount > 0 && (
+                    <p
+                      role="status"
+                      className="rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-900"
+                    >
+                      {blockingCount === 1
+                        ? "The marked order is already under way. It will block"
+                        : "The marked orders are already under way. They will block"}{" "}
+                      {driverName} from ending their next shift until{" "}
+                      {blockingCount === 1 ? "it is" : "they are"} reassigned,
+                      completed, or cancelled from dispatch.
+                    </p>
+                  )}
                   <p className="text-muted-foreground">
                     These orders stay assigned to {driverName}; nothing is
                     cancelled. Reassign them from dispatch if someone else
