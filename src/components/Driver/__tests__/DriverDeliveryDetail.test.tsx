@@ -605,4 +605,67 @@ describe("DriverDeliveryDetail", () => {
       expect(toast.success).not.toHaveBeenCalled();
     });
   });
+
+  // C6 (2026-08-17 mobile round): the POD photo uploaded fine but the driver's
+  // completed-order screen never rendered it. The stored fileUrl is a public
+  // URL into the private delivery-proofs bucket, so the screen must read the
+  // signed URL from the files route (#506 bucket split), not the order row.
+  describe("proof-of-delivery photo on a completed delivery", () => {
+    const SIGNED_POD_URL =
+      "https://supabase.example/storage/v1/object/sign/delivery-proofs/pod.jpg?token=abc";
+
+    function installFetchWithFiles(files: unknown[]) {
+      global.fetch = jest.fn((url: string) => {
+        if (String(url).includes("/files")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(files),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(currentOrder),
+        });
+      }) as unknown as typeof fetch;
+    }
+
+    it("renders the signed POD photo from the files route", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.COMPLETED });
+      installFetchWithFiles([
+        {
+          category: "pickup_signature",
+          fileUrl: "https://supabase.example/sign/signature.png",
+        },
+        {
+          category: "proof_of_delivery",
+          fileUrl: SIGNED_POD_URL,
+        },
+      ]);
+      renderDetail();
+
+      const photo = await screen.findByRole("img", { name: /proof of delivery/i });
+      expect(photo).toHaveAttribute("src", SIGNED_POD_URL);
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/orders/CV-12345/files",
+        expect.objectContaining({ credentials: "include" }),
+      );
+    });
+
+    it("does not fetch files while the delivery is still in progress", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.EN_ROUTE_TO_CLIENT });
+      installFetchWithFiles([{ category: "proof_of_delivery", fileUrl: SIGNED_POD_URL }]);
+      renderDetail();
+      await screen.findByText("Acme Corp");
+
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        expect.stringContaining("/files"),
+        expect.anything(),
+      );
+      expect(
+        screen.queryByRole("img", { name: /proof of delivery/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
