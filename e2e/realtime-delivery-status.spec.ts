@@ -13,9 +13,18 @@ import { test, expect, Page } from '@playwright/test';
  *
  * Note: Some tests may skip gracefully if the realtime feature flags are disabled
  * or if authentication is required.
+ *
+ * FIXME: this suite never ran — it uses no storage state, so every test hit
+ * its "Sign In" guard and skipped. It also targets UI that does not exist:
+ * /vendor/orders and /helpdesk/orders routes, data-testids "order-row",
+ * "driver-status-badge" and "realtime-status-indicator", and a helpdesk login
+ * the E2E setup does not create. RealtimeStatusIndicator only renders on an
+ * ACTIVE order's detail page (SingleOrder), so a rewrite also needs a seeded
+ * active order with an assigned driver. Marked fixme so the skip states the
+ * real reason instead of looking like missing credentials.
  */
 
-test.describe('Real-Time Delivery Status Updates', () => {
+test.describe.fixme('Real-Time Delivery Status Updates', () => {
   // Helper to check if the test should skip due to auth requirements
   const skipIfAuthRequired = async (page: Page) => {
     if ((await page.locator('text=Sign In').count()) > 0) {
