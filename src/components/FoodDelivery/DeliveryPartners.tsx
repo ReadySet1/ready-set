@@ -5,9 +5,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
-
-const LOGISTICS_CALENDAR_URL =
-  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 export interface PartnerLogo {
   name: string;
@@ -116,7 +114,7 @@ const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
   subtitle = "We're proud to collaborate with some of the top names in the industry:",
   partners = DEFAULT_FOOD_PARTNERS,
   ctaLabel = "Partner With Us",
-  calendarUrl = LOGISTICS_CALENDAR_URL,
+  calendarUrl = BOOKING_CALENDAR_URL,
 }) => {
   return (
     <div className="w-full bg-white py-16 md:py-20 lg:py-24">

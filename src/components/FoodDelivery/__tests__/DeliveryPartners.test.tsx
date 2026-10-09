@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
 import DeliveryPartners from "../DeliveryPartners";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 // Mock framer-motion is already configured in jest.setup.ts
 // The mock converts motion components to regular divs
@@ -581,7 +582,7 @@ describe("DeliveryPartners", () => {
 
       const calendarUrl = screen.getByTestId("schedule-dialog-calendar-url");
       expect(calendarUrl).toHaveTextContent(
-        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+        BOOKING_CALENDAR_URL
       );
     });
 

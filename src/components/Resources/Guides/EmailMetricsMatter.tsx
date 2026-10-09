@@ -7,11 +7,11 @@ import { Card } from "@/components/ui/card";
 import AppointmentDialog from "../../VirtualAssistant/Appointment";
 import { DownloadPopup } from "../ui/DownloadPopup";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 const EmailMetricsMatter = () => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
-  const calendarUrl =
-    "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true";
+  const calendarUrl = VA_CONSULTATION_CALENDAR_URL;
 
   const guideTitle = "Why Email Metrics Matter";
 
