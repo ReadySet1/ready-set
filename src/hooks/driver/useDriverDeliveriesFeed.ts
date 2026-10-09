@@ -52,47 +52,67 @@ function parseDeliveries(data: unknown): ApiDelivery[] {
 /** Terminal driver/order statuses that should never count as an active delivery. */
 const TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "DELIVERED"]);
 
+const FEED_URL = "/api/driver-deliveries?page=1&limit=999";
+const POLL_INTERVAL_MS = 60_000;
+
 export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
   const [deliveries, setDeliveries] = useState<ApiDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  /** True once any load has succeeded; later failures keep that data on screen. */
+  const hasData = useRef(false);
+  /** Controller of the request currently in flight, aborted on unmount. */
+  const controllerRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    setError(null);
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
-      const res = await fetch("/api/driver-deliveries?page=1&limit=999");
+      const res = await fetch(FEED_URL, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error("Failed to fetch deliveries");
       const data = await res.json();
+      if (controller.signal.aborted) return;
       setDeliveries(parseDeliveries(data));
+      hasData.current = true;
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "An error occurred");
+      if (controller.signal.aborted) return;
+      // A failed background poll keeps the last good list on screen instead of
+      // replacing it with an error; the next poll / focus refetch retries. The
+      // error only surfaces when there is nothing good to show yet.
+      if (!hasData.current) {
+        setError(e instanceof Error ? e.message : "An error occurred");
+      }
     } finally {
-      setLoading(false);
-      inFlight.current = false;
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+        inFlight.current = false;
+      }
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
-  // Initial load.
+  // Initial load, 60s poll, and refresh when the tab regains focus (a driver
+  // coming back to the app). Unmount stops all three and aborts the request in
+  // flight so a late response never touches state.
   useEffect(() => {
     void load();
-  }, [load]);
-
-  // Poll every 60s.
-  useEffect(() => {
-    const id = setInterval(() => void load(), 60_000);
-    return () => clearInterval(id);
-  }, [load]);
-
-  // Refresh when the tab regains focus (a driver coming back to the app).
-  useEffect(() => {
+    const id = setInterval(() => void load(), POLL_INTERVAL_MS);
     const onVisible = () => {
       if (!document.hidden) void load();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+      inFlight.current = false;
+    };
   }, [load]);
 
   // "Active" = still to be done. Guard on terminal status as well as
