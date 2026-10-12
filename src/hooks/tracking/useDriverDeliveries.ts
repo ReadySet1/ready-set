@@ -7,10 +7,28 @@ import { OrderStatus } from '@/types/order';
 import { createClient } from '@/utils/supabase/client';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
+/**
+ * The raw `/api/driver-deliveries` payload behind `activeDeliveries`, shared so
+ * the Home page's `useDriverDeliveriesFeed` can read the SAME poll instead of
+ * running a second one (the driver home used to fire every request twice).
+ */
+export interface DriverDeliveriesFeedSource {
+  /** Rows exactly as the API returned them on the last successful load. */
+  rows: unknown[];
+  /** False until the first load settles (success or failure). */
+  settled: boolean;
+  /** True once any load succeeded; later failures keep `rows` as they were. */
+  hasData: boolean;
+  /** Message of the last failed load (cleared when the next load starts). */
+  error: string | null;
+  refresh: () => Promise<void>;
+}
+
 interface UseDriverDeliveriesReturn {
   activeDeliveries: DeliveryTracking[];
   loading: boolean;
   error: string | null;
+  feedSource: DriverDeliveriesFeedSource;
   refreshDeliveries: () => Promise<void>;
   updateDeliveryStatus: (
     orderNumber: string,
@@ -49,6 +67,10 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
   const [activeDeliveries, setActiveDeliveries] = useState<DeliveryTracking[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Unmapped rows + first-load status, shared with the Home page's feed hook.
+  const [rawRows, setRawRows] = useState<unknown[]>([]);
+  const [settled, setSettled] = useState(false);
+  const [hasData, setHasData] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
@@ -117,6 +139,8 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         );
 
       setActiveDeliveries(mapped);
+      setRawRows(list);
+      setHasData(true);
     } catch (err) {
       console.error('Error loading active deliveries:', err);
       setError(err instanceof Error ? err.message : 'Failed to load deliveries');
@@ -128,6 +152,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
       });
     } finally {
       setLoading(false);
+      setSettled(true);
     }
   }, []);
 
@@ -222,10 +247,16 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [loadActiveDeliveries]);
 
+  const feedSource = useMemo<DriverDeliveriesFeedSource>(
+    () => ({ rows: rawRows, settled, hasData, error, refresh: refreshDeliveries }),
+    [rawRows, settled, hasData, error, refreshDeliveries],
+  );
+
   return {
     activeDeliveries,
     loading,
     error,
+    feedSource,
     refreshDeliveries,
     updateDeliveryStatus,
   };
