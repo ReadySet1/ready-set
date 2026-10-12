@@ -39,10 +39,19 @@ jest.mock('@/lib/cache/cache-invalidation', () => ({
   invalidateVendorCacheOnStatusUpdate: jest.fn(),
 }));
 
+jest.mock('@/lib/email-preferences', () => ({
+  getEmailPreferencesForUser: jest.fn(async () => ({ deliveryNotifications: true })),
+}));
+
+jest.mock('@/services/notifications/email', () => ({
+  sendDeliveryStatusEmail: jest.fn(async () => undefined),
+}));
+
 import { GET, PATCH } from '@/app/api/catering-requests/[orderId]/status/route';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
+import { sendDeliveryStatusEmail } from '@/services/notifications/email';
 
 // Auth gating (pilot API auth sweep): every test below runs as ADMIN unless
 // it says otherwise.
@@ -303,6 +312,46 @@ describe('/api/catering-requests/[orderId]/status API', () => {
       expect(response.status).toBe(200);
       expect(data.order.driverStatus).toBe('COMPLETED');
       expect(data.order.status).toBe('COMPLETED');
+    });
+
+    it('emails the customer a tracking link to the public order-status page', async () => {
+      // The customer-facing tracking page lives at /order-status/<order_number>;
+      // /orders/<order_number> does not exist and 404s from the email footer.
+      const previousSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      process.env.NEXT_PUBLIC_SITE_URL = 'https://readysetllc.com';
+      try {
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+          ...mockOrder,
+          status: 'IN_PROGRESS',
+          driverStatus: 'ARRIVED_TO_CLIENT',
+        });
+        (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+          ...mockOrder,
+          orderNumber: 'CV-46NF6X/1',
+          driverStatus: 'COMPLETED',
+          status: 'COMPLETED',
+          completeDateTime: new Date('2025-01-20T12:00:00Z'),
+        });
+        (CarrierService.sendStatusUpdate as jest.Mock).mockResolvedValue(null);
+
+        const request = createPatchRequest(
+          'http://localhost:3000/api/catering-requests/order-123/status',
+          { driverStatus: 'COMPLETED' }
+        );
+        const response = await PATCH(request, {
+          params: Promise.resolve({ orderId: 'order-123' }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(sendDeliveryStatusEmail).toHaveBeenCalledTimes(1);
+        const { details } = (sendDeliveryStatusEmail as jest.Mock).mock.calls[0][0];
+        expect(details.trackingLink).toBe(
+          'https://readysetllc.com/order-status/CV-46NF6X%2F1'
+        );
+        expect(details.trackingLink).not.toContain('/orders/');
+      } finally {
+        process.env.NEXT_PUBLIC_SITE_URL = previousSiteUrl;
+      }
     });
 
     it('should validate status transition rules', async () => {
