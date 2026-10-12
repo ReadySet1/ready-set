@@ -25,6 +25,8 @@ let mockTrackingState: {
 };
 jest.mock('@/contexts/DriverTrackingContext', () => ({
   useDriverTracking: () => mockTrackingState,
+  // No provider in this test tree: the deliveries feed hook polls on its own.
+  useDriverDeliveriesFeedSource: () => null,
 }));
 
 // Stub the leaf integrations — each owns its own fetch/context and is tested
