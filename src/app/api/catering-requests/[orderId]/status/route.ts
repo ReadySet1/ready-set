@@ -362,7 +362,7 @@ export async function PATCH(
           deliveryAddress: order.deliveryAddress
             ? `${order.deliveryAddress.street1}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
             : "",
-          trackingLink: `${siteUrl}/orders/${encodeURIComponent(updatedOrder.orderNumber)}`,
+          trackingLink: `${siteUrl}/order-status/${encodeURIComponent(updatedOrder.orderNumber)}`,
           supportLink: `${siteUrl}/contact`,
           unsubscribeLink: `${siteUrl}/account/preferences?tab=notifications`,
         },
