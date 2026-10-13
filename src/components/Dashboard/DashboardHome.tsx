@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { encodeOrderNumber } from "@/utils/order";
+import { formatDateForDisplay } from "@/lib/utils/date-display";
 import { CateringRequest, OrderStatus } from "@/types/order";
 import { useDashboardMetrics } from "@/components/Dashboard/DashboardMetrics";
 import { LoadingDashboard } from "../ui/loading";
@@ -784,7 +785,7 @@ export function ModernDashboardHome() {
       label: "Date",
       render: (order: CateringRequest) => (
         <span className="text-slate-600">
-          {new Date(order.createdAt).toLocaleDateString()}
+          {formatDateForDisplay(order.createdAt)}
         </span>
       ),
     },

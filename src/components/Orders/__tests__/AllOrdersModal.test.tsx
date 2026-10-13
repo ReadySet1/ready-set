@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AllOrdersModal } from "../AllOrdersModal";
+import { simulateBrowserTimezone } from "@/__tests__/utils/browser-timezone";
 import { OrderData } from "@/lib/services/vendor";
 
 // Mock fetch globally
@@ -509,5 +510,58 @@ describe("AllOrdersModal", () => {
       expect(screen.getByText("Completed")).toBeInTheDocument();
       expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
+  });
+});
+
+describe("AllOrdersModal - pickup/arrival timezone", () => {
+  // 06:30Z = Oct 7, 11:30 PM in Pacific; 05:15Z = Oct 7, 10:15 PM in Pacific.
+  // Both are Oct 8 in Tokyo (and in UTC), so a leaked browser zone changes the day.
+  const PICKUP = "2026-10-08T06:30:00.000Z";
+  const ARRIVAL = "2026-10-08T05:15:00.000Z";
+
+  const order: OrderData = {
+    id: "tz-1",
+    orderNumber: "TZ-0001",
+    orderType: "catering",
+    status: "ACTIVE",
+    pickupDateTime: PICKUP,
+    arrivalDateTime: ARRIVAL,
+    orderTotal: 10,
+    pickupAddress: {
+      id: "pickup-tz",
+      street1: "123 Pickup St",
+      city: "San Jose",
+      state: "CA",
+      zip: "95110",
+    },
+    deliveryAddress: {
+      id: "delivery-tz",
+      street1: "456 Delivery Ave",
+      city: "San Jose",
+      state: "CA",
+      zip: "95112",
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    simulateBrowserTimezone("Asia/Tokyo");
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("shows pickup and arrival in the app timezone (Pacific), not the browser timezone", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ orders: [order], hasMore: false, total: 1, page: 1, limit: 1000 }),
+    });
+
+    render(<AllOrdersModal isOpen onClose={jest.fn()} />);
+
+    expect(await screen.findByText("Oct 7, 2026 11:30 PM")).toBeInTheDocument();
+    expect(screen.getByText("Oct 7, 2026 10:15 PM")).toBeInTheDocument();
+    expect(screen.queryByText(/Oct 8/)).not.toBeInTheDocument();
   });
 });
