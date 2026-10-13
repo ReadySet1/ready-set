@@ -4,6 +4,7 @@
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import DashboardHome from '../DashboardHome';
+import { simulateBrowserTimezone } from '@/__tests__/utils/browser-timezone';
 import {
   renderPage,
   mockAuthenticatedUser,
@@ -384,5 +385,49 @@ describe('DashboardHome - StatCard', () => {
       expect(screen.getByText('25')).toBeInTheDocument(); // totalVendors
       expect(screen.getByText('150')).toBeInTheDocument(); // salesTotal
     });
+  });
+});
+
+describe('DashboardHome - active orders date timezone', () => {
+  // 06:30Z = Oct 7, 11:30 PM in Pacific, but Oct 8 in Tokyo (and in UTC).
+  const CREATED_AT = '2026-10-08T06:30:00.000Z';
+
+  beforeEach(() => {
+    resetAllPageMocks();
+    simulateBrowserTimezone('Asia/Tokyo');
+
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/orders/catering-orders')) {
+        return Promise.resolve(
+          createMockApiResponse({
+            ...mockOrdersResponse,
+            orders: [{ ...mockOrdersResponse.orders[0], createdAt: CREATED_AT }],
+          }),
+        );
+      }
+      if (url.includes('/api/users/current-user')) {
+        return Promise.resolve(createMockApiResponse(mockProfileResponse));
+      }
+      if (url.includes('/api/users')) {
+        return Promise.resolve(createMockApiResponse(mockUsersResponse));
+      }
+      if (url.includes('/api/admin/job-applications')) {
+        return Promise.resolve(createMockApiResponse(mockApplicationsResponse));
+      }
+      return Promise.resolve(createMockApiResponse({}));
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('shows the order date in the app timezone (Pacific), not the browser timezone', async () => {
+    renderPage(<DashboardHome />, {
+      user: mockAuthenticatedUser({ role: UserType.ADMIN }),
+    });
+
+    expect(await screen.findByText('Oct 7, 2026')).toBeInTheDocument();
+    expect(screen.queryByText('10/8/2026')).not.toBeInTheDocument();
   });
 });
