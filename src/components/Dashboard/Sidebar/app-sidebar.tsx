@@ -234,7 +234,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar className="bg-slate-50">
+    <Sidebar>
       <SidebarHeader className="p-4">
         <SidebarMenu className="mb-0">
           <SidebarMenuItem>

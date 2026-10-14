@@ -154,6 +154,16 @@ const config: Config = {
         border:  "hsl(var(--border) / <alpha-value>)",
         input:   "hsl(var(--input) / <alpha-value>)",
         ring:    "hsl(var(--ring) / <alpha-value>)",
+        sidebar: {
+          DEFAULT:              "hsl(var(--sidebar-background) / <alpha-value>)",
+          foreground:           "hsl(var(--sidebar-foreground) / <alpha-value>)",
+          primary:              "hsl(var(--sidebar-primary) / <alpha-value>)",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground) / <alpha-value>)",
+          accent:               "hsl(var(--sidebar-accent) / <alpha-value>)",
+          "accent-foreground":  "hsl(var(--sidebar-accent-foreground) / <alpha-value>)",
+          border:               "hsl(var(--sidebar-border) / <alpha-value>)",
+          ring:                 "hsl(var(--sidebar-ring) / <alpha-value>)",
+        },
 
         // ─── Driver app tokens (scoped via `.driver-theme`) ─────────
         // Cool slate-neutral surfaces + amber accent for the mobile
