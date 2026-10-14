@@ -206,6 +206,7 @@ const config: Config = {
         'card-h': '300px',
         'card-h-md': '400px',
         'card-h-lg': '500px',
+        'board-col': '220px',
         // Driver app fixed sizes (exact pixels from the design handoff). Named by
         // role so the components read intent, not magic numbers.
         'driver-hair': '3px',        // segmented/healthbar inner padding
