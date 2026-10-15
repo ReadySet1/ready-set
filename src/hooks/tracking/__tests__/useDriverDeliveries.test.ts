@@ -725,4 +725,73 @@ describe('useDriverDeliveries', () => {
       expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.DELIVERED });
     });
   });
+
+  // The provider in the /driver layout runs this poller for every driver surface,
+  // so a request still in flight must die with the hook, and a slow background
+  // poll must never beat a fresher refresh (e.g. the reload after a status PATCH).
+  describe('request lifecycle', () => {
+    const deferred = <T,>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const feedCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes('/api/driver-deliveries'),
+      );
+
+    it('aborts the feed request in flight on unmount', async () => {
+      const first = deferred<any[]>();
+      deliveriesHandler = () => first.promise;
+
+      const { unmount } = renderHook(() => useDriverDeliveries());
+
+      expect(feedCalls()).toHaveLength(1);
+      const init = feedCalls()[0]![1] as RequestInit;
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      expect(init.signal!.aborted).toBe(false);
+
+      unmount();
+
+      expect(init.signal!.aborted).toBe(true);
+
+      // Let the late response land: it must not throw or be reported.
+      await act(async () => {
+        first.resolve([mockOrder]);
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    it('a superseded poll response cannot overwrite a fresher refresh', async () => {
+      const slowPoll = deferred<any[]>();
+      let calls = 0;
+      deliveriesHandler = () =>
+        ++calls === 1
+          ? slowPoll.promise
+          : [makeOrder({ driverStatus: DriverStatus.EN_ROUTE_TO_CLIENT })];
+
+      const { result } = renderHook(() => useDriverDeliveries());
+      expect(feedCalls()).toHaveLength(1);
+
+      // A refresh starts while the mount poll is still pending and wins the race.
+      await act(async () => {
+        await result.current.refreshDeliveries();
+      });
+      await waitFor(() => {
+        expect(result.current.activeDeliveries[0]?.status).toBe(DriverStatus.EN_ROUTE_TO_CLIENT);
+      });
+      expect(result.current.loading).toBe(false);
+
+      // The stale mount poll finally resolves with the older status.
+      await act(async () => {
+        slowPoll.resolve([makeOrder({ driverStatus: DriverStatus.ASSIGNED })]);
+      });
+
+      expect(result.current.activeDeliveries[0]?.status).toBe(DriverStatus.EN_ROUTE_TO_CLIENT);
+      expect(result.current.error).toBeNull();
+      expect((feedCalls()[0]![1] as RequestInit).signal!.aborted).toBe(true);
+      expect(captureException).not.toHaveBeenCalled();
+    });
+  });
 });
