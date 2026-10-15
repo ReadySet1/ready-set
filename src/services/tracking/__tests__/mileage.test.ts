@@ -27,10 +27,21 @@ jest.mock("@/services/tracking/tracking-settings", () => ({
 
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/utils/prismaDB";
-import { calculateShiftMileage } from "../mileage";
+import { calculateShiftMileage, computeAnchorDistanceMeters } from "../mileage";
 import { getTrackingSettings } from "@/services/tracking/tracking-settings";
 import { TRACKING_SETTINGS_DEFAULTS } from "@/types/tracking-settings";
-import { MILEAGE_CONFIG, milesToMeters } from "@/config/mileage-config";
+import {
+  MILEAGE_CONFIG,
+  METERS_TO_MILES,
+  milesToMeters,
+  mphToMs,
+} from "@/config/mileage-config";
+// Real rs-dev GPS trails (2026-10-14 field test), translated to a synthetic
+// local frame: n/e are meters north/east of a fixed origin, t is seconds since
+// shift start. Distances, timestamps, accuracy and speed are preserved; the
+// real coordinates and driver ids are not. `phantom` marks the fixes from the
+// second, stale stream (constant battery, server-stamped time).
+import phantomPingShifts from "./fixtures/phantom-ping-shifts.json";
 
 const mockQueryRaw = prisma.$queryRawUnsafe as jest.Mock;
 const mockExecuteRaw = prisma.$executeRawUnsafe as jest.Mock;
@@ -63,6 +74,68 @@ function point(northM: number, eastM: number, atSeconds: number): SyntheticPoint
       BASE_LNG + eastM / (M_PER_DEG_LAT * Math.cos((BASE_LAT * Math.PI) / 180)),
     recorded_at: new Date(T0 + atSeconds * 1000),
   };
+}
+
+function milesFromMeters(meters: number): number {
+  return meters * METERS_TO_MILES;
+}
+
+interface FixturePoint {
+  t: number;
+  n: number;
+  e: number;
+  phantom: boolean;
+}
+
+type FixtureShift = keyof typeof phantomPingShifts;
+
+/** Fixture trail as odometer points, optionally without the phantom stream. */
+function fixtureTrail(
+  shift: FixtureShift,
+  { withoutPhantoms = false }: { withoutPhantoms?: boolean } = {},
+): SyntheticPoint[] {
+  const points: FixturePoint[] = phantomPingShifts[shift].points;
+  return points
+    .filter((p) => !(withoutPhantoms && p.phantom))
+    .map((p) => point(p.n, p.e, p.t));
+}
+
+/** Odometer miles at the production defaults (95 mph cap, 3.1 mi segment). */
+function odometerMiles(points: SyntheticPoint[]): number {
+  return milesFromMeters(
+    computeAnchorDistanceMeters(
+      points,
+      mphToMs(TRACKING_SETTINGS_DEFAULTS.mileageMaxSpeedMph),
+      milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES),
+    ),
+  );
+}
+
+/**
+ * Motorcycle-in-the-city route: east at `speedMs` with a 5s fix cadence,
+ * optionally with a silent gap (locked screen) during which the rider keeps
+ * moving at the same speed. Returns the trail and its true length in meters.
+ */
+function cityRoute({
+  speedMs,
+  fixes,
+  gapAfterFix,
+  gapSeconds = 0,
+}: {
+  speedMs: number;
+  fixes: number;
+  gapAfterFix?: number;
+  gapSeconds?: number;
+}): { points: SyntheticPoint[]; trueMeters: number } {
+  const points: SyntheticPoint[] = [];
+  let t = 0;
+  for (let i = 0; i < fixes; i++) {
+    points.push(point(0, t * speedMs, t));
+    t += i === gapAfterFix ? gapSeconds : 5;
+  }
+  const last = points[points.length - 1]!;
+  const trueMeters = ((last.recorded_at.getTime() - T0) / 1000) * speedMs;
+  return { points, trueMeters };
 }
 
 /** Deterministic PRNG (mulberry32) so jitter tests are reproducible. */
@@ -187,31 +260,145 @@ describe("calculateShiftMileage anchor-based odometer", () => {
     expect(MILEAGE_CONFIG.MIN_DISPLACEMENT_M).toBe(15);
   });
 
-  it("drops anchor hops exceeding the admin max speed as GPS glitches", async () => {
-    // A single stray fix teleporting 400m in 10s (40 m/s), then back.
-    const glitchTrail: SyntheticPoint[] = [
+  it("drops hops exceeding the admin max speed as GPS glitches", async () => {
+    // Two consecutive 400m hops in 10s each (40 m/s), never returning — so
+    // only the admin speed cap decides whether they count, not the
+    // out-and-back spike filter.
+    const fastTrail: SyntheticPoint[] = [
       point(0, 0, 0),
       point(400, 0, 10),
-      point(0, 0, 15),
+      point(800, 0, 20),
     ];
 
-    // 60 mph ≈ 26.8 m/s: the 40 m/s hop is a glitch and must not count.
+    // 60 mph ≈ 26.8 m/s: the 40 m/s hops are glitches and must not count.
     mockGetSettings.mockResolvedValue({
       ...TRACKING_SETTINGS_DEFAULTS,
       mileageMaxSpeedMph: 60,
     });
-    mockMileageQueries(glitchTrail);
+    mockMileageQueries(fastTrail);
     const capped = await calculateShiftMileage(SHIFT_ID);
     expect(capped.totalMiles).toBe(0);
 
-    // 95 mph ≈ 42.5 m/s: the same hop is admissible and counts.
+    // 95 mph ≈ 42.5 m/s: the same hops are admissible and count (800m).
     mockGetSettings.mockResolvedValue({
       ...TRACKING_SETTINGS_DEFAULTS,
       mileageMaxSpeedMph: 95,
     });
-    mockMileageQueries(glitchTrail);
+    mockMileageQueries(fastTrail);
     const allowed = await calculateShiftMileage(SHIFT_ID);
-    expect(allowed.totalMiles).toBeGreaterThan(0.2);
+    expect(allowed.totalMiles).toBeCloseTo(milesFromMeters(800), 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Teleport-and-return outliers (phantom pings)
+// ---------------------------------------------------------------------------
+
+describe("computeAnchorDistanceMeters teleport-and-return outliers", () => {
+  it("reproduces the field data: the stationary shift has ~465m phantom spikes", () => {
+    // Guard on the fixture itself so the tests below stay meaningful.
+    const trail = phantomPingShifts.stationaryWithPhantoms.points;
+    const origin = trail.find((p) => !p.phantom)!;
+    const spikes = trail.filter(
+      (p) => p.phantom && Math.hypot(p.n - origin.n, p.e - origin.e) > 400,
+    );
+    expect(spikes.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("counts ~0 mi for the stationary shift polluted by phantom spikes (stored 2.31 mi)", () => {
+    expect(odometerMiles(fixtureTrail("stationaryWithPhantoms"))).toBeLessThan(0.02);
+  });
+
+  it("counts ~0 mi for the stationary shift with a single phantom fix (stored 0.29 mi)", () => {
+    expect(odometerMiles(fixtureTrail("stationaryWithOnePhantom"))).toBeLessThan(0.02);
+  });
+
+  it("keeps a real drive's distance when a phantom stream is interleaved", () => {
+    const clean = odometerMiles(
+      fixtureTrail("realDriveWithPhantoms", { withoutPhantoms: true }),
+    );
+    const polluted = odometerMiles(fixtureTrail("realDriveWithPhantoms"));
+    // The real pickup → dropoff route measures ~0.56 mi. The old odometer
+    // billed 0.92 mi for this shift: the long phantom hops back to the pickup
+    // must go. Two phantoms land within ~30m of the driver while he is still
+    // at the pickup, at walking-pace speeds — indistinguishable from real
+    // movement without device metadata — so a small residual remains.
+    expect(clean).toBeGreaterThan(0.5);
+    expect(polluted).toBeGreaterThanOrEqual(clean);
+    expect(polluted - clean).toBeLessThan(0.1);
+  });
+
+  it("drops a fast spike out and back during real driving", () => {
+    const { points, trueMeters } = cityRoute({ speedMs: 12, fixes: 60 });
+    const spiked = [...points];
+    // Fix 30 teleports 465m sideways for one ping, then the trail resumes.
+    const at = spiked[30]!;
+    spiked[30] = {
+      ...at,
+      latitude: at.latitude + 465 / M_PER_DEG_LAT,
+    };
+    expect(odometerMiles(spiked)).toBeCloseTo(milesFromMeters(trueMeters), 1);
+    expect(odometerMiles(spiked)).toBeLessThan(odometerMiles(points) + 0.01);
+  });
+
+  it("drops a slow-in / fast-out spike after a long stationary stretch", () => {
+    // The original bug: still for two minutes, then a phantom 465m away (slow
+    // vs the anchor's old timestamp), then 5s later back home (impossible).
+    const points: SyntheticPoint[] = [];
+    for (let i = 0; i <= 24; i++) points.push(point(0, 0, i * 5));
+    points.push(point(0, 0, 240)); // locked screen: no fixes for 2 minutes
+    points.push(point(465, 0, 360)); // phantom
+    points.push(point(2, 1, 365)); // back home
+    points.push(point(465, 2, 367)); // phantom again, fast in
+    points.push(point(1, 0, 371)); // and back
+    for (let i = 1; i <= 10; i++) points.push(point(0, 0, 371 + i * 5));
+    expect(odometerMiles(points)).toBeLessThan(0.01);
+  });
+
+  it("ignores a phantom that is the very first fix of the trail", () => {
+    const points: SyntheticPoint[] = [point(465, 0, 0)];
+    for (let i = 1; i <= 30; i++) points.push(point(0, 0, i * 5));
+    expect(odometerMiles(points)).toBeLessThan(0.01);
+  });
+
+  it("ignores a phantom that is the very last fix of the trail", () => {
+    const points: SyntheticPoint[] = [];
+    for (let i = 0; i < 30; i++) points.push(point(0, 0, i * 5));
+    points.push(point(465, 0, 152));
+    expect(odometerMiles(points)).toBeLessThan(0.01);
+  });
+
+  it("drops a two-fix phantom burst", () => {
+    const points: SyntheticPoint[] = [];
+    for (let i = 0; i < 20; i++) points.push(point(0, 0, i * 5));
+    points.push(point(465, 0, 98), point(466, 3, 102));
+    for (let i = 21; i < 40; i++) points.push(point(0, 0, i * 5));
+    expect(odometerMiles(points)).toBeLessThan(0.01);
+  });
+
+  it("counts a motorcycle city route at a 5s cadence", () => {
+    const { points, trueMeters } = cityRoute({ speedMs: 11, fixes: 120 });
+    expect(odometerMiles(points)).toBeCloseTo(milesFromMeters(trueMeters), 2);
+  });
+
+  it("counts the real travel across a locked-screen gap", () => {
+    // 90s without fixes while riding 13 m/s: the 1,170m jump is real and slow
+    // enough (13 m/s) to be plausible, so it must be counted in full.
+    const { points, trueMeters } = cityRoute({
+      speedMs: 13,
+      fixes: 60,
+      gapAfterFix: 25,
+      gapSeconds: 90,
+    });
+    expect(odometerMiles(points)).toBeCloseTo(milesFromMeters(trueMeters), 2);
+  });
+
+  it("counts a 2-minute gap that ends somewhere new and stays there", () => {
+    // Parked, locked screen, rode 1.4 km in two minutes, parked again.
+    const points: SyntheticPoint[] = [];
+    for (let i = 0; i < 12; i++) points.push(point(0, 0, i * 5));
+    for (let i = 0; i < 12; i++) points.push(point(1400, 0, 55 + 120 + i * 5));
+    expect(odometerMiles(points)).toBeCloseTo(milesFromMeters(1400), 2);
   });
 });
 
