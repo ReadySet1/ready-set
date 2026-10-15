@@ -1,31 +1,38 @@
-import { format } from 'date-fns';
-import { utcToLocalTime } from './timezone';
+import { format, toZonedTime } from 'date-fns-tz';
+import { TIMEZONE_CONFIG } from '@/lib/config/timezone';
 
 /**
- * Format a UTC date/time for display in local timezone
- * @param utcDate - UTC date string or Date object
+ * ISO-8601 zone designator at the tail of a string: `Z`, `±HH:MM` or `±HHMM`.
+ * A string without one is "naive" wall-clock time and is formatted as-is.
+ */
+const ZONE_DESIGNATOR_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * Format an absolute instant for display in the app timezone
+ * (TIMEZONE_CONFIG.LOCAL_TIMEZONE), never the viewer's browser timezone.
+ * @param utcDate - Date, or ISO string (`Z` / explicit offset = absolute; no designator = naive)
  * @param formatStr - Format string for date-fns (default: 'MMM d, yyyy h:mm a')
- * @returns Formatted date string in local timezone
+ * @returns Formatted date string in the app timezone
  */
 export function formatDateTimeForDisplay(
   utcDate: string | Date | null | undefined,
   formatStr: string = 'MMM d, yyyy h:mm a'
 ): string {
   if (!utcDate) return 'N/A';
-  
+
   try {
     const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
-    
-    // If the date is already in local timezone (no 'Z' suffix), format directly
-    if (typeof utcDate === 'string' && !utcDate.endsWith('Z')) {
+    if (Number.isNaN(date.getTime())) {
+      throw new RangeError(`Invalid date value: ${String(utcDate)}`);
+    }
+
+    // A naive string carries no zone designator: it is already wall-clock time.
+    if (typeof utcDate === 'string' && !ZONE_DESIGNATOR_RE.test(utcDate.trim())) {
       return format(date, formatStr);
     }
-    
-    // Convert UTC to local time for display
-    const { date: localDate, time: localTime } = utcToLocalTime(date);
-    const localDateTime = new Date(`${localDate}T${localTime}`);
-    
-    return format(localDateTime, formatStr);
+
+    const timeZone = TIMEZONE_CONFIG.LOCAL_TIMEZONE;
+    return format(toZonedTime(date, timeZone), formatStr, { timeZone });
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Invalid Date';

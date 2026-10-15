@@ -123,6 +123,38 @@ describe('capacitor-tracking', () => {
     expect(postedBody().client_sent_at).toBe(nowMs);
   });
 
+  describe('GPS fix time', () => {
+    // A leaked watcher replaying an old fix must not look fresh: the server
+    // stamps NOW() only when no fix time arrives, so the plugin's `time`
+    // (epoch ms of the fix) has to travel as `timestamp`.
+    it('sends the plugin fix time as an ISO timestamp', async () => {
+      const fixTimeMs = nowMs - 10 * 60_000; // a 10-minute-old fix
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ time: fixTimeMs });
+
+      expect(postedBody().timestamp).toBe(new Date(fixTimeMs).toISOString());
+    });
+
+    it('omits timestamp when the plugin reports no fix time', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ time: null });
+
+      expect(postedBody()).not.toHaveProperty('timestamp');
+    });
+
+    it('omits timestamp when the fix time is absent or not a usable epoch', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix(); // no `time` key at all
+      await emitFix({ time: Number.NaN });
+      await emitFix({ time: 0 });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(postedBody(0)).not.toHaveProperty('timestamp');
+      expect(postedBody(1)).not.toHaveProperty('timestamp');
+      expect(postedBody(2)).not.toHaveProperty('timestamp');
+    });
+  });
+
   it('retries the driver-id lookup on later fixes until it succeeds, then caches it', async () => {
     const getDriverId = jest
       .fn()

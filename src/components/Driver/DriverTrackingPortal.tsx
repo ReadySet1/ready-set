@@ -42,6 +42,7 @@ import {
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
 import { formatMiles } from "@/lib/units";
+import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
   useDeliveryStatusRealtime,
@@ -136,6 +137,7 @@ export default function DriverTrackingPortal() {
     stopTracking,
     requestLocationPermission,
     currentShift,
+    clockOffsetMs = 0,
     isShiftActive,
     shiftLoading,
     shiftError,
@@ -194,15 +196,17 @@ export default function DriverTrackingPortal() {
     }
   }, []);
 
-  // Live shift timer.
+  // Live shift timer. Measured on the server's clock: a phone clock running
+  // behind the server kept this at 0:00 for whole shifts (2026-10-14).
+  const shiftStartTime = currentShift?.startTime;
   useEffect(() => {
-    if (!isShiftActive || !currentShift?.startTime) return;
-    const startedAt = new Date(currentShift.startTime).getTime();
-    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    if (!isShiftActive || !shiftStartTime) return;
+    const tick = () =>
+      setElapsed(shiftElapsedSeconds(shiftStartTime, Date.now(), clockOffsetMs));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [isShiftActive, currentShift?.startTime]);
+  }, [isShiftActive, shiftStartTime, clockOffsetMs]);
 
   // GPS auto-resume for an active shift lives in DriverTrackingProvider (the
   // /driver layout), so it fires on every driver page, not only this portal.

@@ -9,8 +9,8 @@ import {
 
 jest.mock("@/lib/db/prisma", () => ({
   prisma: {
-    cateringRequest: { findUnique: jest.fn() },
-    onDemand: { findUnique: jest.fn() },
+    cateringRequest: { findUnique: jest.fn(), findFirst: jest.fn() },
+    onDemand: { findUnique: jest.fn(), findFirst: jest.fn() },
   },
 }));
 
@@ -33,9 +33,31 @@ import { getOrderNotificationConfig } from "@/config/order-notifications";
 import * as Sentry from "@sentry/nextjs";
 
 const mockPrisma = prisma as unknown as {
-  cateringRequest: { findUnique: jest.Mock };
-  onDemand: { findUnique: jest.Mock };
+  cateringRequest: { findUnique: jest.Mock; findFirst: jest.Mock };
+  onDemand: { findUnique: jest.Mock; findFirst: jest.Mock };
 };
+
+/**
+ * Emulates the DB for one stored row: `findUnique` cannot filter on
+ * `deletedAt` (non-unique field) so it always returns the row; `findFirst`
+ * honours `where.deletedAt`. Lets the soft-delete tests prove the real
+ * difference between the two lookups instead of just asserting call shape.
+ */
+function seedRow(
+  model: { findUnique: jest.Mock; findFirst: jest.Mock },
+  row: { id: string; deletedAt: Date | null },
+) {
+  model.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) =>
+    where.id === row.id ? row : null,
+  );
+  model.findFirst.mockImplementation(
+    async ({ where }: { where: { id: string; deletedAt?: Date | null } }) => {
+      if (where.id !== row.id) return null;
+      if (where.deletedAt === null && row.deletedAt !== null) return null;
+      return row;
+    },
+  );
+}
 const mockSend = sendOrderNotificationToAdmin as jest.Mock;
 const mockConfig = getOrderNotificationConfig as jest.Mock;
 
@@ -215,8 +237,8 @@ describe("notifyOrderCreated", () => {
     });
 
     expect(result).toEqual({ sent: false, reason: "disabled" });
-    expect(mockPrisma.cateringRequest.findUnique).not.toHaveBeenCalled();
-    expect(mockPrisma.onDemand.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.cateringRequest.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.onDemand.findFirst).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
     expect(Sentry.captureException).not.toHaveBeenCalled();
@@ -228,7 +250,7 @@ describe("notifyOrderCreated", () => {
 
   it("sends a catering order notification with correctly mapped payload", async () => {
     const order = makeCateringOrder();
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(order);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(order);
 
     const result = await notifyOrderCreated({
       orderId: "order-catering-1",
@@ -237,8 +259,8 @@ describe("notifyOrderCreated", () => {
     });
 
     expect(result).toEqual({ sent: true });
-    expect(mockPrisma.cateringRequest.findUnique).toHaveBeenCalledWith({
-      where: { id: "order-catering-1" },
+    expect(mockPrisma.cateringRequest.findFirst).toHaveBeenCalledWith({
+      where: { id: "order-catering-1", deletedAt: null },
       include: { user: true, pickupAddress: true, deliveryAddress: true },
     });
 
@@ -259,7 +281,7 @@ describe("notifyOrderCreated", () => {
 
   it("sends an on-demand order notification with dimensions and weight", async () => {
     const order = makeOnDemandOrder();
-    mockPrisma.onDemand.findUnique.mockResolvedValue(order);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(order);
 
     const result = await notifyOrderCreated({
       orderId: "order-od-1",
@@ -268,8 +290,8 @@ describe("notifyOrderCreated", () => {
     });
 
     expect(result).toEqual({ sent: true });
-    expect(mockPrisma.onDemand.findUnique).toHaveBeenCalledWith({
-      where: { id: "order-od-1" },
+    expect(mockPrisma.onDemand.findFirst).toHaveBeenCalledWith({
+      where: { id: "order-od-1", deletedAt: null },
       include: { user: true, pickupAddress: true, deliveryAddress: true },
     });
 
@@ -291,7 +313,7 @@ describe("notifyOrderCreated", () => {
   // -----------------------------------------------------------------------
 
   it("returns order_not_found and reports to Sentry when the order does not exist", async () => {
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(null);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
 
     const result = await notifyOrderCreated({
       orderId: "missing-id",
@@ -311,11 +333,60 @@ describe("notifyOrderCreated", () => {
   });
 
   // -----------------------------------------------------------------------
+  // Soft-deleted orders must never be notified
+  // -----------------------------------------------------------------------
+
+  it("does not notify for a soft-deleted catering order", async () => {
+    seedRow(
+      mockPrisma.cateringRequest,
+      makeCateringOrder({ deletedAt: new Date("2026-09-01T12:00:00Z") }),
+    );
+
+    const result = await notifyOrderCreated({
+      orderId: "order-catering-1",
+      orderType: "catering",
+      source: "orders_api",
+    });
+
+    expect(result).toEqual({ sent: false, reason: "order_not_found" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("does not notify for a soft-deleted on-demand order", async () => {
+    seedRow(
+      mockPrisma.onDemand,
+      makeOnDemandOrder({ deletedAt: new Date("2026-09-01T12:00:00Z") }),
+    );
+
+    const result = await notifyOrderCreated({
+      orderId: "order-od-1",
+      orderType: "on_demand",
+      source: "orders_api",
+    });
+
+    expect(result).toEqual({ sent: false, reason: "order_not_found" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("still notifies a live (non-deleted) order through the filtered lookup", async () => {
+    seedRow(mockPrisma.cateringRequest, makeCateringOrder());
+
+    const result = await notifyOrderCreated({
+      orderId: "order-catering-1",
+      orderType: "catering",
+      source: "orders_api",
+    });
+
+    expect(result).toEqual({ sent: true });
+    expect(mockPrisma.cateringRequest.findUnique).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
   // Send returns false (silent failure — Resend down, bad key, rate limit)
   // -----------------------------------------------------------------------
 
   it("returns send_failed and reports to Sentry when send returns false", async () => {
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(makeCateringOrder());
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(makeCateringOrder());
     mockSend.mockResolvedValue(false);
 
     const result = await notifyOrderCreated({
@@ -341,7 +412,7 @@ describe("notifyOrderCreated", () => {
 
   it("resolves (never rejects) when send throws, and reports to Sentry with orderId in extra", async () => {
     const boom = new Error("Resend exploded");
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(makeCateringOrder());
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(makeCateringOrder());
     mockSend.mockRejectedValue(boom);
 
     const result = await notifyOrderCreated({
@@ -369,7 +440,7 @@ describe("notifyOrderCreated", () => {
 
   it("serializes Decimal orderTotal as a string, not [object Object]", async () => {
     const order = makeCateringOrder({ orderTotal: makeDecimal("1234.56") });
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(order);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(order);
 
     await notifyOrderCreated({
       orderId: "order-catering-1",
@@ -390,7 +461,7 @@ describe("notifyOrderCreated", () => {
     const order = makeCateringOrder({
       user: makeUser({ name: null, email: null }),
     });
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(order);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(order);
 
     await notifyOrderCreated({
       orderId: "order-catering-1",

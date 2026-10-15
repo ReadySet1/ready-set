@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Card } from '@/components/ui/card';
-import { AlertTriangleIcon } from 'lucide-react';
+import { AlertTriangleIcon, LocateFixed } from 'lucide-react';
 import type { DeliveryTracking, LocationUpdate } from '@/types/tracking';
 import { cn } from '@/lib/utils';
 import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
@@ -19,6 +19,17 @@ import {
   type NextStop,
   type RouteRequestKey,
 } from '@/lib/driver/next-stop-guide';
+import {
+  FOLLOW_EASE_DURATION_MS,
+  INITIAL_FOLLOW_STATE,
+  followReducer,
+  isPositionJump,
+  isUserCameraGesture,
+  shouldFollowFix,
+  type FollowAction,
+  type FollowState,
+  type LngLatPoint,
+} from '@/lib/driver/map-follow';
 
 // Ensure Mapbox token is available on the client
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -94,6 +105,10 @@ function createNextStopMarkerElement(stop: NextStop): HTMLDivElement {
   el.appendChild(pointer);
   return el;
 }
+
+/** Camera events that mean the driver may have taken over the map by hand
+ *  (each is checked with isUserCameraGesture before pausing follow). */
+const CAMERA_GESTURE_EVENTS = ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'] as const;
 
 /** Hard cap on trail vertices kept in memory / handed to Mapbox. */
 const MAX_TRAIL_POINTS = 1000;
@@ -237,8 +252,21 @@ export default function DriverLiveMap({
 
   // Maintain an in-memory trail of recent coordinates for the session
   const trailRef = useRef<TrailEntry[]>([]);
-  // Track last centered position to detect large jumps
-  const lastCenteredRef = useRef<{ lng: number; lat: number } | null>(null);
+  // Previous GPS fix — first-fix centering and teleport (jump) detection.
+  const lastFixRef = useRef<LngLatPoint | null>(null);
+  // Follow mode (Waze-style): the camera eases to each fix until the driver
+  // pans/zooms/rotates by hand; the Recenter button resumes it. The ref is
+  // what map event handlers and the GPS effect read (no stale closures); the
+  // state only drives the Recenter button.
+  const followRef = useRef<FollowState>(INITIAL_FOLLOW_STATE);
+  const [follow, setFollow] = useState<FollowState>(INITIAL_FOLLOW_STATE);
+  const lastFollowedRef = useRef<LngLatPoint | null>(null);
+  const dispatchFollow = useCallback((action: FollowAction) => {
+    const next = followReducer(followRef.current, action);
+    if (next === followRef.current) return;
+    followRef.current = next;
+    setFollow(next);
+  }, []);
   // Which shift the trail was last seeded from (guards against re-fetching).
   const seededShiftKeyRef = useRef<string | null>(null);
   // Pickup / drop-off markers keyed by delivery id.
@@ -353,6 +381,16 @@ export default function DriverLiveMap({
 
       map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
+      // Pause follow when the driver moves the camera by hand. Programmatic
+      // easeTo / flyTo / fitBounds fire the same events without an
+      // originalEvent, so they never pause it.
+      const onCameraGesture = (event: unknown) => {
+        if (isUserCameraGesture(event)) dispatchFollow({ type: 'userGesture' });
+      };
+      for (const eventName of CAMERA_GESTURE_EVENTS) {
+        map.on(eventName, onCameraGesture);
+      }
+
       map.on('load', () => {
         addSentryBreadcrumb('Driver map loaded', {
           feature: 'driver-live-map',
@@ -420,6 +458,8 @@ export default function DriverLiveMap({
         mapRef.current = null;
         driverMarkerRef.current = null;
         trailRef.current = [];
+        lastFixRef.current = null;
+        lastFollowedRef.current = null;
         pickupMarkersRef.current.clear();
         dropoffMarkersRef.current.clear();
         lastBoundsKeyRef.current = null;
@@ -436,7 +476,7 @@ export default function DriverLiveMap({
       });
       setMapError('Failed to initialize map. Please check console for details.');
     }
-  }, []);
+  }, [dispatchFollow]);
 
   // Update driver marker and trail when location changes
   useEffect(() => {
@@ -490,40 +530,38 @@ export default function DriverLiveMap({
         });
       }
 
-      // Calculate distance from last centered position (for detecting large jumps)
-      const shouldRecenter = () => {
-        // Always center on first location
-        if (!lastCenteredRef.current) return true;
+      const fix: LngLatPoint = { lng, lat };
+      const previousFix = lastFixRef.current;
+      lastFixRef.current = fix;
+      const map = mapRef.current;
 
-        // Calculate approximate distance in km using Haversine-like formula
-        const lastLat = lastCenteredRef.current.lat;
-        const lastLng = lastCenteredRef.current.lng;
-        const latDiff = Math.abs(lat - lastLat);
-        const lngDiff = Math.abs(lng - lastLng);
-
-        // Approximate distance in km (rough calculation)
-        // 1 degree latitude ≈ 111km, 1 degree longitude varies by latitude
-        const distanceKm = Math.sqrt(
-          Math.pow(latDiff * 111, 2) +
-          Math.pow(lngDiff * 111 * Math.cos(lat * Math.PI / 180), 2)
-        );
-
-        // Re-center if position jumped more than 10km (e.g., mock location simulator)
-        return distanceKm > 10;
-      };
-
-      // Center/zoom on the driver when first loaded or position jumped significantly
-      if (shouldRecenter()) {
-        mapRef.current.easeTo({
+      if (!previousFix || isPositionJump(previousFix, fix)) {
+        // First fix, or a teleport (mock-location simulator): center and zoom
+        // in, and resume follow since the camera is back on the driver.
+        map.easeTo({
           center: [lng, lat],
           zoom: MAP_CONFIG.MAX_AUTO_ZOOM,
           duration: MAP_CONFIG.FIT_BOUNDS_DURATION,
         });
-        lastCenteredRef.current = { lng, lat };
-        // Clear the trail when position jumps significantly (it's not a continuous path)
-        if (trailRef.current.length > 1) {
+        lastFollowedRef.current = fix;
+        dispatchFollow({ type: 'recenter' });
+        // A jump is not a continuous path — restart the trail there.
+        if (previousFix && trailRef.current.length > 1) {
           trailRef.current = [{ coord: [lng, lat], t }];
         }
+      } else if (
+        // Don't interrupt an in-flight programmatic animation (e.g. the fit to
+        // a new delivery set); the next fix catches up.
+        !map.isMoving() &&
+        shouldFollowFix({
+          following: followRef.current.following,
+          lastFollowed: lastFollowedRef.current,
+          fix,
+        })
+      ) {
+        // No zoom: keep whatever zoom the driver (or the stop fit) chose.
+        map.easeTo({ center: [lng, lat], duration: FOLLOW_EASE_DURATION_MS });
+        lastFollowedRef.current = fix;
       }
     } catch (error) {
       captureException(error, {
@@ -536,7 +574,22 @@ export default function DriverLiveMap({
         },
       });
     }
-  }, [currentLocation, mapLoaded]);
+  }, [currentLocation, mapLoaded, dispatchFollow]);
+
+  // Recenter: resume follow and fly back to the driver, north-up.
+  const handleRecenter = useCallback(() => {
+    const map = mapRef.current;
+    const fix = lastFixRef.current;
+    dispatchFollow({ type: 'recenter' });
+    if (!map || !fix) return;
+    map.flyTo({
+      center: [fix.lng, fix.lat],
+      bearing: 0,
+      pitch: 0,
+      duration: MAP_CONFIG.FIT_BOUNDS_DURATION,
+    });
+    lastFollowedRef.current = fix;
+  }, [dispatchFollow]);
 
   // Pickup + drop-off markers for active deliveries (2026-07-09 drive-test
   // feedback: neither location was visible on the driver's map). HTML markers
@@ -811,6 +864,19 @@ export default function DriverLiveMap({
           </div>
         </div>
       </div>
+      {/* Bottom-left, raised above the Mapbox logo; the zoom/compass controls
+          and attribution own the bottom-right corner. */}
+      {!follow.following && (
+        <button
+          type="button"
+          onClick={handleRecenter}
+          aria-label="Recenter map on your location"
+          className="absolute bottom-10 left-2 z-10 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-md transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:translate-y-px"
+        >
+          <LocateFixed className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          Recenter
+        </button>
+      )}
     </div>
   );
 }

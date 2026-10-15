@@ -22,9 +22,12 @@ let mockTrackingState: {
   isShiftActive: boolean;
   currentShift: { startTime: string } | null;
   activeDeliveries: unknown[];
+  clockOffsetMs?: number;
 };
 jest.mock('@/contexts/DriverTrackingContext', () => ({
   useDriverTracking: () => mockTrackingState,
+  // No provider in this test tree: the deliveries feed hook polls on its own.
+  useDriverDeliveriesFeedSource: () => null,
 }));
 
 // Stub the leaf integrations — each owns its own fetch/context and is tested
@@ -167,6 +170,29 @@ describe('DriverPage (redesigned home)', () => {
       expect(screen.getByText('Active shift')).toBeInTheDocument();
       await waitFor(() => {
         expect(screen.getByText('2 active')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // 2026-10-14: a phone clock ~3,648 s behind the server made every shift
+  // duration read zero. The home card measures on the server's clock.
+  describe('active shift duration', () => {
+    it('corrects a device clock running an hour behind the server', async () => {
+      const deviceNow = Date.now(); // pinned by setSystemTime in beforeEach
+      const offsetMs = 3_648_000;
+      // Real (server) time is 25 minutes into the shift.
+      const startIso = new Date(deviceNow + offsetMs - 25 * 60_000).toISOString();
+      mockTrackingState = {
+        isShiftActive: true,
+        currentShift: { startTime: startIso },
+        activeDeliveries: [],
+        clockOffsetMs: offsetMs,
+      };
+
+      renderDriverHome();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Active for 25m/)).toBeInTheDocument();
       });
     });
   });
