@@ -526,12 +526,12 @@
     },
     {
       "id": "driver-photo-signature-required",
-      "status": "new",
+      "status": "progress",
       "title": "Mandatory driver photo + signature capture",
       "owner": "emmanuel",
       "source": "jun1",
       "created": "2026-06-01",
-      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration."
+      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration.<br><br><strong>Oct 15:</strong> PR #699 (draft) — pickup photo endpoint + server gates (422 <code>PICKUP_PHOTO_REQUIRED</code> / <code>POD_REQUIRED</code>). Finding: the signature pad lives at <em>pickup</em>, not completion. The \"refused to sign → recipient name\" fallback needs a new <code>deliveries</code> column (e.g. <code>delivery_received_by</code>), not built — Emmanuel to decide."
     },
     {
       "id": "driver-pickup-signature",
@@ -1020,12 +1020,12 @@
     },
     {
       "id": "dynamic-pricing-per-client",
-      "status": "new",
+      "status": "progress",
       "title": "Dynamic per-client pricing config — create new clients without hardcoded values",
       "owner": "emmanuel",
       "source": "jul13",
       "created": "2026-07-13",
-      "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors."
+      "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors.<br><br><strong>Oct 15:</strong> PR #698 — \"New client\" flow on the Adjust Vendor Pricing tab: creates a DB-only config from the generic template, auto-slugged key, 409 on duplicates, audit kept. No migration."
     },
     {
       "id": "sms-provider-final-call",
@@ -1968,12 +1968,12 @@
     },
     {
       "id": "pr-followup-fulton-counties-typing",
-      "status": "new",
+      "status": "progress",
       "title": "PR follow-up — Fulton in CountiesSelection.tsx + counties strict typing",
       "owner": "fernando",
       "source": "sep7",
       "created": "2026-09-07",
-      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types."
+      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types.<br><br><strong>Oct 15:</strong> PR #697 — Fulton added to the quote-request picker (the other four county lists already had it) and <code>counties: any</code> replaced by <code>string | string[]</code> + <code>parseProfileCounties()</code>. Shape inferred from code, not the DB."
     },
     {
       "id": "notify-order-created-findunique-bug",
