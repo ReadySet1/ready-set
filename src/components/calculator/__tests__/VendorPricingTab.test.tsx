@@ -22,9 +22,10 @@ jest.mock('@/components/ui/use-toast', () => ({
 
 // Mock VendorPricingEditor to simplify testing
 jest.mock('../VendorPricingEditor', () => ({
-  VendorPricingEditor: ({ config, onSave, isSaving }: any) => (
+  VendorPricingEditor: ({ config, onSave, isSaving, isNew }: any) => (
     <div data-testid="vendor-pricing-editor">
       <span data-testid="editing-vendor">{config.vendorName}</span>
+      {isNew && <span data-testid="editing-is-new">new</span>}
       <button
         data-testid="mock-save-btn"
         onClick={() =>
@@ -356,6 +357,123 @@ describe('VendorPricingTab', () => {
       const cancelButton = screen.getByTestId('alert-dialog-cancel');
       expect(cancelButton).toBeInTheDocument();
       expect(cancelButton).toHaveTextContent('Cancel');
+    });
+  });
+
+  describe('New Client Flow', () => {
+    async function openNewClientEditor() {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: mockConfigs }),
+      });
+
+      render(<VendorPricingTab />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Destino')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /new client/i }));
+
+      fireEvent.change(screen.getByLabelText(/client name/i), {
+        target: { value: 'Acme Catering' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('editing-vendor')).toHaveTextContent('Acme Catering');
+        expect(screen.getByTestId('editing-is-new')).toBeInTheDocument();
+      });
+    }
+
+    it('offers the New client action in the empty state too', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      });
+
+      render(<VendorPricingTab />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /new client/i })).toBeInTheDocument();
+      });
+    });
+
+    it('opens the editor on a template draft flagged as new', async () => {
+      await openNewClientEditor();
+    });
+
+    it('creates the client via mode=create and selects it', async () => {
+      await openNewClientEditor();
+
+      fireEvent.click(screen.getByTestId('mock-save-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/confirm new client/i)).toBeInTheDocument();
+      });
+
+      const created = {
+        ...mockConfigs[0],
+        id: 'acme-catering',
+        clientName: 'Updated Client',
+        vendorName: 'Acme Catering',
+      };
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          json: async () => ({ success: true, data: created }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, data: [...mockConfigs, created] }),
+        });
+
+      fireEvent.click(screen.getByTestId('alert-dialog-action'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          '/api/calculator/configurations?mode=create',
+          expect.objectContaining({ method: 'POST' })
+        );
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'Client created' })
+        );
+      });
+
+      await waitFor(() => {
+        // The new card is in the list and the editor now edits it as an existing client
+        expect(screen.getAllByText('Acme Catering').length).toBeGreaterThanOrEqual(1);
+        expect(screen.queryByTestId('editing-is-new')).not.toBeInTheDocument();
+      });
+    });
+
+    it('surfaces a duplicate-key rejection and keeps the draft open', async () => {
+      await openNewClientEditor();
+
+      fireEvent.click(screen.getByTestId('mock-save-btn'));
+      await waitFor(() => {
+        expect(screen.getByText(/confirm new client/i)).toBeInTheDocument();
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({ error: 'A configuration with key "acme-catering" already exists' }),
+      });
+
+      fireEvent.click(screen.getByTestId('alert-dialog-action'));
+
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Error creating client',
+            description: expect.stringMatching(/already exists/i),
+            variant: 'destructive',
+          })
+        );
+      });
+      expect(screen.getByTestId('editing-is-new')).toBeInTheDocument();
     });
   });
 
