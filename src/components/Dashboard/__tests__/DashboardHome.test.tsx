@@ -392,7 +392,12 @@ describe('DashboardHome - active orders date timezone', () => {
   // 06:30Z = Oct 7, 11:30 PM in Pacific, but Oct 8 in Tokyo (and in UTC).
   const CREATED_AT = '2026-10-08T06:30:00.000Z';
 
+  // Pin the clock so the activity feed is past its 7-day relative-time window
+  // on every run, not only once the fixture happens to be a week old.
+  const NOW = new Date('2026-10-20T18:00:00.000Z');
+
   beforeEach(() => {
+    jest.useFakeTimers({ now: NOW, advanceTimers: true });
     resetAllPageMocks();
     simulateBrowserTimezone('Asia/Tokyo');
 
@@ -420,6 +425,7 @@ describe('DashboardHome - active orders date timezone', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('shows the order date in the app timezone (Pacific), not the browser timezone', async () => {
@@ -427,7 +433,9 @@ describe('DashboardHome - active orders date timezone', () => {
       user: mockAuthenticatedUser({ role: UserType.ADMIN }),
     });
 
-    expect(await screen.findByText('Oct 7, 2026')).toBeInTheDocument();
+    // Once in the active-orders row and once in the Recent Activity feed,
+    // which falls back to an absolute date for items older than a week.
+    expect(await screen.findAllByText('Oct 7, 2026')).toHaveLength(2);
     expect(screen.queryByText('10/8/2026')).not.toBeInTheDocument();
   });
 });
