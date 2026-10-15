@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryTracking, LocationUpdate } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
 import { OrderStatus } from '@/types/order';
@@ -80,16 +80,31 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     return session?.access_token ?? null;
   }, [supabase]);
 
+  /** Controller of the feed request in flight; aborted when superseded or on unmount. */
+  const controllerRef = useRef<AbortController | null>(null);
+
+  // Latest request wins. A refresh after a status PATCH must never lose to a
+  // slower background poll that started earlier (the list would revert to the
+  // pre-PATCH status until the next tick), so a new load supersedes whatever
+  // is in flight and a superseded response is dropped without touching state.
+  // Skipping while busy — what the Home feed's standalone poller does — would
+  // make that post-PATCH refresh a no-op and hand the guards stale data.
   const loadActiveDeliveries = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
       setLoading(true);
       setError(null);
 
       const res = await fetch('/api/driver-deliveries?page=1&limit=999', {
         credentials: 'include',
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(`Failed to load deliveries (${res.status})`);
       const data = await res.json();
+      if (controller.signal.aborted) return;
       const list: any[] = Array.isArray(data?.deliveries) ? data.deliveries : [];
 
       const mapped: DeliveryTracking[] = list
@@ -142,6 +157,8 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
       setRawRows(list);
       setHasData(true);
     } catch (err) {
+      // An aborted request was superseded or the hook unmounted: not an error.
+      if (controller.signal.aborted) return;
       console.error('Error loading active deliveries:', err);
       setError(err instanceof Error ? err.message : 'Failed to load deliveries');
       captureException(err, {
@@ -151,8 +168,12 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         handled: true,
       });
     } finally {
-      setLoading(false);
-      setSettled(true);
+      if (controllerRef.current === controller) controllerRef.current = null;
+      // A superseded load leaves `loading`/`settled` to the request that replaced it.
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setSettled(true);
+      }
     }
   }, []);
 
@@ -227,9 +248,14 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     await loadActiveDeliveries();
   }, [loadActiveDeliveries]);
 
-  // Load on mount.
+  // Load on mount; abort the request in flight on unmount so a late response
+  // never touches state.
   useEffect(() => {
     loadActiveDeliveries();
+    return () => {
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    };
   }, [loadActiveDeliveries]);
 
   // Periodic refresh (1 min).
