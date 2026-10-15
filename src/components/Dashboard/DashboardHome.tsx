@@ -428,7 +428,7 @@ const ActivityFeedCard: React.FC<{ activities: ActivityItem[] }> = ({
     if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-    return date.toLocaleDateString();
+    return formatDateForDisplay(date);
   };
 
   return (
