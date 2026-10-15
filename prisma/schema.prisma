@@ -226,6 +226,8 @@ model Address {
   name                     String?
   latitude                 Float?
   longitude                Float?
+  /// IANA zone (e.g. America/Chicago). Derived from ZIP at write time; null falls back to derivation at read time.
+  timezone                 String?
   deletedAt                DateTime?         @db.Timestamptz(6)
   creator                  Profile?          @relation("AddressCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cateringDeliveryRequests CateringRequest[] @relation("CateringDelivery")

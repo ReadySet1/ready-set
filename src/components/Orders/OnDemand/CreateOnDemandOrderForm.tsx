@@ -56,6 +56,7 @@ import {
   Package,
 } from "lucide-react";
 import { format } from "date-fns";
+import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
 import { cn } from "@/lib/utils";
 import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
@@ -259,7 +260,8 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         ? { ...data, tempEntityId } as CreateOnDemandOrderInput
         : data as CreateOnDemandOrderInput;
 
-      const result = await createOnDemandOrder(submitData);
+      // The pickers hold browser-local wall-clock; save it in the pickup address zone (PT/CT).
+      const result = await createOnDemandOrder(orderTimesInPickupZone(submitData));
 
       if (result.error) {
         // Map server-side field errors to react-hook-form for inline display
@@ -381,7 +383,9 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         formData.tempEntityId = tempEntityId;
       }
 
-      const result = await createOnDemandOrder(formData as CreateOnDemandOrderInput);
+      const result = await createOnDemandOrder(
+        orderTimesInPickupZone(formData as CreateOnDemandOrderInput),
+      );
 
       if (result.success) {
         if (uploadedFiles.length > 0 && result.orderId) {

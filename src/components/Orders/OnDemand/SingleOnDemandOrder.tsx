@@ -44,7 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import { UserType } from "@/types/client-enums";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 
@@ -158,6 +158,8 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   canEditOrder = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  // Order times are entered and shown in the pickup address zone (PT/CT), never the browser zone.
+  const orderZone = orderTimezone(order);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
   const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
@@ -1168,7 +1170,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                       <div className="text-xs text-slate-500">
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleString(undefined, {
-                              timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                              timeZone: orderZone,
                             })
                           : "N/A"}
                       </div>
@@ -1183,8 +1185,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.pickupDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>
@@ -1198,8 +1201,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.arrivalDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>
@@ -1213,8 +1217,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.completeDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>

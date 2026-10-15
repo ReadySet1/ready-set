@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
+import { deriveAddressTimezone } from "@/lib/utils/address-timezone";
 import { Prisma } from "@prisma/client";
 import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
 import { notifyDriverOrderCancelled } from "@/services/notifications/driver-cancellation";
@@ -316,19 +317,23 @@ async function upsertAddress(
   existingAddressId?: string
 ): Promise<string> {
   const { id, ...addressFields } = addressData;
+  // The zone follows the ZIP; recompute whenever the ZIP is part of the write.
+  const timezone =
+    addressFields.zip !== undefined ? deriveAddressTimezone({ zip: addressFields.zip }) : undefined;
+  const data = timezone === undefined ? addressFields : { ...addressFields, timezone };
 
   // If we have an existing address ID, update it
   if (existingAddressId) {
     await prisma.address.update({
       where: { id: existingAddressId },
-      data: addressFields,
+      data,
     });
     return existingAddressId;
   }
 
   // Otherwise, create a new address
   const newAddress = await prisma.address.create({
-    data: addressFields,
+    data,
   });
   return newAddress.id;
 }
