@@ -62,6 +62,7 @@ export function ProofOfDeliveryCapture({
   className,
   uploadEndpoint,
   hideTitle = false,
+  requirementHint,
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { permission, error: permissionError, isCameraSupported } = useCameraPermission();
@@ -330,9 +331,10 @@ export function ProofOfDeliveryCapture({
       <div className="text-center">
         <h3 className="font-medium">Take a Photo</h3>
         <p className="text-sm text-muted-foreground">
-          {isRequired
-            ? 'A photo is required to complete this delivery'
-            : 'Optionally add a proof of delivery photo'}
+          {requirementHint ??
+            (isRequired
+              ? 'A photo is required to complete this delivery'
+              : 'Optionally add a proof of delivery photo')}
         </p>
       </div>
       <Button onClick={handleCaptureClick} size="lg" className="gap-2">

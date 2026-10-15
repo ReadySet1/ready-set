@@ -14,11 +14,15 @@
  */
 
 /**
- * Categories written by the POD and pickup-signature upload routes
- * (`prisma.fileUpload.create` in src/app/api/orders/[order_number]/pod and
- * .../signature). Matched case-insensitively for safety.
+ * Categories written by the POD, pickup-photo and pickup-signature upload
+ * routes (`prisma.fileUpload.create` in src/app/api/orders/[order_number]/pod,
+ * .../pickup-photo and .../signature). Matched case-insensitively for safety.
  */
-export const POD_FILE_CATEGORIES = ['proof_of_delivery', 'pickup_signature'] as const;
+export const POD_FILE_CATEGORIES = [
+  'proof_of_delivery',
+  'pickup_photo',
+  'pickup_signature',
+] as const;
 
 export function isPodFileCategory(category: string | null | undefined): boolean {
   if (!category) return false;

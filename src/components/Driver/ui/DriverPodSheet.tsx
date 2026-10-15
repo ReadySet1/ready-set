@@ -18,6 +18,11 @@ interface DriverPodSheetProps {
   orderNumber: string;
   /** Endpoint override (defaults to /api/tracking/deliveries/[id]/pod). */
   uploadEndpoint?: string;
+  /** Sheet title (defaults to "Proof of delivery"); the pickup-stage photo of
+   *  the order reuses this sheet with its own title + hint. */
+  title?: string;
+  /** Copy under "Take a Photo" — see ProofOfDeliveryCapture.requirementHint. */
+  requirementHint?: string;
   /** Called with the uploaded image URL once capture+upload succeeds. */
   onComplete: (url: string) => void;
 }
@@ -30,6 +35,8 @@ export function DriverPodSheet({
   deliveryId,
   orderNumber,
   uploadEndpoint,
+  title = "Proof of delivery",
+  requirementHint,
   onComplete,
 }: DriverPodSheetProps) {
   const { resolved } = useDriverTheme();
@@ -55,7 +62,7 @@ export function DriverPodSheet({
         <div className="mx-auto w-full max-w-2xl">
           <SheetHeader className="items-start">
             <SheetTitle className="text-[18px] font-semibold text-driver-text">
-              Proof of delivery
+              {title}
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">
@@ -64,6 +71,7 @@ export function DriverPodSheet({
               orderNumber={orderNumber}
               isRequired
               hideTitle
+              requirementHint={requirementHint}
               uploadEndpoint={uploadEndpoint}
               onUploadComplete={(url) => onComplete(url)}
               onCancel={() => onOpenChange(false)}

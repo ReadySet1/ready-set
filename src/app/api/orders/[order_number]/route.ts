@@ -39,6 +39,7 @@ import {
   resolveOpenShiftIdForUser,
 } from '@/services/tracking/active-shift';
 import { requiresActiveShift } from '@/lib/state-machine/driver-state';
+import { hasUploadInCategory, requiredPhotoForTransition } from '@/lib/driver/stage-photos';
 import {
   recordDriverStatusTransition,
   shouldRecordDriverHistory,
@@ -610,6 +611,29 @@ export async function PATCH(
           {
             error: 'SHIFT_REQUIRED',
             message: 'Start your shift before working a delivery.',
+          },
+          { status: 422 },
+        );
+      }
+    }
+    // Stage photos are mandatory (2026-06-01 decision, reaffirmed 06-22): the
+    // photo of the order at the vendor before PICKED_UP and the photo of the
+    // setup before COMPLETED. The capture sheets are client-side, so this is
+    // the authoritative check: the FileUpload row must already exist on the
+    // order (loaded with it above). Checked ahead of the pickup confirmation
+    // so the client opens the photo sheet first. Admin/helpdesk are exempt so
+    // they can repair stuck orders.
+    if (driverStatus && driverStatus !== currentDriverStatus && !callerIsPrivileged) {
+      const requiredPhoto = requiredPhotoForTransition(driverStatus as DriverStatus);
+      if (
+        requiredPhoto &&
+        !hasUploadInCategory((existingOrder as any).fileUploads, requiredPhoto.category)
+      ) {
+        return NextResponse.json(
+          {
+            error: requiredPhoto.code,
+            code: requiredPhoto.code,
+            message: requiredPhoto.message,
           },
           { status: 422 },
         );

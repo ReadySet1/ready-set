@@ -20,6 +20,7 @@ describe('isPodFileCategory', () => {
     // signature routes.
     expect(isPodFileCategory('proof_of_delivery')).toBe(true);
     expect(isPodFileCategory('pickup_signature')).toBe(true);
+    expect(isPodFileCategory('pickup_photo')).toBe(true);
   });
 
   it('matches case-insensitively and ignores surrounding whitespace', () => {
