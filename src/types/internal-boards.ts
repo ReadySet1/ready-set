@@ -20,6 +20,10 @@ export interface TasksBoardTask {
   owner: string;
   source: string;
   sourceRef?: string;
+  /** YYYY-MM-DD the card entered the board (see workspace CLAUDE.md → Tasks board). */
+  created?: string;
+  /** YYYY-MM-DD the work was closed; done cards only. */
+  closed?: string;
   tags?: TaskTag[];
   description?: string;
   relatedQa?: string;
