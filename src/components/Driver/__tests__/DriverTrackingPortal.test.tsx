@@ -861,6 +861,56 @@ describe("DriverTrackingPortal (redesigned)", () => {
     });
   });
 
+  // 2026-10-14 Android field report: the header timer sat at 0:00 for whole
+  // shifts while "Since 5:31 p.m." was right. The tester's phone clock runs
+  // ~3,648 s behind the server (same device as the 2026-10-06 GPS skew,
+  // PR #668), so `Date.now() - startTime` stayed negative and clamped to 0.
+  describe("shift timer", () => {
+    // Exactly what /api/tracking/shifts/active serializes (timestamptz → ISO Z).
+    const START_ISO = "2026-10-14T23:31:00.000Z";
+    const START_MS = Date.parse(START_ISO);
+
+    afterEach(() => jest.useRealTimers());
+
+    function activeShiftCtx(overrides: Record<string, unknown> = {}) {
+      return baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: START_ISO, status: "active" },
+        currentLocation: sampleLocation,
+        ...overrides,
+      });
+    }
+
+    it("counts up every second from the shift start", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(START_MS + 120_000);
+      mockUseDriverTracking.mockReturnValue(activeShiftCtx({ clockOffsetMs: 0 }));
+      renderPortal();
+      expect(screen.getByText("2:00")).toBeInTheDocument();
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(screen.getByText("2:05")).toBeInTheDocument();
+    });
+
+    it("does not stick at 0:00 when the device clock runs an hour behind the server", () => {
+      const deviceSkewMs = -3_648_000;
+      jest.useFakeTimers();
+      // Real time is two minutes into the shift; the phone reads an hour less.
+      jest.setSystemTime(START_MS + 120_000 + deviceSkewMs);
+      mockUseDriverTracking.mockReturnValue(
+        activeShiftCtx({ clockOffsetMs: -deviceSkewMs }),
+      );
+      renderPortal();
+      expect(screen.queryByText("0:00")).not.toBeInTheDocument();
+      expect(screen.getByText("2:00")).toBeInTheDocument();
+      act(() => {
+        jest.advanceTimersByTime(3_000);
+      });
+      expect(screen.getByText("2:03")).toBeInTheDocument();
+    });
+  });
+
   // C11 (2026-08-17 mobile round): after ending the shift the driver saw no
   // distance at all. The off-shift screen shows the last shift's miles, in
   // imperial units only.
