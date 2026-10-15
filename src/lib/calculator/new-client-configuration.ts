@@ -10,7 +10,10 @@ import {
   GENERIC_TEMPLATE,
 } from './client-configurations';
 
-export const NEW_CLIENT_TEMPLATE_ID = GENERIC_TEMPLATE.id;
+// Literal on purpose: GENERIC_TEMPLATE is only dereferenced inside
+// buildNewClientConfiguration, so importing this module never touches the
+// template at load time (test suites mock client-configurations partially).
+export const NEW_CLIENT_TEMPLATE_ID = 'generic-template';
 export const CONFIG_KEY_MAX_LENGTH = 64;
 export const CONFIG_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
