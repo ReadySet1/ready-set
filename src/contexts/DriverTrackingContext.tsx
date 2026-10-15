@@ -42,6 +42,9 @@ interface DriverTrackingContextValue {
 
   // Shift management
   currentShift: DriverShift | null;
+  /** Server clock minus device clock (ms); feed to shiftElapsedSeconds()
+   *  so shift timers survive a wrong phone clock. */
+  clockOffsetMs: number;
   isShiftActive: boolean;
   shiftLoading: boolean;
   shiftError: string | null;
@@ -120,6 +123,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   // Shift management
   const {
     currentShift,
+    clockOffsetMs,
     isShiftActive,
     startShift,
     endShift: endShiftBase,
@@ -232,6 +236,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
 
     // Shift
     currentShift,
+    clockOffsetMs,
     isShiftActive,
     shiftLoading,
     shiftError,

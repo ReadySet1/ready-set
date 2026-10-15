@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { DriverShift, LocationUpdate } from '@/types/tracking';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { withBearerAuth } from '@/lib/auth/bearer-session';
+import { estimateClockOffsetMs, nextClockOffsetMs } from '@/lib/driver/shift-clock';
 import {
   startShiftBreak,
   endShiftBreak
@@ -15,20 +16,34 @@ import {
  * (after a mid-shift deploy) throws "Server Action not found" and broke shift state.
  * See /api/tracking/shifts/*.
  */
-async function fetchActiveShift(driverId: string): Promise<DriverShift | null> {
+interface ActiveShiftResult {
+  shift: DriverShift | null;
+  /** Server-minus-device clock offset (ms); null when the server sent no time. */
+  clockOffsetMs: number | null;
+}
+
+async function fetchActiveShift(driverId: string): Promise<ActiveShiftResult> {
+  const headers = await withBearerAuth();
+  const sentAt = Date.now();
   const res = await fetch(
     `/api/tracking/shifts/active?driverId=${encodeURIComponent(driverId)}`,
     // Bearer token + cookies: the token survives the stale-cookie failure
     // mode (see @/lib/auth/bearer-session); cookies remain the fallback.
-    { credentials: 'include', headers: await withBearerAuth() },
+    { credentials: 'include', headers },
   );
   if (!res.ok) throw new Error(`Failed to load shift (${res.status})`);
   const data = await res.json();
-  return (data?.shift ?? null) as DriverShift | null;
+  return {
+    shift: (data?.shift ?? null) as DriverShift | null,
+    clockOffsetMs: estimateClockOffsetMs(data?.serverNow, sentAt, Date.now()),
+  };
 }
 
 interface UseDriverShiftReturn {
   currentShift: DriverShift | null;
+  /** Server clock minus device clock (ms). Add to Date.now() before measuring
+   *  shift elapsed time — a phone clock can be off by an hour (2026-10-14). */
+  clockOffsetMs: number;
   isShiftActive: boolean;
   loading: boolean;
   error: string | null;
@@ -46,6 +61,7 @@ export function useDriverShift(): UseDriverShiftReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastShiftMiles, setLastShiftMiles] = useState<number | null>(null);
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
 
   // Get driver ID from session (simplified)
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -80,7 +96,8 @@ export function useDriverShift(): UseDriverShiftReturn {
         return;
       }
 
-      const shift = await fetchActiveShift(driverId);
+      const { shift, clockOffsetMs: measuredOffsetMs } = await fetchActiveShift(driverId);
+      setClockOffsetMs((prev) => nextClockOffsetMs(prev, measuredOffsetMs));
       setCurrentShift(shift);
     } catch (error) {
       console.error('Error loading active shift:', error);
@@ -109,7 +126,7 @@ export function useDriverShift(): UseDriverShiftReturn {
       }
 
       // Check if there's already an active shift
-      const existingShift = await fetchActiveShift(driverId);
+      const { shift: existingShift } = await fetchActiveShift(driverId);
       if (existingShift) {
         throw new Error('You already have an active shift');
       }
@@ -308,6 +325,7 @@ export function useDriverShift(): UseDriverShiftReturn {
 
   return {
     currentShift,
+    clockOffsetMs,
     isShiftActive,
     loading,
     error,

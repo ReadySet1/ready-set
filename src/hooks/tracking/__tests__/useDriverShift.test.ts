@@ -80,6 +80,8 @@ describe('useDriverShift', () => {
   // Active-shift route: a queue of values mirroring mockResolvedValueOnce(...).
   // Each call dequeues the next; once empty it sticks on the last value.
   let activeShiftQueue: Array<any>;
+  // Server clock the active-shift route reports (undefined = old server).
+  let activeServerNow: (() => number) | undefined;
   let startShiftResult: () => FetchResult | Promise<FetchResult>;
   let endShiftResult: () => FetchResult | Promise<FetchResult>;
 
@@ -107,6 +109,7 @@ describe('useDriverShift', () => {
     // Defaults — equivalent to the old action defaults.
     sessionResponse = () => okJson(mockSessionResponse);
     setActiveShift(null); // getActiveShift -> null by default
+    activeServerNow = undefined;
     startShiftResult = () => okJson({ success: true, shiftId: mockShiftId });
     endShiftResult = () => okJson({ success: true });
 
@@ -123,7 +126,13 @@ describe('useDriverShift', () => {
         if (value instanceof Error) {
           return Promise.reject(value);
         }
-        return Promise.resolve(okJson({ success: true, shift: value }));
+        return Promise.resolve(
+          okJson({
+            success: true,
+            shift: value,
+            ...(activeServerNow ? { serverNow: activeServerNow() } : {}),
+          }),
+        );
       }
       if (url.includes('/api/tracking/shifts/start')) {
         return Promise.resolve(startShiftResult());
@@ -193,6 +202,35 @@ describe('useDriverShift', () => {
       await waitFor(() => {
         expect(captureException).toHaveBeenCalled();
       });
+    });
+  });
+
+  // 2026-10-14: an Android tester's phone clock ran ~3,648 s behind the
+  // server, so every shift timer read 0:00. The active-shift route reports the
+  // server clock; the hook turns it into a server-minus-device offset.
+  describe('server clock offset', () => {
+    it('defaults to 0 before any shift is loaded', () => {
+      const { result } = renderHook(() => useDriverShift());
+      expect(result.current.clockOffsetMs).toBe(0);
+    });
+
+    it('measures the device clock running an hour behind the server', async () => {
+      setActiveShift(mockShift);
+      activeServerNow = () => Date.now() + 3_648_000;
+
+      const { result } = renderHook(() => useDriverShift());
+
+      await waitFor(() => expect(result.current.currentShift).toEqual(mockShift));
+      expect(Math.abs(result.current.clockOffsetMs - 3_648_000)).toBeLessThan(1_000);
+    });
+
+    it('stays at 0 when the server does not report its clock (old server)', async () => {
+      setActiveShift(mockShift);
+
+      const { result } = renderHook(() => useDriverShift());
+
+      await waitFor(() => expect(result.current.currentShift).toEqual(mockShift));
+      expect(result.current.clockOffsetMs).toBe(0);
     });
   });
 
