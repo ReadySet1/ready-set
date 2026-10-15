@@ -71,7 +71,14 @@
     "sep18": "Sep 18",
     "sep22drive": "Drive Test 9/22",
     "sep23qa": "Forms QA 9/23",
-    "sep28drive": "Drive Test 9/28"
+    "sep28drive": "Drive Test 9/28",
+    "sep30ci": "CI Review 9/30",
+    "oct6drive": "Drive Test 10/6",
+    "oct7drive": "Drive Test 10/7",
+    "oct8review": "Oct 8 PR review",
+    "oct9review": "Oct 9 merge follow-ups",
+    "oct14drive": "Drive Test 10/14",
+    "oct15batch": "Oct 15 batch"
   },
   "tasks": [
     {
@@ -81,6 +88,8 @@
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#479",
+      "created": "2026-08-05",
+      "closed": "2026-08-06",
       "tags": [
         "critical",
         "bug"
@@ -93,6 +102,8 @@
       "title": "Pay overdue Vercel invoice + fix failed payment method",
       "owner": "mai",
       "source": "jun29",
+      "created": "2026-06-29",
+      "closed": "2026-07-22",
       "tags": [
         "critical"
       ],
@@ -105,6 +116,8 @@
       "owner": "fernando",
       "source": "may4",
       "sourceRef": "#9",
+      "created": "2026-05-04",
+      "closed": "2026-05-11",
       "description": "5-line analysis delivered; fed into the larger counter-proposal."
     },
     {
@@ -114,6 +127,8 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#10",
+      "created": "2026-05-04",
+      "closed": "2026-05-11",
       "description": "Telnyx counter-proposal delivered — projected savings $780–$840/yr vs Twilio. SignalWire flagged as fallback. Report at <code>docs/ready-set/reports/2026-05-07-twilio-alternatives-analysis.md</code>."
     },
     {
@@ -123,6 +138,8 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#13",
+      "created": "2026-05-04",
+      "closed": "2026-05-06",
       "description": "Candidate confirmed at ~15 hrs/week, communicated to Gary on 2026-05-06."
     },
     {
@@ -132,6 +149,8 @@
       "owner": "fernando",
       "source": "may4",
       "sourceRef": "#12",
+      "created": "2026-05-04",
+      "closed": "2026-05-11",
       "description": "Completed without flags raised in the recap."
     },
     {
@@ -141,6 +160,8 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#8",
+      "created": "2026-05-04",
+      "closed": "2026-08-17",
       "tags": [
         "moot"
       ],
@@ -152,6 +173,8 @@
       "title": "Resolve driver tracking sync issues",
       "owner": "emmanuel",
       "source": "may11",
+      "created": "2026-05-11",
+      "closed": "2026-08-03",
       "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections.<br><br><strong>CLOSED 2026-08-03 as superseded:</strong> the May-era sync issues were absorbed and resolved by the subsequent tracking workstream — realtime channel fixes (#409/#410), the driver authz/tracking overhaul (#441), and the June–July walk/drive-test PR series (#446, #460, #475–#477, #483–#485).<br><br>Remaining known realtime gaps are tracked specifically: <code>rea-367b-realtime-strictmode-resubscribe</code> (dev-only) and <code>rea-344-assign-driver-broadcast</code>."
     },
     {
@@ -161,6 +184,8 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#1",
+      "created": "2026-05-04",
+      "closed": "2026-07-13",
       "description": "Blocks the Google Sheet automation thread.<br><br><strong>DECIDED 7/13 meeting: DB profile / web app.</strong> The Coolfire master uploader will NOT be modified (operational risk); driver phone + ID fields are added in the web app instead — tracked as <code>webapp-driver-client-id-phone-fields</code>. SMS send lists therefore come from DB profiles."
     },
     {
@@ -170,6 +195,8 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#2",
+      "created": "2026-05-04",
+      "closed": "2026-08-17",
       "description": "July transition target — clock is ticking.<br><br><strong>Closed 2026-08-17 (board audit):</strong> moot with the bridge card — the 7/13 decision keeps the Coolfire uploader untouched and the replacement is the sheet → orders import.",
       "tags": [
         "moot"
@@ -182,6 +209,7 @@
       "owner": "emmanuel",
       "source": "may4",
       "sourceRef": "#4",
+      "created": "2026-05-04",
       "description": "Inquiry from Gary; no proposal sent yet. They want to send and receive orders."
     },
     {
@@ -191,6 +219,7 @@
       "owner": "gary",
       "source": "may4",
       "sourceRef": "#6",
+      "created": "2026-05-04",
       "description": "Outstanding small difference from previous work."
     },
     {
@@ -200,6 +229,7 @@
       "owner": "gary",
       "source": "may4",
       "sourceRef": "#7",
+      "created": "2026-05-04",
       "description": "Tied to \"withhold maintenance, don't take down sites\" policy. Still needs paper."
     },
     {
@@ -209,6 +239,8 @@
       "owner": "fernando",
       "source": "may4",
       "sourceRef": "#11",
+      "created": "2026-05-04",
+      "closed": "2026-08-17",
       "tags": [
         "moot"
       ],
@@ -216,11 +248,13 @@
     },
     {
       "id": "rea-342-soft-delete-orders",
-      "status": "open",
+      "status": "done",
       "title": "REA-342 — Fix hard-delete in /api/orders/delete",
       "owner": "emmanuel",
       "source": "qa",
       "sourceRef": "REA-342",
+      "created": "2026-05-11",
+      "closed": "2026-10-06",
       "relatedQa": "REA-OMG-06",
       "tags": [
         "bug"
@@ -229,11 +263,13 @@
     },
     {
       "id": "rea-343-bulk-delete-defects",
-      "status": "open",
+      "status": "done",
       "title": "REA-343 — Fix bulk-delete defects + S3 cleanup",
       "owner": "emmanuel",
       "source": "qa",
       "sourceRef": "REA-343",
+      "created": "2026-08-12",
+      "closed": "2026-10-06",
       "relatedQa": "REA-OMG-07",
       "tags": [
         "bug"
@@ -242,16 +278,18 @@
     },
     {
       "id": "rea-344-assign-driver-broadcast",
-      "status": "open",
+      "status": "done",
       "title": "REA-344 — Wire assignDriver realtime broadcast",
       "owner": "emmanuel",
       "source": "qa",
       "sourceRef": "REA-344",
+      "created": "2026-08-12",
+      "closed": "2026-10-06",
       "relatedQa": "REA-OMG-08",
       "tags": [
         "bug"
       ],
-      "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload.<br><br>Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08.<br><br><strong>Re-verified 2026-08-03: still broken</strong> — <code>broadcastDeliveryAssigned</code>'s only references are its unit tests; the assignDriver route's only post-assign side effect is the partner webhook."
+      "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload.<br><br>Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08.<br><br><strong>Re-verified 2026-08-03: still broken</strong> — <code>broadcastDeliveryAssigned</code>'s only references are its unit tests; the assignDriver route's only post-assign side effect is the partner webhook.<br><br><strong>Update 2026-10-05:</strong> PR #632 open: assignDriver now broadcasts <code>delivery:status:updated</code> (ASSIGNED) server-side, and the delivery row gets the order street instead of an empty address. <code>broadcastDeliveryAssigned</code> was not usable (browser-only client). Still open after #632: the on-demand order page and the orders list do not listen, so they still need a reload.<br><br><strong>Update 2026-10-05:</strong> #632 merged to development (catering order detail updates live). Remaining for this card: the on-demand order page and the orders list still need a reload.<br><br><strong>Done 2026-10-06:</strong> #642 merged to development: on-demand detail + both admin order lists refresh live; catering and on-demand detail pages quietly reload on ASSIGNED so the driver card appears. Prod at next promotion."
     },
     {
       "id": "rea-drt-07-supabase-browser-session-bridge",
@@ -259,6 +297,8 @@
       "title": "REA-DRT-07 — Bridge SSR cookie to browser supabase-js session (Realtime never initializes)",
       "owner": "emmanuel",
       "source": "qa",
+      "created": "2026-05-15",
+      "closed": "2026-05-22",
       "relatedQa": "REA-DRT-07",
       "tags": [
         "bug",
@@ -272,6 +312,8 @@
       "title": "Update Hours Sheet (previous weeks)",
       "owner": "emmanuel",
       "source": "may11",
+      "created": "2026-05-11",
+      "closed": "2026-05-19",
       "description": "Sheet updated with the latest tracked hours; Emmanuel confirmed in the May 19 meeting. Gary will review tonight (see <code>gary-review-hours-file</code>)."
     },
     {
@@ -280,6 +322,7 @@
       "title": "Calculator scope for KCO integration",
       "owner": "emmanuel",
       "source": "may11",
+      "created": "2026-05-11",
       "description": "Calculator must handle driver, vendor, and internal calculations simultaneously to eliminate manual data entry errors."
     },
     {
@@ -288,6 +331,7 @@
       "title": "Pre-configure CaterCow staging webhook URL",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-05-13",
       "description": "<strong>Done.</strong> Staging webhook configured on rs-dev via <code>scripts/set-partner-webhook.ts</code>: CaterCow <code>webhook_url</code> = <code>https://api.staging.steerdelivery.com/webhooks/ready_set</code> + a 256-bit secret. Dispatcher fires signed callbacks — verified live (2/2 advances persisted after the <code>after()</code> fix, PR #468)."
     },
     {
@@ -296,6 +340,7 @@
       "title": "Generalize outbound webhook dispatcher (partner-registry-driven)",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-06-05",
       "description": "<strong>Built</strong> on <code>feature/catercow-partner-webhooks</code> (commit <code>50d78873</code>, off <code>development</code>). New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the resolved <code>api_partners</code> row; builds the contract payload, HMAC-SHA256 signs it (<code>x-readyset-signature</code>), 3-attempt backoff (no retry on 4xx), skips with a logged notice when unconfigured.<br><br><code>recordAndDispatchLifecycleEvent</code> writes history + dispatches, self-guarding against <code>CARRIER_CONFIGS</code> and non-partner orders. Added <code>getPartnerByOrderNumber</code> (registry, prefix-match, cached).<br><br>Wired into the driver status route (<code>driverStatus</code>→ASSIGNED/PICKED_UP/ON_THE_WAY/ARRIVED/DELIVERED) and the confirm cancel branch (CANCELLED). 7 unit tests green."
     },
     {
@@ -304,6 +349,8 @@
       "title": "Generate + deliver CaterCow webhook HMAC secret",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-05-13",
+      "closed": "2026-06-29",
       "description": "<strong>Done.</strong> 256-bit secret generated via <code>scripts/set-partner-webhook.ts</code> and <strong>delivered to Nate (CaterCow) on 2026-06-29</strong> with the corrected integration email. Now waiting on Nate's staging sign-off → then prod go-live."
     },
     {
@@ -312,6 +359,8 @@
       "title": "Confirm CaterCow ↔ steerdelivery.com relationship with Gary",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-05-13",
+      "closed": "2026-09-25",
       "description": "Nate's webhook URL is on <code>steerdelivery.com</code>, not <code>catercow.com</code>. Verify this is a known parent/shared-infra relationship before exchanging production HMAC secrets. Quick Slack to Gary should resolve.<br><br><strong>Update 2026-09-25 (board audit):</strong> Moot. Prod HMAC secret issued and the prod <code>webhook_url</code> set to <code>api.steerdelivery.com</code> at the 07-09 go-live (#480).",
       "tags": [
         "moot"
@@ -323,6 +372,7 @@
       "title": "GET /orders/{id} for partner API",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-05-13",
       "description": "<strong>Built</strong> (commit <code>50d78873</code>). <code>GET /api/partners/orders/{id}</code> (+ cater-valley alias) returns current status + last 10 lifecycle events from the new <code>order_status_history</code> table, with the same partner-ownership check as the writes.<br><br>Backed by migration <code>20260605000000_add_order_status_history</code> (applied to dev Supabase). 6 endpoint tests green."
     },
     {
@@ -331,6 +381,7 @@
       "title": "OpenAPI 3.1 export from Zod schemas",
       "owner": "emmanuel",
       "source": "catercow",
+      "created": "2026-05-13",
       "description": "Pre-scoped in <code>docs/catercow/IMPLEMENTATION_PLAN.md</code> Phase 4.2 (~half day). Generate from existing Zod schemas in <code>src/app/api/partners/orders/*/route.ts</code> using <code>zod-to-openapi</code>; output <code>docs/catercow/openapi.yaml</code> + a <code>pnpm openapi:partners</code> script. Defer until CaterCow flags it as needed."
     },
     {
@@ -339,6 +390,7 @@
       "title": "Email SEO updates → sync with Caleb",
       "owner": "fernando",
       "source": "may19",
+      "created": "2026-05-19",
       "description": "Complete the email SEO modifications Gary requested two weeks ago, then sync with Caleb for final verification."
     },
     {
@@ -347,6 +399,8 @@
       "title": "Redesign address manager",
       "owner": "fernando",
       "source": "may19",
+      "created": "2026-05-19",
+      "closed": "2026-05-25",
       "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders.<br><br><strong>DONE — shipped in PR #417 (merged 2026-05-25):</strong> AddressSelector redesigned with RouteBuilder, MiniMap & geocoding + mobile-responsive pass; CateringRequestForm unified to a single AddressSelector. Superseded the original 3-proposal-review-with-Iman approach by shipping the redesign directly."
     },
     {
@@ -355,6 +409,8 @@
       "title": "Push Jitter integration code to <code>development</code>",
       "owner": "emmanuel",
       "source": "may19",
+      "created": "2026-05-19",
+      "closed": "2026-09-25",
       "description": "Push current local testing code for the Jitter integration to <code>development</code> so it can be verified in the staging environment. Endpoints (draft / update / confirm) already shared with Nate; waiting on partner-side feedback.<br><br><strong>Update 2026-09-25 (board audit):</strong> Superseded. \"Jitter\" is the partner draft/update/confirm API shared with Nate, live on prod since 07-09 (#480).",
       "tags": [
         "moot"
@@ -366,6 +422,8 @@
       "title": "Real-world driver integration test (Thursday 2026-05-21)",
       "owner": "emmanuel",
       "source": "may19",
+      "created": "2026-05-19",
+      "closed": "2026-06-01",
       "tags": [
         "critical"
       ],
@@ -377,6 +435,8 @@
       "title": "Review Google hours file tonight",
       "owner": "gary",
       "source": "may19",
+      "created": "2026-05-19",
+      "closed": "2026-08-03",
       "description": "Review the updated hours sheet tonight; contact Emmanuel with any questions before the next scheduled meeting. <strong>CLOSED 2026-08-03 as stale/overtaken:</strong> weekly invoicing has run continuously since (invoices through July settled) with no open questions on the hours file."
     },
     {
@@ -385,6 +445,7 @@
       "title": "Vendor multi-pickup-location support",
       "owner": "emmanuel",
       "source": "may19",
+      "created": "2026-05-19",
       "description": "Implement multiple pickup locations per vendor. Test with Fresh (3 locations). Fresh is lenient on expectations since the company uses the product themselves.<br><br><strong>Update 2026-08-17:</strong> in the 7/13 PARKING LOT (test with Fresh when revived)."
     },
     {
@@ -393,6 +454,8 @@
       "title": "Address Fernando's UX report",
       "owner": "emmanuel",
       "source": "may19",
+      "created": "2026-05-19",
+      "closed": "2026-08-17",
       "description": "Triage + ship fixes from the UX report Fernando provided. In progress per Emmanuel's May 19 update.<br><br><strong>Closed 2026-08-17 (board audit):</strong> superseded — the May UX report predates the full driver redesign (#434), the v2 restyle (#472) and the Jun–Aug walk-test fix waves; anything still valid has been re-found and carded since.",
       "tags": [
         "moot"
@@ -404,6 +467,7 @@
       "title": "Prepare Christino demo endpoint (deferred to next week)",
       "owner": "emmanuel",
       "source": "may19",
+      "created": "2026-05-19",
       "description": "First version of the ordering system is functional on the testing site (local mode). Gary deferred today's demo to focus the Christino 2:00 meeting on financials; demo to land next week.<br><br><strong>Update 2026-08-17:</strong> moved to the PARKING LOT at the 7/13 meeting — not active work; revive only if Gary re-prioritizes."
     },
     {
@@ -413,6 +477,8 @@
       "owner": "emmanuel",
       "source": "qa",
       "sourceRef": "REA-367",
+      "created": "2026-05-20",
+      "closed": "2026-05-22",
       "relatedQa": "REA-DRT-05",
       "tags": [
         "bug",
@@ -422,11 +488,13 @@
     },
     {
       "id": "rea-367b-realtime-strictmode-resubscribe",
-      "status": "open",
+      "status": "done",
       "title": "Realtime channel closes after subscribe under React StrictMode (no re-subscribe)",
       "owner": "emmanuel",
       "source": "qa",
-      "sourceRef": "REA-367",
+      "sourceRef": "REA-367 → PR #652",
+      "created": "2026-05-20",
+      "closed": "2026-10-06",
       "relatedQa": "REA-DRT-05",
       "tags": [
         "bug"
@@ -439,6 +507,8 @@
       "title": "Migrate all sites/apps from Vercel → Hetzner VPS",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
+      "closed": "2026-09-29",
       "tags": [
         "critical"
       ],
@@ -450,6 +520,8 @@
       "title": "Self-host the error-tracking app on the VPS",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
+      "closed": "2026-09-25",
       "description": "The free hosted error-tracking tier hit its event-capture limit. Relocate the error-tracking app to the dedicated VPS to remove usage caps. Part of the Vercel → VPS migration.<br><br><strong>Update 2026-08-17:</strong> confirmed still pending — Sentry remains in <code>package.json</code>; GlitchTip exists only on Emmanuel&rsquo;s personal box, not ReadySet infra. Rides the Vercel → VPS migration.<br><br><strong>Update 2026-09-25 (board audit):</strong> GlitchTip live at <code>glitchtip.readysetllc.com</code> since 08-19; prod moved off Sentry in v2.6.0."
     },
     {
@@ -458,6 +530,7 @@
       "title": "Mandatory driver photo + signature capture",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
       "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration."
     },
     {
@@ -467,6 +540,8 @@
       "owner": "emmanuel",
       "source": "jun22",
       "sourceRef": "#459",
+      "created": "2026-06-22",
+      "closed": "2026-06-24",
       "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/459\">#459</a> MERGED to <code>development</code> 2026-06-24 (all CI green).</strong><br><br>In-app signature pad (<code>signature_pad</code> canvas) gating <code>ARRIVED_AT_VENDOR → PICKED_UP</code>, mirroring the POD gate at delivery. New <code>SignatureCapture</code> + <code>DriverSignatureSheet</code> + <code>POST /api/orders/[order_number]/signature</code> (FileUpload <code>category='pickup_signature'</code> + non-fatal mirror to <code>deliveries.pickup_signature_url</code>, new migration). Manual restaurant-staff signature, NOT DocuSign. Split out of <code>driver-photo-signature-required</code> (which keeps the photo requirements + completion-stage signature).<br><br><strong>Ops (DONE 2026-06-24):</strong> migration <code>20260623000000_add_pickup_signature</code> applied + recorded in <code>_prisma_migrations</code> on dev (earlier) and <strong>prod</strong> (via the Supabase MCP, sha256 <code>014f9173…</code>, during the #463 sync) — <code>deliveries.pickup_signature_url</code> now exists on both. Migrations here are <strong>manual</strong>, not auto-applied on deploy.<br><br><strong>Follow-up:</strong> offline queue for poor-signal vendors; Claude Design polish pass."
     },
     {
@@ -475,6 +550,8 @@
       "title": "Fix mobile refresh-rate issue + continue device testing",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
+      "closed": "2026-08-03",
       "tags": [],
       "description": "Android + Apple device testing (week of May 29) surfaced a refresh-rate issue in the driver/tracking UI.<br><br><strong>CLOSED 2026-08-03 as superseded:</strong> the refresh fix landed with the polling-feed rework (#437) and device testing continued through the real-device walk/drive-test rounds (6/16 CDMX, 6/22, 7/3, 7/9). Ongoing device testing is now <code>web-mobile-test-round1</code> (Fernando, iPhone X)."
     },
@@ -484,6 +561,7 @@
       "title": "Help-desk dashboard front-end redesign",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
       "description": "Redesign in progress: simpler, more organized view for the help-desk team. Mobile-first, dark mode, in-app error reporting, improved responsiveness.<br><br><strong>Update 2026-09-25 (board audit):</strong> Moved back to New: the 08-17 audit found zero commits for this redesign."
     },
     {
@@ -492,6 +570,8 @@
       "title": "Email CaterCow re: API endpoint + timeline",
       "owner": "emmanuel",
       "source": "jun1",
+      "created": "2026-06-01",
+      "closed": "2026-06-29",
       "description": "<strong>Done — Emmanuel sent it 2026-06-29.</strong> Rather than just chase them, Emmanuel completed the full staging integration (PRs #467/#468/#469, verified live) and sent Nate the corrected full-sequence email + the signing secret. Now waiting on Nate's sign-off → then prod go-live (prod key + prod webhook + sync dev→main)."
     },
     {
@@ -500,6 +580,8 @@
       "title": "Capture screenshots of layout problems / errors",
       "owner": "gary",
       "source": "jun1",
+      "created": "2026-06-01",
+      "closed": "2026-08-17",
       "description": "Gary to capture and provide screenshots of any layout issues or errors encountered while using the app, to feed the bug queue.<br><br><strong>Closed 2026-08-17 (board audit):</strong> superseded by structured QA: the web-mobile test matrix, the CDMX drive-test series and the QA board.",
       "tags": [
         "moot"
@@ -511,6 +593,7 @@
       "title": "Verify driver payment calculation accuracy",
       "owner": "fernando",
       "source": "jun1",
+      "created": "2026-06-01",
       "description": "Fernando shifting toward help-desk ops; review the testing results to confirm driver payment amounts calculate correctly."
     },
     {
@@ -529,6 +612,8 @@
       "owner": "emmanuel",
       "source": "walktest",
       "sourceRef": "#446",
+      "created": "2026-06-16",
+      "closed": "2026-06-16",
       "tags": [
         "bug"
       ],
@@ -536,12 +621,14 @@
     },
     {
       "id": "walk-test-pr2",
-      "status": "open",
+      "status": "done",
       "title": "Driver walk-test PR2 — remaining perf slice (60s poll + refetch consolidation)",
       "owner": "emmanuel",
       "source": "walktest",
+      "created": "2026-06-16",
       "tags": [],
-      "description": "<strong>Rescoped 2026-08-03 — 2 of the 3 original items shipped since.</strong><br><br>(1) <strong>Location persistence: DONE</strong> — the driver GPS path now dual-writes (POST <code>/api/tracking/locations</code> → <code>driver_locations</code> AND realtime broadcast) and the offline queue flushes before shift-end (#460).<br><br>(2) <strong>Background/visibility: DONE</strong> — watchPosition re-arm + wake lock (#460), native re-arm recovery (#471).<br><br>(3) <strong>Perf: REMAINING</strong> — <code>useDriverDeliveriesFeed</code> still has the 60s <code>setInterval</code> poll + visibilitychange refetch (the spinner-replace half is fixed: refetches keep the list rendered, and an <code>inFlight</code> guard prevents overlap). Residual: consolidate driver-home mount fetches; a failed poll sets <code>error</code> over stale data; no request cancellation on unmount. Low urgency."
+      "description": "<strong>Rescoped 2026-08-03 — 2 of the 3 original items shipped since.</strong><br><br>(1) <strong>Location persistence: DONE</strong> — the driver GPS path now dual-writes (POST <code>/api/tracking/locations</code> → <code>driver_locations</code> AND realtime broadcast) and the offline queue flushes before shift-end (#460).<br><br>(2) <strong>Background/visibility: DONE</strong> — watchPosition re-arm + wake lock (#460), native re-arm recovery (#471).<br><br>(3) <strong>Perf: REMAINING</strong> — <code>useDriverDeliveriesFeed</code> still has the 60s <code>setInterval</code> poll + visibilitychange refetch (the spinner-replace half is fixed: refetches keep the list rendered, and an <code>inFlight</code> guard prevents overlap). Residual: consolidate driver-home mount fetches; a failed poll sets <code>error</code> over stale data; no request cancellation on unmount. Low urgency.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/693\">#693</a> open against <code>development</code>.<br><br><strong>DONE 2026-10-15</strong> — audit confirmed 60 s poll, single fetch and kept-list-on-failure already shipped (#672/#682); the last gap (no abort on the shared poller) landed in PR <a href=\"https://github.com/ReadySet1/ready-set/pull/693\">#693</a>.",
+      "closed": "2026-10-15"
     },
     {
       "id": "npm-audit-ci-red",
@@ -549,6 +636,8 @@
       "title": "NPM Security Audit CI failing (15 high > threshold 10)",
       "owner": "emmanuel",
       "source": "walktest",
+      "created": "2026-06-16",
+      "closed": "2026-06-17",
       "tags": [
         "bug"
       ],
@@ -560,6 +649,8 @@
       "title": "Hire Robert for QA testing",
       "owner": "gary",
       "source": "jun8",
+      "created": "2026-06-08",
+      "closed": "2026-09-25",
       "description": "<strong>Decision aligned Jun 8.</strong> Robert approved for hire to handle QA testing (Emmanuel has worked with him before — more proactive than Fernando). Gary to contact Mark to authorize bringing him on. Pairs with the 35–40 hr/wk budget under Emmanuel's management (<code>manage-dev-budget</code>) and Fernando's transition out of the dev role.<br><br><strong>Update 2026-08-17:</strong> Mark + Gary conditioned the hire on James (Destino SF owner) paying his pending invoices; James never paid, <strong>Destino is paused and Robert was never hired</strong>. Decision re-queued for Gary at the 8/17 weekly (D3): un-gate the hire for the Ready Set deliveries app anyway — the new weekly 3-round test cadence with Fernando and the Android coverage gap (<code>android-test-coverage</code>) both need a dedicated QA owner.<br><br><strong>Archived 2026-09-25:</strong> plan paused until James settles the pending Destino payments; no update since. Reopen as a new card if it comes back.",
       "tags": [
         "moot"
@@ -571,6 +662,8 @@
       "title": "Android test coverage for the native wrapper",
       "owner": "emmanuel",
       "source": "aug17",
+      "created": "2026-08-17",
+      "closed": "2026-09-03",
       "description": "The Android APK with the zero-redirect entry fix (prerelease <code>native-walk-test-apk-2026-08-13</code>) is <strong>device-unverified</strong> — nobody on the team currently has an Android device (Fernando is on an iPhone X).<br><br><strong>Plan, cheapest first:</strong> (1) emulator smoke test of the <code>/native-launch</code> entry + sign-in flow with mocked GPS — verifies the entry fix, <em>not</em> the background walk; (2) ask Aziel to sideload the APK on the Redmi (installs from the file, no adb needed) to verify the entry fix on real hardware; (3) ask <strong>Mark</strong> whether he has an Android phone to borrow for the locked-screen background-GPS walk; (4) if Robert's hire is un-gated (<code>hire-robert-qa</code>), fold the Android walk into his onboarding; (5) consider buying a ~$100 test device (Moto G / Redmi) as permanent team hardware.<br><br><strong>Pass bar for the walk</strong> (same as iOS, per <code>persistent-gps-background</code>): no trail gap &gt;~30s over a 15–20 min locked-screen/Waze-in-front walk; if Android drops points, evaluate the paid transistorsoft plugin (OEM battery killers).<br><br><strong>2026-09-02:</strong> UNBLOCKED — <em>Aziel</em> will run the test round on a <strong>real Android device</strong> (not an emulator) — which is what makes it count: background GPS, doze/battery-optimisation behaviour, foreground-service survival and lock-screen tracking cannot be validated on an emulator. Fresh APK published as prerelease <code>native-walk-test-apk-2026-09-02</code> with the entry verified <strong>inside the artifact</strong> as <code>/native-launch</code>, plus all 8 permissions confirmed merged via <code>aapt2 dump permissions</code>.<br>⚠️ Found while building: the previous prerelease <code>ready-set-driver-signin-fix.apk</code> (08-13) never contained the fix its name claims — <code>npx cap sync</code> had been run for iOS but never for Android, so the generated <code>android/app/src/main/assets/capacitor.config.json</code> still held <code>/sign-in?returnTo=%2Fdriver</code>. The old release is now marked superseded. Verify the config <em>inside</em> the .apk, never the source.<br><br><strong>Dedicated driver account provisioned 2026-09-02:</strong> <code>aziel.driver@readysetllc.com</code> (driver <code>a47ccb02-92fd-410f-809b-58d9acfdbfeb</code>) on rs-dev, via <code>pnpm driver:account</code>. Credentials in <code>secure/rs-dev-test-accounts.txt</code> — never in this board, the mirror is public. Per-tester logins are the point: a shared driver login is how one person's abandoned run becomes another person's blocked shift (the 2026-08-06 field run, and Fernando's 08-21 End-Shift deadlock). Verified DRIVER/ACTIVE, <code>is_active = true</code>, both <code>profile_id</code> and <code>user_id</code> linked, no open shift.<br><br><strong>2026-09-02 — round COMPLETED, coverage achieved.</strong> Aziel ran the full flow on a real device: sign-in → start shift → en route → arrived at vendor → pickup (signature) → walk → dropoff. 230 GPS points over 83 min. Android is no longer device-unverified. The run <em>failed</em> the background-GPS bar — evidence recorded on <code>persistent-gps-background</code> and <code>native-walk-locked-screen</code>. Drive closed manually 2026-09-03 (app could not complete it; end time set to the last GPS fix so the shift records its true 83.4 min)."
     },
     {
@@ -579,6 +672,7 @@
       "title": "Triage + fix the 5 findings from Fernando's mobile test round 1",
       "owner": "emmanuel",
       "source": "aug17",
+      "created": "2026-08-17",
       "tags": [
         "bug"
       ],
@@ -590,6 +684,7 @@
       "title": "Manage 35–40 hr/wk dev budget",
       "owner": "emmanuel",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "<strong>Decision aligned Jun 8.</strong> Emmanuel steps into an IT-management role: total dev budget set to <strong>35–40 hrs/week</strong> (supersedes the Jun 1 \"25–30 hrs/wk\"), with autonomy to split hours between himself and Robert. Goal: build budgeting, time-management, and delegation skills.<br><br><strong>Update 2026-09-25 (board audit):</strong> Robert was never hired (see <code>hire-robert-qa</code>); the delegation half is on hold until Gary decides."
     },
     {
@@ -598,6 +693,7 @@
       "title": "Cancel corporate Cursor subscription",
       "owner": "emmanuel",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "Deactivate the corporate Cursor service subscription (cost optimization). Standalone action item from Jun 8."
     },
     {
@@ -606,6 +702,7 @@
       "title": "Research + propose AI integration opportunities",
       "owner": "emmanuel",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "Identify areas where AI can improve company operations and present the suggestions to Gary. Part of the broader Jun 8 AI-integration push (see <code>ai-driver-location-matching</code>)."
     },
     {
@@ -614,6 +711,7 @@
       "title": "AI driver↔location matching + automated weekly reporting",
       "owner": "emmanuel",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "Gary's AI-logistics initiative: use AI to correlate drive data, match drivers to locations, and automate weekly reporting. A Gemini \"Gem\" was started (by others) to correlate drive data + flag errors. Scope the Ready Set-side integration."
     },
     {
@@ -622,6 +720,7 @@
       "title": "Schedule weekly 2-hr tech / AI consultation sessions",
       "owner": "gary",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "Recurring 2-hr/week technology + AI consultation / knowledge-sharing sessions (Gary + Emmanuel). Co-owned with Emmanuel. Includes Emmanuel training Gary on Claude Code."
     },
     {
@@ -630,6 +729,7 @@
       "title": "Consult on Gary's nonprofit (financial-education site)",
       "owner": "emmanuel",
       "source": "jun8",
+      "created": "2026-06-08",
       "description": "<strong>Decision aligned Jun 8.</strong> ~2 hrs/week guiding Gary's one-off nonprofit financial-education website (built from scratch), reusing Ready Set's client / user-acquisition frameworks + AI."
     },
     {
@@ -638,6 +738,8 @@
       "title": "File lawsuit against Will (flower shop)",
       "owner": "gary",
       "source": "jun8",
+      "created": "2026-06-08",
+      "closed": "2026-09-25",
       "description": "Submit the lawsuit against Will from the flower shop (Gary committed to file by end of week on Jun 8). Business / legal action item — tracked for completeness.<br><br><strong>Archived 2026-09-25:</strong> Gary personal legal item, not ready-set work; no update since the 06-29 meeting.",
       "tags": [
         "moot"
@@ -650,11 +752,12 @@
       "owner": "emmanuel",
       "source": "jun22",
       "sourceRef": "#460",
+      "created": "2026-06-22",
       "tags": [
         "critical",
         "bug"
       ],
-      "description": "GPS is lost when the app is closed, the phone is locked, or the driver switches to another app (e.g. opens Waze/Maps).<br><br><strong>Web slice — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/460\">#460</a> MERGED to <code>development</code> 2026-06-24:</strong> hardened the <em>foreground</em> trail — re-arm <code>watchPosition</code> + immediate fix on return to foreground (the old visibility handler was dead code), a screen <strong>wake lock</strong> during a shift, and flushing the offline queue before shift-end so mileage reflects the full trail. <strong>Needs a real-device <code>WALK-TEST-SF</code> re-walk to verify.</strong><br><br><strong>True background still requires the native wrapper</strong> (Capacitor + background-geolocation reusing <code>/driver</code>, posting to the existing <code>/api/tracking/locations</code> — no backend change), full eval/runbook in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>.<br><br><strong>Native POC scaffolding drafted — DRAFT PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (2026-06-24):</strong> <code>repos/ready-set/native/driver-app/</code> (Capacitor config + shell + the WebView-side <code>capacitor-tracking.ts</code> bridge + runbook), ready to build. <strong>Still GATED</strong> on a go/no-go + Apple Developer account + Android keystore + real iPhone/Android devices before the POC can actually be built + walk-tested.<br><br><strong>Update 2026-06-24:</strong> POC built out — Android <code>app-debug.apk</code> + the iOS shell both build, and iOS is confirmed loading <code>/driver</code> on the Simulator; the web-side GPS bridge is MERGED to <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> — no-op in a browser, active only inside the native shell). Remaining gate is just the free-Apple-ID signing + a real iPhone/Android to run the on-device background walk.<br><br><strong>Update 2026-06-24 (later):</strong> brought the iOS shell up on Emmanuel's real iPhone (Developer Mode + free-Apple-ID signing done) but hit a <strong>Capacitor 6 vs iOS 26.5 WebView wall</strong> (WKWebView black-screens + bounces to Safari; <code>Frame load interrupted</code> + WebContent sandbox errors; Safari/Simulator load the same URL fine). <strong>Upgraded the shell to Capacitor 8</strong> (now SPM); <strong>pending the on-device re-test</strong>, then the WALK-TEST-SF background walk. Resume: memory <code>native-driver-app-poc-resume</code>.<br><br><strong>Update 2026-07-21 — Phase-1 (prove-it) prep done; the ONLY remaining gate is the locked-screen walk on each platform.</strong> All web-side code is merged (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> bridge, <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> arm-recovery, <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a> walk fixes); the diagnostic <code>server.url</code> override (<code>/sign-in?returnTo=</code> + <code>allowNavigation:['*']</code>) is <strong>reverted</strong> (safe now — #485's sign-in self-heal redirects authed users), both native projects re-synced, and a <strong>fresh Android APK is built with the clean <code>/driver</code> URL baked</strong> (re-sideload before the next walk). iOS needs the 7-day re-sign with the phone attached: <code>cap sync ios</code> → <code>xcodebuild -allowProvisioningUpdates</code> → <code>devicectl device install app</code>. <strong>Pass bar:</strong> no trail gap &gt;~30s during a 15–20 min locked-screen/Waze-in-front walk, both platforms; if Android still drops points, evaluate the paid transistorsoft plugin (OEM battery killers). Once both pass → un-draft + merge #461 and move to productionization (<code>native-wrapper-productionization</code>).<br><br><strong>HANDED OFF to Fernando 2026-07-23</strong> (Emmanuel unavailable for device testing): Phase-1 locked-screen walk runbook is self-contained in a <a href=\"https://github.com/ReadySet1/ready-set/pull/461#issuecomment-5060228104\">PR #461 comment</a> (test creds included; repo now private) + prebuilt APK on the <code>native-walk-test-apk-2026-07-21</code> release; <code>ios/</code>+<code>android/</code> projects committed to the branch. Waiting on Fernando: platform coverage (iOS needs a Mac+Xcode), city/route, walk date → then re-stage via <code>test_stage_walk()</code>. Email draft: <code>docs/ready-set/emails/2026-07-23-fernando-walk-test-handoff-draft.md</code>.<br><br><strong>Update 2026-08-05 — NATIVE TRACK PARKED; the bug stays OPEN.</strong> Draft PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (the Capacitor shell scaffolding) was <strong>closed unmerged</strong> to keep the PR queue clean — the branch <code>chore/native-driver-app-poc</code> is <strong>deliberately preserved, not deleted</strong>. Parking is a <em>resourcing decision, not a technical verdict</em>: the Phase-1 locked-screen walk never ran because the available test device (Fernando's iPhone X) cannot run the native build and there is still no Apple Developer account. The native approach is <strong>unproven in both directions</strong> — not rejected.<br><br><strong>Nothing was lost by closing it:</strong> the web-side GPS bridge stays merged on <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a>), the eval spec lives in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>, the prebuilt APK remains on the <code>native-walk-test-apk-2026-07-21</code> release, and the walk runbook is preserved in the closed PR comment. About 95% of the shell regenerates via <code>npx cap add ios/android</code>; the only hand-written pieces are <code>capacitor.config.ts</code>, the iOS <code>Info.plist</code> usage strings, and the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.<br><br><strong>Still broken in production:</strong> drivers keep losing GPS when the phone locks or they switch to Waze/Maps — only the <em>foreground</em> trail is hardened. <strong>To resume:</strong> branch from <code>chore/native-driver-app-poc</code>, rebase onto <code>development</code>, then <code>cap sync</code>. Gated on <code>buy-app-store-licenses</code> (Apple $99/yr) plus a test device capable of running the build.<br><br><strong>Update 2026-08-17 — TRACK UN-PARKED.</strong> The wrapper is active again on Emmanuel's iPhone 16 Pro Max: the sign-in bounce class was killed for good with the <code>/native-launch</code> zero-redirect entry (web PR <a href=\"https://github.com/ReadySet1/ready-set/pull/514\">#514</a> + wrapper commit <code>a1893d43</code>, <strong>verified on-device 2026-08-13</strong> in the exact cookie-carrying state that broke every previous entry), and the Aug 11–14 CDMX drives ran the full driver flow inside the wrapper. A matching Android APK is published as prerelease <code>native-walk-test-apk-2026-08-13</code> (device-unverified).<br><br><strong>The ONLY remaining Phase-1 gate is still the locked-screen background-GPS walk</strong> — and the free-Apple-ID signing on the iPhone expires ~08-20, so either walk before then or re-sign (or finally buy the Apple Developer account per <code>buy-app-store-licenses</code>).<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Update 2026-09-25 (board audit):</strong> The 09-06 pilot decision re-parked native: the pilot runs foreground-only on mobile web. The iOS locked-screen walk has still not run; walk tracking lives in <code>native-walk-locked-screen</code>."
+      "description": "GPS is lost when the app is closed, the phone is locked, or the driver switches to another app (e.g. opens Waze/Maps).<br><br><strong>Web slice — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/460\">#460</a> MERGED to <code>development</code> 2026-06-24:</strong> hardened the <em>foreground</em> trail — re-arm <code>watchPosition</code> + immediate fix on return to foreground (the old visibility handler was dead code), a screen <strong>wake lock</strong> during a shift, and flushing the offline queue before shift-end so mileage reflects the full trail. <strong>Needs a real-device <code>WALK-TEST-SF</code> re-walk to verify.</strong><br><br><strong>True background still requires the native wrapper</strong> (Capacitor + background-geolocation reusing <code>/driver</code>, posting to the existing <code>/api/tracking/locations</code> — no backend change), full eval/runbook in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>.<br><br><strong>Native POC scaffolding drafted — DRAFT PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (2026-06-24):</strong> <code>repos/ready-set/native/driver-app/</code> (Capacitor config + shell + the WebView-side <code>capacitor-tracking.ts</code> bridge + runbook), ready to build. <strong>Still GATED</strong> on a go/no-go + Apple Developer account + Android keystore + real iPhone/Android devices before the POC can actually be built + walk-tested.<br><br><strong>Update 2026-06-24:</strong> POC built out — Android <code>app-debug.apk</code> + the iOS shell both build, and iOS is confirmed loading <code>/driver</code> on the Simulator; the web-side GPS bridge is MERGED to <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> — no-op in a browser, active only inside the native shell). Remaining gate is just the free-Apple-ID signing + a real iPhone/Android to run the on-device background walk.<br><br><strong>Update 2026-06-24 (later):</strong> brought the iOS shell up on Emmanuel's real iPhone (Developer Mode + free-Apple-ID signing done) but hit a <strong>Capacitor 6 vs iOS 26.5 WebView wall</strong> (WKWebView black-screens + bounces to Safari; <code>Frame load interrupted</code> + WebContent sandbox errors; Safari/Simulator load the same URL fine). <strong>Upgraded the shell to Capacitor 8</strong> (now SPM); <strong>pending the on-device re-test</strong>, then the WALK-TEST-SF background walk. Resume: memory <code>native-driver-app-poc-resume</code>.<br><br><strong>Update 2026-07-21 — Phase-1 (prove-it) prep done; the ONLY remaining gate is the locked-screen walk on each platform.</strong> All web-side code is merged (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> bridge, <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> arm-recovery, <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a> walk fixes); the diagnostic <code>server.url</code> override (<code>/sign-in?returnTo=</code> + <code>allowNavigation:['*']</code>) is <strong>reverted</strong> (safe now — #485's sign-in self-heal redirects authed users), both native projects re-synced, and a <strong>fresh Android APK is built with the clean <code>/driver</code> URL baked</strong> (re-sideload before the next walk). iOS needs the 7-day re-sign with the phone attached: <code>cap sync ios</code> → <code>xcodebuild -allowProvisioningUpdates</code> → <code>devicectl device install app</code>. <strong>Pass bar:</strong> no trail gap &gt;~30s during a 15–20 min locked-screen/Waze-in-front walk, both platforms; if Android still drops points, evaluate the paid transistorsoft plugin (OEM battery killers). Once both pass → un-draft + merge #461 and move to productionization (<code>native-wrapper-productionization</code>).<br><br><strong>HANDED OFF to Fernando 2026-07-23</strong> (Emmanuel unavailable for device testing): Phase-1 locked-screen walk runbook is self-contained in a <a href=\"https://github.com/ReadySet1/ready-set/pull/461#issuecomment-5060228104\">PR #461 comment</a> (test creds included; repo now private) + prebuilt APK on the <code>native-walk-test-apk-2026-07-21</code> release; <code>ios/</code>+<code>android/</code> projects committed to the branch. Waiting on Fernando: platform coverage (iOS needs a Mac+Xcode), city/route, walk date → then re-stage via <code>test_stage_walk()</code>. Email draft: <code>docs/ready-set/emails/2026-07-23-fernando-walk-test-handoff-draft.md</code>.<br><br><strong>Update 2026-08-05 — NATIVE TRACK PARKED; the bug stays OPEN.</strong> Draft PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (the Capacitor shell scaffolding) was <strong>closed unmerged</strong> to keep the PR queue clean — the branch <code>chore/native-driver-app-poc</code> is <strong>deliberately preserved, not deleted</strong>. Parking is a <em>resourcing decision, not a technical verdict</em>: the Phase-1 locked-screen walk never ran because the available test device (Fernando's iPhone X) cannot run the native build and there is still no Apple Developer account. The native approach is <strong>unproven in both directions</strong> — not rejected.<br><br><strong>Nothing was lost by closing it:</strong> the web-side GPS bridge stays merged on <code>development</code> (<a href=\"https://github.com/ReadySet1/ready-set/pull/466\">#466</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/471\">#471</a> / <a href=\"https://github.com/ReadySet1/ready-set/pull/485\">#485</a>), the eval spec lives in <code>docs/ready-set/specs/2026-06-17-native-driver-app-background-tracking.md</code>, the prebuilt APK remains on the <code>native-walk-test-apk-2026-07-21</code> release, and the walk runbook is preserved in the closed PR comment. About 95% of the shell regenerates via <code>npx cap add ios/android</code>; the only hand-written pieces are <code>capacitor.config.ts</code>, the iOS <code>Info.plist</code> usage strings, and the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.<br><br><strong>Still broken in production:</strong> drivers keep losing GPS when the phone locks or they switch to Waze/Maps — only the <em>foreground</em> trail is hardened. <strong>To resume:</strong> branch from <code>chore/native-driver-app-poc</code>, rebase onto <code>development</code>, then <code>cap sync</code>. Gated on <code>buy-app-store-licenses</code> (Apple $99/yr) plus a test device capable of running the build.<br><br><strong>Update 2026-08-17 — TRACK UN-PARKED.</strong> The wrapper is active again on Emmanuel's iPhone 16 Pro Max: the sign-in bounce class was killed for good with the <code>/native-launch</code> zero-redirect entry (web PR <a href=\"https://github.com/ReadySet1/ready-set/pull/514\">#514</a> + wrapper commit <code>a1893d43</code>, <strong>verified on-device 2026-08-13</strong> in the exact cookie-carrying state that broke every previous entry), and the Aug 11–14 CDMX drives ran the full driver flow inside the wrapper. A matching Android APK is published as prerelease <code>native-walk-test-apk-2026-08-13</code> (device-unverified).<br><br><strong>The ONLY remaining Phase-1 gate is still the locked-screen background-GPS walk</strong> — and the free-Apple-ID signing on the iPhone expires ~08-20, so either walk before then or re-sign (or finally buy the Apple Developer account per <code>buy-app-store-licenses</code>).<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Update 2026-09-25 (board audit):</strong> The 09-06 pilot decision re-parked native: the pilot runs foreground-only on mobile web. The iOS locked-screen walk has still not run; walk tracking lives in <code>native-walk-locked-screen</code>.<br><br><strong>Update 2026-10-06 — second Android device, same drop.</strong> Guillermo (León, motorcycle, Android wrapper, drive <code>RSQA-20261006-2019</code>): 10 min shift, only 10 GPS points at 2 m accuracy and ~6 s cadence while the screen was on, then a <strong>130 s hole</strong> covering ~340 m. He confirmed the phone locked itself 2–3 times while he mounted it on the bike — the hole lines up with the locks, not with his three short stops (3 s, ~10 s, ~10 s). Foreground healthy, locked screen dead, exactly Aziel's 09-02 pattern."
     },
     {
       "id": "native-app-go-no-go",
@@ -662,6 +765,8 @@
       "title": "Decide go/no-go on the native driver app (background GPS)",
       "owner": "gary",
       "source": "jun22",
+      "created": "2026-06-22",
+      "closed": "2026-07-13",
       "description": "<strong>Decision teed up — 1-page brief ready for Gary:</strong> <code>docs/ready-set/reports/2026-06-24-native-driver-app-go-no-go-gary.md</code>.<br><br>Web GPS can't track in the background (drivers open Waze / lock the screen → tracking stops, mileage undercounted) — only a native app fixes it. Proposed: a thin Capacitor shell reusing the existing <code>/driver</code> UI (no rewrite, zero backend change); POC scaffolding already drafted in <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> (gated draft).<br><br><strong>Decisions needed:</strong> (1) go/no-go; (2) iOS+Android or one first (rec: Android first); (3) approve $99/yr Apple Developer account + a test iPhone+Android; (4) who builds it; (5) internal-only distribution.<br><br><strong>Lowest-risk path:</strong> approve the <strong>$0</strong> proof-of-concept (~1–2 wk on real phones) before any production spend. Unblocks <code>persistent-gps-background</code> / #461.<br><br><strong>DECIDED 7/13 meeting: GO.</strong> Production store licenses approved for purchase — Google Play ($25 one-time) + Apple Developer ($99/yr, also ends the every-7-days free-Apple-ID re-sign). Purchase tracked as <code>buy-app-store-licenses</code>."
     },
     {
@@ -671,6 +776,8 @@
       "owner": "emmanuel",
       "source": "jun22",
       "sourceRef": "#458",
+      "created": "2026-06-22",
+      "closed": "2026-06-24",
       "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/458\">#458</a> MERGED to <code>development</code> 2026-06-24.</strong><br><br>Gary couldn't find the low-contrast \"Navigate\" link in the Jun 22 live test. Promoted to the prominent <code>DriverButton</code> brand variant (amber) in <code>DriverDeliveryDetail</code> (pickup + drop-off) and <code>DriverTrackingPortal</code>. Shipped together with <code>nav-app-choice</code>."
     },
     {
@@ -680,6 +787,8 @@
       "owner": "emmanuel",
       "source": "jun22",
       "sourceRef": "#458",
+      "created": "2026-06-22",
+      "closed": "2026-06-24",
       "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/458\">#458</a> MERGED to <code>development</code> 2026-06-24.</strong><br><br>New <code>src/lib/driver-navigation.ts</code> <code>buildNavigationUrl(app, target)</code> for Google / Apple / Waze (universal https deep links) + a <code>NavigationAppSheet</code> chooser remembering the pick in localStorage (default Google). Replaces the hardcoded Google Maps URLs. Shipped together with <code>nav-button-visibility</code>."
     },
     {
@@ -688,6 +797,8 @@
       "title": "Confirm bridge-toll $8.00→$8.50 is cleared for production",
       "owner": "fernando",
       "source": "release",
+      "created": "2026-06-24",
+      "closed": "2026-06-24",
       "tags": [
         "critical"
       ],
@@ -701,7 +812,9 @@
       "source": "jul3walk",
       "tags": [],
       "description": "Jul-3 night walk feedback: the Active-deliveries list is confusing when multiple test/real orders coexist. Add date/time filtering (or group by day, soonest first) so the driver can find tonight’s delivery at a glance.",
-      "sourceRef": "#476"
+      "sourceRef": "#476",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "helpdesk-undo-accidental-drive-start",
@@ -713,7 +826,9 @@
         "bug"
       ],
       "description": "Driver accidentally started a delivery and had no way back.<br><br>Verified in code: <code>PATCH /api/orders/[order_number]</code> already lets HELPDESK/ADMIN change status and CANCELLED is reachable from every non-terminal state — but <strong>driverStatus has no backward transitions</strong>, so an accidental start can only be resolved by cancelling the whole order.<br><br>Add a Helpdesk-facing revert (reset driverStatus to ASSIGNED) and/or surface the cancel affordance in the admin/helpdesk order view.",
-      "sourceRef": "#477"
+      "sourceRef": "#477",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "driver-map-trail-straight-line",
@@ -725,7 +840,9 @@
         "bug"
       ],
       "description": "Jul-3 walk: map drew a straight line instead of the real route, and the line “broke” mid-walk.<br><br><strong>Data is NOT the problem</strong> — the DB captured 285 pts/28 min (only two ~90s lock gaps, 2.5 km coherent path).<br><br>Root cause in <code>DriverLiveMap.tsx</code>: the trail lives only in browser memory (<code>trailRef</code>) so locked-screen periods connect as a straight segment, and the 200-point cap <code>shift()</code>s the oldest points — at ~6 s/pt the route START disappears after ~20 min.<br><br>Fix: seed/refresh the trail from <code>GET /api/tracking/locations</code> (supports limit≤1000) and downsample instead of dropping the head.",
-      "sourceRef": "#476"
+      "sourceRef": "#476",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "pod-sheet-duplicate-title",
@@ -737,7 +854,9 @@
         "bug"
       ],
       "description": "<code>DriverPodSheet.tsx:47</code> renders SheetTitle “Proof of delivery” and the wrapped <code>ProofOfDeliveryCapture.tsx:513</code> renders its own CardTitle “Proof of Delivery” — both visible in the popup. Hide the inner CardTitle when hosted in the sheet (prop) or remove it.",
-      "sourceRef": "#476"
+      "sourceRef": "#476",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "driver-action-buttons-loading-state",
@@ -747,7 +866,9 @@
       "source": "jul3walk",
       "tags": [],
       "description": "Status-advance buttons wait on a server round-trip with no visual feedback, so they feel unresponsive (and invite double-taps). Add a spinner/disabled pending state to <code>DriverButton</code> call sites in the delivery detail + tracking portal while the PATCH is in flight.",
-      "sourceRef": "#476"
+      "sourceRef": "#476",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "pickup-signature-gate-bypassed-tracking-portal",
@@ -760,7 +881,9 @@
         "bug"
       ],
       "description": "Jul-3 night walk: the app never asked for the vendor-staff signature at pickup and the order completed with <strong>0 signature uploads</strong> (verified in rs-dev).<br><br>Root cause: #459 added the signature gate only to <code>DriverDeliveryDetail.handleNextAction</code>; the Live-Tracking tab (<code>DriverTrackingPortal.handleAdvance</code>, ~line 172) gates POD (<code>next === COMPLETED</code>) but advances <code>ARRIVED_AT_VENDOR → PICKED_UP</code> with no signature sheet.<br><br>Fix: (1) add the same DriverSignatureSheet gate to the tracking portal; (2) <strong>enforce server-side</strong> — the orders PATCH should reject PICKED_UP for catering orders when no <code>pickup_signature</code> upload exists, so no client surface can skip the mandate (Gary/2026-06-22 decision: signature + photo at pickup are mandatory).",
-      "sourceRef": "#475"
+      "sourceRef": "#475",
+      "created": "2026-07-03",
+      "closed": "2026-07-03"
     },
     {
       "id": "sheet-orders-sync",
@@ -768,6 +891,7 @@
       "title": "Sheet → orders sync: import master-sheet drives into the orders system",
       "owner": "emmanuel",
       "source": "jul9",
+      "created": "2026-07-09",
       "description": "The Coolfire-sunset replacement path: pull drives from the COOLFIRE MASTER UPLOAD sheet (itself auto-fed from the Coolfire API) into our orders system.<br><br>Plan + Phase-0 findings in <code>docs/ready-set/specs/2026-07-09-sheet-orders-sync.md</code> — ~1 wk build, preview-first (<code>/admin/sheet-import</code>) before any cron. Confirm at the 7/10 meeting, then start.<br><br>Blockers: share the sheet with the service account (30 s, Editor); decisions — exclude CaterCow/CaterValley rows (69/119 overlap with API orders), order-ID write-back column, backfill window, cutover.<br><br>Discovered prerequisite: <strong>driver onboarding — only 1 of 27 sheet drivers has an account</strong> (gates assignment + SMS); needs an owner. Also: Seoul Kitchen + Freshroll pricing configs unmapped.<br><br><strong>Update 2026-09-25 (board audit):</strong> Still 0% built and blocked on Gary sharing the sheet (D4 at 08-24, open since 06-29). It dropped off the September decision lists — confirm it is still in scope."
     },
     {
@@ -776,6 +900,7 @@
       "title": "Sheet sync prep: parser for real columns + master-sheet env var",
       "owner": "emmanuel",
       "source": "jul9",
+      "created": "2026-07-09",
       "description": "Decision-proof first slice, start 7/10: extend <code>src/lib/google-sheets/parser.ts</code> for the ~15 real-sheet columns it doesn't map (<code>Coolfire Success ID</code>, Invoice #, Arrival/Complete, timestamp block, contact fields, Stop #) with fixtures from the 7/9 CSV export; plumb <code>GOOGLE_SHEETS_MASTER_SHEET_ID</code> (fallback to the legacy var, which points at the wrong \"Web Quotes\" sheet everywhere) so going live after the share is a one-value change."
     },
     {
@@ -785,6 +910,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#483",
+      "created": "2026-07-09",
+      "closed": "2026-07-09",
       "tags": [
         "critical",
         "bug"
@@ -798,6 +925,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#484",
+      "created": "2026-07-09",
+      "closed": "2026-07-09",
       "tags": [
         "bug"
       ],
@@ -810,6 +939,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#484",
+      "created": "2026-07-09",
+      "closed": "2026-07-09",
       "description": "7/9 drive test ask: disable \"Arrived at restaurant/client\" unless the driver is nearby. PR #484: 150 m fail-open geofence on both surfaces — blocks only when GPS and target coords are both known and clearly out of range; unknown GPS or ungeocoded address never strands a driver. Distance hint shown on the disabled button."
     },
     {
@@ -819,6 +950,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#485",
+      "created": "2026-07-09",
+      "closed": "2026-07-10",
       "tags": [
         "bug"
       ],
@@ -831,6 +964,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#485",
+      "created": "2026-07-09",
+      "closed": "2026-07-10",
       "tags": [
         "bug"
       ],
@@ -843,6 +978,8 @@
       "owner": "emmanuel",
       "source": "jul9walk",
       "sourceRef": "#485",
+      "created": "2026-07-09",
+      "closed": "2026-07-10",
       "description": "<strong>DONE — PR #485 merged to <code>development</code> 2026-07-10.</strong><br><br>7/9 test: the shift could end while WALK-TEST-AM sat Assigned with an overdue pickup (the guard only counted started deliveries).<br><br>#485: ASSIGNED orders with pickup ≤2h away or overdue now block server-side, and the End shift button disables with a \"N deliveries to finish first\" hint. Future-dated assignments don't trap the driver; admin force override kept."
     },
     {
@@ -851,6 +988,7 @@
       "title": "Purchase production app-store licenses (Google Play $25 + Apple $99/yr)",
       "owner": "gary",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "Approved in the 7/13 meeting for the production mobile release. The Apple Developer account also ends the every-7-days free-Apple-ID re-sign ritual on the test iPhone. Closes the spend question behind <code>native-app-go-no-go</code>; unblocks store publication of the native driver app."
     },
     {
@@ -859,6 +997,7 @@
       "title": "Add driver + client ID and phone fields in the web app (not the uploader)",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "7/13 decision: do NOT modify the Coolfire master uploader (operational risk). Driver/client identification numbers + phone fields go directly in the web app during the migration; existing DB UUIDs confirmed as the canonical unique identifier for clients/vendors.<br><br>Supersedes the sheet side of <code>driver-phone-storage</code>; also feeds the SMS send list (driver phones from DB profiles) and the driver-onboarding gap (only 1 of 27 sheet drivers has an account)."
     },
     {
@@ -867,6 +1006,7 @@
       "title": "Verify pricing maps for Seoul Kitchen + Freshroll - SF (email, CC Gary)",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "The only non-partner sheet vendors without a calculator config mapping (7/9 export analysis). Email Fernando / helpdesk to verify the pricing amounts are correct.<br><br><strong>Gary must be CC'd on this and all future pricing correspondence</strong> (explicit 7/13 ask).<br><br><strong>Draft ready:</strong> <code>docs/ready-set/emails/2026-07-13-helpdesk-pricing-and-sheet-questions-draft.md</code> (also carries the Try Hungry $60-vs-$216 tie-break + the master-sheet workflow questions)."
     },
     {
@@ -875,6 +1015,7 @@
       "title": "Demo the pricing admin panel to Gary",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "Show Gary how driver + client pricing is configured in the admin panel (Admin → Calculator → Adjust Vendor Pricing) so pricing changes don't depend on hardcoded values or a developer."
     },
     {
@@ -883,6 +1024,7 @@
       "title": "Dynamic per-client pricing config — create new clients without hardcoded values",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors."
     },
     {
@@ -891,6 +1033,7 @@
       "title": "SMS provider — compare and make the final call (delegated to Emmanuel)",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
       "description": "The May Telnyx-vs-Twilio decision came back to the 7/13 meeting and was <strong>delegated to Emmanuel</strong>: compare Twilio vs cheaper alternatives and decide.<br><br>The 5/7 analysis recommends Telnyx (~$55–75/mo vs ~$120–145/mo).<br><br>Then: open the account + 10DLC registration (weeks — the long pole), set creds, flip the two disabled schedules on.<br><br>Absorbs the four May-11 research cards (Telnyx integration test, Telnyx details email, 5-line porting-cost calc, phone segmentation by marketplace — removed from the board 2026-08-03); send list comes from DB profiles per <code>webapp-driver-client-id-phone-fields</code>.<br><br><strong>Update 2026-09-25 (board audit):</strong> Emmanuel made the call: <strong>Telnyx</strong>. Waiting on Gary's green light (reminded 08-17, still unanswered 09-22). Related: exec-summary decision #2 (Twilio ~$20/mo) and <code>pilot-twilio-prod-creds</code>."
     },
     {
@@ -899,6 +1042,8 @@
       "title": "Fix signature save bug, then notify Gary to schedule the drive test",
       "owner": "emmanuel",
       "source": "jul13",
+      "created": "2026-07-13",
+      "closed": "2026-08-14",
       "description": "<strong>DONE — closed by the Aug 11–14 CDMX drive-test series.</strong><br><br>Signature bugs fixed and field-verified: PR #512 (2026-08-11 drive findings, 9 commits) + PR #513 (2026-08-12 drive findings incl. the blank-signature fullscreen rescale data-loss bug and sheet close-first fix), both merged to <code>development</code>. Three verification drives ran (RSQA-20260811/12/14 orders, CDMX PM route) confirming signature capture, POD, GPS trail, and end-shift all work end-to-end — including the #515 return-to-dispatch escape hatch on-device (see <code>driver-return-to-dispatch</code>)."
     },
     {
@@ -907,6 +1052,7 @@
       "title": "Native shell: WebView cookie/session divergence (client alive, server 401)",
       "owner": "emmanuel",
       "source": "jul21",
+      "created": "2026-07-21",
       "tags": [
         "bug"
       ],
@@ -918,6 +1064,7 @@
       "title": "Native wrapper productionization (iOS + Android hardening)",
       "owner": "emmanuel",
       "source": "jul21",
+      "created": "2026-07-21",
       "description": "<strong>Phase 3 of the background-GPS plan — starts once the locked-screen walks pass (see <code>persistent-gps-background</code>). ~3–5 days once store accounts exist.</strong> From the 7/21 wrapper audit.<br><br><strong>Shared:</strong> (1) scope <code>allowNavigation</code> to the readysetllc.com domains (committed config is fine; never ship the <code>['*']</code> diagnostic); (2) commit the gitignored <code>ios/</code>+<code>android/</code> projects (or add a post-<code>cap add</code> patch step) — regeneration silently wipes hand-applied permissions, already bit twice (Cap-8 regen wiped Android; CAMERA re-add); (3) offline buffering/retry for location POSTs (fixes are dropped on network blips = dead zones); (4) branded icon + splash (both platforms are Capacitor placeholders); (5) versionName/versionCode bump strategy (both hardcoded 1/1.0).<br><br><strong>Android:</strong> release keystore + signing config (release builds unsigned — blocks any distribution, gated on <code>buy-app-store-licenses</code>); real permission-onboarding UX — targetSdk 36 mandates POST_NOTIFICATIONS + the two-step \"Allow all the time\" grant + battery-optimization exemption (all currently left to the plugin's auto-prompt).<br><br><strong>iOS:</strong> \"Always Allow\" onboarding (it's a Settings grant, not a dialog); App-Store background-location justification only if not TestFlight-internal; $99 account ends the 7-day re-sign ritual.<br><br><strong>Distribution decision:</strong> TestFlight-internal + APK sideload avoids Play's background-location review form.<br><br><strong>Update 2026-08-05 — blocked upstream: the native track is PARKED.</strong> Draft PR <a href=\"https://github.com/ReadySet1/ready-set/pull/461\">#461</a> was closed unmerged (branch <code>chore/native-driver-app-poc</code> preserved) because the Phase-1 locked-screen walk never ran — no capable test device and no Apple Developer account. This phase cannot start until <code>persistent-gps-background</code> un-parks and the walks pass.<br><br><strong>Update 2026-09-25 (board audit):</strong> Re-parked 09-06 with the pilot decision. Adds weight to item (2): the 09-21 iOS 27 UIScene fix (SceneDelegate + scene manifest) was hand-applied in the gitignored <code>ios/</code> and is lost on regen."
     },
     {
@@ -927,6 +1074,8 @@
       "owner": "emmanuel",
       "source": "aug3",
       "sourceRef": "#498",
+      "created": "2026-08-03",
+      "closed": "2026-08-03",
       "tags": [
         "bug"
       ],
@@ -938,6 +1087,8 @@
       "title": "Dependency Review restored (public repo + GHAS_ENABLED=true)",
       "owner": "emmanuel",
       "source": "aug3",
+      "created": "2026-08-03",
+      "closed": "2026-08-03",
       "description": "<strong>DONE 2026-08-03 — no paid GHAS needed while the repo is public.</strong><br><br>Dependency graph is free on public repos; verified live: the <code>Dependency Review</code> job on dependabot PR #499 ran ungated (main&apos;s workflow) and PASSED. Repo variable <code>GHAS_ENABLED=true</code> set, so the gated job on development runs again too.<br><br>⚠️ If the repo ever goes private again without paid GHAS, flip <code>GHAS_ENABLED</code> back to false."
     },
     {
@@ -946,6 +1097,8 @@
       "title": "Vercel PR check fixed by the public-repo flip",
       "owner": "emmanuel",
       "source": "aug3",
+      "created": "2026-08-03",
+      "closed": "2026-08-03",
       "description": "<strong>DONE 2026-08-03 — resolved by making the repo public (no team seat needed).</strong><br><br>The <code>Vercel</code> check passes again (<em>Deployment has completed</em>, verified on PR #500) and deployments to <code>ready-set-dev</code> flow normally — the <em>Git author must have access</em> rejection only applied to private repos. No paid Vercel invite required.<br><br>Long-term the check disappears anyway with the Dokploy migration."
     },
     {
@@ -955,7 +1108,9 @@
       "owner": "emmanuel",
       "source": "aug3",
       "description": "<strong>PR #500 OPEN → development (2026-08-03).</strong><br><br>All 61 remaining unbounded <code>\">=X\"</code> overrides bounded to <code>&lt;next-major</code> (next-minor for 0.x), ceilings derived from current lockfile resolutions — zero resolution changes today. Also bumps brace-expansion 5.0.8→5.0.9 (new high advisory). Audit highs back to 2 (linkify-it ×2, unfixable).<br><br>Typecheck/lint clean, 8,346 tests green. Merge once CI passes.<br><br><strong>Closed 2026-08-05:</strong> merged 2026-08-04; <code>development</code>'s <code>Security</code> workflow is green. Note this is what makes the red <code>NPM Security Audit</code> on any PR branched before 2026-08-04 a <em>stale</em> check rather than a real finding — rebase to clear it.",
-      "sourceRef": "#500"
+      "sourceRef": "#500",
+      "created": "2026-08-03",
+      "closed": "2026-08-04"
     },
     {
       "id": "dev-main-sync-aug",
@@ -963,6 +1118,8 @@
       "title": "Sync development → main (security/CI batch #493–#498)",
       "owner": "emmanuel",
       "source": "aug3",
+      "created": "2026-08-03",
+      "closed": "2026-08-12",
       "description": "<strong>DONE — v2.5.0 shipped.</strong> The dev→main promotion landed 2026-08-05 and release-please PR <a href=\"https://github.com/ReadySet1/ready-set/pull/507\">#507</a> (<code>chore(main): release 2.5.0</code>) merged 2026-08-12 — this time with a CLEAN merge state, no CodeQL bypass needed. The security override sweep, brace-expansion bump, and CI fixes are in front of production users.<br><br>Was: development carried the security override sweep (#493), brace-expansion bump (#496), CI timeout fix (#495) and CI infra-red fixes (#498) with no sync PR."
     },
     {
@@ -971,6 +1128,7 @@
       "title": "Repo public again: scrub + rotate the exposed dev test credentials",
       "owner": "emmanuel",
       "source": "aug3",
+      "created": "2026-08-03",
       "tags": [
         "critical"
       ],
@@ -982,6 +1140,8 @@
       "title": "Hetzner boxes restored — unpaid invoices were the cause",
       "owner": "emmanuel",
       "source": "aug3",
+      "created": "2026-08-03",
+      "closed": "2026-08-03",
       "tags": [
         "critical"
       ],
@@ -994,6 +1154,8 @@
       "owner": "emmanuel",
       "source": "aug3",
       "sourceRef": "#497",
+      "created": "2026-08-03",
+      "closed": "2026-08-03",
       "description": "<strong>DONE — merged to development 2026-08-03.</strong> Small fix removing the redundant <code>#vendor-hero</code> URL fragment from CTA links (Fernando, 4 files, tests updated). All checks green."
     },
     {
@@ -1002,30 +1164,121 @@
       "title": "Web app mobile testing round 1 (Fernando, iPhone X/Safari)",
       "owner": "fernando",
       "source": "aug3",
+      "created": "2026-08-03",
+      "closed": "2026-08-17",
       "description": "Role split from the 8/3 meeting (Gary absent): Fernando tests, Emmanuel codes.<br><br>Round 1 = web app on <code>development.readysetllc.com</code>, mobile Safari on iPhone X only. Matrix: <code>docs/ready-set/reports/2026-08-03-web-mobile-test-matrix.md</code> (~35 cases, 8 groups; driver flow is the core).<br><br>Email draft ready; creds go via Slack DM (rotated 8/3). Emmanuel stages WALK-TEST orders the morning of the run. Native-wrapper walk test deferred until the store-license/device question is sorted.<br><br><strong>COMPLETE 2026-08-17:</strong> Fernando delivered the full-round report (email 3:33 PM). Session 1 (Aug 6 walking run): W1–W10 all PASS; its two findings became <a href=\"https://github.com/ReadySet1/ready-set/issues/508\">#508</a> (shipped as #515/#516) and the tab-bar fix. Session 2 (full matrix): Group W clean again; <strong>5 new findings</strong> → triage card <code>web-mobile-round1-findings-triage</code>. Summary: <code>docs/ready-set/reports/2026-08-17-web-mobile-test-round1-results.md</code>."
     },
     {
       "id": "ci-test-failure-masking",
-      "status": "open",
+      "status": "done",
       "title": "CI masks test failures: e2e swallowed twice, unit tests soft-gated",
       "owner": "emmanuel",
       "source": "aug10",
       "sourceRef": "#511",
+      "created": "2026-08-10",
+      "closed": "2026-09-30",
       "tags": [
         "critical",
         "bug"
       ],
-      "description": "Found reviewing PR #511: <code>ci.yml</code> wraps <code>pnpm test:e2e</code> in <code>|| exit 0</code> AND the e2e job has <code>continue-on-error: true</code>, so a red e2e suite still shows a green check (PR #511 hides a link that <code>flowers-landing-page.spec.ts</code> test 12 asserts visible, and CI stayed green). Unit tests run with <code>|| true</code> plus a 95% aggregate pass-rate threshold (REA-285). Remove both e2e masking layers and reconsider the unit threshold so test checks actually gate merges.<br><br><strong>2026-09-29 update:</strong> the masking hides more than flaky tests. (1) E2E never runs: Playwright global setup throws <code>Missing required environment variable: TEST_DRIVER_EMAIL</code> (<code>e2e/auth/setup.ts:27</code>), exit 1, masked green on every PR. (2) <code>src/__tests__/services/brokerSyncService.test.ts</code> has 7 real failures on <code>development</code> (stale mocks since <code>8ded4e04</code>, CaterValley sync now goes through a staff-gated server action). Order: add the E2E secrets → fix the broker mocks → remove the masks."
+      "description": "Found reviewing PR #511: <code>ci.yml</code> wraps <code>pnpm test:e2e</code> in <code>|| exit 0</code> AND the e2e job has <code>continue-on-error: true</code>, so a red e2e suite still shows a green check (PR #511 hides a link that <code>flowers-landing-page.spec.ts</code> test 12 asserts visible, and CI stayed green). Unit tests run with <code>|| true</code> plus a 95% aggregate pass-rate threshold (REA-285). Remove both e2e masking layers and reconsider the unit threshold so test checks actually gate merges.<br><br><strong>2026-09-29 update:</strong> the masking hides more than flaky tests. (1) E2E never runs: Playwright global setup throws <code>Missing required environment variable: TEST_DRIVER_EMAIL</code> (<code>e2e/auth/setup.ts:27</code>), exit 1, masked green on every PR. (2) <code>src/__tests__/services/brokerSyncService.test.ts</code> has 7 real failures on <code>development</code> (stale mocks since <code>8ded4e04</code>, CaterValley sync now goes through a staff-gated server action). Order: add the E2E secrets → fix the broker mocks → remove the masks.<br><br><strong>2026-09-30 — DONE.</strong> #602 (strict unit gate, broker mocks, E2E secret check) and #603 (production build + <code>next start</code>, Playwright <code>globalTimeout</code>, no <code>|| exit 0</code>) merged. E2E now reports honestly: 107 passed / 92 failed / 145 did not run. The job stays non-blocking via <code>continue-on-error</code> until the suite is green; that work moved to <code>e2e-suite-green</code>."
+    },
+    {
+      "id": "e2e-suite-green",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#607",
+      "created": "2026-09-30",
+      "closed": "2026-10-06",
+      "tags": [
+        "bug"
+      ],
+      "title": "Get the E2E suite green, then make it a blocking CI gate",
+      "description": "First honest run (09-30, post-#603): 107 passed / <strong>92 failed</strong> / 2 flaky / 43 skipped / 145 did not run. Most failures share one cause per spec. Estimate ~2–3 dev days.<br><br><strong>Step 0 — infra (#607):</strong> <code>edit-order</code> storageState path (16 tests), CI workers 2→4, <code>driver-shift-workflow</code> runs in order.<br><strong>Step 1 — quick wins (~½ day, parallel agents 09-30):</strong> <code>client-dashboard</code> (12, UI login → client storageState), <code>mileage-calculator</code> (12, nonexistent <code>E2E_TEST_USER_*</code> env → storageState), <code>bulk-user-operations</code> (10, <code>networkidle</code> never settles), <code>calculator-ui</code> + <code>auth-flow</code> (15, stale headings/selectors).<br><strong>Step 2 — surfaced failures (~1–1½ days):</strong> whatever step 1 unmasks, plus <code>data-separation</code> (7) and small specs (<code>admin-demo-calculator</code>, <code>admin-tracking-monitoring</code>, <code>flowers-landing-page</code>, <code>driver-shift-workflow</code>, <code>demo-calculator</code>). Real app bugs found here get their own cards.<br><strong>Step 3 — <code>bug-fixes-integration</code> (12):</strong> none of its ~20 <code>data-testid</code>s exist in the app. Delete if unit tests cover it, else rewrite (~½ day).<br><strong>Step 4 — gate:</strong> drop <code>continue-on-error</code> from the CI E2E job once green on 2 consecutive runs.<br><br>Open question: <code>/api/admin/job-applications</code> needs <code>SUPABASE_SERVICE_ROLE_KEY</code> in CI (new rs-dev secret).<br><br><strong>2026-09-30 — Step 1 done (3 parallel agents):</strong> <a href=\"https://github.com/ReadySet1/ready-set/pull/608\">#608</a> bulk-user-operations (10 pass, 1 skip; destructive confirms never clicked), <a href=\"https://github.com/ReadySet1/ready-set/pull/609\">#609</a> calculator-ui 16/16 + auth-flow 7/7 (console-error test left red on purpose, now names the 404 URLs), <a href=\"https://github.com/ReadySet1/ready-set/pull/610\">#610</a> client-dashboard 12/12 + mileage-calculator 13 pass + 1 fixme. App bugs found → <code>mileage-map-webgl-crash</code>, <code>admin-footer-help-404</code>. Follow-ups: calculator tests 11–16 pass vacuously when vendor configs are missing; <code>.env.example</code> still lists dead <code>E2E_TEST_USER_*</code>.<br><br><strong>New baseline (#607 CI, full suite now fits: 18.8 min, 0 did-not-run):</strong> 210 passed / 116 failed / 63 skipped. Step-1 PRs cover ~48 of the 116. Newly visible for step 2: <code>softDelete</code> (12), <code>vendor-dashboard</code> (10), <code>visual-regression</code> (8 — likely macOS vs Linux screenshot baselines), <code>web-pricing</code> (7), <code>order-flow</code> (1), plus <code>data-separation</code> (7), <code>edit-order</code> (2, down from 16) and the small specs. Expected after step 1: ~68 failing.<br><br><strong>Step 3 research (09-30):</strong> <code>bug-fixes-integration</code> NEVER passed — added in one commit (<code>df68af32</code>, 2025-07-18) against testids and routes (<code>/admin/orders</code>) that never existed. Of 12 tests: 3 check behaviour the app no longer has (free-text CA state, Bay-Area-only counties — contradicted by #522), 7 already covered by targeted tests. Real gaps: job-applications CSV export (~1–2h unit test) and status-change UI (~1h). Decision: delete the spec + add those 2 unit tests. Also: <code>admin-flow.spec.ts</code> checks export/status only if the button exists (vacuous) — tighten later.<br><br><strong>09-30 progress:</strong> #608, #609, #610 MERGED (step 1 done; #610 CI run: 236 passed / 88 failed). Step 3 → <a href=\"https://github.com/ReadySet1/ready-set/pull/611\">#611</a> (spec deleted, 6 unit tests). Step 2 in progress with 4 parallel agents.<br><br><strong>10-01 00:50Z:</strong> #611 (step 3), #612 (vendor-dashboard/web-pricing/order-flow) and #613 (dead links) MERGED. Best CI run so far (#612): 276 passed / 49 failed. Remaining step 2: softDelete+edit-order, data-separation+visual-regression (Linux baselines generated), small specs — agents resumed after the shared dev server hit its 2h limit. admin-demo-calculator console test now fails only on <code>Auth operation failed after 3 attempts</code> (not 404s).<br><br><strong>10-01:</strong> step-2 PRs <a href=\"https://github.com/ReadySet1/ready-set/pull/614\">#614</a> (data-separation per role — no data-exposure bug; 8 Linux visual baselines) and <a href=\"https://github.com/ReadySet1/ready-set/pull/615\">#615</a> (calculators, tracking, flowers, driver-shift with afterAll shift cleanup) opened. Remaining: softDelete + edit-order agent. <a href=\"https://github.com/ReadySet1/ready-set/pull/616\">#616</a> softDelete + edit-order opened (no shared-data writes: mutating requests faked in-browser). All step-2 agents done.<br><br><strong>2026-10-02:</strong> E2E is <strong>green on development</strong> for the first time: 314 passed, 0 failed, 2 flaky (run 37026426828, after #619 + #621; baseline 09-30 was 116 failed). Remaining before making it blocking: fix the recurring flakes (auth-flow mobile, data-separation CLIENT, client/vendor dashboard navigation, driver-shift :337, offline-sync :386) and see a few consecutive green runs.<br><br><strong>Update 2026-10-05:</strong> auth-flow mobile flake fixed in #628 (hydration race). data-separation CLIENT flake root-caused in PR #638: Suspense streams a hidden duplicate of the stats block after &lt;/main&gt; and React 19.2 delays the swap, so page-wide getByText hits strict mode; assertions now scoped to <code>main</code>. Left: same fix in <code>vendor-dashboard.spec.ts:52</code>, then a few consecutive green runs before dropping <code>continue-on-error</code>.<br><br><strong>Update 2026-10-05:</strong> #638 merged (data-separation scoped to main). Same flake still in client-dashboard + vendor-dashboard specs → card e2e-vendor-dashboard-main-scope.<br><br><strong>Update 2026-10-06:</strong> all known Suspense-duplicate flakes fixed (#638, #641) and the useBulkSelection timing test replaced (#640). Next: watch a few consecutive green E2E runs on development, then drop <code>continue-on-error</code>.<br><br><strong>Update 2026-10-06 PM:</strong> five consecutive green runs (316–318 passed, 0 failed, at most 2 flaky that passed on retry). Step 4 opened as <a href=\"https://github.com/ReadySet1/ready-set/pull/644\">#644</a>: <code>continue-on-error</code> removed and <code>All Checks Pass</code> now requires E2E. <strong>Merged 2026-10-06</strong> (<code>8afae655</code>): E2E is a blocking gate on <code>development</code>; reaches <code>main</code> at the next promotion."
+    },
+    {
+      "id": "profile-hard-delete-fk-drift",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#616",
+      "created": "2026-09-30",
+      "closed": "2026-10-07",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "title": "rs-dev cannot permanently delete any profile: user_audits FK lacks ON DELETE CASCADE",
+      "description": "Found by the E2E green-up (#616), verified on the live rs-dev DB: constraint <code>user_audits_userId_fkey</code> is plain <code>FOREIGN KEY (\"userId\") REFERENCES profiles(id)</code>, but the Prisma migration declares <code>ON DELETE CASCADE</code>. Trigger <code>trg_audit_profile_changes</code> then fires AFTER DELETE and inserts an audit row referencing the deleted profile → FK violation, so admin \"Permanently Delete\" fails. <strong>Check prod (<code>ready-set-web</code>) for the same drift before fixing.</strong> Fix: align the constraint with the migration and make the trigger skip/neutralize the audit row on DELETE. 3 orphan CLIENT profiles (no auth user) sit in rs-dev trash from the E2E agent: <code>e2e-softdelete-1790812455225-iuttad@example.com</code>, <code>…490827-2kc9hu@…</code>, <code>…505363-bx3ooi@…</code> — purge after the fix. <br><strong>Resolved 2026-10-07 (#657):</strong> root cause was the audit trigger AND the service both inserting a <code>user_audits</code> row for the just-deleted profile (prod affected too, not only rs-dev). Option B: hard delete writes no audit row; migration <code>20261007000000_hard_delete_no_audit_row</code> fixes the trigger and normalizes the FKs. Applied on rs-dev, 3 orphan profiles purged. <strong>Prod migration owed at next promotion.</strong>"
+    },
+    {
+      "id": "ondemand-edit-order-button",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#616",
+      "created": "2026-09-30",
+      "closed": "2026-10-05",
+      "tags": [
+        "bug"
+      ],
+      "title": "Admin on-demand order detail has no \"Edit Order\" button",
+      "description": "Found by the E2E green-up (#616): the edit dialog supports on-demand fields but the admin on-demand detail page never renders the Edit Order button, so they are unreachable. Related minor: the order page shows \"Order Not Found\" on any load failure, not only a missing order.<br><br><strong>Done 2026-10-05:</strong> #634 merged to development: on-demand detail page renders Edit Order (same gating as catering); non-404 load failures now say \"Unable to Load Order\". Prod at next promotion."
+    },
+    {
+      "id": "driver-portal-drivers-403",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#615",
+      "created": "2026-09-30",
+      "closed": "2026-10-05",
+      "tags": [
+        "bug"
+      ],
+      "title": "Driver portal logs 403 \"permission denied for table drivers\" on every load",
+      "description": "Seen by the E2E green-up (#615): a browser-side Supabase query against <code>drivers</code> returns 403 (RLS / grant) on every <code>/driver</code> load. Find the client query, then either route it through an API that uses <code>src/lib/auth/driver-ownership.ts</code> or fix the policy. Check whether anything in the portal silently depends on it (same family as the 07-02 \"driver-id lookup silently bailed\").<br><br><strong>Update 2026-10-05:</strong> PR #636: the browser query was <code>fetchUserContext</code> in <code>src/lib/realtime/client.ts</code>; its 403 left <code>driverId</code> undefined, which silently disabled the location rate limit and the payload ownership check in <code>broadcast()</code>. driverId now resolves via <code>/api/auth/session</code>, which uses <code>getDriverForUser()</code>.<br><br><strong>Done 2026-10-05:</strong> #636 merged to development (0d7c3985). Prod at next promotion."
+    },
+    {
+      "id": "mileage-map-webgl-crash",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#610",
+      "created": "2026-09-30",
+      "closed": "2026-10-05",
+      "tags": [
+        "bug"
+      ],
+      "title": "Mileage calculator crashes to \"Authentication Error\" when WebGL is unavailable",
+      "description": "Found by the E2E green-up (#610). <code>src/components/MileageCalculator/MileageMap.tsx:40</code> calls <code>new mapboxgl.Map()</code> unguarded; without WebGL, \"Failed to initialize WebGL\" bubbles to <code>AuthErrorBoundary</code> and the whole page shows \"Authentication Error / Something went wrong\" (misleading). Fix: catch map init failure (or check <code>mapboxgl.supported()</code>) and render the existing \"Map unavailable\" fallback. Covered by a <code>test.fixme</code> in <code>e2e/mileage-calculator.spec.ts</code> — un-fixme it with the fix.<br><br><strong>Update 2026-10-05:</strong> PR #631 open (WebGL guard + fallback card, e2e un-fixme).<br><br><strong>Done 2026-10-05:</strong> #631 merged to development: WebGL guard + \"Map unavailable\" fallback, e2e un-fixme. Prod at next promotion."
+    },
+    {
+      "id": "admin-footer-help-404",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "sep30ci",
+      "sourceRef": "#609",
+      "created": "2026-09-30",
+      "closed": "2026-10-01",
+      "tags": [
+        "bug"
+      ],
+      "title": "Dead links: /signin, /signup and /help return 404 (real routes are /sign-in, /sign-up)",
+      "description": "Found by the E2E green-up (#609). <code>src/components/Dashboard/Footer/admin-footer.tsx:85</code> links to <code>/help</code>; no route exists (404). Prod builds prefetch it, so <code>calculator-ui</code> test 3 (no console errors) fails only in CI. Confirm against the URLs that test now prints, then point the link somewhere real or remove it.<br><br><strong>2026-09-30 — confirmed by CI</strong> (calculator-ui test 3 now prints failing responses, #609): <code>404 /signin</code>, <code>404 /signup</code>, <code>404 /help</code>. Sources: <code>src/components/Header/Navigation.tsx:80,85</code> and <code>src/components/Header/menuData.tsx:137,143</code> (→ <code>/sign-in</code>, <code>/sign-up</code>), plus <code>admin-footer.tsx:85</code> (<code>/help</code> has no route). Small fix; turns calculator-ui + admin-demo-calculator console-error tests green.<br><br><strong>DONE 10-01:</strong> fixed in <a href=\"https://github.com/ReadySet1/ready-set/pull/613\">#613</a> — admin footer filtered menu ids 7/8 (Blog/Resources) thinking they were Sign In/Up; removed the Sign In/Up menu entries, filter by path, removed Help Center, deleted unused Header/Navigation.tsx."
     },
     {
       "id": "calendar-url-dedup",
-      "status": "new",
+      "status": "done",
       "title": "Centralize the Google Calendar booking URL (duplicated in 20+ components)",
       "owner": "emmanuel",
       "source": "aug10",
       "sourceRef": "#511",
+      "created": "2026-08-10",
       "tags": [],
-      "description": "The same Google Calendar appointments URL is hardcoded verbatim in 20+ components (SpecialtyHero, BakeryHero, VendorHero, FlowerHero, LogisticsHero, PromoPopup, CateringFeatures, tests, etc.). Extract to a shared constant (e.g. <code>src/config/scheduling-config.ts</code>) so a booking-link change is one edit."
+      "description": "The same Google Calendar appointments URL is hardcoded verbatim in 20+ components (SpecialtyHero, BakeryHero, VendorHero, FlowerHero, LogisticsHero, PromoPopup, CateringFeatures, tests, etc.). Extract to a shared constant (e.g. <code>src/config/scheduling-config.ts</code>) so a booking-link change is one edit.<br><br><strong>DONE 2026-10-09</strong> — Shipped in PR <a href=\"https://github.com/ReadySet1/ready-set/pull/674\">#674</a> (<code>src/config/scheduling-config.ts</code>); no hardcoded copies left.",
+      "closed": "2026-10-09"
     },
     {
       "id": "hide-duplicate-flowers-catering-ctas",
@@ -1033,6 +1286,8 @@
       "title": "Hide duplicate CTAs on flowers + catering landing pages",
       "owner": "fernando",
       "source": "aug10",
+      "created": "2026-08-10",
+      "closed": "2026-08-12",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>Hide the duplicate <em>How Our Service Works</em> button on <code>/flowers-deliveries</code> and the <em>Get Started</em> button on <code>/catering-deliveries</code>.<br><br><strong>Already implemented 2026-08-07 on branch <code>fix/hide-cta-buttons</code> (commit <code>b97da612</code>) — not yet merged.</strong> Both CTAs are gated behind visibility flags in <code>src/config/marketing-cta-config.ts</code>, defaulted off, and remain in source behind <code>{flag &amp;&amp; &lt;JSX/&gt;}</code> conditionals so they can be restored with a one-line flip. Touches <code>src/components/FlowersDelivery/FlowersAbout.tsx</code> and <code>src/components/FoodDelivery/CateringFeatures.tsx</code>; tests cover both flag states.<br><br><strong>DONE — shipped as PR <a href=\"https://github.com/ReadySet1/ready-set/pull/511\">#511</a>, merged to <code>development</code> 2026-08-12</strong> (re-reviewed and approved after Fernando's fixes). The CI test-masking issue found during its review remains tracked separately as <code>ci-test-failure-masking</code>."
     },
     {
@@ -1042,6 +1297,8 @@
       "owner": "fernando",
       "source": "aug10",
       "sourceRef": "#518",
+      "created": "2026-08-10",
+      "closed": "2026-08-17",
       "description": "<strong>DONE — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/518\">#518</a> MERGED to <code>development</code> 2026-08-17.</strong><br><br>Both logos added to <code>DEFAULT_FOOD_PARTNERS</code> in <code>src/components/FoodDelivery/DeliveryPartners.tsx</code> (partner count 12 → 14): Donaji (PNG 258×258) and Componere (WebP 2500×599, cache-busted via <code>ASSET_CACHE_VERSION</code> after re-upload). Assets pre-verified on Cloudinary (HTTP 200). Test counts updated 12→14, all 49 tests green, CI green. Reviewed clean by the specialist review pass 2026-08-17."
     },
     {
@@ -1051,6 +1308,8 @@
       "owner": "fernando",
       "source": "aug10",
       "sourceRef": "#517",
+      "created": "2026-08-10",
+      "closed": "2026-08-19",
       "tags": [
         "bug"
       ],
@@ -1063,7 +1322,9 @@
       "owner": "fernando",
       "source": "aug10",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>The county selector during new order creation only offers the original California service areas. Texas and Georgia counties must be added now that both markets are live.<br><br>County data is referenced across <code>src/lib/services/pricingService.ts</code>, <code>src/services/userService.ts</code> and <code>src/services/email-notification.ts</code>. Note that <code>counties</code> is currently typed <code>any</code> in <code>src/types/user.ts</code> — worth giving it a real type while this area is open. Confirm whether pricing zones and toll rules also need per-state entries, since the existing zone table is Bay Area specific.<br><br><strong>2026-09-01:</strong> PR #522 reviewed, changes requested: swap Houston for Austin/Travis and store county names (<code>Dallas</code>, <code>Travis</code>, <code>Fulton</code>) instead of city names. <strong>#522 merged 09-07.</strong>",
-      "sourceRef": "#522"
+      "sourceRef": "#522",
+      "created": "2026-08-10",
+      "closed": "2026-09-07"
     },
     {
       "id": "order-created-inbox-notification",
@@ -1071,6 +1332,8 @@
       "title": "Email the Ready Set inbox on every order created",
       "owner": "fernando",
       "source": "aug10",
+      "created": "2026-08-10",
+      "closed": "2026-09-07",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>Every order created on the website should trigger an email notification to the Ready Set inbox account, so the team sees new orders without polling the admin dashboard.<br><br>Order creation runs through <code>src/app/api/orders/route.ts</code>; email plumbing already exists in <code>src/lib/email-service.ts</code> and <code>src/services/email-notification.ts</code>. Confirm first whether a notification is already wired and failing silently rather than genuinely absent — that changes this from a feature to a bug. Make delivery failures non-fatal so a bounced notification can never roll back a successful order. <strong>Shipped as #534 (Fernando), merged 09-07.</strong>"
     },
     {
@@ -1080,7 +1343,9 @@
       "owner": "fernando",
       "source": "aug10",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>Add a new request to the pricing section of the website explaining how Ready Set pricing works. Target page is <code>src/app/(site)/pricing/page.tsx</code>.<br><br><strong>Scope pending:</strong> the ask does not yet specify whether this is static explanatory copy, an interactive calculator, or a form request. Confirm the intended output with the team before implementation.<br><br><strong>Update 2026-09-25 (board audit):</strong> PR #561 merged 09-21 (<code>PricingExamplesSection.tsx</code>); on prod since v2.8.0.",
-      "sourceRef": "#561"
+      "sourceRef": "#561",
+      "created": "2026-08-10",
+      "closed": "2026-09-21"
     },
     {
       "id": "catering-delivery-designed-redesign",
@@ -1089,7 +1354,9 @@
       "owner": "fernando",
       "source": "aug10",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>New redesign requested for the <em>Delivery Designed for Your Catering</em> section on <code>/catering-deliveries</code>, rendered by <code>src/components/FoodDelivery/CateringAbout.tsx</code>.<br><br><strong>Scope pending:</strong> no design direction supplied yet. Needs either a design handoff or an agreed direction before implementation, and should follow the same token-driven approach used by the tasks-board redesign so <code>pnpm lint:tokens:diff</code> stays clean.<br><br><strong>Update 2026-09-25 (board audit):</strong> PR #560 merged into <code>development</code> 09-25. Reaches prod with the next promotion.",
-      "sourceRef": "#560"
+      "sourceRef": "#560",
+      "created": "2026-08-10",
+      "closed": "2026-09-25"
     },
     {
       "id": "driver-return-to-dispatch",
@@ -1098,6 +1365,8 @@
       "owner": "emmanuel",
       "source": "aug14walk",
       "sourceRef": "#515 / #516",
+      "created": "2026-08-14",
+      "closed": "2026-08-13",
       "description": "<strong>DONE — PRs <a href=\"https://github.com/ReadySet1/ready-set/pull/515\">#515</a> + <a href=\"https://github.com/ReadySet1/ready-set/pull/516\">#516</a> merged to <code>development</code> (2026-08-13/15), field-verified on the 2026-08-14 CDMX drive.</strong><br><br>Closes the #508 end-shift deadlock Fernando hit on 08-06 (a driver stuck with an unstartable delivery could not end shift). Pre-pickup drivers can now <strong>return the assignment to dispatch</strong> from the blocked end-shift screen: order unassigned back to ACTIVE, dispatch row removed, mirror delivery CANCELLED, reason recorded, admin push notification fired. Admin tracking's Unassign button repointed at the same endpoint.<br><br>#516 then added the product guard from the 08-14 drive review: driver-initiated returns require <strong>dispatch approval</strong> (new <code>delivery_return_requests</code> table, PENDING/APPROVED/REJECTED/VOIDED, one pending request per delivery; migration applied to rs-dev). Post-pickup returns still 409 for drivers, 200 for admin."
     },
     {
@@ -1107,6 +1376,8 @@
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#598",
+      "created": "2026-08-17",
+      "closed": "2026-09-29",
       "tags": [
         "critical",
         "bug"
@@ -1115,15 +1386,17 @@
     },
     {
       "id": "catering-update-invariant-bypass",
-      "status": "open",
+      "status": "done",
       "title": "PATCH order update can null both headcount and orderTotal (bypasses #517's rule)",
       "owner": "emmanuel",
       "source": "review",
-      "sourceRef": "#517",
+      "sourceRef": "#618",
+      "created": "2026-08-17",
+      "closed": "2026-10-02",
       "tags": [
         "bug"
       ],
-      "description": "Found by the 2026-08-17 adversarial review of PR #517.<br><br>#517 enforces \"at least one of headcount / orderTotal\" across three layers — but <strong>only at creation</strong>. <code>PATCH /api/orders/[order_number]</code> (<code>cateringUpdateSchema</code>, lines ~98/104: both fields <code>.nullable()</code>) and <code>EditOrderDialog.tsx</code> accept <code>{ \"headcount\": null, \"orderTotal\": null }</code>, restoring the exact forbidden state one PATCH later. Bonus mismatch: update accepts <code>orderTotal: 0</code> (<code>nonnegative</code>) while all three create layers reject 0.<br><br>#517 declared the edit path out of scope by design, so this is the follow-up: enforce the pair rule (and align the zero-handling) in the PATCH handler + Edit dialog, or explicitly accept the invariant as create-only and document it."
+      "description": "Found by the 2026-08-17 adversarial review of PR #517.<br><br>#517 enforces \"at least one of headcount / orderTotal\" across three layers — but <strong>only at creation</strong>. <code>PATCH /api/orders/[order_number]</code> (<code>cateringUpdateSchema</code>, lines ~98/104: both fields <code>.nullable()</code>) and <code>EditOrderDialog.tsx</code> accept <code>{ \"headcount\": null, \"orderTotal\": null }</code>, restoring the exact forbidden state one PATCH later. Bonus mismatch: update accepts <code>orderTotal: 0</code> (<code>nonnegative</code>) while all three create layers reject 0.<br><br>#517 declared the edit path out of scope by design, so this is the follow-up: enforce the pair rule (and align the zero-handling) in the PATCH handler + Edit dialog, or explicitly accept the invariant as create-only and document it.<br><br><strong>2026-10-01:</strong> fixed in #618 (rule enforced in the PATCH, merged over saved values; catering orderTotal must be positive). Same PR fixes a worse pre-existing bug: the Edit Order dialog could not save ANY number field (typed strings failed <code>z.number()</code>). Awaiting review + a click-through on rs-dev.<br><br><strong>Done 2026-10-05:</strong> fixed by #618 (merged to development 10-02, promoted in #626, live in 2.9.3): PATCH keeps headcount or orderTotal, orderTotal must be positive, and the Edit Order dialog saves number fields again."
     },
     {
       "id": "web-app-mobile-testing-matrix-a-h",
@@ -1131,6 +1404,8 @@
       "title": "Finalize web app mobile testing matrix (sections A–H)",
       "owner": "fernando",
       "source": "aug10",
+      "created": "2026-08-10",
+      "closed": "2026-08-17",
       "description": "<strong>Reported by the Ready Set team.</strong><br><br>Complete the web app mobile testing matrix covering sections A through H. This is a QA deliverable rather than a code change.<br><br>Coordinate with the existing QA board so results feed the same reporting path, and consider linking finished sections back to QA test keys via <code>relatedQa</code> once they exist.<br><br><strong>Update 2026-09-25 (board audit):</strong> Duplicate of <code>web-mobile-test-round1</code>; the A–H matrix was completed and closed 08-17.",
       "tags": [
         "moot"
@@ -1142,6 +1417,8 @@
       "title": "Pickup signature persisted distorted after fullscreen → collapsed resize",
       "owner": "emmanuel",
       "source": "aug18walk",
+      "created": "2026-08-18",
+      "closed": "2026-08-19",
       "tags": [
         "bug",
         "critical"
@@ -1154,6 +1431,8 @@
       "title": "iOS keyboard overlaps the Confirm-pickup sheet",
       "owner": "emmanuel",
       "source": "aug18walk",
+      "created": "2026-08-18",
+      "closed": "2026-08-19",
       "tags": [
         "bug"
       ],
@@ -1165,6 +1444,8 @@
       "title": "Proof-of-delivery “Take Photo” needs two taps",
       "owner": "emmanuel",
       "source": "aug18walk",
+      "created": "2026-08-18",
+      "closed": "2026-08-19",
       "tags": [
         "bug"
       ],
@@ -1176,6 +1457,7 @@
       "title": "Wrapper: successful sign-in opens Safari alongside the app",
       "owner": "emmanuel",
       "source": "aug18walk",
+      "created": "2026-08-18",
       "tags": [
         "bug"
       ],
@@ -1187,6 +1469,8 @@
       "title": "Apex readysetllc.com served Traefik default cert after DNS cutover",
       "owner": "emmanuel",
       "source": "aug20",
+      "created": "2026-08-20",
+      "closed": "2026-08-20",
       "tags": [
         "bug",
         "critical"
@@ -1199,6 +1483,8 @@
       "title": "08-20 drive: delivery flow passed but zero GPS points (0.00 mi shift)",
       "owner": "emmanuel",
       "source": "aug20",
+      "created": "2026-08-20",
+      "closed": "2026-08-21",
       "tags": [
         "bug"
       ],
@@ -1215,7 +1501,9 @@
         "critical"
       ],
       "description": "Found on the 2026-08-20 León drive (Fernando, shift <code>3a9c4725</code>, order <code>Test 0820261</code>). He drove on <code>cromo181@yahoo.com</code>, whose <code>drivers</code> row has <code>is_active = false</code>. <code>POST /api/tracking/locations</code> gates its ownership check on <code>AND is_active = true</code> (<code>route.ts:118-125</code>) and <strong>403s every location point</strong> — <code>driver_locations</code> ended with 0 rows, shift mileage 0.00 mi, admin live map blank for the whole shift.<br><br>The gate is <em>inconsistent</em>: starting a shift and advancing every delivery stage worked fine (the <code>is_active</code> check in <code>delivery-actions.ts:36-44</code> only guards admin assignment), so an inactive driver can complete a delivery end-to-end while producing no tracking data at all. Decide the invariant: either an inactive driver cannot start a shift, or location writes stop requiring <code>is_active</code>.",
-      "sourceRef": "#600"
+      "sourceRef": "#600",
+      "created": "2026-08-20",
+      "closed": "2026-09-29"
     },
     {
       "id": "driver-tracking-failure-silent",
@@ -1228,18 +1516,22 @@
         "critical"
       ],
       "description": "Same 2026-08-20 drive. Fernando granted location permission, saw <strong>no error, warning, or banner</strong>, and completed a full shift believing tracking worked — while every point was being rejected server-side. <code>useLocationTracking.ts:243-253</code> posts to <code>/api/tracking/locations</code> and swallows the non-OK response.<br><br>Needs a visible driver-side state when N consecutive location writes fail (403/401/5xx): persistent banner on the driver screen, and ideally a block or loud warning at shift start. A tracking system that fails silently is worse than one that fails loudly — the whole walk produced no usable data and nobody knew until the DB was inspected the next day.",
-      "sourceRef": "#601"
+      "sourceRef": "#601",
+      "created": "2026-08-20",
+      "closed": "2026-09-29"
     },
     {
       "id": "driver-history-stale-weekly-summaries",
-      "status": "new",
+      "status": "done",
       "title": "Driver History shows zeros — stale weekly summaries override live shifts",
       "owner": "emmanuel",
       "source": "aug20walk",
+      "created": "2026-08-20",
+      "closed": "2026-10-05",
       "tags": [
         "bug"
       ],
-      "description": "Screenshot from Fernando 2026-08-21: <em>Your history</em> reports <strong>0 Total Shifts / 0 Deliveries / 0.0 Total Miles / 0h</strong> for May 24 – Aug 20, although his 08-20 shift is COMPLETED in the DB with <code>delivery_count = 1</code>.<br><br><code>GET /api/drivers/[driverId]/history</code> computes period totals from <code>driver_weekly_summaries</code> first and only falls back to live shift/delivery rows when <code>summaries.length === 0</code> (<code>route.ts:177</code>). His driver has 10 <em>zero-valued</em> summary rows in the window, so the fallback never fires and the stale zeros win. Fix the condition to per-week coverage: any week in range without a fresh summary should be computed from shifts.<br><br><strong>Blocks QA signal:</strong> <code>fernando.driver@readysetllc.com</code> (driver <code>c509f094</code>) carries the same 10 zero rows, so a correct GPS run still shows zeros on this screen until this lands or the rows are cleared on rs-dev."
+      "description": "Screenshot from Fernando 2026-08-21: <em>Your history</em> reports <strong>0 Total Shifts / 0 Deliveries / 0.0 Total Miles / 0h</strong> for May 24 – Aug 20, although his 08-20 shift is COMPLETED in the DB with <code>delivery_count = 1</code>.<br><br><code>GET /api/drivers/[driverId]/history</code> computes period totals from <code>driver_weekly_summaries</code> first and only falls back to live shift/delivery rows when <code>summaries.length === 0</code> (<code>route.ts:177</code>). His driver has 10 <em>zero-valued</em> summary rows in the window, so the fallback never fires and the stale zeros win. Fix the condition to per-week coverage: any week in range without a fresh summary should be computed from shifts.<br><br><strong>Blocks QA signal:</strong> <code>fernando.driver@readysetllc.com</code> (driver <code>c509f094</code>) carries the same 10 zero rows, so a correct GPS run still shows zeros on this screen until this lands or the rows are cleared on rs-dev.<br><br><strong>Update 2026-10-05:</strong> PR #637: per-week coverage (a summary is used only if fresh, other weeks from live shifts); also fixed the fallback comparing status to <code>COMPLETED</code> while rows store <code>completed</code>.<br><br><strong>Done 2026-10-05:</strong> #637 merged to development (4ec31d5d). Prod at next promotion. Summary job flaws tracked in driver-summary-job-flaws."
     },
     {
       "id": "enable-vps-crons",
@@ -1247,6 +1539,7 @@
       "title": "Scheduled jobs not running since the Dokploy cutover",
       "owner": "emmanuel",
       "source": "aug20walk",
+      "created": "2026-08-20",
       "tags": [
         "bug"
       ],
@@ -1259,6 +1552,8 @@
       "status": "done",
       "title": "Cancelling an order did not cascade to driver rows — driver deadlocked at End Shift",
       "sourceRef": "#525",
+      "created": "2026-08-21",
+      "closed": "2026-08-22",
       "tags": [
         "bug",
         "critical"
@@ -1272,6 +1567,8 @@
       "status": "done",
       "title": "Admin tracking Overview tab froze after first load (stale counts, 0 mi, 48 active deliveries)",
       "sourceRef": "#527",
+      "created": "2026-08-21",
+      "closed": "2026-08-22",
       "tags": [
         "bug"
       ],
@@ -1284,6 +1581,8 @@
       "status": "done",
       "title": "Live Map: travelled trail, planned route and order links in the driver popup",
       "sourceRef": "#526",
+      "created": "2026-08-21",
+      "closed": "2026-08-22",
       "description": "Feature gaps #6 and #7 requested during the 2026-08-21 drive. <code>LiveDriverMap</code> only rendered point markers and a static popup with no links.<br><br><strong>Shipped (PR #526):</strong> per-driver travelled trail from <code>driver_locations</code> for the active shift (served by the new <code>GET /api/tracking/shifts/[id]/trail</code>, realtime-appended), planned pickup→dropoff route for the active delivery, legend toggles for both layers, and <em>View order</em> / <em>View delivery</em> links in the popup. Merged to <code>development</code>, awaiting the next dev→main sync."
     },
     {
@@ -1293,6 +1592,8 @@
       "status": "done",
       "title": "Driver status flickered STOPPED/MOVING at walking pace",
       "sourceRef": "#524",
+      "created": "2026-08-21",
+      "closed": "2026-08-22",
       "tags": [
         "bug"
       ],
@@ -1308,7 +1609,9 @@
         "bug"
       ],
       "description": "Spotted while wiring the trail endpoint for PR #526. <code>GET /api/tracking/shifts/[id]</code> selects <code>start_time</code> / <code>end_time</code> from <code>driver_shifts</code>, but the table columns are <code>shift_start</code> / <code>shift_end</code>, so the route fails today. Rename the selected columns (and any mapped response fields) and add a test that hits the route against the real schema. <br><br><strong>Fixed (PR #529, merged 2026-08-22):</strong> route rewritten against the real <code>driver_shifts</code> schema with a soft-delete filter; <code>PUT action=end</code> now delegates to <code>endDriverShift</code> so the cancel guard cannot be bypassed. Merged to <code>development</code>, awaiting the next dev→main sync.",
-      "sourceRef": "#529"
+      "sourceRef": "#529",
+      "created": "2026-08-21",
+      "closed": "2026-08-22"
     },
     {
       "owner": "emmanuel",
@@ -1317,15 +1620,19 @@
       "status": "done",
       "title": "No driver notification when an assigned order is cancelled",
       "description": "Follow-up to the 2026-08-21 cancel deadlock. PR #525 makes the cancel cascade to the driver-side rows, but the driver still learns about the cancellation only by noticing the order disappeared. Push or in-app notification to the assigned driver (and a visible state on the delivery screen) when an admin cancels an order they are assigned to. <br><br><strong>Shipped (PR #530, merged 2026-08-22):</strong> the assigned driver now gets an SMS (Twilio) and an in-app realtime alert in the driver portal when dispatch cancels the order. SMS degrades to a logged skip if <code>TWILIO_*</code> is unset on the server. Merged to <code>development</code>, awaiting the next dev→main sync.",
-      "sourceRef": "#530"
+      "sourceRef": "#530",
+      "created": "2026-08-21",
+      "closed": "2026-08-22"
     },
     {
       "owner": "emmanuel",
       "source": "aug21",
+      "created": "2026-08-21",
+      "closed": "2026-10-14",
       "id": "rewalk-0821-cancel-end-shift",
-      "status": "open",
+      "status": "done",
       "title": "Device re-walk on rs-dev: cancel an assigned order, then End Shift; compare live vs closed-shift miles",
-      "description": "Verification pass for the 2026-08-21 fixes once <code>development</code> is deployed on rs-dev. Start a shift on <code>fernando.driver@readysetllc.com</code>, get an order assigned, cancel it from admin, and confirm <strong>End Shift succeeds</strong> without DB surgery (#525). During the walk, compare the live miles shown on the admin Overview / popup (#527) against the closed-shift mileage on the driver History and shift record; note any gap. Also eyeball the trail and planned route layers (#526) and the status pill stability (#524).<br><br><strong>Update 2026-09-25 (board audit):</strong> Return→End Shift passed 09-21 and the 09-22 drive passed clean. Only two checks remain: End Shift after an <em>admin cancel</em>, and live vs closed-shift miles."
+      "description": "Verification pass for the 2026-08-21 fixes once <code>development</code> is deployed on rs-dev. Start a shift on <code>fernando.driver@readysetllc.com</code>, get an order assigned, cancel it from admin, and confirm <strong>End Shift succeeds</strong> without DB surgery (#525). During the walk, compare the live miles shown on the admin Overview / popup (#527) against the closed-shift mileage on the driver History and shift record; note any gap. Also eyeball the trail and planned route layers (#526) and the status pill stability (#524).<br><br><strong>Update 2026-09-25 (board audit):</strong> Return→End Shift passed 09-21 and the 09-22 drive passed clean. Only two checks remain: End Shift after an <em>admin cancel</em>, and live vs closed-shift miles. <strong>PASSED 10/14 (Guillermo, Android):</strong> RSQA-20261014-2322 cancelled from admin at 17:27 while his shift was open; the in-app cancel alert appeared; End shift closed at 17:28 with no deadlock; the app showed 2.3 mi = the DB's 2.31 (those miles are phantom; see <code>mileage-phantom-pickup-pings</code>). No SMS sent: TWILIO_* is unset on dev and prod, and the driver has no phone on file (see <code>pilot-twilio-prod-creds</code>)."
     },
     {
       "id": "merge-pr532-v260",
@@ -1334,6 +1641,8 @@
       "owner": "emmanuel",
       "source": "aug31",
       "sourceRef": "#532",
+      "created": "2026-08-31",
+      "closed": "2026-08-31",
       "description": "Promotion PR staged since 08-22, CI fully green, prod migration <code>delivery_return_requests</code> already applied+verified. Merge-commit (never squash) from the ReadySet1 login (main-protect ruleset), then merge the release-please PR so the apex flips to 2.6.0.<br><br><strong>2026-09-02 DONE:</strong> #532 merged 08-31 (<code>7f96c286</code>); release PR #538 merged (<code>6c2de40e</code>), v2.6.0 tagged + released. Prod apex verified <code>healthy</code> on <code>version: 2.6.0</code> (DB 533 ms) at 19:29Z. Cycle closed by #541 (<code>64db8555</code>): main-only divergence now 0. Note: the &quot;merge from the ReadySet1 account&quot; step was never real — <code>gh pr merge N --merge --admin</code> works from the normal CLI account."
     },
     {
@@ -1343,6 +1652,8 @@
       "owner": "fernando",
       "source": "aug31",
       "sourceRef": "#534",
+      "created": "2026-08-31",
+      "closed": "2026-09-07",
       "tags": [
         "bug"
       ],
@@ -1355,6 +1666,8 @@
       "owner": "emmanuel",
       "source": "aug31",
       "sourceRef": "#522",
+      "created": "2026-08-31",
+      "closed": "2026-09-07",
       "description": "Open since mid-August with no review pass. Review or close.<br><br><strong>Update 2026-09-25 (board audit):</strong> Approved 09-06, merged 09-07 (shipped in the #550 promotion)."
     },
     {
@@ -1364,7 +1677,9 @@
       "owner": "emmanuel",
       "source": "aug31",
       "description": "Staging verified + signing secret sent 06-29. On Nate's sign-off: issue prod key, register prod webhook, go live. Gary decision owed: straight to prod or demo first.<br><br><strong>Update 2026-09-25 (board audit):</strong> Live on prod since 07-09 (#480, prod key last4 <code>02f0</code>). Card text was stale.",
-      "sourceRef": "#480"
+      "sourceRef": "#480",
+      "created": "2026-08-31",
+      "closed": "2026-09-25"
     },
     {
       "id": "native-walk-locked-screen",
@@ -1372,10 +1687,11 @@
       "title": "Locked-screen background-GPS walk — last native-app gate",
       "owner": "emmanuel",
       "source": "aug31",
+      "created": "2026-08-31",
       "tags": [
         "critical"
       ],
-      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again.<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Gate NOT cleared on Android.</strong> iOS locked-screen walk still owed separately (profile re-signed 2026-09-02, valid to 09-09).<br><br><strong>Update 2026-09-25 (board audit):</strong> The \"~Sep 2\" date is stale. iOS profile re-signed 09-21, <strong>expires 09-28</strong>; the iOS 27 UIScene fix is local only; the wrapper loaded blank after the 09-21 drive. iOS walk still not run."
+      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again.<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Gate NOT cleared on Android.</strong> iOS locked-screen walk still owed separately (profile re-signed 2026-09-02, valid to 09-09).<br><br><strong>Update 2026-09-25 (board audit):</strong> The \"~Sep 2\" date is stale. iOS profile re-signed 09-21, <strong>expires 09-28</strong>; the iOS 27 UIScene fix is local only; the wrapper loaded blank after the 09-21 drive. iOS walk still not run. <strong>10/14 partial (Guillermo, Android, motorcycle):</strong> locked only 2–3 min per window (asked for ≥10). Locked while driving 17:12–17:14: 22 pts, steady 5.5 s cadence, max gap 7.3 s = good. Locked standing still 17:06–17:09: about 1 ping/min (gaps 81/56/67 s), probably Android throttling a stationary fix. Still owed: one ≥10 min locked stretch while moving."
     },
     {
       "id": "api-health-unhealthy-check",
@@ -1387,7 +1703,9 @@
         "bug"
       ],
       "description": "Since the VPS move: <code>checkDatabaseHealth</code> runs 4 sequential Supabase round trips against 100/500ms thresholds (EU→us-east-1), so dev (~3.3s) and prod (~2.2s) always read unhealthy. Parallelize/re-threshold, and drop the dead Stripe check (<code>PaymentForm.tsx</code> is orphaned) so monitoring isn't permanently degraded.<br><br><strong>Update 2026-09-25 (board audit):</strong> PR #537 merged 08-31; apex reports healthy on v2.8.0 (09-23).",
-      "sourceRef": "#537"
+      "sourceRef": "#537",
+      "created": "2026-08-31",
+      "closed": "2026-08-31"
     },
     {
       "id": "glitchtip-review-0827",
@@ -1395,6 +1713,7 @@
       "title": "GlitchTip: review rs-dev errors around the 08-27 drive window",
       "owner": "emmanuel",
       "source": "aug31",
+      "created": "2026-08-31",
       "description": "rs-dev error reporting goes to GlitchTip (project 1), not Sentry. Check 21:31–21:41 UTC 08-27 via <code>secure/glitchtip-admin.txt</code>; wire Resend SMTP for alert emails while in there."
     },
     {
@@ -1403,6 +1722,7 @@
       "title": "Rotate the plaintext Supabase PAT in .mcp.json",
       "owner": "emmanuel",
       "source": "aug31",
+      "created": "2026-08-31",
       "description": "Personal access token sits inline in <code>repos/ready-set/.mcp.json</code> (gitignored, never committed — verified). Issue a new PAT, delete the old, move it to a <code>SUPABASE_ACCESS_TOKEN</code> env var."
     },
     {
@@ -1411,6 +1731,7 @@
       "title": "Verify the Vercel GitHub app is uninstalled",
       "owner": "emmanuel",
       "source": "aug31",
+      "created": "2026-08-31",
       "description": "Last Vercel-removal loose end: confirm the GitHub app integration is gone from the ReadySet1 account/repos."
     },
     {
@@ -1419,6 +1740,8 @@
       "title": "Off-host backups + uptime monitoring for the ready-set VPS",
       "owner": "emmanuel",
       "source": "aug31",
+      "created": "2026-08-31",
+      "closed": "2026-09-14",
       "tags": [
         "critical",
         "moot"
@@ -1435,7 +1758,9 @@
         "bug"
       ],
       "description": "GlitchTip issue 3: minified React error #418 (server/client text content mismatch) ×10 on <code>/driver</code>, iOS Mobile Safari, during Fernando's 08-27 drive. Likely a client-only date/time or locale-dependent value rendered during SSR. Non-fatal but fires on every driver page load.<br><br><strong>2026-09-01:</strong> Root cause: greeting computed from the server clock (UTC) during SSR; the device (PDT) rendered a different time-of-day bucket. Fixed in PR #539 with a hydration regression test. Merged to development 2026-09-01 (d8390493).",
-      "sourceRef": "#539"
+      "sourceRef": "#539",
+      "created": "2026-08-31",
+      "closed": "2026-09-01"
     },
     {
       "id": "delivery-advance-without-shift",
@@ -1443,6 +1768,8 @@
       "title": "Driver can advance a delivery with no shift running — untracked and invisible to admin",
       "owner": "emmanuel",
       "source": "qa",
+      "created": "2026-09-06",
+      "closed": "2026-09-07",
       "tags": [
         "bug",
         "critical"
@@ -1451,32 +1778,37 @@
     },
     {
       "id": "reset-script-leaves-future-seed",
-      "status": "new",
+      "status": "done",
       "title": "test:drive:reset leaves a superseded future-dated seed assigned — re-seeding the same day can deadlock End Shift",
       "owner": "emmanuel",
       "source": "qa",
+      "created": "2026-09-06",
       "tags": [
         "bug"
       ],
-      "description": "Found 2026-09-03 preparing Emmanuel's iOS run. Seeded a drive for 18:00, then re-seeded for 18:30 after correcting the time. <strong>Both orders ended up ASSIGNED to the same driver</strong> with live dispatch rows.<br><br><code>scripts/reset-driver-test-drive.ts</code> only clears orders its <code>blockingOrders</code> predicate matches: in-flight, or <code>ASSIGNED</code> with <code>pickupDateTime &lt;= now</code>. Its comment states <em>\"Future-dated assignments are harmless.\"</em> That holds when you seed shortly before a run, but <strong>not when you re-seed earlier the same day</strong> — the superseded order was 6 hours out at re-seed time, so it was skipped, and it would have come due at 17:59 while the tester was mid-walk. At End Shift both orders would be due and both would block.<br><br>This is the exact failure class of the 2026-08-06 field run and Fernando's 08-21 deadlock, arriving by a new route.<br><br><strong>Fix direction:</strong> when seeding, also retire any existing <em>disposable</em> (<code>RSQA-</code>) order still dispatched to that driver regardless of pickup time — <code>isDisposableTestOrder</code> already identifies them; the predicate just never consults it for future-dated rows. Cleared manually this time by deleting the dispatch row and soft-deleting the order."
+      "description": "Found 2026-09-03 preparing Emmanuel's iOS run. Seeded a drive for 18:00, then re-seeded for 18:30 after correcting the time. <strong>Both orders ended up ASSIGNED to the same driver</strong> with live dispatch rows.<br><br><code>scripts/reset-driver-test-drive.ts</code> only clears orders its <code>blockingOrders</code> predicate matches: in-flight, or <code>ASSIGNED</code> with <code>pickupDateTime &lt;= now</code>. Its comment states <em>\"Future-dated assignments are harmless.\"</em> That holds when you seed shortly before a run, but <strong>not when you re-seed earlier the same day</strong> — the superseded order was 6 hours out at re-seed time, so it was skipped, and it would have come due at 17:59 while the tester was mid-walk. At End Shift both orders would be due and both would block.<br><br>This is the exact failure class of the 2026-08-06 field run and Fernando's 08-21 deadlock, arriving by a new route.<br><br><strong>Fix direction:</strong> when seeding, also retire any existing <em>disposable</em> (<code>RSQA-</code>) order still dispatched to that driver regardless of pickup time — <code>isDisposableTestOrder</code> already identifies them; the predicate just never consults it for future-dated rows. Cleared manually this time by deleting the dispatch row and soft-deleting the order.<br><br><strong>DONE 2026-10-09</strong> — Fixed in PR <a href=\"https://github.com/ReadySet1/ready-set/pull/675\">#675</a> (retire superseded future-dated test seeds).",
+      "closed": "2026-10-09"
     },
     {
       "id": "wrapper-logout-safari-bounce",
-      "status": "new",
+      "status": "progress",
       "title": "iOS wrapper: log out bounces to Safari and the user cannot actually log out",
       "owner": "emmanuel",
       "source": "qa",
+      "created": "2026-09-06",
       "tags": [
         "bug",
         "critical"
       ],
-      "description": "Reported 2026-09-03 (Emmanuel, iOS wrapper). Tapping log out opens <strong>Safari</strong> instead of staying in the app, and the log out never completes — the user stays signed in.<br><br><strong>Cause:</strong> <code>src/app/(site)/(users)/driver/page.tsx:99</code> ends the handler with <code>window.location.href = \"/sign-in\"</code>. This is the same trap <code>/native-launch</code> was created to avoid: <code>capacitor.config.ts</code> documents that <code>/sign-in</code> issues a redirect when a session is still present, and <strong>any 307 on a WKWebView navigation fails the provisional load and bounces the user out to Safari</strong>. The \"cannot log out\" half is consistent with the known WebView cookie/session divergence (<code>native-shell-session-divergence</code>): <code>supabase.auth.signOut()</code> clears the client session while the server-side cookie survives, so <code>/sign-in</code> still redirects as authenticated.<br><br><strong>Fix direction:</strong> send log out to <code>/native-launch</code> (the only route that answers 200 in every auth state) rather than <code>/sign-in</code>, and make sign-out clear the server cookie — not just the client session — so the redirect decision agrees with the client. Sibling of <code>wrapper-post-login-safari-bounce</code>: same root cause on the way out instead of the way in."
+      "description": "Reported 2026-09-03 (Emmanuel, iOS wrapper). Tapping log out opens <strong>Safari</strong> instead of staying in the app, and the log out never completes — the user stays signed in.<br><br><strong>Cause:</strong> <code>src/app/(site)/(users)/driver/page.tsx:99</code> ends the handler with <code>window.location.href = \"/sign-in\"</code>. This is the same trap <code>/native-launch</code> was created to avoid: <code>capacitor.config.ts</code> documents that <code>/sign-in</code> issues a redirect when a session is still present, and <strong>any 307 on a WKWebView navigation fails the provisional load and bounces the user out to Safari</strong>. The \"cannot log out\" half is consistent with the known WebView cookie/session divergence (<code>native-shell-session-divergence</code>): <code>supabase.auth.signOut()</code> clears the client session while the server-side cookie survives, so <code>/sign-in</code> still redirects as authenticated.<br><br><strong>Fix direction:</strong> send log out to <code>/native-launch</code> (the only route that answers 200 in every auth state) rather than <code>/sign-in</code>, and make sign-out clear the server cookie — not just the client session — so the redirect decision agrees with the client. Sibling of <code>wrapper-post-login-safari-bounce</code>: same root cause on the way out instead of the way in.<br><br><strong>Update 2026-10-05:</strong> fix shipped in #606 (server sign-out route + <code>performSignOut()</code> → <code>/native-launch</code>, live in 2.9.3). Remaining: confirm log out on a device inside the iOS wrapper."
     },
     {
       "id": "pilot-db-backup-workflow",
       "status": "done",
       "owner": "fernando",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-29",
       "tags": [
         "critical"
       ],
@@ -1488,6 +1820,8 @@
       "status": "done",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-14",
       "tags": [
         "critical"
       ],
@@ -1499,6 +1833,7 @@
       "status": "new",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
       "title": "Monitoring follow-ups: watch GlitchTip itself + phone push + error alerts",
       "description": "(1) Nothing watches the GlitchTip box <code>5.78.141.250</code> — if it dies, prod monitoring dies silently; add a free external check on <code>glitchtip.readysetllc.com</code>. (2) Email is the only channel — add an ntfy push recipient for real phone paging. (3) No error-spike alert yet (only uptime). (4) GlitchTip has <code>enableUserRegistration: true</code> — anyone can sign up; disable it. (5) Prod app <code>RESEND_API_KEY</code> is full-access; swap for a send-only key."
     },
@@ -1507,6 +1842,8 @@
       "status": "done",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-07",
       "tags": [
         "bug",
         "critical"
@@ -1519,6 +1856,8 @@
       "status": "done",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-07",
       "tags": [
         "bug"
       ],
@@ -1530,6 +1869,8 @@
       "status": "done",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-07",
       "tags": [
         "bug",
         "critical"
@@ -1542,6 +1883,8 @@
       "status": "done",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
+      "closed": "2026-09-07",
       "tags": [
         "critical"
       ],
@@ -1553,15 +1896,17 @@
       "status": "open",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
       "tags": [],
       "title": "S3 — TWILIO_* unset on prod: driver-cancel SMS silently skips",
-      "description": "#530 degrades to a logged skip without creds. Either set Twilio on <code>ready-set-prod</code> (Dokploy) or make it an ops rule that dispatch calls the driver on cancel during the pilot."
+      "description": "#530 degrades to a logged skip without creds. Either set Twilio on <code>ready-set-prod</code> (Dokploy) or make it an ops rule that dispatch calls the driver on cancel during the pilot. <strong>Re-confirmed 10/14:</strong> Dokploy env (names only) has NO <code>TWILIO_*</code> on either <code>ready-set-web</code> (dev) or <code>ready-set-prod</code>. Also, test driver Guillermo has no phone on <code>profiles.contactNumber</code> or <code>drivers.phone_number</code>, so the SMS would skip even with Twilio set. Blocked on <code>sms-provider-final-call</code>. <strong>Device-confirmed 10/14:</strong> on the cancel check Guillermo got only the in-app alert, no SMS (expected given the above)."
     },
     {
       "id": "pilot-web-foreground-run",
       "status": "open",
       "owner": "emmanuel",
       "source": "pilot",
+      "created": "2026-09-06",
       "tags": [],
       "title": "Run the pilot: 2–3 real drivers, mobile web, foreground-only, 1 week, admin watching",
       "description": "Web only (Chrome/Safari, no wrapper; Android Chrome preferred). Driver rules: start shift on Tracking before touching an order; screen on + app in front between stops; reopen Tracking after a reload; advance status only with signal; end shift from Tracking; if blocked → Return to dispatch or call admin. Admin watches stale markers &gt;5 min, double active shifts, stuck End Shift (force-end via <code>PUT /api/tracking/shifts/{id}</code> <code>metadata.force</code>). Starts after D1–D3, S1–S2, O1–O2 land and dev→main is promoted.<br><br><strong>Update 2026-09-25 (board audit):</strong> All prerequisite PRs are merged and on prod (v2.8.0). Blocked on prod backups (<code>pilot-db-backup-workflow</code>) and on Fernando/Gary for the start week + driver names."
@@ -1576,7 +1921,8 @@
       ],
       "title": "createCateringOrder / createOnDemandOrder never reject a null user",
       "description": "Found in the #534 re-review: both admin server actions call <code>supabase.auth.getUser()</code> but proceed on <code>null</code> (tests pass <code>user: null</code> and expect success). Middleware on <code>/admin/*</code> covers it today; add an explicit caller check.",
-      "sourceRef": "#599"
+      "sourceRef": "#599",
+      "closed": "2026-09-29"
     },
     {
       "id": "npm-audit-main-red-again",
@@ -1586,7 +1932,9 @@
       "tags": [],
       "title": "NPM Security Audit fails on main again (16 highs &gt; cap 10 via googleapis &gt; qs)",
       "description": "Not required by the ruleset, but the next dev→main promotion will show red. Override sweep like #540 before promoting.<br><br><strong>Update 2026-09-25 (board audit):</strong> NPM Security Audit passes on <code>main</code> (09-23) and <code>development</code> (09-25) after #549.",
-      "sourceRef": "#549"
+      "sourceRef": "#549",
+      "created": "2026-09-06",
+      "closed": "2026-09-25"
     },
     {
       "id": "delivery-finalize-multi-photo",
@@ -1594,6 +1942,7 @@
       "title": "Allow up to 3 photos when driver finalizes delivery",
       "owner": "gary",
       "source": "sep7",
+      "created": "2026-09-07",
       "description": "Requested by Gary. The delivery-completion flow should accept a maximum of 3 photos (currently limited to one). Update the finalize-delivery UI and API to support multi-photo upload with a cap of three."
     },
     {
@@ -1602,6 +1951,7 @@
       "title": "Address cannot be edited during new catering order creation",
       "owner": "fernando",
       "source": "sep7",
+      "created": "2026-09-07",
       "tags": [
         "bug"
       ],
@@ -1613,6 +1963,7 @@
       "title": "Post-QR-scan role modal (Driver / Client / Vendor)",
       "owner": "fernando",
       "source": "sep7",
+      "created": "2026-09-07",
       "description": "After scanning the QR code, show a modal with three options: Driver routes to the driver application; Client and Vendor route to sign-up to create a new account."
     },
     {
@@ -1621,26 +1972,31 @@
       "title": "PR follow-up — Fulton in CountiesSelection.tsx + counties strict typing",
       "owner": "fernando",
       "source": "sep7",
+      "created": "2026-09-07",
       "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types."
     },
     {
       "id": "notify-order-created-findunique-bug",
-      "status": "new",
+      "status": "done",
       "title": "notifyOrderCreated uses findUnique instead of findFirst",
       "owner": "fernando",
       "source": "sep7",
+      "created": "2026-09-07",
       "tags": [
         "bug"
       ],
-      "description": "Switch to <code>findFirst</code> so the query can include <code>deletedAt: null</code> — <code>findUnique</code> cannot filter on non-unique fields, so soft-deleted records are not excluded."
+      "description": "Switch to <code>findFirst</code> so the query can include <code>deletedAt: null</code> — <code>findUnique</code> cannot filter on non-unique fields, so soft-deleted records are not excluded.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/691\">#691</a> open against <code>development</code>.<br><br><strong>DONE 2026-10-15</strong> — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/691\">#691</a> merged into <code>development</code>.",
+      "closed": "2026-10-15"
     },
     {
       "id": "harness-docblock-stale-guard-mention",
-      "status": "new",
+      "status": "done",
       "title": "Update harness docblock — remove NODE_ENV guard mention",
       "owner": "fernando",
       "source": "sep7",
-      "description": "The docblock still references a <code>NODE_ENV</code> guard that no longer exists. Remove the stale reference so the documentation matches the current implementation."
+      "created": "2026-09-07",
+      "description": "The docblock still references a <code>NODE_ENV</code> guard that no longer exists. Remove the stale reference so the documentation matches the current implementation.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/690\">#690</a> open against <code>development</code>.<br><br><strong>DONE 2026-10-15</strong> — PR <a href=\"https://github.com/ReadySet1/ready-set/pull/690\">#690</a> merged into <code>development</code>.",
+      "closed": "2026-10-15"
     },
     {
       "id": "tasks-board-desktop-layout-bugs",
@@ -1648,6 +2004,7 @@
       "title": "Tasks Board renders incorrectly on desktop",
       "owner": "fernando",
       "source": "sep7",
+      "created": "2026-09-07",
       "tags": [
         "bug",
         "critical"
@@ -1664,7 +2021,9 @@
         "bug"
       ],
       "description": "Drive 9/22 pickup: after expanding the signature box to full screen, the signature drawn in the inline pad came back distorted. Also switch the full-screen pad from portrait to landscape so the stroke area uses the whole screen. Component: <code>src/components/Driver/SignatureCapture.tsx</code>.",
-      "sourceRef": "#573"
+      "sourceRef": "#573",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "driver-actions-slow-on-vps",
@@ -1676,7 +2035,9 @@
         "critical"
       ],
       "description": "Every driver action (start shift, status change, signature, POD) takes noticeably longer than on Vercel. Likely cause: the Hetzner box is in Germany and the dev database is in us-west-1, so each query pays a transatlantic round trip and the driver flow issues several sequential queries per action. Measure, cut round trips per action, and decide on region placement. Measured: VPS→rs-dev 170–186 ms, VPS→prod 99–109 ms per round trip. #574 cut start shift 7→3 and end shift 16→8 round trips. Remaining win is infra: move the VPS to Hetzner Ashburn (x86) next to the prod DB.",
-      "sourceRef": "#574"
+      "sourceRef": "#574",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "mileage-recalc-job-wrong-columns",
@@ -1688,7 +2049,9 @@
         "bug"
       ],
       "description": "<code>src/jobs/driverMileageRecalculation.ts</code> selects <code>end_time</code> and <code>total_distance_km</code> but <code>driver_shifts</code> has <code>shift_end</code> and <code>total_distance</code>. Fails every night at 00:00 UTC with <em>column \"end_time\" does not exist</em>; has never run successfully.",
-      "sourceRef": "#570"
+      "sourceRef": "#570",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "memory-alert-heap-ratio-noise",
@@ -1700,7 +2063,9 @@
         "bug"
       ],
       "description": "<code>monitorMemoryUsage()</code> in <code>src/lib/alerting.ts</code> divides heapUsed by heapTotal, which sits near 90% by design in V8. Logs show WARNING/CRITICAL alerts every 5 minutes at ~300 MB. Compare against the real heap limit or the container memory limit instead.",
-      "sourceRef": "#572"
+      "sourceRef": "#572",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "driver-flow-no-status-history",
@@ -1709,7 +2074,9 @@
       "owner": "emmanuel",
       "source": "sep22drive",
       "description": "The 9/22 order went through all six driver stamps but <code>order_status_history</code> got zero rows (6 rows total in rs-dev). Write a history row on each driver-side transition so admins get an audit trail per order.",
-      "sourceRef": "#571"
+      "sourceRef": "#571",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "gps-battery-level-null",
@@ -1721,7 +2088,9 @@
         "bug"
       ],
       "description": "All 239 location points from the 9/22 drive have <code>battery_level</code> null even though the column and the HealthBar exist. Check whether the driver client reads and sends battery (Capacitor Device API in the wrapper, Battery Status API in the browser) and wire it through <code>/api/tracking/locations</code>.",
-      "sourceRef": "#569"
+      "sourceRef": "#569",
+      "created": "2026-09-22",
+      "closed": "2026-09-22"
     },
     {
       "id": "rs-dev-stale-test-rows",
@@ -1729,6 +2098,7 @@
       "title": "Clean stale test rows on rs-dev",
       "owner": "emmanuel",
       "source": "sep22drive",
+      "created": "2026-09-22",
       "description": "Left over from older drives, not from 9/22: 3 shifts still <code>active</code> (latest Aug 6), 9 deliveries <code>ASSIGNED</code>, 11 dispatched catering orders <code>ASSIGNED</code>. They did not block the 9/22 End Shift but pollute admin views. Close or cancel by SQL after confirming none belong to a tester's upcoming drive."
     },
     {
@@ -1738,6 +2108,7 @@
       "owner": "emmanuel",
       "source": "sep23qa",
       "sourceRef": "#580–#585",
+      "created": "2026-09-23",
       "description": "All six fixes are merged and live on <code>development.readysetllc.com</code> (not on prod until the next promotion). B6 verified by curl. Still to check: <strong>B1/A9</strong> 5× contact form then sign up; <strong>C7</strong> job-application email link opens the dialog; <strong>C15</strong> guide download email arrives; <strong>E2</strong> admin menu on a phone; <strong>G5</strong> Sign In visible in iPhone portrait.<br><br><strong>Update 2026-09-25:</strong> ✅ <strong>C15</strong> Sanity guide download → <code>/api/leads</code> 200 <code>emailSent: true</code>. ✅ <strong>B1/A9</strong> 5 contact submissions (all 200) then client sign-up → \"Registration Successful!\". Test data left on rs-dev: client <code>qa+forms0925@readysetllc.com</code> (unconfirmed) + lead <code>b9faaa56</code>. Still to check: <strong>C7</strong> (admin), <strong>E2</strong> + <strong>G5</strong> (iPhone)."
     },
     {
@@ -1746,6 +2117,7 @@
       "title": "E1 — mobile admin create-order bounces to sign-in",
       "owner": "emmanuel",
       "source": "sep23qa",
+      "created": "2026-09-23",
       "tags": [
         "bug"
       ],
@@ -1757,6 +2129,7 @@
       "title": "T4/G2 — image upload failure on mobile",
       "owner": "emmanuel",
       "source": "sep23qa",
+      "created": "2026-09-23",
       "tags": [
         "bug"
       ],
@@ -1772,7 +2145,9 @@
         "bug"
       ],
       "description": "<code>api/job-applications/route.ts</code> (~L318) builds the admin email HTML with raw applicant input. Escape every interpolated field (same class as the #534 review finding).<br><br><strong>Update 2026-09-25:</strong> fix in PR #590 (builder extracted to <code>src/lib/job-application-email.ts</code>, all values through <code>escapeHtml</code>, TDD). Waiting on CI + merge.<br><br><strong>Update 2026-09-25 (review):</strong> /review ran 6 specialists + adversarial; fixed in <code>4f3718c4</code>: https-only links, ISO UTC dates, list nesting, scalar fields passed separately. 8 tests. Follow-ups carded: <code>job-application-file-id-ownership</code>, <code>job-application-email-failures-silent</code>.",
-      "sourceRef": "#590"
+      "sourceRef": "#590",
+      "created": "2026-09-23",
+      "closed": "2026-09-25"
     },
     {
       "id": "rotate-rs-dev-db-password",
@@ -1780,6 +2155,7 @@
       "title": "Rotate the rs-dev DB password (leaked into a worker transcript)",
       "owner": "emmanuel",
       "source": "sep22drive",
+      "created": "2026-09-22",
       "tags": [
         "critical"
       ],
@@ -1792,6 +2168,8 @@
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#591",
+      "created": "2026-09-25",
+      "closed": "2026-09-25",
       "tags": [
         "critical",
         "bug"
@@ -1800,15 +2178,17 @@
     },
     {
       "id": "job-application-email-failures-silent",
-      "status": "new",
+      "status": "done",
       "title": "Job application: admin email failures are swallowed (applicant sees success)",
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#590",
+      "created": "2026-09-25",
+      "closed": "2026-10-05",
       "tags": [
         "bug"
       ],
-      "description": "Found in the #590 review. If the refetch returns null or <code>sendEmail</code> fails, the route logs to console and still returns <code>success: true</code>, so admins never hear about the application. The send also retries inside the request (up to ~30 s). Surface failures to monitoring (GlitchTip) and consider a per-field length cap on the public form."
+      "description": "Found in the #590 review. If the refetch returns null or <code>sendEmail</code> fails, the route logs to console and still returns <code>success: true</code>, so admins never hear about the application. The send also retries inside the request (up to ~30 s). Surface failures to monitoring (GlitchTip) and consider a per-field length cap on the public form.<br><br><strong>Done 2026-10-05:</strong> #633 merged to development: admin email sent after the response, failures reported to GlitchTip with the application id only. Length cap not added (route has no schema); shared email retry untouched."
     },
     {
       "id": "file-uploads-get-signs-any-path",
@@ -1817,6 +2197,8 @@
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#593",
+      "created": "2026-09-25",
+      "closed": "2026-09-28",
       "tags": [
         "critical",
         "bug"
@@ -1825,15 +2207,17 @@
     },
     {
       "id": "download-email-dead-domain",
-      "status": "open",
+      "status": "done",
       "title": "Resource-download email: broken logo + dead ready-set.co domain in URL allowlist",
       "owner": "emmanuel",
       "source": "review",
       "sourceRef": "#592",
+      "created": "2026-09-28",
+      "closed": "2026-10-05",
       "tags": [
         "bug"
       ],
-      "description": "Found reviewing #592 (2026-09-28). <code>src/components/Resources/DownloadEmailTemplate.tsx</code> loads its logo from <code>https://ready-set.co/images/logo/logo.png</code> (L95), which returns 405 today, so every live download email shows a broken image; its contact/unsubscribe/privacy links (L129, L182–183) also point at the dead domain. <code>ready-set.co</code> has no MX and is parked at GoDaddy until 2027-03-05, yet L30–31 keep it in the URL allowlist: if it lapses, the next registrant gets a domain our validation trusts. Fix: move links to <code>readysetllc.com</code>, logo to Cloudinary (same approach as #579), drop the dead domain from the allowlist."
+      "description": "Found reviewing #592 (2026-09-28). <code>src/components/Resources/DownloadEmailTemplate.tsx</code> loads its logo from <code>https://ready-set.co/images/logo/logo.png</code> (L95), which returns 405 today, so every live download email shows a broken image; its contact/unsubscribe/privacy links (L129, L182–183) also point at the dead domain. <code>ready-set.co</code> has no MX and is parked at GoDaddy until 2027-03-05, yet L30–31 keep it in the URL allowlist: if it lapses, the next registrant gets a domain our validation trusts. Fix: move links to <code>readysetllc.com</code>, logo to Cloudinary (same approach as #579), drop the dead domain from the allowlist.<br><br><strong>Done 2026-10-05:</strong> fixed by Fernando in #605 (live in 2.9.3): logo + links moved off <code>ready-set.co</code>, dead domain dropped from the allowlist."
     },
     {
       "id": "vps-ashburn-migration",
@@ -1841,8 +2225,217 @@
       "owner": "emmanuel",
       "status": "open",
       "source": "sep28drive",
+      "created": "2026-09-28",
       "tags": [],
       "description": "Driver button actions lag because of distance: phone→VPS 205–280 ms and VPS→prod DB ~100 ms per query. Ashburn puts prod Supabase at 1–3 ms and lets CI drop the 75-min ARM cross-build. Plan: <code>docs/ready-set/specs/2026-09-28-vps-ashburn-migration-plan.md</code>. Est. ~$31/mo vs ~$13 today. <strong>Blocked on Gary:</strong> cost OK + expected concurrent drivers + a 1 h evening window (destino-sf lives on the same box)."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "review",
+      "status": "done",
+      "id": "driver-summary-job-flaws",
+      "title": "Weekly driver summary job writes wrong or stale numbers",
+      "sourceRef": "#637 → PR #651",
+      "created": "2026-10-05",
+      "closed": "2026-10-06",
+      "tags": [
+        "bug"
+      ],
+      "description": "Found in the #637 review (2026-10-05). <code>src/jobs/driverSummaryGeneration.ts</code>: never regenerates a week that already has a summary (edits never land unless <code>forceRegenerate</code>), never writes the current week, compares delivery status to <code>delivered</code> while rows store <code>DELIVERED</code> (completedDeliveries always 0), and <code>differenceInHours</code> drops partial hours (50-min shift = 0 h). Last run 2026-08-16 (no cron). After #637 the history screen no longer depends on it, so not urgent."
+    },
+    {
+      "owner": "emmanuel",
+      "source": "review",
+      "status": "done",
+      "id": "e2e-vendor-dashboard-main-scope",
+      "title": "Scope client + vendor dashboard E2E \"Active Orders\" checks to main (same flake as #638)",
+      "sourceRef": "#638",
+      "created": "2026-10-05",
+      "closed": "2026-10-06",
+      "tags": [
+        "bug"
+      ],
+      "description": "<code>e2e/vendor-dashboard.spec.ts:52</code> uses page-wide <code>getByText(\"Active Orders\")</code> and hits the same Suspense hidden-duplicate strict-mode flake fixed in #638. Scope it to <code>page.getByRole(\"main\")</code>.<br><br>Also <code>e2e/client-dashboard.spec.ts:123</code> (skeleton test) and the other unscoped <code>getByText</code> checks in that spec: failed both attempts on #636 CI run 37381328106 with the same 2-element strict-mode error.<br><br><strong>Done 2026-10-06:</strong> #641 merged: client + vendor dashboard specs scoped to <code>main</code>."
+    },
+    {
+      "id": "unit-wallclock-assertions",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "review",
+      "sourceRef": "#640",
+      "created": "2026-10-06",
+      "closed": "2026-10-06",
+      "tags": [
+        "bug"
+      ],
+      "title": "Replace remaining wall-clock assertions in unit tests",
+      "description": "Listed in #640 (2026-10-05). Tightest, most likely to flake: <code>src/__tests__/cache/api-caching-qa.test.ts</code> :269/:288 (&lt;5 ms), :577 (&lt;10 ms), :547 (&lt;100 ms); <code>src/__tests__/api/api-security-qa.test.ts:637</code> (&lt;10 ms); <code>src/__tests__/seo/integration.test.ts:294</code> (&lt;100 ms). Looser (1–10 s): file-service-signed-url, OrderDetailsAPI, health, catervalley-resilience, email-resilience, user-deletion-flow, user-deletion-performance. Replace with behaviour assertions or fake timers.<br><br><strong>Update 2026-10-06:</strong> <a href=\"https://github.com/ReadySet1/ready-set/pull/647\">#647</a> open (test files only): 8 files moved to call-count, exact-delay (fake clock) and keyed-lookup checks; one mock-timing test deleted. Finding: the four cache budgets were vacuous because that file mocks <code>performance.now</code> to 0. Left: <code>user-deletion-performance.test.ts</code> (real-DB benchmark, returns early under Jest). <strong>Merged 2026-10-06</strong> (<code>52578ec0</code>)."
+    },
+    {
+      "id": "driver-map-trail-mistaken-for-route",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct6drive",
+      "created": "2026-10-06",
+      "closed": "2026-10-14",
+      "title": "Driver map: breadcrumb trail reads as a route; no guide to the next stop",
+      "description": "Guillermo's first drive (2026-10-06, León, motorcycle, Android wrapper): the live map draws the trail of where he has <em>been</em>, and he read it as a <strong>route he was supposed to follow</strong> — stopped at the Restaurante thinking a further step was pending, only continued once he realised it was just his own track. His words: the map gave him no guide like Google Maps or Waze. Speed and the rest of the flow felt fine.<br><br><strong>Two layers to fix:</strong> (1) make the breadcrumb unmistakable — faded/dashed line, a small \"your path\" legend, and the next stop clearly marked as the target; (2) give a real guide to the next stop: a Mapbox Directions line vendor → client on the in-app map, and/or a <strong>Navigate</strong> button that deep-links to Google Maps / Waze with the stop's coordinates. Trade-off: handing off to Waze backgrounds the wrapper, which is exactly where Android drops GPS (<code>persistent-gps-background</code>) — so the in-app directions line is the option that keeps tracking alive. <strong>Verified 10/14 (Guillermo, Android):</strong> the screenshot shows the blue \"Next: Pickup · 0.8 mi · 3 min\" route line plus the \"Route to next stop / Your path\" legend."
+    },
+    {
+      "id": "android-location-prompt-every-run",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct7drive",
+      "tags": [
+        "bug"
+      ],
+      "title": "Android wrapper: asks to enable location / grant permission on every run",
+      "description": "Guillermo (León, Android wrapper): has to tap the yellow <strong>Request location permission</strong> button on Track every run; no Android dialog appears, it spins, then the trip works. <strong>Real cause (10-08):</strong> the WebView Permissions API reports <code>prompt</code> every launch, so <code>useLocationTracking</code> never fetched a fix on mount. <strong>Fix in PR #660:</strong> on native, read the permission from the background-geolocation plugin and auto-fetch when granted; one in-app explanation before any system dialog; requires \"Precise\". Web + iOS unchanged. <strong>Next:</strong> merge, then Guillermo confirms on rs-dev that he lands on Start shift directly. <strong>Verified 10/14:</strong> Guillermo opened the app and landed directly on \"Start shift\", with no yellow permission button. Closed.",
+      "sourceRef": "#660",
+      "created": "2026-10-07",
+      "closed": "2026-10-14"
+    },
+    {
+      "id": "order-timezone-per-location",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "oct8review",
+      "sourceRef": "#658",
+      "created": "2026-10-08",
+      "tags": [
+        "critical",
+        "bug"
+      ],
+      "title": "Orders assume Pacific time everywhere: Austin (Central) orders shift by 2 hours",
+      "description": "The app has one global timezone (<code>TIMEZONE_CONFIG.LOCAL_TIMEZONE = America/Los_Angeles</code> in <code>src/lib/config/timezone.ts</code>) plus hardcoded <code>America/Los_Angeles</code> in client screens; no address or order stores a timezone. Ready Set is taking orders in <strong>Austin, TX (Central)</strong>, and sign-up already offers Fulton, GA (Eastern). A time typed as local is saved as Pacific (11:00 CT entered = stored 11:00 PT = 13:00 CT), and every screen agrees on the wrong time. <strong>First:</strong> measure impact on prod (Austin orders, entry path: web form vs CaterValley/CaterCow API). <strong>Fix:</strong> IANA timezone per address/order derived from location; convert input and display with the order's zone; show the zone label (CT/PT). <strong>Prod read 2026-10-08:</strong> 0 orders (catering or on-demand, pickup or delivery) touch Texas yet; 10 TX addresses saved (7 Austin, last 2026-07-25) with no orders. No existing order is wrong today; it breaks on the first Austin order entered in the app. Also: <code>addresses.state</code> is dirty (\"CA\", \"CALIFORNIA\", \"CALIFORNIA (95054)\", \"SAN FRANCISCO\", \"CAIFORNIA\"), so derive the zone from ZIP or coordinates, not the state text.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/694\">#694</a> open against <code>development</code> (DRAFT: design note in <code>docs/ready-set/specs/2026-10-15-order-timezone-per-location.md</code>, migration <code>address_timezone</code> not applied anywhere yet)."
+    },
+    {
+      "id": "android-pod-camera-opens-gallery",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct6drive",
+      "created": "2026-10-06",
+      "closed": "2026-10-07",
+      "tags": [
+        "bug"
+      ],
+      "title": "Android wrapper: proof-of-delivery photo opens the gallery instead of the camera",
+      "description": "Reported by Guillermo on his 2026-10-06 drive. <strong>Root cause:</strong> <code>ProofOfDeliveryCapture.tsx</code> uses <code>&lt;input type=file accept=image/* capture=environment&gt;</code>; Capacitor's <code>BridgeWebChromeClient.showImageCapturePicker</code> calls <code>resolveActivity(ACTION_IMAGE_CAPTURE)</code>, which on Android 11+ returns null unless the app manifest declares package visibility for that intent — the published APK (<code>native-walk-test-apk-2026-09-02</code>) has no <code>&lt;queries&gt;</code> block (verified with <code>aapt2 dump xmltree</code>), so Capacitor logs \"Media capture intent could not be launched\" and falls back to the file picker.<br><br><strong>Fix built 2026-10-06:</strong> <code>&lt;queries&gt;&lt;intent&gt;&lt;action android:name=\"android.media.action.IMAGE_CAPTURE\"/&gt;&lt;/intent&gt;&lt;/queries&gt;</code> added to <code>native/driver-app/android/app/src/main/AndroidManifest.xml</code>; rebuilt APK verified inside the artifact (queries present, entry <code>/native-launch</code>, permissions intact), sha256 <code>acc5d7ad…8fd208</code>. <strong>Pending:</strong> commit on <code>chore/native-driver-app-poc</code>, publish a new prerelease, Guillermo reinstalls and retries the photo. <br><strong>Verified 2026-10-07:</strong> Guillermo retested on drive RSQA-20261007-2114 with prerelease <code>native-walk-test-apk-2026-10-06</code>; camera opens and the POD photo saves."
+    },
+    {
+      "id": "pod-photo-route-cookie-only",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct9review",
+      "sourceRef": "C6",
+      "created": "2026-10-09",
+      "closed": "2026-10-12",
+      "tags": [
+        "bug"
+      ],
+      "title": "POD photo card hidden in the wrapper: /api/orders/[n]/files accepts the cookie only, not the Bearer token",
+      "description": "<code>GET /api/orders/[order_number]/files</code> (<code>src/app/api/orders/[order_number]/files/route.ts:35-43</code>) authenticates with the cookie-based <code>createClient()</code> + <code>getUser()</code> only, while the driver client (<code>src/components/Driver/DriverDeliveryDetail.tsx:328-338</code>) sends a Bearer token like every other driver route. Inside the native wrapper, where the server cookie goes stale while the token stays valid, the route answers 401 and the completed-order screen silently hides the proof-of-delivery photo card (Fernando's C6; pilot-relevant, display only, the upload itself is unaffected). <strong>Fix:</strong> authenticate with <code>withAuth()</code> from <code>src/lib/auth-middleware.ts</code> (Bearer first, cookie fallback) and keep the admin / owner / assigned-driver checks. Fixed in PR #680 (merged 10-12): the route now uses <code>withAuth</code>, so Bearer requests from the wrappers get the photo card."
+    },
+    {
+      "id": "delivery-email-tracking-link-404",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct9review",
+      "created": "2026-10-09",
+      "closed": "2026-10-12",
+      "tags": [
+        "bug"
+      ],
+      "title": "Delivery-status emails link to /orders/<n>, which 404s (real page is /order-status/<n>)",
+      "description": "The customer delivery-status emails (en route, arrived, picked up, completed) build <code>trackingLink</code> as <code>${siteUrl}/orders/&lt;orderNumber&gt;</code> in <code>src/app/api/catering-requests/[orderId]/status/route.ts:365</code>, and the footer's \"View live status\" link (<code>src/templates/emails/components/footer.html:9</code>) points there; no <code>/orders/[order_number]</code> page or <code>next.config.js</code> redirect exists, so the customer lands on a 404. The real page is <code>/order-status/&lt;n&gt;</code> (<code>src/app/(site)/order-status/[order_number]/page.tsx</code>), which push notifications already use (<code>src/services/notifications/push.ts:282</code>). <strong>Fix:</strong> build the link with <code>/order-status/</code> and update the fixture in <code>src/services/notifications/__tests__/email-notifications.test.ts:31</code>. Fixed in PR #681 (merged 10-12): the status route now links to <code>/order-status/&lt;order&gt;</code>."
+    },
+    {
+      "id": "shifts-post-409-stale-current-shift",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct9review",
+      "sourceRef": "#675",
+      "created": "2026-10-09",
+      "closed": "2026-10-13",
+      "tags": [
+        "bug"
+      ],
+      "title": "POST /api/tracking/shifts still 409s when drivers.current_shift_id points at a closed shift",
+      "description": "<code>POST /api/tracking/shifts</code> (<code>src/app/api/tracking/shifts/route.ts:195-201</code>) returns 409 \"Driver already has an active shift\" whenever <code>drivers.current_shift_id</code> is non-null, without checking the shift's status; only <code>endDriverShift</code> clears that pointer (<code>src/app/actions/tracking/driver-actions.ts:468</code>), so a pointer left behind by a hand-edited or script-closed shift (admin force-end does go through <code>endDriverShift</code>) leaves this endpoint refusing a new shift. <strong>Not reachable from the driver app today:</strong> <code>useDriverShift.ts:117</code> calls <code>/api/tracking/shifts/start</code>, which goes straight to <code>startDriverShift</code> and the #675 resume / repair logic (no 409, and the new shift overwrites the pointer). <strong>Fix:</strong> drop the stale pre-check and delegate to <code>startDriverShift</code>, or delete the legacy POST handler. <strong>Fixed in #684 (merged 2026-10-13):</strong> the pre-check is gone, <code>startDriverShift</code> is the single guard."
+    },
+    {
+      "id": "driver-home-double-deliveries-fetch",
+      "status": "done",
+      "owner": "emmanuel",
+      "source": "oct9review",
+      "created": "2026-10-09",
+      "closed": "2026-10-12",
+      "tags": [
+        "bug"
+      ],
+      "title": "Driver Home fetches /api/driver-deliveries twice on mount, every 60 s and on every focus",
+      "description": "On <code>/driver</code> the <code>DriverTrackingProvider</code> mounted by <code>src/app/(site)/(users)/driver/layout.tsx:25</code> runs <code>useDriverDeliveries</code> (<code>src/hooks/tracking/useDriverDeliveries.ts:66,206</code>) and the Home page (<code>src/app/(site)/(users)/driver/page.tsx:37</code>) runs <code>useDriverDeliveriesFeed</code> (<code>src/hooks/driver/useDriverDeliveriesFeed.ts:55,103</code>); both fetch the identical <code>/api/driver-deliveries?page=1&amp;limit=999</code> on mount, every 60 s and on every tab focus, so each driver phone sends two identical requests each time (double load on the pilot's busiest driver endpoint, two chances for the list and the context to disagree). <strong>Fix:</strong> one fetcher: let the feed hook read the provider's list, or share one TanStack Query key so Home and the context consume the same response. Fixed in PR #682 (merged 10-12): the layout provider owns the single poll and the home feed reads from it."
+    },
+    {
+      "id": "mileage-phantom-pickup-pings",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "oct14drive",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "title": "Stationary shift billed 2.31 mi: phantom pings at the old pickup point get past the odometer",
+      "description": "Guillermo stood still for all of shift <code>7ce59c6b</code> (10/14, 17:18–17:28 CST), yet it closed at 2.31 mi. Of 92 GPS points, 9 jump about 465 m in 3–6 s (over 300 km/h) to a spot 14 m from shift 1's pickup, then back. Those jumps make up 4,174 of 4,190 raw meters. Two defects: (1) <strong>source</strong>: something replays an old position (accuracy 2.7–3.5 m, speed about 1–1.5 m/s, <code>source=realtime</code>). Unverified suspects: a cached or stale fix from the native wrapper, or a second location watcher. (2) <strong>odometer</strong>: <code>computeAnchorDistanceMeters</code> (<code>src/services/tracking/mileage.ts:122,137</code>) measures the speed gate from the last <em>accepted</em> anchor, not the previous raw point, so a long stationary stretch makes a 465 m jump look slow. 4 phantom pings × about 930 m round trip = 3,718 m = the 2.31 mi billed. Miles drive pay, so this blocks the pilot. <strong>Reproduced again:</strong> shift <code>ee153c36</code> (17:31–17:36, stationary) closed at 0.29 mi = exactly one 465 m phantom jump. <strong>Fix 10/14 (commit <code>5f11663f</code>, branch <code>fix/mileage-phantom-pings</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/686\">#686</a>):</strong> new <code>rejectTeleportSpikes</code> pre-pass checks each hop against the previous fix (drops A→B→A spikes up to 5 points, else re-anchors without billing the impossible hop); real travel across 90 s–2 min lock gaps still counts. Replayed rs-dev points: <code>7ce59c6b</code> 2.31→0.00 mi, <code>ee153c36</code> 0.29→0.00, <code>7d11538c</code> 0.92→0.65. Stored values not recomputed. Ping source split into <code>phantom-ping-source-stale-watcher</code>. <strong>MERGED 10/14</strong> (#686 <code>76c101a0</code>); device check pending.",
+      "sourceRef": "#686",
+      "created": "2026-10-14"
+    },
+    {
+      "id": "driver-shift-timer-stuck-zero",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "oct14drive",
+      "tags": [
+        "bug"
+      ],
+      "title": "Live tracking shift timer stuck at 0:00 during an active shift",
+      "description": "On 10/14 Guillermo's Live tracking header showed <code>0:00</code> at 5:23 p.m. on a shift that started at 5:18, so it should have read about 5:00. The timer is the shift-elapsed clock (<code>src/components/Driver/DriverTrackingPortal.tsx:195-202</code>), not per order. Suspects: <code>currentShift.startTime</code> is missing (the effect returns early and <code>elapsed</code> stays 0), or the device clock is ahead of the server (negative delta clamped to 0 in <code>formatDuration</code>). Retest requested: start a shift, wait 1 min, screenshot. <strong>Confirmed 10/14 17:33</strong> (shift <code>ee153c36</code>, started 17:31): still 0:00. The <code>development</code> code (2.10.1) matches this branch. \"Since 5:31 p.m.\" renders from the same <code>currentShift.startTime</code>, so startTime is present and parses. The empty-startTime theory is out: either <code>Date.now() - startedAt</code> stays ≤ 0 in the WebView, or the interval never updates. Next: reproduce with a driver account in a browser and read the console. <strong>Root cause 10/14:</strong> the phone clock runs about 1 h behind the server (#668 measured 3,648 s on 10/06), so <code>Date.now() - startedAt</code> is negative and clamps to 0:00 for the first hour. <strong>Fix (commit <code>c530b3c0</code>, branch <code>fix/driver-shift-timer-zero</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/687\">#687</a>):</strong> <code>/api/tracking/shifts/active</code> returns <code>serverNow</code>, <code>useDriverShift</code> derives the offset, and <code>shiftElapsedSeconds()</code> drives the header, ShiftPill and the home \"Active for\" card. Follow-up: <code>DriverLiveMap.tsx:277</code> still sizes the trail window on the phone clock. Ask Guillermo whether automatic date/time is on. <strong>MERGED 10/14</strong> (#687 <code>9d5b7ce8</code>); device check pending.",
+      "sourceRef": "#687",
+      "created": "2026-10-14"
+    },
+    {
+      "id": "driver-map-follow-mode",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "oct14drive",
+      "title": "Driver live map does not follow the driver: the marker drives off-screen",
+      "description": "Guillermo (10/14): the Ready Set map is better than before, but it doesn't \"follow\" him; the marker moves until it leaves the screen. Confirmed in <code>src/components/Driver/DriverLiveMap.tsx:389-411</code>: <code>shouldRecenter()</code> only fires on the first fix or a jump of more than 10 km, so normal driving never moves the camera. Ask: Waze-style follow mode (ease the camera to each fix, pause when the driver pans or zooms by hand) plus a \"recenter\" button to resume. Drivers who prefer the in-app map over Google Maps or Waze to save phone resources depend on this. <strong>Built 10/14 (commit <code>94114bae</code>, branch <code>feat/driver-map-follow-mode</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/688\">#688</a>):</strong> follow on by default (600 ms ease, &lt;5 m fixes skipped), hand gestures pause it (Mapbox <code>originalEvent</code>), Recenter button while paused; jump detection now compares consecutive fixes, so a long drive no longer wipes the trail after 10 km. Needs a device check (pinch/rotate, smoothness, button on the 256 px map). <strong>MERGED 10/14</strong> (#688 <code>c0664292</code>); device check pending.",
+      "sourceRef": "#688",
+      "created": "2026-10-14"
+    },
+    {
+      "id": "phantom-ping-source-stale-watcher",
+      "status": "progress",
+      "owner": "emmanuel",
+      "source": "oct14drive",
+      "created": "2026-10-14",
+      "tags": [
+        "bug"
+      ],
+      "title": "Phantom GPS stream: a stale second source keeps posting the old pickup position",
+      "description": "Found while fixing <code>mileage-phantom-pickup-pings</code>. On 10/14, 11 points came in through the native path (<code>postLocation</code> in <code>src/lib/tracking/capacitor-tracking.ts</code> ~410-440, server-stamped time). Battery stuck at 30% while the live stream read 68→60, constant altitude 1989.3. The stream started 7 s after shift <code>7d11538c</code> began and kept posting at the pickup through two later shifts until 23:31Z. Same phone, one auth session. Hypothesis: a leaked watcher or a stale second JS context. Next step: send the plugin's <code>location.time</code> as <code>timestamp</code> from <code>postLocation</code> so stale fixes carry their real time; needs a device check.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/692\">#692</a> open against <code>development</code> (needs a device check by Guillermo).<br><br><strong>2026-10-15:</strong> #692 merged into <code>development</code>; stays in progress until Guillermo's device check and a look at <code>recorded_at</code> vs <code>created_at</code> on the next phantom stream."
+    },
+    {
+      "id": "dashboard-activity-feed-browser-timezone",
+      "status": "progress",
+      "title": "Admin dashboard activity feed shows week-old dates in the browser timezone",
+      "owner": "emmanuel",
+      "source": "oct15batch",
+      "tags": [
+        "bug"
+      ],
+      "created": "2026-10-15",
+      "description": "Found when the DashboardHome timezone test went red on every branch on 2026-10-15: <code>formatTimeAgo</code> in <code>src/components/Dashboard/DashboardHome.tsx</code> fell back to <code>toLocaleDateString()</code> (browser zone + locale) for items older than 7 days, while the rest of the page uses the app timezone since #685. The test only hit that branch once its fixed fixture turned a week old. Fix: route the fallback through <code>formatDateForDisplay</code> and pin the test clock with fake timers. PR open against <code>development</code>; merge first, then update-branch #690-#694."
     }
   ]
 }
