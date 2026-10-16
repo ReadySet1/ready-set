@@ -37,6 +37,8 @@ interface RouteBarProps {
   activeSlot: ActiveSlot;
   onEditSlot: (slot: 'pickup' | 'delivery') => void;
   onClearSlot: (slot: 'pickup' | 'delivery') => void;
+  /** Open the in-place editor for the address in a slot. */
+  onEditAddress?: (slot: 'pickup' | 'delivery') => void;
   className?: string;
 }
 
@@ -46,6 +48,7 @@ export function RouteBar({
   activeSlot,
   onEditSlot,
   onClearSlot,
+  onEditAddress,
   className,
 }: RouteBarProps) {
   // Direct coords from the address record
@@ -105,6 +108,7 @@ export function RouteBar({
           isActive={activeSlot === 'pickup'}
           onEdit={() => onEditSlot('pickup')}
           onClear={() => onClearSlot('pickup')}
+          onEditDetails={onEditAddress ? () => onEditAddress('pickup') : undefined}
         />
         <Connector pickup={pickup} delivery={delivery} />
         <RouteSlot
@@ -113,6 +117,7 @@ export function RouteBar({
           isActive={activeSlot === 'delivery'}
           onEdit={() => onEditSlot('delivery')}
           onClear={() => onClearSlot('delivery')}
+          onEditDetails={onEditAddress ? () => onEditAddress('delivery') : undefined}
         />
         <div className="col-span-3 mt-2 h-[120px]">
           <MiniMap
@@ -132,6 +137,7 @@ export function RouteBar({
           isActive={activeSlot === 'pickup'}
           onEdit={() => onEditSlot('pickup')}
           onClear={() => onClearSlot('pickup')}
+          onEditDetails={onEditAddress ? () => onEditAddress('pickup') : undefined}
         />
         <div className="flex justify-center">
           <Connector pickup={pickup} delivery={delivery} />
@@ -142,6 +148,7 @@ export function RouteBar({
           isActive={activeSlot === 'delivery'}
           onEdit={() => onEditSlot('delivery')}
           onClear={() => onClearSlot('delivery')}
+          onEditDetails={onEditAddress ? () => onEditAddress('delivery') : undefined}
         />
         <div className="mt-1 h-[100px]">
           <MiniMap

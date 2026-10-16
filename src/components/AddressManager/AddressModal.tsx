@@ -25,15 +25,47 @@ import { MapPin, Loader2 } from "lucide-react";
 import AddressFormSection from "./AddressFormSection";
 
 interface AddressModalProps {
-  onAddressUpdated: () => void | Promise<void>;
+  /** Called after a successful save with the address returned by the API. */
+  onAddressUpdated: (savedAddress?: Address) => void | Promise<void>;
   addressToEdit: Address | null;
+  /**
+   * Prefill for a NEW address (ignored when `addressToEdit` is set). Only the
+   * location fields are copied: the copy never inherits id, owner or sharing.
+   */
+  initialValues?: Partial<Address>;
+  /** Optional explanation shown under the dialog description. */
+  notice?: string;
   isOpen: boolean;
   onClose: () => void;
+}
+
+const EMPTY_NEW_ADDRESS: Partial<Address> = {
+  county: "",
+  isRestaurant: false,
+  isShared: false,
+};
+
+function toPrefill(values: Partial<Address>): Partial<Address> {
+  return {
+    ...EMPTY_NEW_ADDRESS,
+    county: values.county ?? "",
+    name: values.name ?? null,
+    street1: values.street1 ?? "",
+    street2: values.street2 ?? null,
+    city: values.city ?? "",
+    state: values.state ?? "",
+    zip: values.zip ?? "",
+    locationNumber: values.locationNumber ?? null,
+    parkingLoading: values.parkingLoading ?? null,
+    isRestaurant: values.isRestaurant === true,
+  };
 }
 
 const AddressModal: React.FC<AddressModalProps> = ({
   onAddressUpdated,
   addressToEdit,
+  initialValues,
+  notice,
   isOpen,
   onClose,
 }) => {
@@ -52,13 +84,9 @@ const AddressModal: React.FC<AddressModalProps> = ({
         setValue(key as keyof Address, value);
       });
     } else {
-      reset({
-        county: "",
-        isRestaurant: false,
-        isShared: false,
-      });
+      reset(initialValues ? toPrefill(initialValues) : EMPTY_NEW_ADDRESS);
     }
-  }, [addressToEdit, setValue, reset]);
+  }, [addressToEdit, initialValues, setValue, reset]);
 
   const onSubmit = async (data: Address) => {
     // Prevent double submissions
@@ -79,17 +107,15 @@ const AddressModal: React.FC<AddressModalProps> = ({
     };
 
     try {
-      if (addressToEdit) {
-        await updateMutation.mutateAsync({
-          id: addressToEdit.id,
-          data: formData,
-        });
-      } else {
-        await createMutation.mutateAsync(formData);
-      }
+      const savedAddress = addressToEdit
+        ? await updateMutation.mutateAsync({
+            id: addressToEdit.id,
+            data: formData,
+          })
+        : await createMutation.mutateAsync(formData);
 
       reset();
-      await onAddressUpdated();
+      await onAddressUpdated(savedAddress);
     } catch (error) {
       console.error("Address submission error:", error);
     }
@@ -110,6 +136,11 @@ const AddressModal: React.FC<AddressModalProps> = ({
               ? "Update the address information below"
               : "Fill in the details to add a new address"}
           </DialogDescription>
+          {notice && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {notice}
+            </p>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

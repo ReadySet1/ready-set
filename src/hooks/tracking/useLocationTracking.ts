@@ -16,6 +16,7 @@ import {
   subscribeNativeLocationIssue,
 } from '@/lib/tracking/native-location-issue';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
+import { withDeadline } from '@/lib/driver/with-deadline';
 
 interface UseLocationTrackingReturn {
   currentLocation: LocationUpdate | null;
@@ -79,6 +80,14 @@ const getIOSBrowserName = (): string => {
 };
 
 const TRACKING_INTERVAL = 30000; // 30 seconds
+
+/**
+ * Upper bound for the /api/auth/session driver-id lookup. 2026-10 field
+ * failure (iPhone X, iOS 16.7): the lookup had no timeout, and the location
+ * permission request awaited it before clearing its spinner, so "Start shift"
+ * spun until the page was reloaded.
+ */
+export const DRIVER_ID_LOOKUP_TIMEOUT_MS = 10_000;
 const MAX_RETRY_ATTEMPTS = 3;
 
 // Offline-queue flush pacing. The 2026-08 test drive fired dozens of queued
@@ -176,16 +185,18 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       return cachedDriverIdRef.current;
     }
     try {
-      const response = await fetch('/api/auth/session');
-      if (response.ok) {
-        const session = await response.json();
-        const driverId = session.user?.driverId || null;
-        if (driverId) {
-          cachedDriverIdRef.current = driverId;
+      return await withDeadline(async (signal) => {
+        const response = await fetch('/api/auth/session', { signal });
+        if (response.ok) {
+          const session = await response.json();
+          const driverId = session.user?.driverId || null;
+          if (driverId) {
+            cachedDriverIdRef.current = driverId;
+          }
+          return driverId;
         }
-        return driverId;
-      }
-      return null;
+        return null;
+      }, DRIVER_ID_LOOKUP_TIMEOUT_MS);
     } catch (error) {
       console.error('Error getting driver ID:', error);
       return null;
@@ -682,58 +693,61 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     setIsRequestingPermission(true);
     setError(null);
 
-    // Native wrapper: getCurrentPosition below would make the WebView pop the
-    // Android permission dialog with no context. If the OS permission is
-    // missing, show the in-app explanation instead (its button is the only path
-    // to the OS dialog) and report not-granted. No native answer (web, iOS
-    // wrapper) → the web flow below, unchanged.
-    if (isCapacitorNative()) {
-      const native = await checkNativeLocationPermission({ explain: true });
-      if (native === 'not-granted') {
-        setPermissionState('prompt');
-        setIsRequestingPermission(false);
-        return false;
-      }
-    }
-
+    // Every exit clears the spinner, including a native-bridge throw.
     try {
-      // This call MUST be triggered by user interaction for iOS Safari to show the prompt
-      const position = await getCurrentPosition();
-
-      // If we get here, permission was granted
-      setPermissionState('granted');
-      await handlePositionUpdate(position);
-      setIsRequestingPermission(false);
-      return true;
-    } catch (err) {
-      setIsRequestingPermission(false);
-
-      const maybeError = err as Partial<GeolocationPositionError>;
-      if (maybeError.code === 1) {
-        // Permission denied
-        setPermissionState('denied');
-        if (isIOSBrowser()) {
-          // All iOS browsers use WebKit and require Settings app for location permissions
-          const browserName = getIOSBrowserName();
-          setError(`Location access denied. Go to Settings > ${browserName} > Location and enable access for this website.`);
-        } else {
-          setError('Location access denied. Please enable location permissions for this site.');
+      // Native wrapper: getCurrentPosition below would make the WebView pop the
+      // Android permission dialog with no context. If the OS permission is
+      // missing, show the in-app explanation instead (its button is the only path
+      // to the OS dialog) and report not-granted. No native answer (web, iOS
+      // wrapper) → the web flow below, unchanged.
+      if (isCapacitorNative()) {
+        const native = await checkNativeLocationPermission({ explain: true });
+        if (native === 'not-granted') {
+          setPermissionState('prompt');
+          return false;
         }
-        return false;
-      } else if (maybeError.code === 2) {
-        // Position unavailable - but permission might be granted
-        setPermissionState('granted');
-        setError('Location information unavailable. Check GPS settings or signal.');
-        return true; // Permission was granted, just couldn't get position
-      } else if (maybeError.code === 3) {
-        // Timeout - but permission might be granted
-        setPermissionState('granted');
-        setError('Location request timed out. This can happen in areas with weak GPS signal. Try again or move to a better location.');
-        return true; // Permission was granted, just timed out
       }
 
-      handleGeolocationError(err);
-      return false;
+      try {
+        // This call MUST be triggered by user interaction for iOS Safari to show the prompt
+        const position = await getCurrentPosition();
+
+        // If we get here, permission was granted
+        setPermissionState('granted');
+        // Bounded: the driver-id lookup inside gives up after
+        // DRIVER_ID_LOOKUP_TIMEOUT_MS, so it can't hold the spinner.
+        await handlePositionUpdate(position);
+        return true;
+      } catch (err) {
+        const maybeError = err as Partial<GeolocationPositionError>;
+        if (maybeError.code === 1) {
+          // Permission denied
+          setPermissionState('denied');
+          if (isIOSBrowser()) {
+            // All iOS browsers use WebKit and require Settings app for location permissions
+            const browserName = getIOSBrowserName();
+            setError(`Location access denied. Go to Settings > ${browserName} > Location and enable access for this website.`);
+          } else {
+            setError('Location access denied. Please enable location permissions for this site.');
+          }
+          return false;
+        } else if (maybeError.code === 2) {
+          // Position unavailable - but permission might be granted
+          setPermissionState('granted');
+          setError('Location information unavailable. Check GPS settings or signal.');
+          return true; // Permission was granted, just couldn't get position
+        } else if (maybeError.code === 3) {
+          // Timeout - but permission might be granted
+          setPermissionState('granted');
+          setError('Location request timed out. This can happen in areas with weak GPS signal. Try again or move to a better location.');
+          return true; // Permission was granted, just timed out
+        }
+
+        handleGeolocationError(err);
+        return false;
+      }
+    } finally {
+      setIsRequestingPermission(false);
     }
   }, [getCurrentPosition, handlePositionUpdate, handleGeolocationError]);
 
