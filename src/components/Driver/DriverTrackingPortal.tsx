@@ -471,8 +471,8 @@ export default function DriverTrackingPortal() {
 
             {/* Shift control bar */}
             <DriverCard className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-semibold text-driver-text">
                     On shift
                   </div>
@@ -486,7 +486,7 @@ export default function DriverTrackingPortal() {
                       : ""}
                   </div>
                   {endShiftBlockers > 0 ? (
-                    <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                    <div className="mt-0.5 break-words text-[11px] font-semibold text-driver-subtle">
                       {endShiftBlockers === 1
                         ? `Order ${firstBlockerOrderNumber} to finish or return first`
                         : `${endShiftBlockers} deliveries to finish or return first`}
@@ -502,11 +502,10 @@ export default function DriverTrackingPortal() {
                   onClick={handleEndShift}
                   loading={shiftLoading}
                   aria-disabled={endShiftBlockers > 0}
-                  className={
-                    endShiftBlockers > 0
-                      ? "cursor-not-allowed opacity-50"
-                      : undefined
-                  }
+                  className={cn(
+                    "shrink-0 whitespace-nowrap",
+                    endShiftBlockers > 0 && "cursor-not-allowed opacity-50",
+                  )}
                 >
                   <Square className="h-4 w-4" />
                   End shift
