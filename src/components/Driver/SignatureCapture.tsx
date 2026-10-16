@@ -24,9 +24,60 @@ type LockableOrientation = {
   unlock?: () => void;
 };
 
+/**
+ * Which confirmation this pad records:
+ *  - `pickup`   — vendor staff at pickup: NAME required, signature optional
+ *                 (2026-07-09 policy) → POST .../signature
+ *  - `delivery` — the recipient at completion: SIGNATURE, or their NAME if they
+ *                 refuse to sign (Gary 2026-06-01/06-22) → POST .../recipient
+ */
+export type SignatureStage = "pickup" | "delivery";
+
+const STAGE_COPY: Record<
+  SignatureStage,
+  {
+    intro: string;
+    nameLabel: string;
+    placeholder: string;
+    padHint: string;
+    confirmLabel: string;
+    missingError: string;
+    successToast: string;
+    fileName: string;
+    endpoint: string;
+  }
+> = {
+  pickup: {
+    intro:
+      "Enter the name of the person who handed over the order. Signature is optional.",
+    nameLabel: "Received / confirmed by",
+    placeholder: "Name of restaurant staff",
+    padHint: "Sign here (optional)",
+    confirmLabel: "Confirm pickup",
+    missingError: "Please enter who handed over the order.",
+    successToast: "Pickup confirmed",
+    fileName: "pickup-signature.png",
+    endpoint: "signature",
+  },
+  delivery: {
+    intro:
+      "Required: the recipient's signature. If they refuse to sign, enter their name instead.",
+    nameLabel: "Recipient name",
+    placeholder: "Name of the person receiving the order",
+    padHint: "Recipient signs here",
+    confirmLabel: "Confirm delivery",
+    missingError: "Get the recipient's signature, or enter their name if they refuse to sign.",
+    successToast: "Recipient recorded",
+    fileName: "delivery-signature.png",
+    endpoint: "recipient",
+  },
+};
+
 interface SignatureCaptureProps {
   orderNumber: string;
-  /** Endpoint override (defaults to /api/orders/[order_number]/signature). */
+  /** Pickup (default) or completion confirmation — see SignatureStage. */
+  stage?: SignatureStage;
+  /** Endpoint override (defaults to the stage's /api/orders/[order_number]/… route). */
   uploadEndpoint?: string;
   /** Called once the confirmation is stored. `url` is the signature image URL
    *  when one was drawn, or null for a name-only confirmation. */
@@ -53,6 +104,7 @@ function dataURLToBlob(dataURL: string): Blob {
  */
 export function SignatureCapture({
   orderNumber,
+  stage = "pickup",
   uploadEndpoint,
   onUploadComplete,
   onCancel,
@@ -62,6 +114,9 @@ export function SignatureCapture({
   const padRef = useRef<SignaturePad | null>(null);
   const [hasInk, setHasInk] = useState(false);
   const [receivedBy, setReceivedBy] = useState("");
+  const copy = STAGE_COPY[stage];
+  // Pickup needs the name; delivery accepts a signature OR the name.
+  const canConfirm = stage === "delivery" ? hasInk || !!receivedBy.trim() : !!receivedBy.trim();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Full-screen signing mode (field feedback: the inline pad is too small).
@@ -264,21 +319,22 @@ export function SignatureCapture({
 
   const handleConfirm = useCallback(async () => {
     const name = receivedBy.trim();
-    if (!name) {
-      setError("Please enter who handed over the order.");
+    const pad = padRef.current;
+    const signed = !!pad && !pad.isEmpty();
+    if (!name && !(stage === "delivery" && signed)) {
+      setError(copy.missingError);
       return;
     }
     setUploading(true);
     setError(null);
     try {
       const formData = new FormData();
-      formData.append("receivedBy", name);
+      if (name) formData.append("receivedBy", name);
 
-      // The signature is optional — attach it only when the pad has ink.
-      const pad = padRef.current;
-      if (pad && !pad.isEmpty()) {
+      // Attach the signature only when the pad has ink.
+      if (pad && signed) {
         const blob = dataURLToBlob(pad.toDataURL("image/png"));
-        const file = new File([blob], "pickup-signature.png", {
+        const file = new File([blob], copy.fileName, {
           type: "image/png",
         });
         formData.append("file", file, file.name);
@@ -286,7 +342,7 @@ export function SignatureCapture({
 
       const endpoint =
         uploadEndpoint ??
-        `/api/orders/${encodeURIComponent(orderNumber)}/signature`;
+        `/api/orders/${encodeURIComponent(orderNumber)}/${copy.endpoint}`;
       // Bearer token survives stale auth cookies (2026-08 field failure); no
       // manual Content-Type — the browser must set the multipart boundary.
       const res = await fetch(endpoint, {
@@ -299,7 +355,7 @@ export function SignatureCapture({
         throw new Error(body.error || "Upload failed");
       }
       const result = await res.json();
-      toast.success("Pickup confirmed");
+      toast.success(copy.successToast);
       onUploadComplete(result.url ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
@@ -308,18 +364,17 @@ export function SignatureCapture({
     } finally {
       setUploading(false);
     }
-  }, [orderNumber, uploadEndpoint, onUploadComplete, receivedBy]);
+  }, [orderNumber, uploadEndpoint, onUploadComplete, receivedBy, stage, copy]);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <p className="text-[13.5px] font-semibold text-driver-muted">
-        Enter the name of the person who handed over the order. Signature is
-        optional.
+        {copy.intro}
       </p>
 
       <label className="flex flex-col gap-1.5">
         <span className="text-[12.5px] font-semibold text-driver-muted">
-          Received / confirmed by
+          {copy.nameLabel}
         </span>
         <input
           type="text"
@@ -328,12 +383,12 @@ export function SignatureCapture({
             setReceivedBy(e.target.value);
             if (error) setError(null);
           }}
-          placeholder="Name of restaurant staff"
+          placeholder={copy.placeholder}
           maxLength={255}
           autoComplete="off"
           disabled={uploading}
           className="w-full rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt px-4 py-3 text-[15px] font-semibold text-driver-text placeholder:text-driver-subtle focus:outline-none focus:ring-2 focus:ring-driver-brand disabled:opacity-50"
-          aria-label="Received / confirmed by"
+          aria-label={copy.nameLabel}
         />
       </label>
 
@@ -384,11 +439,11 @@ export function SignatureCapture({
               "block w-full touch-none",
               fullscreen ? "h-full" : "h-48",
             )}
-            aria-label="Signature pad (optional)"
+            aria-label={stage === "delivery" ? "Signature pad" : "Signature pad (optional)"}
           />
           {!hasInk && !rotated ? (
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-driver-subtle">
-              Sign here (optional)
+              {copy.padHint}
             </span>
           ) : null}
           {!fullscreen ? (
@@ -436,7 +491,7 @@ export function SignatureCapture({
             </div>
             {!hasInk ? (
               <span className="self-center text-[13px] font-semibold text-driver-subtle">
-                Sign here (optional)
+                {copy.padHint}
               </span>
             ) : null}
             <div className="flex items-center">
@@ -474,12 +529,12 @@ export function SignatureCapture({
           variant="brand"
           full
           loading={uploading}
-          disabled={uploading || !receivedBy.trim()}
+          disabled={uploading || !canConfirm}
           onClick={handleConfirm}
           className="flex-1"
         >
           {!uploading ? <Check className="h-4 w-4" strokeWidth={2.6} /> : null}
-          Confirm pickup
+          {copy.confirmLabel}
         </DriverButton>
       </div>
 

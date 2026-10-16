@@ -594,7 +594,13 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       // ARRIVED_AT_VENDOR -> PICKED_UP without the signature sheet. The server
       // must be the backstop regardless of which client surface forgot the gate.
       // Since 2026-07-09 the gate accepts a receiver NAME or a signature.
-      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      // The (separately mandatory) pickup photo is on file so this block
+      // exercises the confirmation rule only.
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'pickup_photo' }],
+      });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
       (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(null);
@@ -611,7 +617,11 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     });
 
     it('rejects a driver PICKED_UP when the recorded receiver name is whitespace-only', async () => {
-      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'pickup_photo' }],
+      });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
       (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
@@ -628,7 +638,14 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     });
 
     it('allows a driver PICKED_UP with a receiver name only (no signature upload)', async () => {
-      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      // The pickup photo is a separate mandatory artifact (see the
+      // 'Mandatory stage photos' block) — present here so only the
+      // confirmation rule is exercised.
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'pickup_photo' }],
+      });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
       (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
@@ -651,7 +668,11 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
     });
 
     it('allows a driver PICKED_UP once the pickup_signature upload exists', async () => {
-      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'pickup_photo' }],
+      });
       mockCaller('driver-456', 'DRIVER');
       (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue({ id: 'sig-1' });
       (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(null);
@@ -686,6 +707,346 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(response.status).toBe(200);
       expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
     });
+  });
+  describe('Mandatory stage photos (Jun-1 / Jun-22 decision: photo at pickup + photo at completion)', () => {
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    const patchStatus = async (driverStatus: string) => {
+      const { PATCH } = await importRoute();
+      return PATCH(createPatchRequest({ driverStatus }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+    };
+
+    beforeEach(() => {
+      // On shift, so the photo rule is what gets exercised.
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
+      // Pickup + recipient confirmations satisfied (names recorded) unless a
+      // test says otherwise, so only the photo rule is exercised here.
+      (mockedPrisma.fileUpload.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
+        pickupReceivedBy: 'Maria Lopez',
+        deliveryReceivedBy: 'Sam Carter',
+        deliverySignatureUrl: null,
+      });
+    });
+
+    it('rejects a driver PICKED_UP with 422 PICKUP_PHOTO_REQUIRED when no pickup photo is on file, even with the receiver name', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('PICKED_UP');
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBe('PICKUP_PHOTO_REQUIRED');
+      expect(body.code).toBe('PICKUP_PHOTO_REQUIRED');
+      expect(body.message).toMatch(/photo of the order/i);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+      expect(channelSendCalls).toHaveLength(0);
+    });
+
+    it('does not count a proof_of_delivery or pickup_signature upload as the pickup photo', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'proof_of_delivery' }, { category: 'pickup_signature' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('PICKED_UP');
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('PICKUP_PHOTO_REQUIRED');
+    });
+
+    it('allows a driver PICKED_UP once a pickup_photo upload exists (case-insensitive category)', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_AT_VENDOR',
+        fileUploads: [{ category: 'PICKUP_PHOTO' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('PICKED_UP');
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('reports the missing photo before the missing pickup confirmation (the client opens the photo sheet first)', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const response = await patchStatus('PICKED_UP');
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('PICKUP_PHOTO_REQUIRED');
+    });
+
+    it('rejects a driver COMPLETED with 422 POD_REQUIRED when no proof_of_delivery photo is on file', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBe('POD_REQUIRED');
+      expect(body.code).toBe('POD_REQUIRED');
+      expect(body.message).toMatch(/photo of the setup/i);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+      expect(channelSendCalls).toHaveLength(0);
+    });
+
+    it('does not count the pickup photo as proof of delivery', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'pickup_photo' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('POD_REQUIRED');
+    });
+
+    it('allows a driver COMPLETED once the proof_of_delivery upload exists', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('does not re-check the photo when a driver re-affirms a status they already hold', async () => {
+      setupMocks({ status: 'COMPLETED', driverStatus: 'COMPLETED', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(200);
+    });
+
+    it('lets a privileged (ADMIN) caller set COMPLETED without a photo (data repair)', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT', fileUploads: [] });
+      mockCaller('admin-user', 'ADMIN');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('does not gate non-photo stages (EN_ROUTE_TO_CLIENT) on any upload', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('EN_ROUTE_TO_CLIENT');
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Recipient confirmation at completion (Gary Jun-1/22: setup photo AND signature or recipient name)', () => {
+    const mockCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: { id: userId } },
+            error: null,
+          }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type },
+            error: null,
+          }),
+        }),
+      } as any);
+    };
+
+    const complete = async () => {
+      const { PATCH } = await importRoute();
+      return PATCH(createPatchRequest({ driverStatus: 'COMPLETED' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+    };
+
+    const deliveryRow = (row: { deliveryReceivedBy?: string | null; deliverySignatureUrl?: string | null } | null) =>
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue(
+        row ? { deliveryReceivedBy: null, deliverySignatureUrl: null, ...row } : null,
+      );
+
+    beforeEach(() => {
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
+      deliveryRow(null);
+    });
+
+    it('rejects with 422 POD_REQUIRED when the photo is missing, even with a recipient name', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+      deliveryRow({ deliveryReceivedBy: 'Sam Carter' });
+
+      const response = await complete();
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('POD_REQUIRED');
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('reports the missing photo first when both the photo and the recipient are missing', async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT', fileUploads: [] });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await complete();
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('POD_REQUIRED');
+    });
+
+    it('rejects with 422 RECIPIENT_REQUIRED when the photo is on file but there is no signature or name', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await complete();
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBe('RECIPIENT_REQUIRED');
+      expect(body.code).toBe('RECIPIENT_REQUIRED');
+      expect(body.message).toMatch(/signature|name/i);
+      expect(mockedPrisma.cateringRequest.update).not.toHaveBeenCalled();
+      expect(channelSendCalls).toHaveLength(0);
+    });
+
+    it('treats a whitespace-only recipient name as missing', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+      deliveryRow({ deliveryReceivedBy: '   ' });
+
+      const response = await complete();
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('RECIPIENT_REQUIRED');
+    });
+
+    it('does not count the pickup signature or pickup receiver name as the recipient confirmation', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }, { category: 'pickup_signature' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+      (mockedPrisma.delivery.findUnique as jest.Mock).mockResolvedValue({
+        pickupReceivedBy: 'Maria Lopez',
+        deliveryReceivedBy: null,
+        deliverySignatureUrl: null,
+      });
+
+      const response = await complete();
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe('RECIPIENT_REQUIRED');
+    });
+
+    it('allows COMPLETED with the photo and the recipient name only (recipient refused to sign)', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+      deliveryRow({ deliveryReceivedBy: 'Sam Carter' });
+
+      const response = await complete();
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+      expect(mockedPrisma.delivery.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { orderNumber: 'CAT-001' },
+          select: expect.objectContaining({ deliveryReceivedBy: true, deliverySignatureUrl: true }),
+        }),
+      );
+    });
+
+    it('allows COMPLETED with the photo and a delivery_signature upload only (no name)', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }, { category: 'DELIVERY_SIGNATURE' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await complete();
+
+      expect(response.status).toBe(200);
+      expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('allows COMPLETED with the photo and a mirrored delivery_signature_url only', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [{ category: 'proof_of_delivery' }],
+      });
+      mockCaller('driver-456', 'DRIVER');
+      deliveryRow({ deliverySignatureUrl: 'https://cdn.example.com/deliveries/sig.png' });
+
+      const response = await complete();
+
+      expect(response.status).toBe(200);
+    });
+
+    it.each(['ADMIN', 'HELPDESK'])(
+      'lets a privileged (%s) caller set COMPLETED with no photo and no recipient (data repair)',
+      async (role) => {
+        setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_TO_CLIENT', fileUploads: [] });
+        mockCaller('admin-user', role);
+
+        const response = await complete();
+
+        expect(response.status).toBe(200);
+        expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
+      },
+    );
   });
   describe('Active-shift gate on driver movement statuses (2026-09-02 field bug)', () => {
     // Same caller-mock shape as the blocks above.

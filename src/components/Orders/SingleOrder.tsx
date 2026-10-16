@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "./DriverStatus";
+import { DeliveryRecipient } from "./DeliveryRecipient";
 import OrderHeader from "./ui/OrderHeader";
 import OrderDetails from "./ui/OrderDetails";
 import AddressInfo from "./ui/AddressInfo";
@@ -1082,6 +1083,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                     canUpdateStatus={canUserUpdateTimeline}
                     onStatusUpdate={updateDriverStatus}
                   />
+                  <div className="mt-3">
+                    <DeliveryRecipient receivedBy={(order as any).deliveryReceivedBy} />
+                  </div>
                 </div>
               </div>
             </div>

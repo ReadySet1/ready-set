@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "../DriverStatus";
+import { DeliveryRecipient } from "../DeliveryRecipient";
 import OrderDetails from "../ui/OrderDetails";
 import AddressInfo from "../ui/AddressInfo";
 import AdditionalInfo from "../ui/AdditionalInfo";
@@ -904,6 +905,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   onStatusChange={handleOrderStatusChange}
                   canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
+                <DeliveryRecipient receivedBy={(order as any).deliveryReceivedBy} />
               </div>
             </div>
 

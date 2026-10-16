@@ -42,6 +42,7 @@ import {
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
 import { formatMiles } from "@/lib/units";
+import { RECIPIENT_REQUIRED_CODE, stageGateMessage } from "@/lib/driver/stage-photos";
 import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
@@ -117,6 +118,10 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  /** Pickup: photo of the order at the vendor, before the confirmation. */
+  const [pickupPhotoTarget, setPickupPhotoTarget] = useState<PodTarget | null>(null);
+  /** Completion: recipient's signature, or name if they refuse (after POD). */
+  const [recipientTarget, setRecipientTarget] = useState<PodTarget | null>(null);
   /** Order number of the delivery being handed back to dispatch (issue #508). */
   const [returnTarget, setReturnTarget] = useState<string | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
@@ -147,7 +152,7 @@ export default function DriverTrackingPortal() {
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
-    updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
     isOnline,
     queuedItems,
@@ -281,20 +286,32 @@ export default function DriverTrackingPortal() {
     if (shiftError) toast.error(shiftError);
   }, [shiftError]);
 
-  const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
-    setUpdatingId(deliveryId);
+  const advanceStatus = async (target: PodTarget, status: DriverStatus) => {
+    setUpdatingId(target.deliveryId);
     try {
-      const ok = await updateDeliveryStatus(
-        deliveryId,
+      const outcome = await advanceDeliveryStatus(
+        target.deliveryId,
         status,
         currentLocation || undefined,
       );
-      if (!ok) {
-        // The update failed server-side (auth, network, validation). Without
-        // this the button just does nothing and the driver assumes a freeze.
-        toast.error("Couldn't update the delivery status. Please try again.");
+      if (!outcome.ok) {
+        // Server-side stage gates (authoritative, same as the detail screen):
+        // say what is missing in plain words and reopen the matching sheet —
+        // e.g. an upload queued offline that has not landed yet.
+        const gateMessage = stageGateMessage(outcome.code, outcome.message);
+        if (gateMessage) {
+          toast.error(gateMessage);
+          if (outcome.code === "PICKUP_PHOTO_REQUIRED") setPickupPhotoTarget(target);
+          else if (outcome.code === "PICKUP_CONFIRMATION_REQUIRED") setSigTarget(target);
+          else if (outcome.code === "POD_REQUIRED") setPodTarget(target);
+          else if (outcome.code === RECIPIENT_REQUIRED_CODE) setRecipientTarget(target);
+        } else {
+          // Anything else (auth, network, validation). Without this the
+          // button just does nothing and the driver assumes a freeze.
+          toast.error("Couldn't update the delivery status. Please try again.");
+        }
       }
-      return ok;
+      return outcome.ok;
     } finally {
       setUpdatingId(null);
     }
@@ -316,38 +333,58 @@ export default function DriverTrackingPortal() {
     }
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
-    // The pickup step routes through vendor-signature capture (mandatory per
-    // the 2026-06-22 decision — mirrors the gate in DriverDeliveryDetail; the
-    // server also rejects an unsigned PICKED_UP).
+    const target = { deliveryId: delivery.id, orderNumber };
+    // Pickup: photo of the order, then the vendor confirmation (both
+    // mandatory; mirrors DriverDeliveryDetail, the server enforces both). The
+    // feed carries no pickup-photo flag, so the photo is always asked here; a
+    // retake replaces the earlier one.
     if (next === DriverStatus.PICKED_UP) {
-      setSigTarget({ deliveryId: delivery.id, orderNumber });
+      setPickupPhotoTarget(target);
       return;
     }
-    // The final step routes through proof-of-delivery capture.
+    // Completion: setup photo (skipped when the feed shows one on file), then
+    // the recipient's signature or name.
     if (next === DriverStatus.COMPLETED) {
-      setPodTarget({ deliveryId: delivery.id, orderNumber });
+      if (delivery.proofOfDelivery) setRecipientTarget(target);
+      else setPodTarget(target);
       return;
     }
-    advanceStatus(delivery.id, next);
+    advanceStatus(target, next);
+  };
+
+  /** Pickup photo stored → on to the pickup confirmation. */
+  const onPickupPhotoComplete = () => {
+    if (!pickupPhotoTarget) return;
+    setSigTarget(pickupPhotoTarget);
+    setPickupPhotoTarget(null);
   };
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    const { deliveryId } = podTarget;
+    // Setup photo stored → the recipient sign-off is the second mandatory
+    // completion capture (server: 422 RECIPIENT_REQUIRED). Mirrors
+    // DriverDeliveryDetail.
+    setRecipientTarget(podTarget);
+    setPodTarget(null);
+  };
+
+  const onRecipientComplete = async () => {
+    if (!recipientTarget) return;
+    const target = recipientTarget;
     // The upload already succeeded (and toasted) — close the sheet NOW instead
     // of holding it open across the status PATCH + deliveries refetch (2-5s on
     // LTE reads as a hang). A failed advance is surfaced by advanceStatus's
-    // toast and retried from the delivery card. Mirrors DriverDeliveryDetail.
-    setPodTarget(null);
-    await advanceStatus(deliveryId, DriverStatus.COMPLETED);
+    // toast and retried from the delivery card.
+    setRecipientTarget(null);
+    await advanceStatus(target, DriverStatus.COMPLETED);
   };
 
   const onSignatureComplete = async () => {
     if (!sigTarget) return;
-    const { deliveryId } = sigTarget;
-    // Same close-first semantics as POD.
+    const target = sigTarget;
+    // Same close-first semantics as the recipient sheet.
     setSigTarget(null);
-    await advanceStatus(deliveryId, DriverStatus.PICKED_UP);
+    await advanceStatus(target, DriverStatus.PICKED_UP);
   };
 
   const isPickupToday = (d?: Date) =>
@@ -735,6 +772,19 @@ export default function DriverTrackingPortal() {
         )}
       </div>
 
+      {pickupPhotoTarget ? (
+        <DriverPodSheet
+          open={!!pickupPhotoTarget}
+          onOpenChange={(o) => !o && setPickupPhotoTarget(null)}
+          deliveryId={pickupPhotoTarget.deliveryId}
+          orderNumber={pickupPhotoTarget.orderNumber}
+          title="Photo of the order"
+          requirementHint="Take a photo of the order at the vendor before confirming pickup"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(pickupPhotoTarget.orderNumber)}/pickup-photo`}
+          onComplete={onPickupPhotoComplete}
+        />
+      ) : null}
+
       {sigTarget ? (
         <DriverSignatureSheet
           open={!!sigTarget}
@@ -752,6 +802,17 @@ export default function DriverTrackingPortal() {
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {recipientTarget ? (
+        <DriverSignatureSheet
+          open={!!recipientTarget}
+          onOpenChange={(o) => !o && setRecipientTarget(null)}
+          orderNumber={recipientTarget.orderNumber}
+          stage="delivery"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(recipientTarget.orderNumber)}/recipient`}
+          onComplete={() => void onRecipientComplete()}
         />
       ) : null}
 

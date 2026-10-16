@@ -92,6 +92,9 @@ export interface ProofOfDeliveryCaptureProps {
   /** Hide the card's own "Proof of Delivery" title — for hosts (sheets/dialogs)
    *  that already render a title above this component. */
   hideTitle?: boolean;
+  /** Replaces the default "A photo is required to complete this delivery"
+   *  line under "Take a Photo" — e.g. the pickup-stage photo of the order. */
+  requirementHint?: string;
 }
 
 /**
