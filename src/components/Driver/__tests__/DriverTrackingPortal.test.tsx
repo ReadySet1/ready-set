@@ -646,6 +646,19 @@ describe("DriverTrackingPortal (redesigned)", () => {
       expect(endShift).not.toHaveBeenCalled();
     });
 
+    it("keeps End shift on one line next to a long blocked-state hint (375px)", () => {
+      // 2026-10 iPhone X: the hint squeezed the button until it wrapped to
+      // "End / shift". The button must not shrink; the hint column wraps.
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+      const button = screen.getByRole("button", { name: /end shift/i });
+      expect(button).toHaveClass("shrink-0", "whitespace-nowrap");
+      const hint = screen.getByText(/order cr-1 to finish or return first/i);
+      expect(hint.parentElement).toHaveClass("min-w-0");
+    });
+
     it("names the blocking order in the blocked-state hint", () => {
       mockUseDriverTracking.mockReturnValue(
         withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
