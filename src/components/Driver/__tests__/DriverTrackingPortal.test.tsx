@@ -554,6 +554,8 @@ describe("DriverTrackingPortal (redesigned)", () => {
       "data-endpoint",
       "/api/orders/cr-1/pickup-photo",
     );
+    // The pickup photo stays a single photo; only the setup photo takes 3.
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "1");
     expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument();
     expect(updateDeliveryStatus).not.toHaveBeenCalled();
 
@@ -696,6 +698,8 @@ describe("DriverTrackingPortal (redesigned)", () => {
           "/api/orders/cr-1/pod",
         ),
       );
+      // The reopened setup-photo sheet is the multi-photo capture.
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
       expect(toast.error).toHaveBeenCalledWith(
         expect.stringMatching(/photo of the setup/i),
       );
