@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { FileDownIcon } from "lucide-react";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface ServiceCardProps {
   title: string;
@@ -116,7 +117,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               <AppointmentDialog
                 buttonText={buttonText}
                 buttonClassName="rounded-full bg-amber-300 px-4 py-1.5 text-sm font-medium text-black transition-colors duration-300 hover:bg-yellow-500 md:px-5 md:py-2 lg:px-6 xs:py-2 lg:py-2 xl:px-8 xl:text-base"
-                calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"
+                calendarUrl={VA_CONSULTATION_CALENDAR_URL}
                 buttonIcon={null}
                 dialogTitle="Schedule a Custom Request Discussion"
                 dialogDescription="Choose a time to discuss your custom project needs."
@@ -162,7 +163,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
     <div className="mt-4 h-[70vh] min-h-card-h-md w-full bg-white dark:bg-gray-900">
       {showCalendar ? (
         <iframe
-          src="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"
+          src={VA_CONSULTATION_CALENDAR_URL}
           className="h-full w-full rounded-md border-0"
           title="Booking Calendar"
         />
@@ -209,7 +210,7 @@ export default function VirtualAssistantProjects() {
         <div className="mt-8 flex items-center justify-center md:mt-12 lg:mt-16 xl:mt-20">
           <AppointmentDialog
             buttonVariant="black"
-            calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"
+            calendarUrl={VA_CONSULTATION_CALENDAR_URL}
           />
         </div>
       </div>

@@ -3,6 +3,7 @@
 import React from "react";
 import AppointmentDialog from "./Appointment";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface CTAProps {
   heading?: string;
@@ -53,7 +54,7 @@ const DiscoveryBanner: React.FC<CTAProps> = ({
             <div className="flex justify-center pt-4">
               <AppointmentDialog
                 buttonVariant="black"
-                calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"
+                calendarUrl={VA_CONSULTATION_CALENDAR_URL}
               />
             </div>
           </div>

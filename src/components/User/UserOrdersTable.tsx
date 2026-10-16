@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Truck } from "lucide-react";
+import { formatDateForDisplay } from "@/lib/utils/date-display";
 
 interface Order {
   id: string;
@@ -180,7 +181,7 @@ const ClientOrders: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
-                              {new Date(order.date).toLocaleDateString()}
+                              {formatDateForDisplay(order.date)}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {(() => {

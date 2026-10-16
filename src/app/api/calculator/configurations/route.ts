@@ -13,6 +13,7 @@ import {
   getActiveConfigurations,
   getConfiguration
 } from '@/lib/calculator/client-configurations';
+import { validateConfigKey } from '@/lib/calculator/new-client-configuration';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Calculator pricing changes affect every order — gate writes to admin roles
@@ -234,6 +235,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ?mode=create — the admin panel's "New client" flow. Creation must never
+    // silently overwrite an existing key, so this mode insists on a fresh key
+    // and inserts instead of upserting.
+    const isCreate = new URL(request.url).searchParams.get('mode') === 'create';
+
     const body = await request.json();
     const config: ClientDeliveryConfiguration = body;
 
@@ -246,7 +252,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch previous config for audit logging
+    if (isCreate) {
+      const keyError = validateConfigKey(config.id);
+      if (keyError) {
+        return NextResponse.json(
+          { error: 'Invalid configuration key', details: [keyError] },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Fetch previous config for audit logging (and, in create mode, to refuse
+    // duplicates — there the lookup is load-bearing, so its failure propagates).
     let previousConfig: ClientDeliveryConfiguration | null = null;
     try {
       const existingRecord = await prisma.deliveryConfiguration.findUnique({
@@ -255,18 +272,31 @@ export async function POST(request: NextRequest) {
       if (existingRecord) {
         previousConfig = dbToConfig(existingRecord);
       }
-    } catch {
-      // Non-critical: proceed without previous config
+    } catch (lookupError) {
+      if (isCreate) throw lookupError;
+      // Non-critical for updates: proceed without previous config
+    }
+
+    if (isCreate && (previousConfig || getConfiguration(config.id))) {
+      return NextResponse.json(
+        {
+          error: `A configuration with key "${config.id}" already exists`,
+          configId: config.id,
+        },
+        { status: 409 }
+      );
     }
 
     // Save to database
     const dbData = configToDb(config, auth.userId);
 
-    const savedConfig = await prisma.deliveryConfiguration.upsert({
-      where: { configId: config.id },
-      update: dbData,
-      create: dbData
-    });
+    const savedConfig = isCreate
+      ? await prisma.deliveryConfiguration.create({ data: dbData })
+      : await prisma.deliveryConfiguration.upsert({
+          where: { configId: config.id },
+          update: dbData,
+          create: dbData
+        });
 
     // Audit logging
     const changes = computeConfigChanges(previousConfig, config);
@@ -294,12 +324,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: dbToConfig(savedConfig),
-      message: 'Configuration saved successfully'
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: dbToConfig(savedConfig),
+        message: isCreate
+          ? 'Configuration created successfully'
+          : 'Configuration saved successfully'
+      },
+      { status: isCreate ? 201 : 200 }
+    );
   } catch (error) {
+    // Two admins creating the same key at once: the unique index wins the race.
+    if ((error as { code?: string } | null)?.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A configuration with this key already exists' },
+        { status: 409 }
+      );
+    }
+
     Sentry.captureException(error, {
       tags: { operation: 'calculator-configurations-post' },
     });

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   Hourglass,
   MapPin,
@@ -310,6 +311,49 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     void fetchOrder();
     void fetchPendingReturn();
   }, [fetchOrder, fetchPendingReturn]);
+
+  // Proof-of-delivery photo for a completed delivery. The fileUrl stored on
+  // the order is a public URL into the private delivery-proofs bucket (it
+  // 404s), so read the signed URL from the files route, which signs POD
+  // paths against the right bucket (#506). Non-fatal: no photo, no card.
+  const isCompleted =
+    !!order &&
+    resolveDriverStatus(order.driverStatus).status === DriverStatus.COMPLETED;
+  const [podPhotoUrl, setPodPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isCompleted || !orderNumber) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = await getValidSession();
+        const res = await fetch(
+          `/api/orders/${encodeURIComponent(orderNumber)}/files`,
+          {
+            credentials: "include",
+            headers: session
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+          },
+        );
+        if (!res.ok) return;
+        const files = (await res.json()) as unknown;
+        if (!Array.isArray(files)) return;
+        const pod = files.find(
+          (f: { category?: unknown; fileUrl?: unknown }) =>
+            typeof f?.category === "string" &&
+            f.category.toLowerCase() === "proof_of_delivery" &&
+            typeof f.fileUrl === "string" &&
+            f.fileUrl.length > 0,
+        ) as { fileUrl: string } | undefined;
+        if (!cancelled && pod) setPodPhotoUrl(pod.fileUrl);
+      } catch {
+        /* best-effort — the card simply stays hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCompleted, orderNumber, getValidSession]);
 
   /** PATCH driverStatus (and order status on COMPLETED), then refresh. */
   const advanceStatus = useCallback(
@@ -732,6 +776,23 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           </div>
         ) : null}
       </DriverCard>
+
+      {isCompleted && podPhotoUrl ? (
+        <DriverCard className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Camera className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
+              Proof of delivery
+            </span>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL; next/image would need a remote pattern per signed host */}
+          <img
+            src={podPhotoUrl}
+            alt="Proof of delivery photo"
+            className="max-h-80 w-full rounded-xl object-contain"
+          />
+        </DriverCard>
+      ) : null}
 
       {/* Sticky action bar */}
       <div

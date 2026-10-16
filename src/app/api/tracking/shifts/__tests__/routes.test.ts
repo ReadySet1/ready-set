@@ -108,7 +108,22 @@ describe('GET /api/tracking/shifts/active', () => {
     const res = await activeGET(new NextRequest('http://localhost/api/tracking/shifts/active?driverId=d-1'));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data).toEqual({ success: true, shift: { id: 'shift-1', status: 'active' } });
+    expect(data).toEqual({
+      success: true,
+      shift: { id: 'shift-1', status: 'active' },
+      serverNow: expect.any(Number),
+    });
     expect(mockActive).toHaveBeenCalledWith('d-1');
+  });
+
+  // Lets the driver app correct a wrong phone clock for the shift timer.
+  it('reports the server clock as epoch ms', async () => {
+    mockActive.mockResolvedValue(null);
+    const before = Date.now();
+    const res = await activeGET(new NextRequest('http://localhost/api/tracking/shifts/active?driverId=d-1'));
+    const after = Date.now();
+    const data = await res.json();
+    expect(data.serverNow).toBeGreaterThanOrEqual(before);
+    expect(data.serverNow).toBeLessThanOrEqual(after);
   });
 });

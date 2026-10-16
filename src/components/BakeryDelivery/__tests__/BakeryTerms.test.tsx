@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import BakeryTerms from "../BakeryTerms";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 // Mock dependencies
 jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
@@ -355,7 +356,7 @@ describe("BakeryTerms", () => {
       const bookButton = screen.getByText("Book a Call");
       expect(bookButton).toHaveAttribute(
         "data-calendar-url",
-        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true",
+        BOOKING_CALENDAR_URL,
       );
     });
 

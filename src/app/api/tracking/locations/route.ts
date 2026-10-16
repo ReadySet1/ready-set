@@ -6,6 +6,7 @@ import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
+import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 
 interface LocationUpdate {
   driver_id: string;
@@ -20,22 +21,9 @@ interface LocationUpdate {
   /** GPS fix time (ISO string) — offline-replayed points carry the original
    *  capture time instead of the replay time. */
   timestamp?: string;
-}
-
-// Sanity bounds for a client-supplied fix time: small clock skew forward,
-// up to a day of offline queueing backward. Anything outside → NOW().
-const RECORDED_AT_MAX_FUTURE_MS = 2 * 60 * 1000;
-const RECORDED_AT_MAX_PAST_MS = 24 * 60 * 60 * 1000;
-
-/** Returns the client fix time as an ISO string when plausible, else null. */
-function resolveRecordedAt(timestamp: unknown): string | null {
-  if (typeof timestamp !== 'string' && typeof timestamp !== 'number') return null;
-  const ms = new Date(timestamp).getTime();
-  if (!Number.isFinite(ms)) return null;
-  const now = Date.now();
-  if (ms > now + RECORDED_AT_MAX_FUTURE_MS) return null;
-  if (ms < now - RECORDED_AT_MAX_PAST_MS) return null;
-  return new Date(ms).toISOString();
+  /** Device clock (epoch ms) at send time — lets the server measure and
+   *  correct a skewed phone clock. Absent on older clients. */
+  client_sent_at?: number;
 }
 
 // POST - Record driver location
@@ -82,10 +70,28 @@ export async function POST(request: NextRequest) {
       altitude,
       battery_level,
       is_moving,
-      timestamp
+      timestamp,
+      client_sent_at,
     }: LocationUpdate = body;
 
-    const recordedAt = resolveRecordedAt(timestamp);
+    const { recordedAt, clockOffsetMs, clockCorrected } = resolveRecordedAt({
+      timestamp,
+      clientSentAt: client_sent_at,
+      serverNowMs: Date.now(),
+    });
+    if (clockCorrected) {
+      // One structured line per skewed request so wrong phone clocks are
+      // visible in the logs (grep the event name).
+      console.warn(
+        JSON.stringify({
+          event: 'tracking.device_clock_skew',
+          driverId: driver_id,
+          authUserId: auth.context.user.id,
+          offsetMs: clockOffsetMs,
+          hasFixTime: timestamp != null,
+        }),
+      );
+    }
     // 0-100 integer or null; invalid values degrade to null, never a 400.
     const batteryLevel = BatteryLevelSchema.parse(battery_level);
 

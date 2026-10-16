@@ -20,10 +20,12 @@ export const CountiesSelection = ({ register, errors }: CountiesSelectionProps) 
 
   const texasCounties = ["Dallas", "Travis"];
 
+  const georgiaCounties = ["Fulton"];
+
   return (
     <div className="space-y-4">
       <h3 className="font-medium">Counties Serviced</h3>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <div>
           <h4 className="font-medium">California</h4>
           <div className="space-y-2">
@@ -46,6 +48,21 @@ export const CountiesSelection = ({ register, errors }: CountiesSelectionProps) 
               <label key={county} className="flex items-center space-x-2">
                 <input 
                   type="checkbox" 
+                  value={county}
+                  {...register('counties')}
+                />
+                <span>{county}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="font-medium">Georgia</h4>
+          <div className="space-y-2">
+            {georgiaCounties.map((county) => (
+              <label key={county} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
                   value={county}
                   {...register('counties')}
                 />

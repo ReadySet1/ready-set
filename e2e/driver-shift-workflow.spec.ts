@@ -16,9 +16,10 @@
  */
 
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { authStatePath, hasAuthState, missingAuthReason } from './fixtures/auth-state';
 
 // Reuse the driver session created by e2e/auth/setup.ts
-test.use({ storageState: 'e2e/.auth/driver.json' });
+test.use({ storageState: authStatePath('driver') });
 
 // Every test here drives the same shared driver account's shift, so run them
 // in order in one worker. 'default' (not 'serial') keeps later tests running
@@ -35,24 +36,27 @@ const TEST_TIMEOUT_MS = 90_000;
 // start or end moments later.
 const SHIFT_ACTION_TIMEOUT_MS = 30_000;
 
+// Skip only when no driver credentials were configured. With credentials, a
+// redirect to sign-in is a real failure (openTrackingPage asserts the URL).
 test.beforeEach(() => {
+  test.skip(!hasAuthState('driver'), missingAuthReason('driver'));
   test.setTimeout(TEST_TIMEOUT_MS);
 });
 
 // This spec drives the SHARED driver account. Never leave its shift open:
 // an open shift blocks other specs and field testers using the same login.
 test.afterAll(async ({ browser }, testInfo) => {
+  if (!hasAuthState('driver')) return;
   test.setTimeout(TEST_TIMEOUT_MS);
   const context = await browser.newContext({
     baseURL: testInfo.project.use.baseURL,
-    storageState: 'e2e/.auth/driver.json',
+    storageState: authStatePath('driver'),
     permissions: ['geolocation'],
     geolocation: TEST_LOCATIONS.start,
   });
   try {
     const page = await context.newPage();
     await openTrackingPage(page);
-    if (await checkAuthRequired(page)) return;
 
     const endShiftButton = page.getByRole('button', { name: /end shift/i });
     if ((await endShiftButton.count()) === 0) return;
@@ -123,20 +127,40 @@ async function openTrackingPage(page: Page) {
     .waitForResponse((res) => res.url().includes('/api/tracking/shifts/active'), {
       timeout: 30000,
     })
-    .catch(() => null); // e.g. redirected to sign-in; checkAuthRequired handles it
+    .catch(() => null); // a redirect to sign-in fails the URL assertion below
   await page.goto('/driver/tracking');
+  await expect(page, 'driver session was rejected (redirected away)').toHaveURL(/\/driver\/tracking/);
   await activeShiftLoaded;
   await waitForPageReady(page);
 }
 
 /**
- * Helper to check if driver authentication is required
+ * Make sure the shared driver has an active shift, starting one if needed.
+ *
+ * Tests that need a shift must not rely on an earlier test having started it:
+ * when a test fails, Playwright tears the worker down, the file's afterAll ends
+ * the shift, and the retry and every later test start with no shift.
  */
-async function checkAuthRequired(page: Page): Promise<boolean> {
-  // Unauthenticated access to a protected route redirects to the sign-in page.
-  if (/\/sign-in|\/login/.test(page.url())) return true;
-  const signInLink = page.getByRole('link', { name: /sign in|log ?in/i });
-  return (await signInLink.count()) > 0;
+async function ensureShiftActive(page: Page) {
+  const endShift = page.getByRole('button', { name: /end shift/i });
+  if ((await endShift.count()) === 0) {
+    await page.getByRole('button', { name: /start shift/i }).click();
+  }
+  await expect(endShift).toBeVisible({ timeout: SHIFT_ACTION_TIMEOUT_MS });
+}
+
+/**
+ * Resolves on the first location POST, which the portal sends only once its
+ * position watch is armed during a shift (useLocationTracking: startTracking ->
+ * watchPosition -> handlePositionUpdate -> /api/tracking/locations).
+ * Register it BEFORE the navigation or Start-shift click that arms the watch.
+ */
+function waitForLocationPing(page: Page) {
+  return page.waitForRequest(
+    (req) => req.method() === 'POST' && new URL(req.url()).pathname === '/api/tracking/locations',
+    // Covers opening the page (up to ~30s) plus a Start-shift round-trip.
+    { timeout: 2 * SHIFT_ACTION_TIMEOUT_MS }
+  );
 }
 
 test.describe('Driver Shift Workflow', () => {
@@ -149,12 +173,6 @@ test.describe('Driver Shift Workflow', () => {
       // Navigate to driver tracking page
       await openTrackingPage(page);
 
-      // Check if auth is required - skip if so (auth setup needed)
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required - ensure driver auth fixture is set up');
-        return;
-      }
-
       // Verify we're on the tracking page
       await expect(page).toHaveURL(/\/driver\/tracking/);
     });
@@ -165,11 +183,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // The redesigned portal no longer prints raw lat/lng. Location acquisition
       // is reflected by (a) the HealthBar GPS chip showing a "<n>m" accuracy
@@ -193,11 +206,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       // Look for Start Shift button
       const startShiftButton = page.getByRole('button', { name: /start shift/i });
 
@@ -215,11 +223,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       const startShiftButton = page.getByRole('button', { name: /start shift/i });
 
@@ -248,11 +251,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // Active shift is signalled by the "On shift" label / "End shift" button.
       // waitForPageReady already waited for the portal to settle, so the shift
@@ -290,11 +288,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       // Look for accuracy indicator (shows meters like "10m" or "Accuracy: 10m")
       await expect(async () => {
         const pageContent = await page.content();
@@ -309,11 +302,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // Look for tracking status indicators
       const trackingIndicators = [
@@ -338,19 +326,15 @@ test.describe('Driver Shift Workflow', () => {
       await context.grantPermissions(['geolocation']);
       await setGeolocation(context, TEST_LOCATIONS.start);
 
+      // The portal only watches position during a shift. Before the watch is
+      // armed it shows a one-shot fix, and a watch armed right after that fix
+      // gets the cached position back (maximumAge), so a location change made
+      // in between is never seen. That race was this test's flake: wait for
+      // the first location ping, which proves the watch is running.
+      const watchArmed = waitForLocationPing(page);
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
-      // The portal only watches position during a shift; before one it reads
-      // the location once, so there is nothing to update.
-      if ((await page.getByRole('button', { name: /end shift/i }).count()) === 0) {
-        test.skip(true, 'Location updates stream only during an active shift');
-        return;
-      }
+      await ensureShiftActive(page);
+      await watchArmed;
 
       // The HealthBar GPS chip shows the fix accuracy in feet, so a new fix
       // with a different accuracy is visible there.
@@ -369,11 +353,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // Look for online/offline status indicator
       const statusIndicators = [
@@ -402,11 +381,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       // Look for deliveries section - may or may not have active deliveries
       const deliverySectionIndicators = [
         page.locator('text=Active Deliveries'),
@@ -424,11 +398,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // Look for delivery action buttons
       const deliveryButtons = [
@@ -458,11 +427,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       const enRouteButton = page.getByRole('button', { name: /en route/i }).first();
 
       if ((await enRouteButton.count()) === 0) {
@@ -487,11 +451,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       const arrivedButton = page.getByRole('button', { name: /arrived/i }).first();
 
       if ((await arrivedButton.count()) === 0) {
@@ -510,11 +469,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.arrival);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       const completeButton = page.getByRole('button', { name: /complete.*delivery/i }).first();
 
@@ -542,11 +496,6 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       // Either End Shift button exists (active shift) or Start Shift button exists (no active shift)
       const endShiftButton = page.getByRole('button', { name: /end shift/i });
       const startShiftButton = page.getByRole('button', { name: /start shift/i });
@@ -563,19 +512,8 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
-      const endShiftButton = page.getByRole('button', { name: /end shift/i });
-
-      if ((await endShiftButton.count()) === 0) {
-        test.skip(true, 'No active shift to end');
-        return;
-      }
-
-      await endShiftButton.click();
+      await ensureShiftActive(page);
+      await page.getByRole('button', { name: /end shift/i }).click();
 
       // Ending a shift returns to the pre-shift view ("Start shift" / "Request
       // location permission"). Poll instead of a fixed wait.
@@ -593,17 +531,9 @@ test.describe('Driver Shift Workflow', () => {
 
       await openTrackingPage(page);
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
-      // Only check if shift is active
-      const endShiftButton = page.getByRole('button', { name: /end shift/i });
-      if ((await endShiftButton.count()) === 0) {
-        test.skip(true, 'No active shift - statistics only visible during shift');
-        return;
-      }
+      // Statistics only render during a shift; start one rather than depend on
+      // test order (the file-level afterAll ends it).
+      await ensureShiftActive(page);
 
       // The redesigned portal surfaces live shift stats via the ShiftPill:
       // an "On shift" label plus a running duration ("M:SS" / "H:MM:SS"), and
@@ -639,11 +569,6 @@ test.describe('Driver Shift Workflow', () => {
         .waitFor({ state: 'visible', timeout: 15000 })
         .catch(() => {});
 
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
-
       // The page should handle missing location gracefully
       // Either show an error message or prompt to enable location
       const errorIndicators = [
@@ -662,11 +587,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // Simulate offline mode
       await context.setOffline(true);
@@ -691,11 +611,6 @@ test.describe('Driver Shift Workflow', () => {
       await setGeolocation(context, TEST_LOCATIONS.start);
 
       await openTrackingPage(page);
-
-      if (await checkAuthRequired(page)) {
-        test.skip(true, 'Driver authentication required');
-        return;
-      }
 
       // The portal only mounts the map during an active shift. Earlier tests in
       // this file end the shift, so start one here instead of relying on order;
@@ -725,11 +640,6 @@ test.describe('Full Shift Workflow Integration', () => {
 
     // Step 1: Navigate to driver tracking page
     await openTrackingPage(page);
-
-    if (await checkAuthRequired(page)) {
-      test.skip(true, 'Driver authentication required for full workflow test');
-      return;
-    }
 
     // Step 2: Start shift if not already active
     const startShiftButton = page.getByRole('button', { name: /start shift/i });

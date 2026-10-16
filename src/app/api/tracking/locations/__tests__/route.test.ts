@@ -367,16 +367,85 @@ describe("/api/tracking/locations", () => {
         expect(recordedAtParam()).toBe(ts);
       });
 
-      it("falls back to NOW() when the timestamp is too far in the future", async () => {
-        const ts = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-        const response = await POST(
-          createPostRequest("http://localhost:3000/api/tracking/locations", {
-            ...mockLocationData,
-            timestamp: ts,
-          }),
-        );
-        expect(response.status).toBe(201);
-        expect(recordedAtParam()).toBeNull();
+      it("clamps a future timestamp to server now", async () => {
+        const serverNow = Date.parse("2026-10-06T18:00:00.000Z");
+        const nowSpy = jest.spyOn(Date, "now").mockReturnValue(serverNow);
+        try {
+          const ts = new Date(serverNow + 10 * 60 * 1000).toISOString();
+          const response = await POST(
+            createPostRequest("http://localhost:3000/api/tracking/locations", {
+              ...mockLocationData,
+              timestamp: ts,
+            }),
+          );
+          expect(response.status).toBe(201);
+          expect(recordedAtParam()).toBe(new Date(serverNow).toISOString());
+        } finally {
+          nowSpy.mockRestore();
+        }
+      });
+
+      describe("device clock skew (client_sent_at)", () => {
+        const serverNow = Date.parse("2026-10-06T18:00:00.000Z");
+        let nowSpy: jest.SpyInstance;
+        let warnSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+          nowSpy = jest.spyOn(Date, "now").mockReturnValue(serverNow);
+          warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+        });
+        afterEach(() => {
+          nowSpy.mockRestore();
+          warnSpy.mockRestore();
+        });
+
+        it("stores the fix time corrected by the device clock offset", async () => {
+          // The 2026-10-06 Android tester: phone clock 3,648 s behind.
+          const deviceNow = serverNow - 3_648_000;
+          const response = await POST(
+            createPostRequest("http://localhost:3000/api/tracking/locations", {
+              ...mockLocationData,
+              timestamp: new Date(deviceNow - 2_000).toISOString(),
+              client_sent_at: deviceNow,
+            }),
+          );
+          expect(response.status).toBe(201);
+          expect(recordedAtParam()).toBe(new Date(serverNow - 2_000).toISOString());
+        });
+
+        it("logs one structured line with the detected offset", async () => {
+          const deviceNow = serverNow - 3_648_000;
+          await POST(
+            createPostRequest("http://localhost:3000/api/tracking/locations", {
+              ...mockLocationData,
+              timestamp: new Date(deviceNow - 2_000).toISOString(),
+              client_sent_at: deviceNow,
+            }),
+          );
+          const skewLines = warnSpy.mock.calls.filter(
+            ([line]) => typeof line === "string" && line.includes("tracking.device_clock_skew"),
+          );
+          expect(skewLines).toHaveLength(1);
+          const entry = JSON.parse(skewLines[0]![0] as string);
+          expect(entry).toMatchObject({
+            event: "tracking.device_clock_skew",
+            driverId: mockDriverId,
+            offsetMs: 3_648_000,
+          });
+        });
+
+        it("does not correct or log within the tolerance", async () => {
+          const ts = new Date(serverNow - 60_000).toISOString();
+          await POST(
+            createPostRequest("http://localhost:3000/api/tracking/locations", {
+              ...mockLocationData,
+              timestamp: ts,
+              client_sent_at: serverNow - 400,
+            }),
+          );
+          expect(recordedAtParam()).toBe(ts);
+          expect(warnSpy).not.toHaveBeenCalled();
+        });
       });
 
       it("falls back to NOW() when the timestamp is older than 24 hours", async () => {

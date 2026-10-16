@@ -6,6 +6,7 @@ import ServiceFeaturesSection from "@/components/ui/ServiceFeaturesSection";
 import ScheduleDialog from "./Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 const LogisticsPage: React.FC = () => {
   const { openForm, DialogForm } = FormManager();
@@ -52,7 +53,7 @@ const LogisticsPage: React.FC = () => {
         customSecondaryButton={
           <ScheduleDialog
             buttonText="Schedule a Call"
-            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+            calendarUrl={BOOKING_CALENDAR_URL}
             className="rounded-lg border border-gray-200 bg-white px-6 py-3 font-medium text-gray-900 transition-colors hover:bg-gray-50"
           />
         }

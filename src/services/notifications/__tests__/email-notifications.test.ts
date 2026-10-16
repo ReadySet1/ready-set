@@ -28,7 +28,7 @@ describe("sendDeliveryStatusEmail", () => {
     driverName: "Driver One",
     estimatedArrival: "2025-01-01T10:00:00.000Z",
     deliveryAddress: "123 Main St, City, ST 12345",
-    trackingLink: "https://test.readysetllc.com/orders/ORD-123",
+    trackingLink: "https://test.readysetllc.com/order-status/ORD-123",
     supportLink: "https://test.readysetllc.com/contact",
     unsubscribeLink: "https://test.readysetllc.com/account/preferences?tab=notifications",
   };

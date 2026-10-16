@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useLocationTracking } from '../useLocationTracking';
+import { useLocationTracking, DRIVER_ID_LOOKUP_TIMEOUT_MS } from '../useLocationTracking';
 
 // The hook no longer uses the updateDriverLocation Server Action; it POSTs each
 // location to the /api/tracking/locations route. Location sync is therefore
@@ -394,6 +394,30 @@ describe('useLocationTracking', () => {
       expect(body.timestamp).toBe(new Date(mockPosition.timestamp).toISOString());
     });
 
+    it('includes the device send time (client_sent_at) in the POST body', async () => {
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        result.current.startTracking();
+      });
+
+      const before = Date.now();
+      await act(async () => {
+        mockWatchCallback(mockPosition);
+      });
+
+      await waitFor(() => {
+        expect(locationPostCalls().length).toBeGreaterThan(0);
+      });
+
+      // Epoch ms from the device clock at send time — the server compares it
+      // with its own clock to correct a skewed phone's fix times.
+      const body = JSON.parse(locationPostCalls().pop()![1].body);
+      expect(typeof body.client_sent_at).toBe('number');
+      expect(body.client_sent_at).toBeGreaterThanOrEqual(before);
+      expect(body.client_sent_at).toBeLessThanOrEqual(Date.now());
+    });
+
     it('should trigger offline sync when starting tracking', async () => {
       const { result } = renderHook(() => useLocationTracking());
 
@@ -723,8 +747,14 @@ describe('useLocationTracking', () => {
       expect(body.driver_id).toBe(mockDriverId);
       expect(body.latitude).toBe(unsyncedLocation.coordinates.lat);
       expect(body.longitude).toBe(unsyncedLocation.coordinates.lng);
-      // Replayed points carry their ORIGINAL fix time, not the replay time.
+      // Replayed points carry their ORIGINAL fix time, not the replay time...
       expect(body.timestamp).toBe(unsyncedLocation.timestamp);
+      // ...but client_sent_at is the REPLAY time, so the server measures the
+      // device clock offset at flush time and corrects the old fix with it.
+      expect(typeof body.client_sent_at).toBe('number');
+      expect(body.client_sent_at).toBeGreaterThanOrEqual(
+        Date.parse(unsyncedLocation.timestamp),
+      );
       expect(mockLocationStore.markAsSynced).toHaveBeenCalledWith('loc-1');
     });
 
@@ -1205,7 +1235,7 @@ describe('useLocationTracking', () => {
       renderHook(() => useLocationTracking());
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/auth/session');
+        expect(global.fetch).toHaveBeenCalledWith('/api/auth/session', expect.anything());
       });
     });
 
@@ -1247,6 +1277,50 @@ describe('useLocationTracking', () => {
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();
       });
+    });
+  });
+
+  describe('permission request never strands the spinner (2026-10 iPhone X)', () => {
+    it('clears isRequestingPermission when the driver-id lookup hangs', async () => {
+      sessionResponse = () => new Promise(() => undefined) as unknown as FetchResult;
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.requestLocationPermission();
+      });
+      expect(result.current.isRequestingPermission).toBe(true);
+
+      let granted: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(DRIVER_ID_LOOKUP_TIMEOUT_MS);
+        granted = await pending;
+      });
+
+      expect(granted).toBe(true);
+      expect(result.current.isRequestingPermission).toBe(false);
+    });
+
+    it('clears isRequestingPermission when the native permission check throws', async () => {
+      mockNativeShell.isNative = true;
+      // Only the tap-driven check (explain: true) fails; the mount check answers.
+      mockCheckNativeLocationPermission.mockImplementation((opts?: { explain?: boolean }) =>
+        opts?.explain ? Promise.reject(new Error('bridge gone')) : Promise.resolve('granted'),
+      );
+
+      try {
+        const { result } = renderHook(() => useLocationTracking());
+
+        await act(async () => {
+          await result.current.requestLocationPermission().catch(() => false);
+        });
+
+        expect(result.current.isRequestingPermission).toBe(false);
+      } finally {
+        mockNativeShell.isNative = false;
+        mockCheckNativeLocationPermission.mockReset();
+      }
     });
   });
 

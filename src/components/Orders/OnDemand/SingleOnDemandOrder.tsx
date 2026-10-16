@@ -44,6 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
+import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
 import { UserType } from "@/types/client-enums";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 
@@ -1166,7 +1167,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                       </div>
                       <div className="text-xs text-slate-500">
                         {order.createdAt
-                          ? new Date(order.createdAt).toLocaleString()
+                          ? new Date(order.createdAt).toLocaleString(undefined, {
+                              timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                            })
                           : "N/A"}
                       </div>
                     </div>
@@ -1179,7 +1182,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                           Scheduled Pickup
                         </div>
                         <div className="text-xs text-slate-500">
-                          {new Date(order.pickupDateTime).toLocaleString()}
+                          {new Date(order.pickupDateTime).toLocaleString(undefined, {
+                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                          })}
                         </div>
                       </div>
                     </div>
@@ -1192,7 +1197,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                           Driver Arrived
                         </div>
                         <div className="text-xs text-slate-500">
-                          {new Date(order.arrivalDateTime).toLocaleString()}
+                          {new Date(order.arrivalDateTime).toLocaleString(undefined, {
+                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                          })}
                         </div>
                       </div>
                     </div>
@@ -1205,7 +1212,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                           Order Completed
                         </div>
                         <div className="text-xs text-slate-500">
-                          {new Date(order.completeDateTime).toLocaleString()}
+                          {new Date(order.completeDateTime).toLocaleString(undefined, {
+                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                          })}
                         </div>
                       </div>
                     </div>
