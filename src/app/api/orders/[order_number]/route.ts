@@ -39,7 +39,13 @@ import {
   resolveOpenShiftIdForUser,
 } from '@/services/tracking/active-shift';
 import { requiresActiveShift } from '@/lib/state-machine/driver-state';
-import { hasUploadInCategory, requiredPhotoForTransition } from '@/lib/driver/stage-photos';
+import {
+  RECIPIENT_REQUIRED_CODE,
+  RECIPIENT_REQUIRED_MESSAGE,
+  hasRecipientConfirmation,
+  hasUploadInCategory,
+  requiredPhotoForTransition,
+} from '@/lib/driver/stage-photos';
 import {
   recordDriverStatusTransition,
   shouldRecordDriverHistory,
@@ -279,6 +285,7 @@ export async function GET(
             enRouteAt: true,
             arrivedAtClientAt: true,
             deliveredAt: true,
+            deliveryReceivedBy: true,
           },
         });
 
@@ -293,6 +300,9 @@ export async function GET(
             arrivedAtClientAt: toISO(delivery.arrivedAtClientAt),
             deliveredAt: toISO(delivery.deliveredAt),
           };
+          // Completion recipient (signature-refused fallback) for the
+          // completed-order views.
+          serializedOrder.deliveryReceivedBy = delivery.deliveryReceivedBy ?? null;
         }
       } catch (deliveryError) {
         console.warn('Failed to fetch delivery timestamps:', deliveryError);
@@ -672,6 +682,41 @@ export async function PATCH(
             message:
               'Record who handed over the order (name) or capture a signature before marking picked up',
             code: 'PICKUP_CONFIRMATION_REQUIRED',
+          },
+          { status: 422 },
+        );
+      }
+    }
+
+    // Recipient confirmation at completion (Gary, 2026-06-01 / 06-22): the
+    // setup photo (checked above) AND the recipient's signature or — when they
+    // refuse to sign — their name. Written by POST .../recipient; checked after
+    // the photo so the client opens the photo sheet first. Admin/helpdesk are
+    // exempt so they can repair stuck orders.
+    if (
+      driverStatus === DriverStatus.COMPLETED &&
+      currentDriverStatus !== DriverStatus.COMPLETED &&
+      !callerIsPrivileged
+    ) {
+      const files = (existingOrder as any).fileUploads;
+      let confirmed = hasRecipientConfirmation({ files });
+      if (!confirmed) {
+        const deliveryRow = await prisma.delivery.findUnique({
+          where: { orderNumber: (existingOrder as any).orderNumber },
+          select: { deliveryReceivedBy: true, deliverySignatureUrl: true },
+        });
+        confirmed = hasRecipientConfirmation({
+          files,
+          deliveryReceivedBy: deliveryRow?.deliveryReceivedBy,
+          deliverySignatureUrl: deliveryRow?.deliverySignatureUrl,
+        });
+      }
+      if (!confirmed) {
+        return NextResponse.json(
+          {
+            error: RECIPIENT_REQUIRED_CODE,
+            code: RECIPIENT_REQUIRED_CODE,
+            message: RECIPIENT_REQUIRED_MESSAGE,
           },
           { status: 422 },
         );
@@ -1104,6 +1149,7 @@ export async function PATCH(
             enRouteAt: true,
             arrivedAtClientAt: true,
             deliveredAt: true,
+            deliveryReceivedBy: true,
           },
         });
         if (delivery) {
@@ -1117,6 +1163,9 @@ export async function PATCH(
             arrivedAtClientAt: toISO(delivery.arrivedAtClientAt),
             deliveredAt: toISO(delivery.deliveredAt),
           };
+          // Completion recipient (signature-refused fallback) for the
+          // completed-order views.
+          serializedOrder.deliveryReceivedBy = delivery.deliveryReceivedBy ?? null;
         }
       } catch (deliveryErr) {
         console.warn('Failed to fetch delivery timestamps after update:', deliveryErr);

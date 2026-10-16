@@ -16,6 +16,32 @@ import { DriverStatus } from '@/types/user';
 export const PICKUP_PHOTO_CATEGORY = 'pickup_photo';
 /** `file_uploads.category` written by POST /api/orders/[order_number]/pod. */
 export const DELIVERY_PHOTO_CATEGORY = 'proof_of_delivery';
+/** `file_uploads.category` written by POST /api/orders/[order_number]/recipient
+ *  when the recipient signs at completion. */
+export const DELIVERY_SIGNATURE_CATEGORY = 'delivery_signature';
+
+/**
+ * Recipient confirmation at completion (same decision): besides the setup
+ * photo, COMPLETED requires the recipient's signature OR — when they refuse to
+ * sign — their name. Satisfied by a 'delivery_signature' upload, the mirrored
+ * `deliveries.delivery_signature_url`, or a non-blank
+ * `deliveries.delivery_received_by`.
+ */
+export const RECIPIENT_REQUIRED_CODE = 'RECIPIENT_REQUIRED';
+export const RECIPIENT_REQUIRED_MESSAGE =
+  "Get the recipient's signature, or their name if they refuse to sign, before completing the delivery.";
+
+export function hasRecipientConfirmation(input: {
+  files?: ReadonlyArray<{ category?: string | null } | null | undefined> | null;
+  deliveryReceivedBy?: string | null;
+  deliverySignatureUrl?: string | null;
+}): boolean {
+  return (
+    hasUploadInCategory(input.files, DELIVERY_SIGNATURE_CATEGORY) ||
+    !!input.deliverySignatureUrl?.trim() ||
+    !!input.deliveryReceivedBy?.trim()
+  );
+}
 
 export type StagePhotoCode = 'PICKUP_PHOTO_REQUIRED' | 'POD_REQUIRED';
 

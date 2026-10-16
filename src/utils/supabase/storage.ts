@@ -149,7 +149,10 @@ export async function uploadPODImage(
  */
 export async function uploadPickupSignatureImage(
   file: File | Blob,
-  orderId: string
+  orderId: string,
+  // 'delivery' = the recipient's signature at completion (POST .../recipient);
+  // same bucket + rules, distinct filename prefix.
+  options: { stage?: 'pickup' | 'delivery' } = {}
 ): Promise<{ url: string; path?: string; error?: string }> {
   try {
     const supabase = await createClient();
@@ -168,7 +171,8 @@ export async function uploadPickupSignatureImage(
     }
 
     const timestamp = Date.now();
-    const filename = `deliveries/${orderId}/pickup-signature-${timestamp}.png`;
+    const prefix = options.stage === 'delivery' ? 'delivery-signature' : 'pickup-signature';
+    const filename = `deliveries/${orderId}/${prefix}-${timestamp}.png`;
 
     const { data, error } = await supabase.storage
       .from(POD_BUCKET_NAME)
