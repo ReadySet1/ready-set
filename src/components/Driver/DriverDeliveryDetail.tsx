@@ -44,6 +44,7 @@ import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
   DELIVERY_PHOTO_CATEGORY,
   PICKUP_PHOTO_CATEGORY,
+  POD_MAX_PHOTOS,
   RECIPIENT_REQUIRED_CODE,
   hasRecipientConfirmation,
   hasUploadInCategory,
@@ -336,14 +337,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     void fetchPendingReturn();
   }, [fetchOrder, fetchPendingReturn]);
 
-  // Proof-of-delivery photo for a completed delivery. The fileUrl stored on
-  // the order is a public URL into the private delivery-proofs bucket (it
-  // 404s), so read the signed URL from the files route, which signs POD
-  // paths against the right bucket (#506). Non-fatal: no photo, no card.
+  // Proof-of-delivery photos (up to POD_MAX_PHOTOS) for a completed delivery.
+  // The fileUrl stored on the order is a public URL into the private
+  // delivery-proofs bucket (it 404s), so read the signed URLs from the files
+  // route, which signs POD paths against the right bucket (#506). Non-fatal:
+  // no photo, no card.
   const isCompleted =
     !!order &&
     resolveDriverStatus(order.driverStatus).status === DriverStatus.COMPLETED;
-  const [podPhotoUrl, setPodPhotoUrl] = useState<string | null>(null);
+  const [podPhotoUrls, setPodPhotoUrls] = useState<string[]>([]);
   useEffect(() => {
     if (!isCompleted || !orderNumber) return;
     let cancelled = false;
@@ -362,14 +364,24 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         if (!res.ok) return;
         const files = (await res.json()) as unknown;
         if (!Array.isArray(files)) return;
-        const pod = files.find(
-          (f: { category?: unknown; fileUrl?: unknown }) =>
-            typeof f?.category === "string" &&
-            f.category.toLowerCase() === "proof_of_delivery" &&
-            typeof f.fileUrl === "string" &&
-            f.fileUrl.length > 0,
-        ) as { fileUrl: string } | undefined;
-        if (!cancelled && pod) setPodPhotoUrl(pod.fileUrl);
+        const pods = (
+          files as Array<{ category?: unknown; fileUrl?: unknown; uploadedAt?: unknown }>
+        )
+          .filter(
+            (f) =>
+              typeof f?.category === "string" &&
+              f.category.toLowerCase() === DELIVERY_PHOTO_CATEGORY &&
+              typeof f.fileUrl === "string" &&
+              f.fileUrl.length > 0,
+          )
+          // The files route lists newest first; show photos in capture order.
+          .sort((a, b) => {
+            const at = typeof a.uploadedAt === "string" ? Date.parse(a.uploadedAt) : NaN;
+            const bt = typeof b.uploadedAt === "string" ? Date.parse(b.uploadedAt) : NaN;
+            return Number.isNaN(at) || Number.isNaN(bt) ? 0 : at - bt;
+          })
+          .map((f) => f.fileUrl as string);
+        if (!cancelled && pods.length > 0) setPodPhotoUrls(pods);
       } catch {
         /* best-effort — the card simply stays hidden */
       }
@@ -886,20 +898,46 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         ) : null}
       </DriverCard>
 
-      {isCompleted && podPhotoUrl ? (
+      {isCompleted && podPhotoUrls.length > 0 ? (
         <DriverCard className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Camera className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
               Proof of delivery
             </span>
+            {podPhotoUrls.length > 1 ? (
+              <span className="ml-auto text-[11px] font-semibold text-driver-subtle">
+                {podPhotoUrls.length} photos
+              </span>
+            ) : null}
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL; next/image would need a remote pattern per signed host */}
-          <img
-            src={podPhotoUrl}
-            alt="Proof of delivery photo"
-            className="max-h-80 w-full rounded-xl object-contain"
-          />
+          {podPhotoUrls.length === 1 ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL; next/image would need a remote pattern per signed host */
+            <img
+              src={podPhotoUrls[0]}
+              alt="Proof of delivery photo"
+              className="max-h-80 w-full rounded-xl object-contain"
+            />
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {podPhotoUrls.map((url, index) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block aspect-square overflow-hidden rounded-xl bg-driver-surface-alt"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL */}
+                  <img
+                    src={url}
+                    alt={`Proof of delivery photo ${index + 1} of ${podPhotoUrls.length}`}
+                    className="h-full w-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
         </DriverCard>
       ) : null}
 
@@ -993,6 +1031,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           deliveryId={order.id}
           orderNumber={order.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
+          maxPhotos={POD_MAX_PHOTOS}
           onComplete={onPodComplete}
         />
       ) : null}

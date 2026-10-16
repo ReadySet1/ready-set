@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestUser } from '@/utils/supabase/request-user';
 import { prisma } from '@/utils/prismaDB';
-import { uploadPODImage } from '@/utils/supabase/storage';
+import { deletePODImage, uploadPODImage } from '@/utils/supabase/storage';
 import {
   POD_MAX_UPLOAD_SIZE_BYTES,
   POD_MAX_UPLOAD_SIZE_MB,
 } from '@/types/proof-of-delivery';
-import { DELIVERY_PHOTO_CATEGORY, PICKUP_PHOTO_CATEGORY } from '@/lib/driver/stage-photos';
+import {
+  DELIVERY_PHOTO_CATEGORY,
+  PICKUP_PHOTO_CATEGORY,
+  POD_MAX_PHOTOS,
+  POD_PHOTO_LIMIT_CODE,
+} from '@/lib/driver/stage-photos';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -22,26 +27,59 @@ import * as Sentry from '@sentry/nextjs';
  * Both create a FileUpload row linked to the CateringRequest or OnDemand
  * order; that row is what the orders PATCH gate reads before allowing
  * PICKED_UP / COMPLETED.
+ *
+ * Photo count per stage (`maxPhotos`):
+ *   - delivery: up to POD_MAX_PHOTOS. Each POST appends one photo (the client
+ *     and the offline queue post them one at a time); a POST that would exceed
+ *     the cap answers 409 POD_PHOTO_LIMIT. The cap is re-checked under a row
+ *     lock on the order so two parallel uploads cannot both take the last slot.
+ *   - pickup: a single photo; a new POST replaces the previous one (retake).
  */
 export type StagePhoto = 'delivery' | 'pickup';
 
 const STAGE_CONFIG: Record<
   StagePhoto,
-  { category: string; label: string; sentryOp: string; mirrorToDeliveries: boolean }
+  {
+    category: string;
+    label: string;
+    sentryOp: string;
+    mirrorToDeliveries: boolean;
+    maxPhotos: number;
+  }
 > = {
   delivery: {
     category: DELIVERY_PHOTO_CATEGORY,
     label: 'proof of delivery',
     sentryOp: 'pod_upload',
     mirrorToDeliveries: true,
+    maxPhotos: POD_MAX_PHOTOS,
   },
   pickup: {
     category: PICKUP_PHOTO_CATEGORY,
     label: 'pickup photo',
     sentryOp: 'pickup_photo_upload',
     mirrorToDeliveries: false,
+    maxPhotos: 1,
   },
 };
+
+/** Order tables, locked by id while the photo cap is re-checked. */
+const ORDER_TABLE: Record<'catering' | 'on_demand', string> = {
+  catering: 'catering_requests',
+  on_demand: 'on_demand_requests',
+};
+
+function photoLimitResponse(maxPhotos: number) {
+  return NextResponse.json(
+    {
+      success: false,
+      code: POD_PHOTO_LIMIT_CODE,
+      error: `Proof of delivery is limited to ${maxPhotos} photos per order.`,
+      maxPhotos,
+    },
+    { status: 409 },
+  );
+}
 
 export async function handleStagePhotoUpload(
   request: NextRequest,
@@ -176,6 +214,19 @@ export async function handleStagePhotoUpload(
       );
     }
 
+    const orderLink =
+      orderType === 'catering' ? { cateringRequestId: orderId } : { onDemandId: orderId };
+    const categoryWhere = { category: config.category, ...orderLink };
+    const appendsPhotos = config.maxPhotos > 1;
+
+    // Cheap pre-check so a full order never costs a storage upload.
+    if (appendsPhotos) {
+      const existing = await prisma.fileUpload.count({ where: categoryWhere });
+      if (existing >= config.maxPhotos) {
+        return photoLimitResponse(config.maxPhotos);
+      }
+    }
+
     // Upload to Supabase Storage
     const uploadResult = await uploadPODImage(file, orderId, { stage });
 
@@ -186,32 +237,47 @@ export async function handleStagePhotoUpload(
       );
     }
 
-    // Delete any existing FileUpload of this category for this order
-    await prisma.fileUpload.deleteMany({
-      where: {
-        category: config.category,
-        ...(orderType === 'catering'
-          ? { cateringRequestId: orderId }
-          : { onDemandId: orderId }),
-      },
-    });
+    const fileUploadData = {
+      userId: user.id,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      fileUrl: uploadResult.url,
+      filePath: uploadResult.path,
+      category: config.category,
+      isTemporary: false,
+      ...orderLink,
+    };
 
-    // Create FileUpload record
-    const fileUpload = await prisma.fileUpload.create({
-      data: {
-        userId: user.id,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        fileUrl: uploadResult.url,
-        filePath: uploadResult.path,
-        category: config.category,
-        isTemporary: false,
-        ...(orderType === 'catering'
-          ? { cateringRequestId: orderId }
-          : { onDemandId: orderId }),
-      },
-    });
+    let fileUpload: { id: string };
+    let photoCount = 1;
+
+    if (appendsPhotos) {
+      // Re-check the cap with the order row locked: two parallel POSTs that
+      // both passed the pre-check serialize here, and only one takes the slot.
+      const table = ORDER_TABLE[orderType];
+      const created = await prisma.$transaction(async (tx) => {
+        await tx.$queryRawUnsafe(`SELECT id FROM ${table} WHERE id = $1::uuid FOR UPDATE`, orderId);
+        const existing = await tx.fileUpload.count({ where: categoryWhere });
+        if (existing >= config.maxPhotos) return null;
+        const row = await tx.fileUpload.create({ data: fileUploadData });
+        return { row, count: existing + 1 };
+      });
+
+      if (!created) {
+        // Lost the race for the last slot: drop the orphaned storage object.
+        if (uploadResult.path) {
+          await deletePODImage(uploadResult.path).catch(() => undefined);
+        }
+        return photoLimitResponse(config.maxPhotos);
+      }
+      fileUpload = created.row;
+      photoCount = created.count;
+    } else {
+      // Single-photo stage: a new upload replaces the previous one (retake).
+      await prisma.fileUpload.deleteMany({ where: categoryWhere });
+      fileUpload = await prisma.fileUpload.create({ data: fileUploadData });
+    }
 
     // Mirror the photo URL onto the standalone `deliveries` row so the admin
     // tracking map + POD gallery (which read delivery_photo_url) see it too.
@@ -240,6 +306,8 @@ export async function handleStagePhotoUpload(
       url: uploadResult.url,
       path: uploadResult.path,
       fileUploadId: fileUpload.id,
+      photoCount,
+      maxPhotos: config.maxPhotos,
       message: `${capitalize(config.label)} uploaded successfully`,
     });
   } catch (error) {

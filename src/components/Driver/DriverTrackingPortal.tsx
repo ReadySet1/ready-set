@@ -45,6 +45,7 @@ import { formatMiles } from "@/lib/units";
 import { RECIPIENT_REQUIRED_CODE, stageGateMessage } from "@/lib/driver/stage-photos";
 import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import { POD_MAX_PHOTOS } from "@/lib/driver/stage-photos";
 import {
   useDeliveryStatusRealtime,
   type DeliveryStatusUpdatedPayload,
@@ -801,6 +802,7 @@ export default function DriverTrackingPortal() {
           deliveryId={podTarget.deliveryId}
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
+          maxPhotos={POD_MAX_PHOTOS}
           onComplete={onPodComplete}
         />
       ) : null}

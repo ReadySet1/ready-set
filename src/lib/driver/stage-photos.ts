@@ -43,6 +43,15 @@ export function hasRecipientConfirmation(input: {
   );
 }
 
+/**
+ * Proof of delivery accepts up to this many photos per order (Gary, card
+ * `delivery-finalize-multi-photo`); at least one is still required to complete.
+ * The pickup photo stays a single, replaceable photo.
+ */
+export const POD_MAX_PHOTOS = 3;
+/** Error code returned by POST /pod when the order already holds POD_MAX_PHOTOS. */
+export const POD_PHOTO_LIMIT_CODE = 'POD_PHOTO_LIMIT';
+
 export type StagePhotoCode = 'PICKUP_PHOTO_REQUIRED' | 'POD_REQUIRED';
 
 export interface StagePhotoRequirement {
@@ -73,16 +82,23 @@ export function requiredPhotoForTransition(
   return REQUIREMENTS[next as DriverStatus] ?? null;
 }
 
-/** True when any upload in `files` carries `category` (case-insensitive). */
-export function hasUploadInCategory(
-  files: ReadonlyArray<{ category?: string | null } | null | undefined> | null | undefined,
-  category: string,
-): boolean {
-  if (!Array.isArray(files)) return false;
+type UploadList =
+  | ReadonlyArray<{ category?: string | null } | null | undefined>
+  | null
+  | undefined;
+
+/** Number of uploads in `files` that carry `category` (case-insensitive). */
+export function countUploadsInCategory(files: UploadList, category: string): number {
+  if (!Array.isArray(files)) return 0;
   const wanted = category.trim().toLowerCase();
-  return files.some(
+  return files.filter(
     (file) => typeof file?.category === 'string' && file.category.trim().toLowerCase() === wanted,
-  );
+  ).length;
+}
+
+/** True when any upload in `files` carries `category` (case-insensitive). */
+export function hasUploadInCategory(files: UploadList, category: string): boolean {
+  return countUploadsInCategory(files, category) > 0;
 }
 
 /** Plain driver copy per orders-PATCH gate code (fallback when the 422 body

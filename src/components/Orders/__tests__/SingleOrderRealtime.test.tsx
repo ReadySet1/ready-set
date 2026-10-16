@@ -294,3 +294,39 @@ describe("SingleOrder live delivery status updates", () => {
     expect(screen.getByTestId("driver-status")).toHaveTextContent("none");
   });
 });
+
+describe("SingleOrder proof-of-delivery card", () => {
+  it("shows every POD photo the files route returns (multi-photo POD)", async () => {
+    const podFiles = [3, 2, 1].map((n) => ({
+      id: `pod-${n}`,
+      fileName: `pod-${n}.jpg`,
+      fileType: "image/jpeg",
+      fileSize: 100,
+      fileUrl: `https://signed/pod-${n}.jpg`,
+      category: "proof_of_delivery",
+      uploadedAt: `2026-10-16T17:0${n}:00Z`,
+      updatedAt: null,
+    }));
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("?include=dispatch.driver")) return jsonResponse(cateringOrder());
+      if (url.includes("/files")) return jsonResponse(podFiles);
+      return jsonResponse([]);
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole("heading", { name: /proof of delivery/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("3 photos")).toBeInTheDocument();
+  });
+
+  it("has no proof-of-delivery card while the order has no POD photo", async () => {
+    mockOrderApi(() => cateringOrder());
+    renderPage();
+    await screen.findByTestId("driver-card");
+
+    expect(
+      screen.queryByRole("heading", { name: /proof of delivery/i }),
+    ).not.toBeInTheDocument();
+  });
+});

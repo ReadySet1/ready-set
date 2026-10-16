@@ -37,6 +37,7 @@ import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
+import { ProofOfDeliveryPanel } from "./ui/ProofOfDeliveryPanel";
 import {
   Driver,
   Order,
@@ -1169,6 +1170,13 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Proof of Delivery (all POD photos, up to 3) */}
+            <ProofOfDeliveryPanel
+              orderId={order.id.toString()}
+              orderNumber={order.orderNumber}
+              files={files}
+            />
 
             {/* Order Files */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
