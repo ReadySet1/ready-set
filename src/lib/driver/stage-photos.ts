@@ -84,3 +84,24 @@ export function hasUploadInCategory(
     (file) => typeof file?.category === 'string' && file.category.trim().toLowerCase() === wanted,
   );
 }
+
+/** Plain driver copy per orders-PATCH gate code (fallback when the 422 body
+ *  carries no message). */
+const GATE_FALLBACK_MESSAGES: Record<string, string> = {
+  PICKUP_PHOTO_REQUIRED: REQUIREMENTS[DriverStatus.PICKED_UP]!.message,
+  POD_REQUIRED: REQUIREMENTS[DriverStatus.COMPLETED]!.message,
+  [RECIPIENT_REQUIRED_CODE]: RECIPIENT_REQUIRED_MESSAGE,
+  PICKUP_CONFIRMATION_REQUIRED:
+    'Record who handed over the order (name) or capture a signature before marking it picked up.',
+  SHIFT_REQUIRED: 'Start your shift before working a delivery.',
+};
+
+/** Message to show for a gate rejection: the server's, else plain fallback
+ *  copy for a known code, else null (caller shows its generic error). */
+export function stageGateMessage(
+  code: string | null | undefined,
+  serverMessage?: string | null,
+): string | null {
+  if (!code || !(code in GATE_FALLBACK_MESSAGES)) return null;
+  return serverMessage?.trim() || GATE_FALLBACK_MESSAGES[code] || null;
+}

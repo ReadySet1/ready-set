@@ -4,6 +4,7 @@ import {
   PICKUP_PHOTO_CATEGORY,
   hasUploadInCategory,
   requiredPhotoForTransition,
+  stageGateMessage,
 } from '../stage-photos';
 
 describe('hasUploadInCategory', () => {
@@ -53,5 +54,27 @@ describe('requiredPhotoForTransition', () => {
     }
     expect(requiredPhotoForTransition('CANCELLED')).toBeNull();
     expect(requiredPhotoForTransition(null)).toBeNull();
+  });
+});
+
+describe('stageGateMessage (plain driver copy for a 422 gate code)', () => {
+  it('prefers the server message when one was sent', () => {
+    expect(stageGateMessage('POD_REQUIRED', 'Server copy')).toBe('Server copy');
+  });
+
+  it.each([
+    ['PICKUP_PHOTO_REQUIRED', /photo of the order/i],
+    ['POD_REQUIRED', /photo of the setup/i],
+    ['RECIPIENT_REQUIRED', /recipient's signature/i],
+    ['PICKUP_CONFIRMATION_REQUIRED', /handed over the order/i],
+    ['SHIFT_REQUIRED', /start your shift/i],
+  ])('falls back to plain copy for %s', (code, copy) => {
+    expect(stageGateMessage(code)).toMatch(copy);
+    expect(stageGateMessage(code, '   ')).toMatch(copy);
+  });
+
+  it('returns null for an unknown code', () => {
+    expect(stageGateMessage('SOMETHING_ELSE')).toBeNull();
+    expect(stageGateMessage(undefined)).toBeNull();
   });
 });
