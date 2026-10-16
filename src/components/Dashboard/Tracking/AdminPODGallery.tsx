@@ -148,6 +148,36 @@ export function AdminPODGallery({ className }: AdminPODGalleryProps) {
   );
 
   /**
+   * Every POD photo of a delivery (up to 3); older API responses carry only
+   * the single `photoUrl`.
+   */
+  const podPhotosOf = (item: PODGalleryItem) =>
+    item.photos?.length ? item.photos : [{ id: item.id, url: item.photoUrl, uploadedAt: item.capturedAt }];
+
+  /**
+   * One photo fills the card; several share it as a row of square tiles.
+   */
+  const renderPhotos = (item: PODGalleryItem) => {
+    const photos = podPhotosOf(item);
+    return (
+      <div className={cn(photos.length > 1 && 'grid grid-cols-3 gap-0.5 pt-9')}>
+        {photos.map((photo) => (
+          <ProofOfDeliveryViewer
+            key={photo.id}
+            photoUrl={photo.url}
+            deliveryId={item.deliveryId}
+            orderNumber={item.orderNumber}
+            capturedAt={new Date(photo.uploadedAt)}
+            className={photos.length > 1 ? 'aspect-square w-full' : 'aspect-[4/3] w-full'}
+            showDownload={true}
+            showLocation={false}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  /**
    * Render gallery grid
    */
   const renderGallery = () => (
@@ -155,21 +185,21 @@ export function AdminPODGallery({ className }: AdminPODGalleryProps) {
       {podItems.map((item) => (
         <Card key={item.id} className="overflow-hidden">
           <div className="relative">
-            <ProofOfDeliveryViewer
-              photoUrl={item.photoUrl}
-              deliveryId={item.deliveryId}
-              orderNumber={item.orderNumber}
-              capturedAt={new Date(item.capturedAt)}
-              className="aspect-[4/3] w-full"
-              showDownload={true}
-              showLocation={false}
-            />
+            {renderPhotos(item)}
             <Badge
               variant="secondary"
               className="absolute left-2 top-2 bg-black/60 text-white hover:bg-black/60"
             >
               {item.orderNumber}
             </Badge>
+            {podPhotosOf(item).length > 1 && (
+              <Badge
+                variant="secondary"
+                className="absolute right-2 top-2 bg-black/60 text-white hover:bg-black/60"
+              >
+                {podPhotosOf(item).length} photos
+              </Badge>
+            )}
           </div>
           <CardContent className="p-3">
             <div className="space-y-1.5">

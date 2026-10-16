@@ -236,11 +236,20 @@ export interface PODGalleryFilters {
 /**
  * POD gallery item for admin view
  */
+export interface PODGalleryPhoto {
+  id: string;
+  url: string;
+  uploadedAt: Date | string;
+}
+
 export interface PODGalleryItem {
   id: string;
   deliveryId: string;
   orderNumber: string;
+  /** Lead photo (the first of `photos`). */
   photoUrl: string;
+  /** Every POD photo on the order, oldest first (up to 3). */
+  photos: PODGalleryPhoto[];
   thumbnailUrl?: string;
   capturedAt: Date;
   driverName: string;

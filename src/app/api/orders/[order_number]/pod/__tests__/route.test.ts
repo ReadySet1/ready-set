@@ -352,3 +352,105 @@ describe('POD GET — returns every photo on the order', () => {
     );
   });
 });
+
+describe('POD DELETE — one specific photo by file id (admin)', () => {
+  const pods = [
+    { id: 'f3', fileUrl: 'https://cdn/3.jpg', filePath: 'p/3.jpg', uploadedAt: new Date('2026-10-16T10:02:00Z') },
+    { id: 'f2', fileUrl: 'https://cdn/2.jpg', filePath: 'p/2.jpg', uploadedAt: new Date('2026-10-16T10:01:00Z') },
+    { id: 'f1', fileUrl: 'https://cdn/1.jpg', filePath: 'p/1.jpg', uploadedAt: new Date('2026-10-16T10:00:00Z') },
+  ];
+
+  const deleteRequest = (query = '') =>
+    new NextRequest(`http://localhost:3000/api/orders/CAT-001/pod${query}`, { method: 'DELETE' });
+  const ctx = () => ({ params: Promise.resolve({ order_number: 'CAT-001' }) });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks({ role: 'ADMIN' });
+    (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
+      id: 'order-123',
+      orderNumber: 'CAT-001',
+      fileUploads: pods,
+    });
+    (mockedPrisma.fileUpload.delete as jest.Mock).mockResolvedValue({});
+    const { deletePODImage } = jest.requireMock('@/utils/supabase/storage');
+    (deletePODImage as jest.Mock).mockResolvedValue({ success: true });
+  });
+
+  it('deletes exactly the photo named by fileUploadId', async () => {
+    const { DELETE } = await importRoute();
+
+    const res = await DELETE(deleteRequest('?fileUploadId=f2'), ctx());
+
+    expect(res.status).toBe(200);
+    expect(mockedPrisma.fileUpload.delete).toHaveBeenCalledWith({ where: { id: 'f2' } });
+    const { deletePODImage } = jest.requireMock('@/utils/supabase/storage');
+    expect(deletePODImage).toHaveBeenCalledWith('p/2.jpg');
+    const data = await res.json();
+    expect(data.deletedFileUploadId).toBe('f2');
+    expect(data.remainingPhotos).toBe(2);
+  });
+
+  it('without an id keeps the old behaviour: removes the most recent photo', async () => {
+    const { DELETE } = await importRoute();
+
+    const res = await DELETE(deleteRequest(), ctx());
+
+    expect(res.status).toBe(200);
+    expect(mockedPrisma.fileUpload.delete).toHaveBeenCalledWith({ where: { id: 'f3' } });
+    const findArgs = (mockedPrisma.cateringRequest.findFirst as jest.Mock).mock.calls[0][0];
+    expect(findArgs.include.fileUploads).toEqual(
+      expect.objectContaining({
+        where: { category: 'proof_of_delivery' },
+        orderBy: { uploadedAt: 'desc' },
+      }),
+    );
+  });
+
+  it('404s an id that is not a proof-of-delivery photo of this order', async () => {
+    const { DELETE } = await importRoute();
+
+    const res = await DELETE(deleteRequest('?fileUploadId=someone-elses'), ctx());
+
+    expect(res.status).toBe(404);
+    expect(mockedPrisma.fileUpload.delete).not.toHaveBeenCalled();
+  });
+
+  it('re-points the deliveries mirror at the newest remaining photo', async () => {
+    const { DELETE } = await importRoute();
+
+    await DELETE(deleteRequest('?fileUploadId=f3'), ctx());
+
+    const [sql, urlArg, orderArg] = (mockedPrisma.$executeRawUnsafe as jest.Mock).mock.calls[0];
+    expect(sql).toContain('UPDATE deliveries');
+    expect(sql).toContain('delivery_photo_url = $1');
+    expect(urlArg).toBe('https://cdn/2.jpg');
+    expect(orderArg).toBe('CAT-001');
+  });
+
+  it('may remove the last remaining photo (existing behaviour) and clears the mirror', async () => {
+    (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
+      id: 'order-123',
+      orderNumber: 'CAT-001',
+      fileUploads: [pods[2]],
+    });
+    const { DELETE } = await importRoute();
+
+    const res = await DELETE(deleteRequest('?fileUploadId=f1'), ctx());
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).remainingPhotos).toBe(0);
+    const [, urlArg] = (mockedPrisma.$executeRawUnsafe as jest.Mock).mock.calls[0];
+    expect(urlArg).toBeNull();
+  });
+
+  it('still refuses non-admins', async () => {
+    setupMocks({ role: 'DRIVER' });
+    const { DELETE } = await importRoute();
+
+    const res = await DELETE(deleteRequest('?fileUploadId=f2'), ctx());
+
+    expect(res.status).toBe(403);
+    expect(mockedPrisma.fileUpload.delete).not.toHaveBeenCalled();
+  });
+});
