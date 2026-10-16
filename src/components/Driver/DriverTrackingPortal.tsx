@@ -211,15 +211,14 @@ export default function DriverTrackingPortal() {
   // GPS auto-resume for an active shift lives in DriverTrackingProvider (the
   // /driver layout), so it fires on every driver page, not only this portal.
 
+  // Start shift only renders once a location exists (the permission CTA shows
+  // before that), so this render's currentLocation is the position the driver
+  // just granted. The old fallback re-requested permission and then re-read
+  // currentLocation from this same stale closure — always null — so it could
+  // never start a shift.
   const handleStartShift = async () => {
-    let location = currentLocation;
-    if (!location) {
-      const granted = await requestLocationPermission();
-      if (!granted) return;
-      location = currentLocation;
-    }
-    if (!location) return;
-    const ok = await startShift(location);
+    if (!currentLocation) return;
+    const ok = await startShift(currentLocation);
     if (ok) startTracking();
   };
 
