@@ -247,6 +247,16 @@
     --input:             var(--neutral-200);
     --ring:              var(--brand-500);
 
+    /* Shadcn sidebar aliases (light) — consumed by components/ui/sidebar.tsx */
+    --sidebar-background:         var(--background);
+    --sidebar-foreground:         var(--foreground);
+    --sidebar-primary:            var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent:             var(--neutral-100);
+    --sidebar-accent-foreground:  var(--neutral-900);
+    --sidebar-border:             var(--border);
+    --sidebar-ring:               var(--ring);
+
     /* Type */
     --font-sans:    "Montserrat", ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-display: "Kabel", "Montserrat", sans-serif;
@@ -277,6 +287,15 @@
     --border:            var(--neutral-700);
     --input:             var(--neutral-700);
     --ring:              var(--brand-400);
+
+    --sidebar-background:         var(--neutral-900);
+    --sidebar-foreground:         var(--neutral-50);
+    --sidebar-primary:            var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent:             var(--neutral-800);
+    --sidebar-accent-foreground:  var(--neutral-50);
+    --sidebar-border:             var(--border);
+    --sidebar-ring:               var(--ring);
   }
 
   /* Opt-in display font (marketing/H1). Default headings stay Kabel
