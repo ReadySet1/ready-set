@@ -60,8 +60,12 @@ jest.mock("@/utils/supabase/client", () => ({
 // POD capture pulls in camera APIs — stub it so the sheet renders cleanly.
 // The stub exposes a button so tests can drive the upload-complete callback.
 jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
-  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint }: any) => (
-    <div data-testid="pod-capture" data-endpoint={uploadEndpoint}>
+  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint, maxPhotos }: any) => (
+    <div
+      data-testid="pod-capture"
+      data-endpoint={uploadEndpoint}
+      data-max-photos={String(maxPhotos ?? 1)}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/photo.jpg")}>
         finish pod upload
       </button>
@@ -219,6 +223,8 @@ describe("DriverDeliveryDetail", () => {
 
     fireEvent.click(await screen.findByText("Complete delivery"));
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+    // The completion photo takes up to 3 photos (delivery-finalize-multi-photo).
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
 
     // Driving the capture flow (photo, then recipient) advances to COMPLETED...
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
@@ -684,6 +690,9 @@ describe("DriverDeliveryDetail", () => {
         "/api/orders/CV-12345/pickup-photo",
       );
 
+      // The photo of the order stays a single photo (the 3-photo cap is POD only).
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "1");
+
       fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
 
       expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
@@ -950,6 +959,25 @@ describe("DriverDeliveryDetail", () => {
         "/api/orders/CV-12345/files",
         expect.objectContaining({ credentials: "include" }),
       );
+    });
+
+    it("renders every proof-of-delivery photo when the delivery has several", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.COMPLETED });
+      installFetchWithFiles([
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=1` },
+        { category: "pickup_photo", fileUrl: "https://supabase.example/sign/pickup.jpg" },
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=2` },
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=3` },
+      ]);
+      renderDetail();
+
+      await screen.findByRole("img", { name: /proof of delivery photo 1 of 3/i });
+      const photos = screen.getAllByRole("img", { name: /proof of delivery photo/i });
+      expect(photos.map((img) => img.getAttribute("src"))).toEqual([
+        `${SIGNED_POD_URL}&n=1`,
+        `${SIGNED_POD_URL}&n=2`,
+        `${SIGNED_POD_URL}&n=3`,
+      ]);
     });
 
     it("does not fetch files while the delivery is still in progress", async () => {

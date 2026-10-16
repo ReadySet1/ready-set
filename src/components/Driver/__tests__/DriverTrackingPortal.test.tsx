@@ -46,8 +46,12 @@ jest.mock("@/components/Driver/DriverLiveMap", () => ({
 // POD capture pulls in camera APIs — stub it for the sheet path. The stub
 // exposes a button so tests can drive the upload-complete callback.
 jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
-  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint }: any) => (
-    <div data-testid="pod-capture" data-endpoint={uploadEndpoint}>
+  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint, maxPhotos }: any) => (
+    <div
+      data-testid="pod-capture"
+      data-endpoint={uploadEndpoint}
+      data-max-photos={String(maxPhotos ?? 1)}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/photo.jpg")}>
         finish pod upload
       </button>
@@ -324,6 +328,8 @@ describe("DriverTrackingPortal (redesigned)", () => {
     // The final step routes through proof-of-delivery capture.
     fireEvent.click(screen.getByText(/complete delivery/i));
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+    // Same completion photo as the detail screen: up to 3 photos.
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
 
     // Drive the capture flow (photo, then recipient) to completion; the
     // status update fails.

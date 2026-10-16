@@ -23,6 +23,9 @@ interface DriverPodSheetProps {
   title?: string;
   /** Copy under "Take a Photo" — see ProofOfDeliveryCapture.requirementHint. */
   requirementHint?: string;
+  /** Photos the driver may attach (default 1); the completion photo passes
+   *  POD_MAX_PHOTOS to collect up to 3 thumbnails before uploading. */
+  maxPhotos?: number;
   /** Called with the uploaded image URL once capture+upload succeeds. */
   onComplete: (url: string) => void;
 }
@@ -37,6 +40,7 @@ export function DriverPodSheet({
   uploadEndpoint,
   title = "Proof of delivery",
   requirementHint,
+  maxPhotos,
   onComplete,
 }: DriverPodSheetProps) {
   const { resolved } = useDriverTheme();
@@ -72,6 +76,7 @@ export function DriverPodSheet({
               isRequired
               hideTitle
               requirementHint={requirementHint}
+              maxPhotos={maxPhotos}
               uploadEndpoint={uploadEndpoint}
               onUploadComplete={(url) => onComplete(url)}
               onCancel={() => onOpenChange(false)}

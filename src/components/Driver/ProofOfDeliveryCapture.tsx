@@ -38,9 +38,24 @@ import {
 import { usePODOfflineQueue } from '@/hooks/tracking/usePODOfflineQueue';
 import { withBearerAuth } from '@/lib/auth/bearer-session';
 import { Badge } from '@/components/ui/badge';
+import { ProofOfDeliveryMultiCapture } from './ProofOfDeliveryMultiCapture';
 
 /**
  * ProofOfDeliveryCapture Component
+ *
+ * `maxPhotos > 1` renders the multi-photo flow (thumbnails, count, remove
+ * before submit — see ProofOfDeliveryMultiCapture); otherwise the original
+ * single-photo flow below.
+ */
+export function ProofOfDeliveryCapture(props: ProofOfDeliveryCaptureProps) {
+  if ((props.maxPhotos ?? 1) > 1) {
+    return <ProofOfDeliveryMultiCapture {...props} />;
+  }
+  return <SinglePhotoCapture {...props} />;
+}
+
+/**
+ * Single-photo capture
  *
  * Mobile-optimized photo capture component for drivers to take
  * proof of delivery photos during delivery completion.
@@ -52,7 +67,7 @@ import { Badge } from '@/components/ui/badge';
  * - Upload progress indicator
  * - Graceful permission handling
  */
-export function ProofOfDeliveryCapture({
+function SinglePhotoCapture({
   deliveryId,
   orderNumber,
   isRequired = false,

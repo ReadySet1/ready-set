@@ -83,7 +83,9 @@ export interface ProofOfDeliveryCaptureProps {
   deliveryId: string;
   orderNumber: string;
   isRequired?: boolean;
-  onUploadComplete: (url: string, metadata?: PODMetadata) => void;
+  /** `url` is the first photo; `urls` lists every photo when the capture
+   *  takes several (maxPhotos > 1). */
+  onUploadComplete: (url: string, metadata?: PODMetadata, urls?: string[]) => void;
   onCancel: () => void;
   onError?: (error: string) => void;
   className?: string;
@@ -95,6 +97,10 @@ export interface ProofOfDeliveryCaptureProps {
   /** Replaces the default "A photo is required to complete this delivery"
    *  line under "Take a Photo" — e.g. the pickup-stage photo of the order. */
   requirementHint?: string;
+  /** How many photos the driver may attach (default 1). Above 1 the capture
+   *  collects thumbnails and uploads them one per request; the proof of
+   *  delivery takes up to POD_MAX_PHOTOS (see src/lib/driver/stage-photos). */
+  maxPhotos?: number;
 }
 
 /**

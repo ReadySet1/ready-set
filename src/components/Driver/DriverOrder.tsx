@@ -35,6 +35,7 @@ import { createClient } from "@/utils/supabase/client";
 import { decodeOrderNumber } from "@/utils/order";
 import { ProofOfDeliveryCapture } from "./ProofOfDeliveryCapture";
 import { ProofOfDeliveryViewer } from "./ProofOfDeliveryViewer";
+import { DELIVERY_PHOTO_CATEGORY, POD_MAX_PHOTOS } from "@/lib/driver/stage-photos";
 
 // Shared types
 interface Driver {
@@ -285,15 +286,13 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
   const params = useParams();
 
   /**
-   * Get POD photo URL from fileUploads
+   * POD photo URLs from fileUploads (up to POD_MAX_PHOTOS per order)
    */
-  const getPODUrl = () => {
-    return order?.fileUploads?.find(
-      (f) => f.category === "proof_of_delivery"
-    )?.fileUrl;
-  };
+  const podUrls: string[] = (order?.fileUploads ?? [])
+    .filter((f) => f.category === DELIVERY_PHOTO_CATEGORY && !!f.fileUrl)
+    .map((f) => f.fileUrl);
 
-  const hasExistingPOD = !!getPODUrl();
+  const hasExistingPOD = podUrls.length > 0;
 
   // Extract order number from URL params with proper decoding for slashes
   const orderNumber = (() => {
@@ -678,22 +677,30 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
           />
 
           {/* POD Photo Viewer - show existing photo if available */}
-          {hasExistingPOD && getPODUrl() && (
+          {hasExistingPOD && (
             <Card className="border-green-200 bg-green-50">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Camera className="h-4 w-4 text-green-600" />
                   Proof of Delivery
+                  {podUrls.length > 1 && (
+                    <span className="ml-auto text-sm font-normal text-muted-foreground">
+                      {podUrls.length} photos
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ProofOfDeliveryViewer
-                  photoUrl={getPODUrl()!}
-                  deliveryId={order.id}
-                  orderNumber={order.orderNumber}
-                  showDownload={true}
-                  className="max-w-xs"
-                />
+              <CardContent className="flex flex-wrap gap-3">
+                {podUrls.map((url) => (
+                  <ProofOfDeliveryViewer
+                    key={url}
+                    photoUrl={url}
+                    deliveryId={order.id}
+                    orderNumber={order.orderNumber}
+                    showDownload={true}
+                    className="max-w-xs"
+                  />
+                ))}
               </CardContent>
             </Card>
           )}
@@ -750,6 +757,7 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
               orderNumber={order.orderNumber}
               onUploadComplete={handlePODUploadComplete}
               onCancel={handlePODCancel}
+              maxPhotos={POD_MAX_PHOTOS}
               uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
             />
           )}
