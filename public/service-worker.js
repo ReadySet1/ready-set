@@ -1,12 +1,12 @@
 // ReadySet Driver Portal Service Worker
 // Provides offline capabilities and background sync for location tracking
 
-const CACHE_NAME = 'readyset-driver-v1';
-const STATIC_CACHE_URLS = [
-  '/driver/tracking',
-  '/manifest.json',
-  // Add other essential assets here
-];
+// Bumped from v1: activate deletes every other cache, which clears the stale
+// /driver/tracking HTML and authenticated API responses v1 stored on phones.
+// Nothing is cached any more; the name only exists so activate can clean up.
+const CACHE_NAME = 'readyset-driver-v2';
+
+const LOCATION_ENDPOINT_PATH = '/api/tracking/locations';
 
 const LOCATION_QUEUE_STORE = 'location-queue';
 const DB_NAME = 'readyset-driver-db';
@@ -18,15 +18,9 @@ const LOCATION_FLUSH_SPACING_MS = 250;
 const LOCATION_FLUSH_429_BACKOFF_MS = 30000;
 let locationFlushBackoffUntil = 0;
 
-// Install event - cache essential resources
+// Install event - nothing to precache; take over as soon as possible.
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_CACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate event - clean up old caches
@@ -47,50 +41,36 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - serve from cache when offline
+// Fetch event - the SW's only job is the offline location queue.
+// Every other request returns without calling respondWith, so the browser
+// handles it normally (no caching, no synthetic responses). Calling
+// respondWith with a cache miss resolves `undefined`, which Safari reports as
+// "FetchEvent.respondWith received an error: Returned response is null".
 self.addEventListener('fetch', (event) => {
-  // Handle location update requests specially
-  if (event.request.url.includes('/api/tracking/locations')) {
+  if (isLocationPost(event.request)) {
     event.respondWith(handleLocationRequest(event.request));
-    return;
   }
-
-  // Handle other requests with cache-first strategy for navigation
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          return response || fetch(event.request);
-        })
-        .catch(() => {
-          // Return offline page if available
-          return caches.match('/driver/tracking');
-        })
-    );
-    return;
-  }
-
-  // Default network-first strategy for API calls
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, responseClone));
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache
-        return caches.match(event.request);
-      })
-  );
 });
+
+function isLocationPost(request) {
+  if (request.method !== 'POST') return false;
+  try {
+    const url = new URL(request.url);
+    return url.origin === self.location.origin && url.pathname === LOCATION_ENDPOINT_PATH;
+  } catch (error) {
+    return false;
+  }
+}
 
 // Handle location update requests with offline queue
 async function handleLocationRequest(request) {
+  // fetch() consumes the body, so keep a copy for the offline queue first.
+  let body = null;
+  try {
+    body = await request.clone().text();
+  } catch (cloneError) {
+    console.error('Could not read location request body:', cloneError);
+  }
   try {
     // Try to send immediately
     const response = await fetch(request);
@@ -111,12 +91,26 @@ async function handleLocationRequest(request) {
       url: request.url,
       method: request.method,
       headers: Object.fromEntries(request.headers.entries()),
-      body: await request.text(),
+      body,
       timestamp: Date.now()
     };
     
-    await storeOfflineRequest(requestData);
-    
+    try {
+      if (body === null) throw new Error('Request body unavailable');
+      await storeOfflineRequest(requestData);
+    } catch (storeError) {
+      // Never hand respondWith a rejection: answer with a real response so
+      // the page sees a normal failed request instead of a Safari error.
+      console.error('Could not queue location update:', storeError);
+      return new Response(
+        JSON.stringify({ success: false, queued: false }),
+        {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Return a synthetic response
     return new Response(
       JSON.stringify({ success: false, queued: true }),
