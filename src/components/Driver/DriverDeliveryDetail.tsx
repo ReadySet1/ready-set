@@ -44,6 +44,8 @@ import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
   DELIVERY_PHOTO_CATEGORY,
   PICKUP_PHOTO_CATEGORY,
+  RECIPIENT_REQUIRED_CODE,
+  hasRecipientConfirmation,
   hasUploadInCategory,
 } from "@/lib/driver/stage-photos";
 
@@ -64,7 +66,9 @@ import {
  *
  * Mandatory captures (server-enforced with 422 codes, mirrored here):
  *   ARRIVED_AT_VENDOR → PICKED_UP: photo of the order, then pickup confirmation
- *   ARRIVED_TO_CLIENT → COMPLETED: photo of the setup (POD)
+ *   ARRIVED_TO_CLIENT → COMPLETED: photo of the setup (POD), then the
+ *     recipient's signature or — if they refuse to sign — their name
+ *     (POST /api/orders/{orderNumber}/recipient via DriverSignatureSheet)
  */
 
 interface AddressLike {
@@ -132,6 +136,8 @@ interface DriverOrder {
   /** file_uploads rows on the order — the stage-photo categories decide
    *  whether a capture sheet still has to open. */
   fileUploads?: Array<{ category?: string | null } | null> | null;
+  /** Recipient name recorded at completion (deliveries.delivery_received_by). */
+  deliveryReceivedBy?: string | null;
 }
 
 /** Map each lifecycle stage to the deliveryTimestamps field that records it. */
@@ -206,6 +212,9 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
    *  uploads on load (below); the server gate (422) stays authoritative. */
   const [pickupPhotoDone, setPickupPhotoDone] = useState(false);
   const [podDone, setPodDone] = useState(false);
+  /** Recipient sign-off at completion (signature, or name if they refuse). */
+  const [recipientOpen, setRecipientOpen] = useState(false);
+  const [recipientDone, setRecipientDone] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   /** True while this order has a PENDING return request awaiting dispatch. */
   const [pendingReturn, setPendingReturn] = useState(false);
@@ -434,6 +443,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
             setPodOpen(true);
             return;
           }
+          if (code === RECIPIENT_REQUIRED_CODE) {
+            setRecipientDone(false);
+            toast.error(
+              message ||
+                "Get the recipient's signature, or their name if they refuse to sign.",
+            );
+            setRecipientOpen(true);
+            return;
+          }
           if (code === "PICKUP_CONFIRMATION_REQUIRED") {
             toast.error(message || "Confirm the pickup before continuing.");
             setSignatureOpen(true);
@@ -506,6 +524,12 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const hasPickupPhoto =
     pickupPhotoDone || hasUploadInCategory(order?.fileUploads, PICKUP_PHOTO_CATEGORY);
   const hasPod = podDone || hasUploadInCategory(order?.fileUploads, DELIVERY_PHOTO_CATEGORY);
+  const hasRecipient =
+    recipientDone ||
+    hasRecipientConfirmation({
+      files: order?.fileUploads,
+      deliveryReceivedBy: order?.deliveryReceivedBy,
+    });
 
   /** Next-Action handler: gate the pickup photo + confirmation (pickup) and
    *  the POD photo (delivery) steps, otherwise advance. */
@@ -550,14 +574,17 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
       setSignatureOpen(true);
       return;
     }
-    // Completion: a photo of the setup (mandatory; server enforces it).
-    if (
-      current === DriverStatus.ARRIVED_TO_CLIENT &&
-      next === DriverStatus.COMPLETED &&
-      !hasPod
-    ) {
-      setPodOpen(true);
-      return;
+    // Completion: a photo of the setup, then the recipient's signature or
+    // name (both mandatory; the server enforces them).
+    if (current === DriverStatus.ARRIVED_TO_CLIENT && next === DriverStatus.COMPLETED) {
+      if (!hasPod) {
+        setPodOpen(true);
+        return;
+      }
+      if (!hasRecipient) {
+        setRecipientOpen(true);
+        return;
+      }
     }
     void advanceStatus(next);
   }, [
@@ -569,6 +596,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     shiftLoading,
     hasPickupPhoto,
     hasPod,
+    hasRecipient,
   ]);
 
   /** Photo of the order stored → straight on to the pickup confirmation. */
@@ -583,9 +611,20 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     await advanceStatus(DriverStatus.PICKED_UP);
   }, [advanceStatus]);
 
+  /** Setup photo stored → on to the recipient sign-off (unless on file). */
   const onPodComplete = useCallback(async () => {
     setPodDone(true);
     setPodOpen(false);
+    if (!hasRecipient) {
+      setRecipientOpen(true);
+      return;
+    }
+    await advanceStatus(DriverStatus.COMPLETED);
+  }, [advanceStatus, hasRecipient]);
+
+  const onRecipientComplete = useCallback(async () => {
+    setRecipientDone(true);
+    setRecipientOpen(false);
     await advanceStatus(DriverStatus.COMPLETED);
   }, [advanceStatus]);
 
@@ -864,6 +903,20 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         </DriverCard>
       ) : null}
 
+      {isCompleted && order.deliveryReceivedBy?.trim() ? (
+        <DriverCard className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <UserIcon className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
+              Received by
+            </span>
+          </div>
+          <div className="text-[14px] font-semibold text-driver-text">
+            {order.deliveryReceivedBy.trim()}
+          </div>
+        </DriverCard>
+      ) : null}
+
       {/* Sticky action bar */}
       <div
         className="fixed inset-x-0 bottom-0 z-30 border-t border-driver-border bg-driver-glass px-4 pt-3 backdrop-blur-xl backdrop-saturate-150"
@@ -884,7 +937,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
                 geofenceBlocked
                   ? geofenceHint(arrivalCheck!.distanceM!)
                   : completing
-                    ? "Photo required to complete"
+                    ? "Photo + recipient signature or name required"
                     : pickingUp
                       ? "Photo of the order required"
                       : "Tap to update your status"
@@ -941,6 +994,17 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           orderNumber={order.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {recipientOpen ? (
+        <DriverSignatureSheet
+          open={recipientOpen}
+          onOpenChange={setRecipientOpen}
+          orderNumber={order.orderNumber}
+          stage="delivery"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/recipient`}
+          onComplete={onRecipientComplete}
         />
       ) : null}
 

@@ -117,6 +117,8 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  /** Completion: recipient's signature, or name if they refuse (after POD). */
+  const [recipientTarget, setRecipientTarget] = useState<PodTarget | null>(null);
   /** Order number of the delivery being handed back to dispatch (issue #508). */
   const [returnTarget, setReturnTarget] = useState<string | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
@@ -324,7 +326,8 @@ export default function DriverTrackingPortal() {
       setSigTarget({ deliveryId: delivery.id, orderNumber });
       return;
     }
-    // The final step routes through proof-of-delivery capture.
+    // The final step routes through proof-of-delivery capture, then the
+    // recipient sign-off.
     if (next === DriverStatus.COMPLETED) {
       setPodTarget({ deliveryId: delivery.id, orderNumber });
       return;
@@ -334,12 +337,21 @@ export default function DriverTrackingPortal() {
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    const { deliveryId } = podTarget;
+    // Setup photo stored → the recipient sign-off is the second mandatory
+    // completion capture (server: 422 RECIPIENT_REQUIRED). Mirrors
+    // DriverDeliveryDetail.
+    setRecipientTarget(podTarget);
+    setPodTarget(null);
+  };
+
+  const onRecipientComplete = async () => {
+    if (!recipientTarget) return;
+    const { deliveryId } = recipientTarget;
     // The upload already succeeded (and toasted) — close the sheet NOW instead
     // of holding it open across the status PATCH + deliveries refetch (2-5s on
     // LTE reads as a hang). A failed advance is surfaced by advanceStatus's
-    // toast and retried from the delivery card. Mirrors DriverDeliveryDetail.
-    setPodTarget(null);
+    // toast and retried from the delivery card.
+    setRecipientTarget(null);
     await advanceStatus(deliveryId, DriverStatus.COMPLETED);
   };
 
@@ -754,6 +766,17 @@ export default function DriverTrackingPortal() {
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {recipientTarget ? (
+        <DriverSignatureSheet
+          open={!!recipientTarget}
+          onOpenChange={(o) => !o && setRecipientTarget(null)}
+          orderNumber={recipientTarget.orderNumber}
+          stage="delivery"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(recipientTarget.orderNumber)}/recipient`}
+          onComplete={() => void onRecipientComplete()}
         />
       ) : null}
 

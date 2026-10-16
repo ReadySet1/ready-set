@@ -64,8 +64,12 @@ jest.mock("@/lib/auth/bearer-session", () => ({
 }));
 
 jest.mock("@/components/Driver/SignatureCapture", () => ({
-  SignatureCapture: ({ onUploadComplete }: any) => (
-    <div data-testid="signature-capture">
+  SignatureCapture: ({ onUploadComplete, stage, uploadEndpoint }: any) => (
+    <div
+      data-testid="signature-capture"
+      data-stage={stage ?? "pickup"}
+      data-endpoint={uploadEndpoint}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/signature.png")}>
         finish signature upload
       </button>
@@ -312,13 +316,17 @@ describe("DriverTrackingPortal (redesigned)", () => {
     fireEvent.click(screen.getByText(/complete delivery/i));
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
 
-    // Drive the capture flow to completion; the status update fails.
+    // Drive the capture flow (photo, then recipient) to completion; the
+    // status update fails.
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish signature upload/i }),
+    );
 
-    // The upload already succeeded — the sheet closes right away and the
+    // The uploads already succeeded — the sheet closes right away and the
     // failed advance is surfaced via toast (retry from the delivery card).
     await waitFor(() =>
-      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(updateDeliveryStatus).toHaveBeenCalledWith(
@@ -330,6 +338,44 @@ describe("DriverTrackingPortal (redesigned)", () => {
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
         expect.stringMatching(/couldn't update the delivery status/i),
+      ),
+    );
+  });
+
+  it("asks for the recipient's signature or name after the setup photo, before completing", async () => {
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_TO_CLIENT,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/complete delivery/i));
+    fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+
+    const capture = await screen.findByTestId("signature-capture");
+    expect(capture).toHaveAttribute("data-stage", "delivery");
+    expect(capture).toHaveAttribute("data-endpoint", "/api/orders/cr-1/recipient");
+    expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
+    expect(updateDeliveryStatus).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /finish signature upload/i }));
+    await waitFor(() =>
+      expect(updateDeliveryStatus).toHaveBeenCalledWith(
+        "del-1",
+        DriverStatus.COMPLETED,
+        sampleLocation,
       ),
     );
   });
@@ -361,12 +407,16 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish signature upload/i }),
+    );
 
     // The sheet must close while the PATCH + refetch are still in flight —
     // on LTE they take seconds and an open sheet reads as a hang.
     await waitFor(() =>
-      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
     );
+    expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
     expect(updateDeliveryStatus).toHaveBeenCalledWith(
       "del-1",
       DriverStatus.COMPLETED,
