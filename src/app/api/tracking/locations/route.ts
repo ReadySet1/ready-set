@@ -7,6 +7,10 @@ import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { getTrackingSettings } from '@/services/tracking/tracking-settings';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
 import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
+import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
+import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-point-mileage';
+import { runAfterResponse } from '@/lib/api/after-response';
+import * as Sentry from '@sentry/nextjs';
 
 interface LocationUpdate {
   driver_id: string;
@@ -74,10 +78,11 @@ export async function POST(request: NextRequest) {
       client_sent_at,
     }: LocationUpdate = body;
 
+    const serverNowMs = Date.now();
     const { recordedAt, clockOffsetMs, clockCorrected } = resolveRecordedAt({
       timestamp,
       clientSentAt: client_sent_at,
-      serverNowMs: Date.now(),
+      serverNowMs,
     });
     if (clockCorrected) {
       // One structured line per skewed request so wrong phone clocks are
@@ -140,6 +145,18 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Newest point already stored (index-backed on driver_id, recorded_at).
+      // Read BEFORE the insert so the new point is compared against history.
+      const latestRows = await tx.$queryRawUnsafe<{ latest_recorded_at: Date | null }[]>(
+        `SELECT MAX(recorded_at) AS latest_recorded_at FROM driver_locations WHERE driver_id = $1::uuid AND deleted_at IS NULL`,
+        driver_id,
+      );
+      const isCurrentPosition = shouldUpdateLastKnownLocation({
+        recordedAt,
+        latestStoredAt: latestRows[0]?.latest_recorded_at ?? null,
+        serverNowMs,
+      });
+
       const inserted = await tx.$queryRawUnsafe<any[]>(
         `
         INSERT INTO driver_locations (
@@ -180,6 +197,21 @@ export async function POST(request: NextRequest) {
         recordedAt,
       );
 
+      // A late / out-of-order point (offline-queue replay) is history: it is
+      // stored above for mileage and trails, but must not move the driver's
+      // current position on the live maps.
+      if (!isCurrentPosition) {
+        console.warn(
+          JSON.stringify({
+            event: 'tracking.late_point',
+            driverId: driver_id,
+            recordedAt,
+            latestStoredAt: latestRows[0]?.latest_recorded_at ?? null,
+          }),
+        );
+        return inserted[0];
+      }
+
       // Update driver's last known location
       await tx.$executeRawUnsafe(
         `
@@ -202,6 +234,34 @@ export async function POST(request: NextRequest) {
       ...locationRow,
       location: JSON.parse(locationRow.location_geojson)
     };
+
+    // A late point may land inside a shift that was already closed, whose
+    // miles were computed at End shift without it. Recompute after the
+    // response so the driver's request never waits on (or fails from) it.
+    if (recordedAt && shouldCheckClosedShift({ recordedAt, serverNowMs })) {
+      const lateRecordedAt = recordedAt;
+      runAfterResponse('late GPS point mileage recompute failed', async () => {
+        try {
+          const result = await recomputeClosedShiftMileageForPoint(driver_id, lateRecordedAt);
+          if (result.recomputed) {
+            console.info(
+              JSON.stringify({
+                event: 'tracking.late_point_mileage_recomputed',
+                driverId: driver_id,
+                shiftId: result.shiftId,
+                recordedAt: lateRecordedAt,
+              }),
+            );
+          }
+        } catch (error) {
+          Sentry.captureException(error, {
+            tags: { component: 'late-gps-point-mileage' },
+            extra: { driverId: driver_id, recordedAt: lateRecordedAt },
+          });
+          throw error;
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,
