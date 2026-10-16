@@ -423,6 +423,10 @@ function TaskCard({
             {TAG_META[tag]?.label ?? tag}
           </span>
         ))}
+        {task.created && <DatePill label="added" date={task.created} />}
+        {task.status === "done" && task.closed && (
+          <DatePill label="closed" date={task.closed} />
+        )}
         <span className="ml-auto whitespace-nowrap text-[11px] font-semibold text-slate-400">
           {metaText(task, sourceLabels)}
         </span>
@@ -437,6 +441,15 @@ function TaskCard({
         </span>
       </span>
     </button>
+  );
+}
+
+/** Muted "added 2026-09-23" / "closed 2026-10-12" pill; dates are YYYY-MM-DD strings. */
+function DatePill({ label, date }: { label: string; date: string }) {
+  return (
+    <span className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-medium tabular-nums text-slate-400">
+      {label} {date}
+    </span>
   );
 }
 
