@@ -845,6 +845,23 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(mockedPrisma.cateringRequest.update).toHaveBeenCalled();
     });
 
+    it('allows a driver COMPLETED with the full set of 3 proof_of_delivery photos (multi-photo POD)', async () => {
+      setupMocks({
+        status: 'IN_PROGRESS',
+        driverStatus: 'ARRIVED_TO_CLIENT',
+        fileUploads: [
+          { category: 'proof_of_delivery' },
+          { category: 'proof_of_delivery' },
+          { category: 'proof_of_delivery' },
+        ],
+      });
+      mockCaller('driver-456', 'DRIVER');
+
+      const response = await patchStatus('COMPLETED');
+
+      expect(response.status).toBe(200);
+    });
+
     it('does not re-check the photo when a driver re-affirms a status they already hold', async () => {
       setupMocks({ status: 'COMPLETED', driverStatus: 'COMPLETED', fileUploads: [] });
       mockCaller('driver-456', 'DRIVER');

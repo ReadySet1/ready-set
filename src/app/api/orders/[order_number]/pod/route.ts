@@ -4,9 +4,11 @@ import { prisma } from '@/utils/prismaDB';
 import { deletePODImage } from '@/utils/supabase/storage';
 import * as Sentry from '@sentry/nextjs';
 import { handleStagePhotoUpload } from './stage-photo-upload';
+import { DELIVERY_PHOTO_CATEGORY, POD_MAX_PHOTOS } from '@/lib/driver/stage-photos';
 
 /**
- * POST - Upload a Proof of Delivery photo for an order
+ * POST - Upload a Proof of Delivery photo for an order (one per request, up
+ * to POD_MAX_PHOTOS per order; a further photo answers 409 POD_PHOTO_LIMIT)
  *
  * Creates a FileUpload record linked to either a CateringRequest or OnDemand
  * order with category='proof_of_delivery' and mirrors the URL onto the
@@ -21,7 +23,10 @@ export async function POST(
 }
 
 /**
- * GET - Get the Proof of Delivery photo URL for an order
+ * GET - Get the Proof of Delivery photos for an order
+ *
+ * `photos` lists every POD photo oldest first; `url` / `fileUploadId` /
+ * `uploadedAt` describe the first one (kept for single-photo callers).
  */
 export async function GET(
   request: NextRequest,
@@ -41,8 +46,8 @@ export async function GET(
       );
     }
 
-    // Find the order and its POD
-    let fileUpload = null;
+    // Find the order and its POD photos
+    let photos: Array<{ id: string; fileUrl: string; uploadedAt: Date }> = [];
 
     // Try catering request first
     const cateringRequest = await prisma.cateringRequest.findFirst({
@@ -52,15 +57,16 @@ export async function GET(
       },
       include: {
         fileUploads: {
-          where: { category: 'proof_of_delivery' },
-          orderBy: { uploadedAt: 'desc' },
-          take: 1,
+          where: { category: DELIVERY_PHOTO_CATEGORY },
+          orderBy: { uploadedAt: 'asc' },
+          take: POD_MAX_PHOTOS,
         },
       },
     });
 
+    let orderFound = !!cateringRequest;
     if (cateringRequest) {
-      fileUpload = cateringRequest.fileUploads[0] || null;
+      photos = cateringRequest.fileUploads;
     } else {
       // Try on-demand order
       const onDemandOrder = await prisma.onDemand.findFirst({
@@ -70,39 +76,47 @@ export async function GET(
         },
         include: {
           fileUploads: {
-            where: { category: 'proof_of_delivery' },
-            orderBy: { uploadedAt: 'desc' },
-            take: 1,
+            where: { category: DELIVERY_PHOTO_CATEGORY },
+            orderBy: { uploadedAt: 'asc' },
+            take: POD_MAX_PHOTOS,
           },
         },
       });
 
       if (onDemandOrder) {
-        fileUpload = onDemandOrder.fileUploads[0] || null;
+        orderFound = true;
+        photos = onDemandOrder.fileUploads;
       }
     }
 
-    if (!cateringRequest && !fileUpload) {
+    if (!orderFound) {
       return NextResponse.json(
         { success: false, error: 'Order not found' },
         { status: 404 }
       );
     }
 
-    if (!fileUpload) {
+    const [first] = photos;
+    if (!first) {
       return NextResponse.json({
         success: true,
         hasPhoto: false,
         url: null,
+        photos: [],
       });
     }
 
     return NextResponse.json({
       success: true,
       hasPhoto: true,
-      url: fileUpload.fileUrl,
-      uploadedAt: fileUpload.uploadedAt,
-      fileUploadId: fileUpload.id,
+      url: first.fileUrl,
+      uploadedAt: first.uploadedAt,
+      fileUploadId: first.id,
+      photos: photos.map((photo) => ({
+        id: photo.id,
+        url: photo.fileUrl,
+        uploadedAt: photo.uploadedAt,
+      })),
     });
   } catch (error) {
     Sentry.captureException(error, {
@@ -120,7 +134,8 @@ export async function GET(
 }
 
 /**
- * DELETE - Remove a Proof of Delivery photo from an order
+ * DELETE - Remove a Proof of Delivery photo from an order (the most recent
+ * one, when the order holds several)
  */
 export async function DELETE(
   request: NextRequest,
@@ -164,7 +179,8 @@ export async function DELETE(
       },
       include: {
         fileUploads: {
-          where: { category: 'proof_of_delivery' },
+          where: { category: DELIVERY_PHOTO_CATEGORY },
+          orderBy: { uploadedAt: 'desc' },
           take: 1,
         },
       },
@@ -181,7 +197,8 @@ export async function DELETE(
         },
         include: {
           fileUploads: {
-            where: { category: 'proof_of_delivery' },
+            where: { category: DELIVERY_PHOTO_CATEGORY },
+            orderBy: { uploadedAt: 'desc' },
             take: 1,
           },
         },

@@ -2,6 +2,9 @@ import { DriverStatus } from '@/types/user';
 import {
   DELIVERY_PHOTO_CATEGORY,
   PICKUP_PHOTO_CATEGORY,
+  POD_MAX_PHOTOS,
+  POD_PHOTO_LIMIT_CODE,
+  countUploadsInCategory,
   hasUploadInCategory,
   requiredPhotoForTransition,
   stageGateMessage,
@@ -76,5 +79,23 @@ describe('stageGateMessage (plain driver copy for a 422 gate code)', () => {
   it('returns null for an unknown code', () => {
     expect(stageGateMessage('SOMETHING_ELSE')).toBeNull();
     expect(stageGateMessage(undefined)).toBeNull();
+  });
+});
+
+describe('proof-of-delivery photo cap', () => {
+  it('allows up to three photos per order', () => {
+    expect(POD_MAX_PHOTOS).toBe(3);
+    expect(POD_PHOTO_LIMIT_CODE).toBe('POD_PHOTO_LIMIT');
+  });
+
+  it('countUploadsInCategory counts every matching upload, not just the first', () => {
+    const files = [
+      { category: 'proof_of_delivery' },
+      { category: 'pickup_photo' },
+      { category: 'Proof_Of_Delivery' },
+      null,
+    ];
+    expect(countUploadsInCategory(files, DELIVERY_PHOTO_CATEGORY)).toBe(2);
+    expect(countUploadsInCategory(null, DELIVERY_PHOTO_CATEGORY)).toBe(0);
   });
 });
