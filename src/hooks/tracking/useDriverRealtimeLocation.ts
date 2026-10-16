@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
+import { isOutOfOrderPoint } from '@/lib/tracking/late-point';
 import {
   createDriverLocationChannel,
   type DriverLocationChannel,
@@ -118,6 +119,15 @@ export function useDriverRealtimeLocation({
     connectGenRef.current++;
   }, []);
 
+  // Newest point shown so far. A late point (offline-queue replay) arriving
+  // after a newer one is history and must not move the marker backwards.
+  const latestShownAtRef = useRef<Date | null>(null);
+  const acceptLocation = useCallback((next: DriverLocation): boolean => {
+    if (isOutOfOrderPoint(next.lastUpdate, latestShownAtRef.current)) return false;
+    latestShownAtRef.current = next.lastUpdate;
+    return true;
+  }, []);
+
   // Handle location update from realtime channel
   const handleLocationUpdate = useCallback((payload: DriverLocationUpdatedPayload) => {
     // Filter for our specific driver
@@ -141,9 +151,10 @@ export function useDriverRealtimeLocation({
       lastUpdate: new Date(payload.timestamp),
     };
 
+    if (!acceptLocation(newLocation)) return;
     setLocation(newLocation);
     onLocationUpdateRef.current?.(newLocation);
-  }, []);
+  }, [acceptLocation]);
 
   // Database record type for location inserts
   interface LocationRecord {
@@ -171,9 +182,10 @@ export function useDriverRealtimeLocation({
       lastUpdate: new Date(record.recorded_at || Date.now()),
     };
 
+    if (!acceptLocation(newLocation)) return;
     setLocation(newLocation);
     onLocationUpdateRef.current?.(newLocation);
-  }, []);
+  }, [acceptLocation]);
 
   // Connect to realtime channel
   const connect = useCallback(async () => {
