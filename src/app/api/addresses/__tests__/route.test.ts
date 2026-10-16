@@ -760,6 +760,46 @@ describe("/api/addresses", () => {
       await expectNotFound(response);
     });
 
+    it("should return 404 and not update when the address is soft-deleted", async () => {
+      // The lookup must exclude soft-deleted rows; the DB returns nothing for them.
+      mockPrisma.address.findUnique.mockImplementation(async (args: any) =>
+        args?.where?.deletedAt === null ? null : { ...mockAddress, deletedAt: new Date() }
+      );
+
+      const request = createPutRequest(
+        `http://localhost:3000/api/addresses?id=${mockAddress.id}`,
+        { city: "Oakland" }
+      );
+
+      const response = await PUT(request);
+
+      await expectNotFound(response);
+      expect(mockPrisma.address.findUnique).toHaveBeenCalledWith({
+        where: { id: mockAddress.id, deletedAt: null },
+      });
+      expect(mockPrisma.address.update).not.toHaveBeenCalled();
+    });
+
+    it("should still let the creator update their own live address", async () => {
+      const request = createPutRequest(
+        `http://localhost:3000/api/addresses?id=${mockAddress.id}`,
+        { city: "Oakland" }
+      );
+
+      const response = await PUT(request);
+
+      await expectSuccessResponse(response, 200);
+      expect(mockPrisma.address.findUnique).toHaveBeenCalledWith({
+        where: { id: mockAddress.id, deletedAt: null },
+      });
+      expect(mockPrisma.address.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockAddress.id },
+          data: { city: "Oakland" },
+        })
+      );
+    });
+
     it("should allow creator to update their address", async () => {
       const request = createPutRequest(
         `http://localhost:3000/api/addresses?id=${mockAddress.id}`,
@@ -772,7 +812,7 @@ describe("/api/addresses", () => {
       expect(mockPrisma.address.update).toHaveBeenCalled();
     });
 
-    it("should return 403 when non-creator tries to update", async () => {
+    it("should return 404 (not 403) when non-creator tries to update, without leaking existence", async () => {
       const otherUserAddress = createMockAddress({
         id: "other-address-id",
         createdBy: "other-user-id",
@@ -788,7 +828,8 @@ describe("/api/addresses", () => {
 
       const response = await PUT(request);
 
-      await expectForbidden(response);
+      await expectNotFound(response);
+      expect(mockPrisma.address.update).not.toHaveBeenCalled();
     });
 
     it("should allow admin to update any address", async () => {
@@ -848,6 +889,25 @@ describe("/api/addresses", () => {
       await expectNotFound(response);
     });
 
+    it("should return 404 and not re-delete when the address is already soft-deleted", async () => {
+      mockPrisma.address.findUnique.mockImplementation(async (args: any) =>
+        args?.where?.deletedAt === null ? null : { ...mockAddress, deletedAt: new Date() }
+      );
+
+      const request = createDeleteRequest(
+        `http://localhost:3000/api/addresses?id=${mockAddress.id}`
+      );
+
+      const response = await DELETE(request);
+
+      await expectNotFound(response);
+      expect(mockPrisma.address.findUnique).toHaveBeenCalledWith({
+        where: { id: mockAddress.id, deletedAt: null },
+      });
+      expect(mockPrisma.address.update).not.toHaveBeenCalled();
+      expect(mockPrisma.userAddress.deleteMany).not.toHaveBeenCalled();
+    });
+
     it("should allow creator to delete their address (soft delete)", async () => {
       const request = createDeleteRequest(
         `http://localhost:3000/api/addresses?id=${mockAddress.id}`
@@ -866,7 +926,7 @@ describe("/api/addresses", () => {
       });
     });
 
-    it("should return 403 when non-creator tries to delete", async () => {
+    it("should return 404 (not 403) when non-creator tries to delete, without leaking existence", async () => {
       const otherUserAddress = createMockAddress({
         id: "other-address-id",
         createdBy: "other-user-id",
@@ -881,7 +941,9 @@ describe("/api/addresses", () => {
 
       const response = await DELETE(request);
 
-      await expectForbidden(response);
+      await expectNotFound(response);
+      expect(mockPrisma.address.update).not.toHaveBeenCalled();
+      expect(mockPrisma.userAddress.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should allow admin to delete any address", async () => {
