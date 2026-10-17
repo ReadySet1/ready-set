@@ -8,15 +8,22 @@
  * time and POSTs the contract-shaped status payload, HMAC-SHA256 signed
  * with the `x-readyset-signature` header (see `docs/catercow/API_CONTRACT.md`).
  *
- * Retry model (v1): up to 3 synchronous attempts with exponential
- * backoff, no retry on 4xx. The contract's "5 attempts over ~30 min"
- * durability needs a queue/cron and is a planned fast-follow; until then
- * a missed callback is recoverable by the partner via GET /orders/{id}.
+ * Retry model: every event is persisted to `partner_webhook_deliveries`
+ * and attempt 1 is made in-request (same latency as before on the happy
+ * path). Any non-2xx / timeout / network failure is left to the
+ * `/api/admin/partner-webhook-retry` cron worker, which retries with
+ * backoff up to the contract's "5 attempts over ~30 minutes" — see
+ * `partner-webhook-queue.ts`. A callback that still fails stays
+ * recoverable by the partner via GET /orders/{id}.
  */
 
 import { DriverStatus } from '@/types/prisma';
 import { prisma } from '@/lib/db/prisma';
-import { signPayload, SIGNATURE_HEADER } from '@/lib/security/hmac';
+import {
+  enqueuePartnerWebhook,
+  recordAttemptResult,
+  sendSignedWebhook,
+} from '@/lib/services/partner-webhook-queue';
 import { getPartnerByOrderNumber, type ResolvedPartner } from '@/lib/services/partner-registry';
 import { CarrierServiceClient } from '@/lib/services/carrier-service-client';
 import { webhookLogger } from '@/lib/services/webhook-logger';
@@ -61,23 +68,26 @@ export interface PartnerWebhookInput {
   driver?: { name: string; phone: string };
   location?: { lat: number; lng: number };
   notes?: string;
-}
-
-export type PartnerWebhookResult =
-  | { delivered: true; attempts: number; httpStatus: number }
-  | { delivered: false; skipped: 'misconfigured'; attempts: 0; httpStatus: null }
-  | { delivered: false; attempts: number; lastError: string; httpStatus: number | null };
-
-const RETRY = { maxAttempts: 3, baseDelayMs: 1000, timeoutMs: 10_000 };
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  /**
+   * The `order_status_history` row for this event. It is the queue's
+   * idempotency key: an event that is already queued is not sent again.
+   */
+  statusHistoryId?: string | null;
 }
 
 /**
- * Send a single status webhook to a partner. Best-effort: never throws —
- * callers fire-and-forget after the order state is already committed, so
- * a delivery failure must not roll back or fail the originating request.
+ * `queued` says whether the event made it into the durable queue — when
+ * true, a failed first attempt will be retried by the cron worker.
+ */
+export type PartnerWebhookResult =
+  | { delivered: true; attempts: 1; httpStatus: number; queued: boolean }
+  | { delivered: false; skipped: 'misconfigured' | 'duplicate'; attempts: 0; httpStatus: null }
+  | { delivered: false; attempts: 1; lastError: string; httpStatus: number | null; queued: boolean };
+
+/**
+ * Queue a status webhook and make the first attempt. Best-effort: never
+ * throws — callers run it after the order state is already committed, so a
+ * delivery failure must not roll back or fail the originating request.
  */
 export async function dispatchPartnerWebhook(input: PartnerWebhookInput): Promise<PartnerWebhookResult> {
   const { partner } = input;
@@ -102,74 +112,67 @@ export async function dispatchPartnerWebhook(input: PartnerWebhookInput): Promis
     ...(input.notes ? { notes: input.notes } : {}),
   };
   const body = JSON.stringify(payload);
-  const signature = await signPayload(partner.webhookSecret, body);
 
-  let lastError = 'unknown error';
-  let lastStatus: number | null = null;
+  const queued = await enqueuePartnerWebhook({
+    partnerId: partner.id,
+    cateringRequestId: input.orderId,
+    orderNumber: input.orderNumber,
+    statusHistoryId: input.statusHistoryId ?? null,
+    eventStatus: input.status,
+    payload,
+  });
+  if (queued && !queued.created) {
+    carrierLogger.info(
+      `[partner-webhook] ${input.status} for ${input.orderNumber} is already queued — not sending again`
+    );
+    return { delivered: false, skipped: 'duplicate', attempts: 0, httpStatus: null };
+  }
 
-  for (let attempt = 1; attempt <= RETRY.maxAttempts; attempt++) {
-    const start = Date.now();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), RETRY.timeoutMs);
+  const outcome = await sendSignedWebhook({
+    url: partner.webhookUrl,
+    secret: partner.webhookSecret,
+    body,
+  });
 
+  if (outcome.ok) {
+    await webhookLogger.logSuccess({
+      carrierId: partner.slug,
+      orderNumber: input.orderNumber,
+      status: input.status,
+      responseTime: outcome.responseTimeMs,
+    });
+  } else {
+    await webhookLogger.logFailure({
+      carrierId: partner.slug,
+      orderNumber: input.orderNumber,
+      status: input.status,
+      errorMessage: outcome.error ?? 'unknown error',
+      responseTime: outcome.responseTimeMs,
+    });
+  }
+
+  if (queued) {
     try {
-      const res = await fetch(partner.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          [SIGNATURE_HEADER]: signature,
-        },
-        body,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      lastStatus = res.status;
-      const responseTime = Date.now() - start;
-
-      if (res.ok) {
-        await webhookLogger.logSuccess({
-          carrierId: partner.slug,
-          orderNumber: input.orderNumber,
-          status: input.status,
-          responseTime,
-        });
-        return { delivered: true, attempts: attempt, httpStatus: res.status };
-      }
-
-      lastError = `HTTP ${res.status}`;
-      await webhookLogger.logFailure({
-        carrierId: partner.slug,
-        orderNumber: input.orderNumber,
-        status: input.status,
-        errorMessage: lastError,
-        responseTime,
-      });
-
-      // 4xx is a client error on the partner's side — retrying won't help.
-      if (res.status >= 400 && res.status < 500) break;
+      await recordAttemptResult(queued, outcome);
     } catch (err) {
-      clearTimeout(timeoutId);
-      lastError =
-        err instanceof Error
-          ? err.name === 'AbortError'
-            ? `request timed out after ${RETRY.timeoutMs}ms`
-            : err.message
-          : 'unknown error';
-      await webhookLogger.logFailure({
-        carrierId: partner.slug,
-        orderNumber: input.orderNumber,
-        status: input.status,
-        errorMessage: lastError,
-        responseTime: Date.now() - start,
-      });
-    }
-
-    if (attempt < RETRY.maxAttempts) {
-      await sleep(RETRY.baseDelayMs * Math.pow(2, attempt - 1));
+      // The row keeps its lease and comes due for the worker, which may
+      // repeat a delivered attempt — at-least-once, as the contract allows.
+      carrierLogger.error(
+        `[partner-webhook] failed to record attempt for ${input.orderNumber}:`,
+        err
+      );
     }
   }
 
-  return { delivered: false, attempts: RETRY.maxAttempts, lastError, httpStatus: lastStatus };
+  return outcome.ok
+    ? { delivered: true, attempts: 1, httpStatus: outcome.httpStatus ?? 200, queued: queued !== null }
+    : {
+        delivered: false,
+        attempts: 1,
+        lastError: outcome.error ?? 'unknown error',
+        httpStatus: outcome.httpStatus,
+        queued: queued !== null,
+      };
 }
 
 function stripPrefix(orderNumber: string, prefix: string): string {
@@ -211,8 +214,9 @@ export async function recordAndDispatchLifecycleEvent(input: LifecycleEventInput
     const partner = await getPartnerByOrderNumber(input.orderNumber);
     if (!partner) return;
 
+    let statusHistoryId: string | null = null;
     try {
-      await prisma.orderStatusHistory.create({
+      const history = await prisma.orderStatusHistory.create({
         data: {
           cateringRequestId: input.orderId,
           partnerStatus: input.partnerStatus,
@@ -221,7 +225,9 @@ export async function recordAndDispatchLifecycleEvent(input: LifecycleEventInput
           location: input.location ?? undefined,
           notes: input.notes,
         },
+        select: { id: true },
       });
+      statusHistoryId = history?.id ?? null;
     } catch (err) {
       carrierLogger.error(
         `[partner-webhook] failed to record status history for ${input.orderNumber}:`,
@@ -238,6 +244,7 @@ export async function recordAndDispatchLifecycleEvent(input: LifecycleEventInput
       driver: input.driver,
       location: input.location,
       notes: input.notes,
+      statusHistoryId,
     });
   } catch (err) {
     carrierLogger.error(

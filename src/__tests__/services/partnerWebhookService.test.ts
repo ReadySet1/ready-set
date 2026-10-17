@@ -2,8 +2,9 @@
 //
 // Unit tests for the registry-driven partner webhook dispatcher:
 // status mapping, the skip-when-unconfigured guard, HMAC-signed POST,
-// no-retry-on-4xx, and the record+dispatch orchestration (history write,
-// legacy-carrier guard, non-partner no-op).
+// enqueue + single in-request attempt (retries belong to the cron worker),
+// and the record+dispatch orchestration (history write, legacy-carrier
+// guard, non-partner no-op).
 
 import {
   dispatchPartnerWebhook,
@@ -15,8 +16,13 @@ import { getPartnerByOrderNumber } from '@/lib/services/partner-registry';
 import { signPayload } from '@/lib/security/hmac';
 
 jest.mock('@/lib/db/prisma', () => ({
-  prisma: { orderStatusHistory: { create: jest.fn() } },
+  prisma: {
+    orderStatusHistory: { create: jest.fn() },
+    partnerWebhookDelivery: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
+  },
 }));
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn(), captureMessage: jest.fn() }));
 
 jest.mock('@/lib/services/partner-registry', () => ({
   getPartnerByOrderNumber: jest.fn(),
@@ -47,10 +53,17 @@ const PARTNER = {
 };
 
 const mockFetch = jest.fn();
+const deliveries = prisma.partnerWebhookDelivery as unknown as {
+  create: jest.Mock;
+  findUnique: jest.Mock;
+  updateMany: jest.Mock;
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = mockFetch as unknown as typeof fetch;
+  deliveries.create.mockResolvedValue({ id: 'delivery-1', attempts: 0 });
+  deliveries.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe('DRIVER_STATUS_TO_PARTNER_LIFECYCLE', () => {
@@ -82,6 +95,7 @@ describe('dispatchPartnerWebhook', () => {
 
     expect(result).toEqual({ delivered: false, skipped: 'misconfigured', attempts: 0, httpStatus: null });
     expect(mockFetch).not.toHaveBeenCalled();
+    expect(deliveries.create).not.toHaveBeenCalled();
   });
 
   it('POSTs an HMAC-signed payload and reports delivery on 200', async () => {
@@ -89,7 +103,7 @@ describe('dispatchPartnerWebhook', () => {
 
     const result = await dispatchPartnerWebhook(baseInput);
 
-    expect(result).toEqual({ delivered: true, attempts: 1, httpStatus: 200 });
+    expect(result).toEqual({ delivered: true, attempts: 1, httpStatus: 200, queued: true });
     expect(signPayload).toHaveBeenCalledWith('shared-secret', expect.any(String));
 
     const [url, init] = mockFetch.mock.calls[0];
@@ -101,13 +115,70 @@ describe('dispatchPartnerWebhook', () => {
     expect(typeof body.timestamp).toBe('string');
   });
 
-  it('does not retry on a 4xx response', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({}) });
+  it('enqueues the event before the first attempt and signs exactly the queued payload', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await dispatchPartnerWebhook({ ...baseInput, statusHistoryId: 'hist-1' });
+
+    const { data } = deliveries.create.mock.calls[0][0];
+    expect(data).toMatchObject({
+      partnerId: 'partner-cc-id',
+      cateringRequestId: 'order-uuid',
+      orderNumber: 'CC-12345',
+      statusHistoryId: 'hist-1',
+      eventStatus: 'ASSIGNED',
+      state: 'PENDING',
+    });
+    const [, init] = mockFetch.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual(data.payload);
+    expect(signPayload).toHaveBeenCalledWith('shared-secret', init.body);
+  });
+
+  it('records a success on the queued row', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await dispatchPartnerWebhook(baseInput);
+
+    expect(deliveries.updateMany).toHaveBeenCalledWith({
+      where: { id: 'delivery-1', state: 'PENDING', attempts: 0 },
+      data: expect.objectContaining({ state: 'SUCCEEDED', attempts: 1 }),
+    });
+  });
+
+  it.each([400, 503])(
+    'makes a single in-request attempt on HTTP %i and leaves the retry to the worker',
+    async (status) => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status });
+
+      const result = await dispatchPartnerWebhook(baseInput);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ delivered: false, attempts: 1, httpStatus: status, queued: true });
+      expect(deliveries.updateMany).toHaveBeenCalledWith({
+        where: { id: 'delivery-1', state: 'PENDING', attempts: 0 },
+        data: expect.objectContaining({ state: 'PENDING', attempts: 1, lastStatusCode: status }),
+      });
+    },
+  );
+
+  it('does not send again when the event is already queued', async () => {
+    deliveries.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
+    deliveries.findUnique.mockResolvedValueOnce({ id: 'delivery-1', attempts: 1 });
+
+    const result = await dispatchPartnerWebhook({ ...baseInput, statusHistoryId: 'hist-1' });
+
+    expect(result).toEqual({ delivered: false, skipped: 'duplicate', attempts: 0, httpStatus: null });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('still makes the in-request attempt when the queue write fails', async () => {
+    deliveries.create.mockRejectedValueOnce(new Error('relation does not exist'));
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
 
     const result = await dispatchPartnerWebhook(baseInput);
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ delivered: false, httpStatus: 400 });
+    expect(result).toEqual({ delivered: true, attempts: 1, httpStatus: 200, queued: false });
+    expect(deliveries.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -126,6 +197,7 @@ describe('recordAndDispatchLifecycleEvent', () => {
 
   it('records history and dispatches for a registry partner order', async () => {
     (getPartnerByOrderNumber as jest.Mock).mockResolvedValueOnce(PARTNER);
+    (prisma.orderStatusHistory.create as jest.Mock).mockResolvedValueOnce({ id: 'hist-9' });
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
 
     await recordAndDispatchLifecycleEvent({
@@ -143,8 +215,28 @@ describe('recordAndDispatchLifecycleEvent', () => {
         driverStatus: 'COMPLETED',
         changedBy: 'driver-1',
       }),
+      select: { id: true },
     });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(deliveries.create.mock.calls[0][0].data).toMatchObject({
+      statusHistoryId: 'hist-9',
+      eventStatus: 'DELIVERED',
+    });
+  });
+
+  it('still dispatches (without an idempotency key) when the history write fails', async () => {
+    (getPartnerByOrderNumber as jest.Mock).mockResolvedValueOnce(PARTNER);
+    (prisma.orderStatusHistory.create as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await recordAndDispatchLifecycleEvent({
+      orderId: 'order-uuid',
+      orderNumber: 'CC-12345',
+      partnerStatus: 'ASSIGNED',
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(deliveries.create.mock.calls[0][0].data).toMatchObject({ statusHistoryId: null });
   });
 
   it('no-ops when the order is not owned by any registry partner', async () => {

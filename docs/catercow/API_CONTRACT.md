@@ -2,8 +2,8 @@
 
 **Audience:** CaterCow Engineering
 **Status:** Reflects current Ready Set implementation
-**Last Updated:** 2026-05-12
-**Version:** 0.2
+**Last Updated:** 2026-10-16
+**Version:** 0.3
 
 > This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
 
@@ -330,6 +330,14 @@ x-readyset-signature: <HMAC-SHA256 of body using shared secret>
 
 CaterCow's webhook should return `200 OK` within 10 seconds. Non-2xx responses trigger retry with exponential backoff (5 attempts over ~30 minutes).
 
+### Delivery and retries
+
+- **Any** non-2xx response, a timeout (no answer within 10 seconds) or a connection error counts as a failed attempt, 4xx included.
+- Attempts run at roughly **t+0, 2, 6, 14 and 30 minutes** after the status change (each retry may land up to a minute later than listed). After the 5th failure Ready Set stops retrying that event; the current status stays available via `GET /orders/{id}`.
+- Every retry sends the **same body**, including the original `timestamp` (the time of the status change, not of the attempt). The `x-readyset-signature` header is computed over that exact body with the signing secret that is current at send time.
+- Delivery is **at-least-once**: the same event can occasionally arrive twice. Treat `(orderId, status, timestamp)` as the deduplication key.
+- Events for the same order are retried independently, so a retried event can arrive after a newer one. Use `timestamp` to order them.
+
 ---
 
 ## Pricing
@@ -469,6 +477,10 @@ Ready Set will provide:
 ---
 
 ## Changelog
+
+### v0.3 (2026-10-16)
+- Status webhook retries are now durable: failed callbacks are retried from a persisted queue, so the existing "5 attempts over ~30 minutes" promise holds even when the original request has finished. Previously Ready Set retried 3 times within a few seconds and never retried a 4xx.
+- Added a "Delivery and retries" section: what counts as a failed attempt (all non-2xx, timeouts, connection errors), the retry schedule, the body and `timestamp` staying the same across retries, at-least-once delivery, and possible out-of-order arrival.
 
 ### v0.2 (2026-05-12)
 - Reconciled response shapes with the live route implementations. Previous v0.1 fields drifted from what shipped:
