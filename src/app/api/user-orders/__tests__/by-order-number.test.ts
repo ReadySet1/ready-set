@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { GET } from "../[order_number]/route";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
+import { expectUserIdFilter } from "@/__tests__/helpers/api-test-helpers";
 
 // Mocks
 jest.mock("@/utils/prismaDB", () => ({
@@ -185,6 +186,44 @@ describe("/api/user-orders/[order_number]", () => {
 
     expect(res.status).toBe(404);
     expect(json.message).toBe("Order not found");
+  });
+
+  // ---- Non-owner gets 404 ------------------------------------------------
+
+  it("returns 404 when order belongs to another user (catering and on-demand lookups both filter by userId)", async () => {
+    // Both findFirst return null because the userId filter excludes the order
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(null);
+
+    const res = await GET({} as NextRequest, {
+      params: Promise.resolve({ order_number: encodeURIComponent("CAT001") }),
+    });
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.message).toBe("Order not found");
+  });
+
+  it("passes the caller's userId to the catering findFirst", async () => {
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(baseCatering);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(null);
+
+    await GET({} as NextRequest, {
+      params: Promise.resolve({ order_number: encodeURIComponent("CAT001") }),
+    });
+
+    expectUserIdFilter(mockPrisma.cateringRequest.findFirst, mockUser.id);
+  });
+
+  it("passes the caller's userId to the on-demand fallback findFirst", async () => {
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(baseOnDemand);
+
+    await GET({} as NextRequest, {
+      params: Promise.resolve({ order_number: encodeURIComponent("OND001") }),
+    });
+
+    expectUserIdFilter(mockPrisma.onDemand.findFirst, mockUser.id);
   });
 });
 
