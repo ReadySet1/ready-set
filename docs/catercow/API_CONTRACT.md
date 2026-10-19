@@ -5,7 +5,7 @@
 **Last Updated:** 2026-10-16
 **Version:** 0.3
 
-> This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
+> This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). v0.3 makes status-webhook retries durable: every non-2xx response (4xx included), timeout or connection error is retried on the schedule in [Delivery and retries](#delivery-and-retries), so expect at-least-once delivery. All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
 
 ---
 
