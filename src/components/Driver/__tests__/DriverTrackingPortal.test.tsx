@@ -46,8 +46,12 @@ jest.mock("@/components/Driver/DriverLiveMap", () => ({
 // POD capture pulls in camera APIs — stub it for the sheet path. The stub
 // exposes a button so tests can drive the upload-complete callback.
 jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
-  ProofOfDeliveryCapture: ({ onUploadComplete }: any) => (
-    <div data-testid="pod-capture">
+  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint, maxPhotos }: any) => (
+    <div
+      data-testid="pod-capture"
+      data-endpoint={uploadEndpoint}
+      data-max-photos={String(maxPhotos ?? 1)}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/photo.jpg")}>
         finish pod upload
       </button>
@@ -64,8 +68,12 @@ jest.mock("@/lib/auth/bearer-session", () => ({
 }));
 
 jest.mock("@/components/Driver/SignatureCapture", () => ({
-  SignatureCapture: ({ onUploadComplete }: any) => (
-    <div data-testid="signature-capture">
+  SignatureCapture: ({ onUploadComplete, stage, uploadEndpoint }: any) => (
+    <div
+      data-testid="signature-capture"
+      data-stage={stage ?? "pickup"}
+      data-endpoint={uploadEndpoint}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/signature.png")}>
         finish signature upload
       </button>
@@ -83,6 +91,14 @@ const requestLocationPermission = jest.fn().mockResolvedValue(true);
 const startShift = jest.fn().mockResolvedValue(true);
 const endShift = jest.fn().mockResolvedValue(true);
 const updateDeliveryStatus = jest.fn().mockResolvedValue(true);
+// The portal advances through advanceDeliveryStatus (structured outcome);
+// by default it mirrors updateDeliveryStatus so the boolean-based tests keep
+// driving it, and a test can resolve it with a 422 gate outcome directly.
+const advanceDeliveryStatus = jest.fn(async (...args: unknown[]) => {
+  const result = await updateDeliveryStatus(...args);
+  if (result === true) return { ok: true };
+  return result && typeof result === "object" ? result : { ok: false };
+});
 const refreshDeliveries = jest.fn().mockResolvedValue(undefined);
 
 const sampleLocation = {
@@ -121,6 +137,7 @@ function baseCtx(overrides: Record<string, unknown> = {}) {
     deliveriesLoading: false,
     deliveriesError: null,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
     isOnline: true,
     queuedItems: 0,
@@ -311,14 +328,20 @@ describe("DriverTrackingPortal (redesigned)", () => {
     // The final step routes through proof-of-delivery capture.
     fireEvent.click(screen.getByText(/complete delivery/i));
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+    // Same completion photo as the detail screen: up to 3 photos.
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
 
-    // Drive the capture flow to completion; the status update fails.
+    // Drive the capture flow (photo, then recipient) to completion; the
+    // status update fails.
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish signature upload/i }),
+    );
 
-    // The upload already succeeded — the sheet closes right away and the
+    // The uploads already succeeded — the sheet closes right away and the
     // failed advance is surfaced via toast (retry from the delivery card).
     await waitFor(() =>
-      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(updateDeliveryStatus).toHaveBeenCalledWith(
@@ -330,6 +353,44 @@ describe("DriverTrackingPortal (redesigned)", () => {
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
         expect.stringMatching(/couldn't update the delivery status/i),
+      ),
+    );
+  });
+
+  it("asks for the recipient's signature or name after the setup photo, before completing", async () => {
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status: DriverStatus.ARRIVED_TO_CLIENT,
+            deliveryLocation: { coordinates: [-122.41, 37.77] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    fireEvent.click(screen.getByText(/complete delivery/i));
+    fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+
+    const capture = await screen.findByTestId("signature-capture");
+    expect(capture).toHaveAttribute("data-stage", "delivery");
+    expect(capture).toHaveAttribute("data-endpoint", "/api/orders/cr-1/recipient");
+    expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
+    expect(updateDeliveryStatus).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /finish signature upload/i }));
+    await waitFor(() =>
+      expect(updateDeliveryStatus).toHaveBeenCalledWith(
+        "del-1",
+        DriverStatus.COMPLETED,
+        sampleLocation,
       ),
     );
   });
@@ -361,12 +422,16 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /finish signature upload/i }),
+    );
 
     // The sheet must close while the PATCH + refetch are still in flight —
     // on LTE they take seconds and an open sheet reads as a hang.
     await waitFor(() =>
-      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument(),
     );
+    expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
     expect(updateDeliveryStatus).toHaveBeenCalledWith(
       "del-1",
       DriverStatus.COMPLETED,
@@ -400,6 +465,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
     renderPortal();
 
     fireEvent.click(screen.getByText(/picked up the order/i));
+    fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
     expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
 
     fireEvent.click(
@@ -458,7 +524,7 @@ describe("DriverTrackingPortal (redesigned)", () => {
     expect(screen.getByText(/#CR-LATER/)).toBeInTheDocument();
   });
 
-  it("routes the pickup step through the signature sheet instead of advancing directly", async () => {
+  it("routes the pickup step through the pickup photo, then the signature sheet, instead of advancing directly", async () => {
     // Jul-3 walk-test regression: this surface advanced ARRIVED_AT_VENDOR ->
     // PICKED_UP with no vendor signature (the gate only existed in
     // DriverDeliveryDetail). The pickup mandate applies on every surface.
@@ -482,8 +548,24 @@ describe("DriverTrackingPortal (redesigned)", () => {
 
     fireEvent.click(screen.getByText(/picked up the order/i));
 
-    // The signature sheet opens and NO status update happens yet.
-    expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+    // The pickup photo sheet opens first (the server gates PICKED_UP on it)...
+    expect(await screen.findByText("Photo of the order")).toBeInTheDocument();
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute(
+      "data-endpoint",
+      "/api/orders/cr-1/pickup-photo",
+    );
+    // The pickup photo stays a single photo; only the setup photo takes 3.
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "1");
+    expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument();
+    expect(updateDeliveryStatus).not.toHaveBeenCalled();
+
+    // ...then the pickup confirmation, still with NO status update.
+    fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    expect(await screen.findByTestId("signature-capture")).toHaveAttribute(
+      "data-stage",
+      "pickup",
+    );
+    expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
     expect(updateDeliveryStatus).not.toHaveBeenCalled();
 
     // Completing the signature advances to PICKED_UP.
@@ -497,6 +579,175 @@ describe("DriverTrackingPortal (redesigned)", () => {
         sampleLocation,
       ),
     );
+  });
+
+  describe("stage gates (same rules as the delivery detail screen)", () => {
+    const onShift = (delivery: Record<string, unknown>) =>
+      mockUseDriverTracking.mockReturnValue(
+        baseCtx({
+          isShiftActive: true,
+          currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+          currentLocation: sampleLocation,
+          activeDeliveries: [
+            {
+              id: "del-1",
+              cateringRequestId: "cr-1",
+              driverId: "driver-1",
+              deliveryLocation: { coordinates: [-122.41, 37.77] },
+              ...delivery,
+            },
+          ],
+        }),
+      );
+
+    const rejectOnce = (code: string, message?: string) =>
+      advanceDeliveryStatus.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        code,
+        ...(message ? { message } : {}),
+      } as any);
+
+    const genericToastShown = () =>
+      (toast.error as jest.Mock).mock.calls.some(([m]) =>
+        /couldn't update the delivery status/i.test(String(m)),
+      );
+
+    /** Pickup flow: photo → confirmation → advance. */
+    const runPickup = async () => {
+      fireEvent.click(screen.getByText(/picked up the order/i));
+      fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /finish signature upload/i }),
+      );
+    };
+
+    it("goes straight to the recipient sheet when the setup photo is already on file", async () => {
+      onShift({
+        status: DriverStatus.ARRIVED_TO_CLIENT,
+        proofOfDelivery: "https://pod.example/photo.jpg",
+      });
+      renderPortal();
+
+      fireEvent.click(screen.getByText(/complete delivery/i));
+
+      expect(await screen.findByTestId("signature-capture")).toHaveAttribute(
+        "data-stage",
+        "delivery",
+      );
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
+      expect(advanceDeliveryStatus).not.toHaveBeenCalled();
+    });
+
+    it("reopens the pickup photo sheet with a plain message on 422 PICKUP_PHOTO_REQUIRED", async () => {
+      onShift({ status: DriverStatus.ARRIVED_AT_VENDOR });
+      rejectOnce(
+        "PICKUP_PHOTO_REQUIRED",
+        "Take a photo of the order at the vendor before marking it picked up.",
+      );
+      renderPortal();
+
+      await runPickup();
+
+      expect(await screen.findByText("Photo of the order")).toBeInTheDocument();
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute(
+        "data-endpoint",
+        "/api/orders/cr-1/pickup-photo",
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        "Take a photo of the order at the vendor before marking it picked up.",
+      );
+      expect(genericToastShown()).toBe(false);
+    });
+
+    it("reopens the pickup confirmation on 422 PICKUP_CONFIRMATION_REQUIRED", async () => {
+      onShift({ status: DriverStatus.ARRIVED_AT_VENDOR });
+      rejectOnce("PICKUP_CONFIRMATION_REQUIRED");
+      renderPortal();
+
+      await runPickup();
+
+      await waitFor(() =>
+        expect(screen.getByTestId("signature-capture")).toHaveAttribute(
+          "data-stage",
+          "pickup",
+        ),
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/handed over the order/i),
+      );
+      expect(genericToastShown()).toBe(false);
+    });
+
+    it("reopens the POD sheet on 422 POD_REQUIRED, with plain fallback copy when the server sent none", async () => {
+      onShift({
+        status: DriverStatus.ARRIVED_TO_CLIENT,
+        proofOfDelivery: "https://pod.example/photo.jpg",
+      });
+      rejectOnce("POD_REQUIRED");
+      renderPortal();
+
+      fireEvent.click(screen.getByText(/complete delivery/i));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /finish signature upload/i }),
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pod-capture")).toHaveAttribute(
+          "data-endpoint",
+          "/api/orders/cr-1/pod",
+        ),
+      );
+      // The reopened setup-photo sheet is the multi-photo capture.
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/photo of the setup/i),
+      );
+      expect(genericToastShown()).toBe(false);
+    });
+
+    it("reopens the recipient sheet on 422 RECIPIENT_REQUIRED", async () => {
+      onShift({
+        status: DriverStatus.ARRIVED_TO_CLIENT,
+        proofOfDelivery: "https://pod.example/photo.jpg",
+      });
+      rejectOnce(
+        "RECIPIENT_REQUIRED",
+        "Get the recipient's signature, or their name if they refuse to sign, before completing the delivery.",
+      );
+      renderPortal();
+
+      fireEvent.click(screen.getByText(/complete delivery/i));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /finish signature upload/i }),
+      );
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Get the recipient's signature, or their name if they refuse to sign, before completing the delivery.",
+        ),
+      );
+      expect(await screen.findByTestId("signature-capture")).toHaveAttribute(
+        "data-stage",
+        "delivery",
+      );
+      expect(genericToastShown()).toBe(false);
+    });
+
+    it("shows the plain shift message on 422 SHIFT_REQUIRED", async () => {
+      onShift({ status: DriverStatus.ASSIGNED });
+      rejectOnce("SHIFT_REQUIRED");
+      renderPortal();
+
+      fireEvent.click(screen.getByText(/on my way to vendor/i));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringMatching(/start your shift/i),
+        ),
+      );
+      expect(genericToastShown()).toBe(false);
+    });
   });
 
   it("shows an offline banner when offline", () => {
@@ -644,6 +895,19 @@ describe("DriverTrackingPortal (redesigned)", () => {
       );
       await waitFor(() => expect(refreshDeliveries).toHaveBeenCalled());
       expect(endShift).not.toHaveBeenCalled();
+    });
+
+    it("keeps End shift on one line next to a long blocked-state hint (375px)", () => {
+      // 2026-10 iPhone X: the hint squeezed the button until it wrapped to
+      // "End / shift". The button must not shrink; the hint column wraps.
+      mockUseDriverTracking.mockReturnValue(
+        withDelivery({ status: DriverStatus.EN_ROUTE_TO_CLIENT }),
+      );
+      renderPortal();
+      const button = screen.getByRole("button", { name: /end shift/i });
+      expect(button).toHaveClass("shrink-0", "whitespace-nowrap");
+      const hint = screen.getByText(/order cr-1 to finish or return first/i);
+      expect(hint.parentElement).toHaveClass("min-w-0");
     });
 
     it("names the blocking order in the blocked-state hint", () => {

@@ -1,12 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
-import type { PODGalleryItem } from '@/types/proof-of-delivery';
+import type { PODGalleryItem, PODGalleryPhoto } from '@/types/proof-of-delivery';
+import { DELIVERY_PHOTO_CATEGORY, POD_MAX_PHOTOS } from '@/lib/driver/stage-photos';
+import { POD_BUCKET_NAME } from '@/utils/supabase/storage';
+import { DEFAULT_SIGNED_URL_EXPIRATION } from '@/config/file-config';
+
+/**
+ * Every POD photo (up to POD_MAX_PHOTOS, oldest first) for the given order
+ * numbers, keyed by lower-cased order number, with URLs signed against the
+ * private delivery-proofs bucket. The `deliveries` row only mirrors the
+ * newest upload, so the file_uploads rows on the order are the source.
+ */
+async function loadPodPhotos(orderNumbers: string[]): Promise<Map<string, PODGalleryPhoto[]>> {
+  const byOrder = new Map<string, PODGalleryPhoto[]>();
+  if (orderNumbers.length === 0) return byOrder;
+
+  const orderFilter = {
+    orderNumber: { in: orderNumbers, mode: 'insensitive' as const },
+    deletedAt: null,
+  };
+  const files = await prisma.fileUpload.findMany({
+    where: {
+      category: DELIVERY_PHOTO_CATEGORY,
+      OR: [{ cateringRequest: orderFilter }, { onDemand: orderFilter }],
+    },
+    select: {
+      id: true,
+      fileUrl: true,
+      filePath: true,
+      uploadedAt: true,
+      cateringRequest: { select: { orderNumber: true } },
+      onDemand: { select: { orderNumber: true } },
+    },
+    orderBy: { uploadedAt: 'asc' },
+  });
+
+  const paths = files.map((f) => f.filePath).filter((p): p is string => !!p);
+  let signed = new Map<string, string>();
+  if (paths.length > 0) {
+    const { getSignedUrlCache } = await import('@/lib/signed-url-cache');
+    signed = await getSignedUrlCache().getBatchSignedUrls(
+      POD_BUCKET_NAME,
+      paths,
+      DEFAULT_SIGNED_URL_EXPIRATION,
+    );
+  }
+
+  for (const file of files) {
+    const orderNumber = file.cateringRequest?.orderNumber ?? file.onDemand?.orderNumber;
+    if (!orderNumber) continue;
+    const key = orderNumber.toLowerCase();
+    const list = byOrder.get(key) ?? [];
+    if (list.length >= POD_MAX_PHOTOS) continue;
+    list.push({
+      id: file.id,
+      url: (file.filePath && signed.get(file.filePath)) || file.fileUrl,
+      uploadedAt: file.uploadedAt,
+    });
+    byOrder.set(key, list);
+  }
+  return byOrder;
+}
 
 /**
  * GET /api/tracking/deliveries/pod-gallery
  *
- * Fetches paginated proof of delivery photos for the admin gallery.
+ * Fetches paginated proof of delivery photos for the admin gallery: one item
+ * per delivery, carrying every POD photo of its order in `photos`.
  * Supports search, driver filtering, and date range filtering.
  */
 export async function GET(request: NextRequest) {
@@ -120,19 +181,32 @@ export async function GET(request: NextRequest) {
       prisma.$queryRawUnsafe<{ total: bigint }[]>(countQuery, ...countParams)
     ]);
 
-    // Transform results to PODGalleryItem format
-    const items: PODGalleryItem[] = dataResult.map(row => ({
-      id: row.id,
-      deliveryId: row.delivery_id,
-      orderNumber: row.order_number || row.id,
-      photoUrl: row.photo_url,
-      capturedAt: new Date(row.captured_at),
-      driverName: row.driver_name,
-      driverId: row.driver_id,
-      customerName: row.customer_name || undefined,
-      deliveryAddress: row.delivery_address || undefined,
-      deliveryStatus: row.status
-    }));
+    const photosByOrder = await loadPodPhotos(
+      dataResult
+        .map((row) => row.order_number)
+        .filter((n): n is string => typeof n === 'string' && n.length > 0),
+    );
+
+    // Transform results to PODGalleryItem format. Without POD rows on the
+    // order (legacy data) the deliveries mirror URL is the only photo.
+    const items: PODGalleryItem[] = dataResult.map(row => {
+      const photos: PODGalleryPhoto[] =
+        photosByOrder.get(String(row.order_number || '').toLowerCase()) ??
+        [{ id: row.id, url: row.photo_url, uploadedAt: new Date(row.captured_at) }];
+      return {
+        id: row.id,
+        deliveryId: row.delivery_id,
+        orderNumber: row.order_number || row.id,
+        photoUrl: photos[0]?.url ?? row.photo_url,
+        photos,
+        capturedAt: new Date(row.captured_at),
+        driverName: row.driver_name,
+        driverId: row.driver_id,
+        customerName: row.customer_name || undefined,
+        deliveryAddress: row.delivery_address || undefined,
+        deliveryStatus: row.status
+      };
+    });
 
     const totalItems = Number(countResult[0]?.total || 0);
 

@@ -143,7 +143,9 @@ jest.mock("../ProofOfDeliveryCapture", () => ({
 }));
 
 jest.mock("../ProofOfDeliveryViewer", () => ({
-  ProofOfDeliveryViewer: () => <div data-testid="pod-viewer">POD Viewer</div>,
+  ProofOfDeliveryViewer: ({ photoUrl }: { photoUrl: string }) => (
+    <div data-testid="pod-viewer" data-url={photoUrl}>POD Viewer</div>
+  ),
 }));
 
 // Mock lib/utils
@@ -251,6 +253,35 @@ describe("DriverDashboardPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Back to Dashboard")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Proof of delivery card", () => {
+    afterEach(() => mockFetch.mockReset());
+
+    it("shows every proof-of-delivery photo on the order (up to 3)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ...mockCateringOrder,
+          fileUploads: [
+            { category: "proof_of_delivery", fileUrl: "https://cdn/pod-1.jpg" },
+            { category: "pickup_photo", fileUrl: "https://cdn/pickup.jpg" },
+            { category: "proof_of_delivery", fileUrl: "https://cdn/pod-2.jpg" },
+            { category: "proof_of_delivery", fileUrl: "https://cdn/pod-3.jpg" },
+          ],
+        }),
+      });
+
+      render(<DriverDashboardPage />);
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId("pod-viewer")).toHaveLength(3);
+      });
+      expect(
+        screen.getAllByTestId("pod-viewer").map((el) => el.getAttribute("data-url")),
+      ).toEqual(["https://cdn/pod-1.jpg", "https://cdn/pod-2.jpg", "https://cdn/pod-3.jpg"]);
+      expect(screen.getByText("3 photos")).toBeInTheDocument();
     });
   });
 

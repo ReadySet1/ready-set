@@ -703,6 +703,41 @@ describe('useAdminRealtimeTracking', () => {
       ]);
     });
 
+    it('ignores an out-of-order ping for the current position (late offline-queue replay)', async () => {
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      const now = Date.now();
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 37.785,
+          lng: -122.4094,
+          timestamp: new Date(now).toISOString(),
+        });
+      });
+
+      // A point recorded 3 h earlier arrives after the live one.
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-123',
+          lat: 37.1,
+          lng: -122.9,
+          timestamp: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+        });
+      });
+
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].lastKnownLocation?.coordinates).toEqual([
+        -122.4094,
+        37.785,
+      ]);
+      expect(new Date(result.current.activeDrivers[0].lastLocationUpdate!).getTime()).toBe(now);
+    });
+
     it('should limit recent locations to 100', async () => {
       const { result } = renderHook(() => useAdminRealtimeTracking());
 

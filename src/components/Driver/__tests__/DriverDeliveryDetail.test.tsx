@@ -60,11 +60,29 @@ jest.mock("@/utils/supabase/client", () => ({
 // POD capture pulls in camera APIs — stub it so the sheet renders cleanly.
 // The stub exposes a button so tests can drive the upload-complete callback.
 jest.mock("@/components/Driver/ProofOfDeliveryCapture", () => ({
-  ProofOfDeliveryCapture: ({ onUploadComplete }: any) => (
-    <div data-testid="pod-capture">
+  ProofOfDeliveryCapture: ({ onUploadComplete, uploadEndpoint, maxPhotos }: any) => (
+    <div
+      data-testid="pod-capture"
+      data-endpoint={uploadEndpoint}
+      data-max-photos={String(maxPhotos ?? 1)}
+    >
       <button onClick={() => onUploadComplete("https://pod.example/photo.jpg")}>
         finish pod upload
       </button>
+    </div>
+  ),
+}));
+
+// The pickup confirmation pulls in the canvas signature pad — stub it the
+// same way, with a button that drives the name-only completion callback.
+jest.mock("@/components/Driver/SignatureCapture", () => ({
+  SignatureCapture: ({ onUploadComplete, stage, uploadEndpoint }: any) => (
+    <div
+      data-testid="signature-capture"
+      data-stage={stage ?? "pickup"}
+      data-endpoint={uploadEndpoint}
+    >
+      <button onClick={() => onUploadComplete(null)}>finish signature</button>
     </div>
   ),
 }));
@@ -205,9 +223,12 @@ describe("DriverDeliveryDetail", () => {
 
     fireEvent.click(await screen.findByText("Complete delivery"));
     expect(await screen.findByTestId("pod-capture")).toBeInTheDocument();
+    // The completion photo takes up to 3 photos (delivery-finalize-multi-photo).
+    expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "3");
 
-    // Driving the capture flow to completion advances to COMPLETED...
+    // Driving the capture flow (photo, then recipient) advances to COMPLETED...
     fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /finish signature/i }));
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/api/orders/CV-12345"),
@@ -234,6 +255,7 @@ describe("DriverDeliveryDetail", () => {
 
     fireEvent.click(await screen.findByText("Complete delivery"));
     fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /finish signature/i }));
 
     // The completion still finishes (feed refresh + success toast) even
     // though the follow-up PATCH never answers.
@@ -610,6 +632,292 @@ describe("DriverDeliveryDetail", () => {
   // completed-order screen never rendered it. The stored fileUrl is a public
   // URL into the private delivery-proofs bucket, so the screen must read the
   // signed URL from the files route (#506 bucket split), not the order row.
+  describe("mandatory stage photos (driver-photo-signature-required)", () => {
+    /** PATCH answers 422 with the given gate code once, then succeeds. */
+    function installFetchRejectingPatchOnce(code: string, message: string) {
+      let rejected = false;
+      global.fetch = jest.fn((_url: string, opts?: RequestInit) => {
+        const method = opts?.method ?? "GET";
+        if (method === "PATCH" && !rejected) {
+          rejected = true;
+          return Promise.resolve({
+            ok: false,
+            status: 422,
+            json: () => Promise.resolve({ error: code, code, message }),
+          });
+        }
+        if (method === "PATCH") {
+          const body = JSON.parse((opts?.body as string) ?? "{}");
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(makeOrder({ driverStatus: body.driverStatus })),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(currentOrder),
+        });
+      }) as unknown as typeof fetch;
+    }
+
+    const patchCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter((c) => c[1]?.method === "PATCH");
+
+    it("requires a photo of the order before confirming pickup: photo sheet first, no confirmation sheet, no PATCH", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_AT_VENDOR });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Picked up the order"));
+
+      expect(await screen.findByText("Photo of the order")).toBeInTheDocument();
+      expect(screen.getByTestId("pod-capture")).toBeInTheDocument();
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument();
+      expect(patchCalls()).toHaveLength(0);
+    });
+
+    it("uploads the pickup photo to the pickup-photo endpoint, then opens the pickup confirmation, and PATCHes PICKED_UP only after it", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_AT_VENDOR });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Picked up the order"));
+      await screen.findByText("Photo of the order");
+
+      // The photo sheet posts to the pickup endpoint, not the POD one.
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute(
+        "data-endpoint",
+        "/api/orders/CV-12345/pickup-photo",
+      );
+
+      // The photo of the order stays a single photo (the 3-photo cap is POD only).
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute("data-max-photos", "1");
+
+      fireEvent.click(screen.getByRole("button", { name: /finish pod upload/i }));
+
+      expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+      expect(patchCalls()).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole("button", { name: /finish signature/i }));
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({
+            method: "PATCH",
+            body: JSON.stringify({ driverStatus: DriverStatus.PICKED_UP }),
+          }),
+        );
+      });
+    });
+
+    it("skips the photo sheet when the order already carries a pickup_photo upload", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_AT_VENDOR,
+        fileUploads: [{ category: "pickup_photo", fileUrl: "https://x/pickup.jpg" }],
+      });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Picked up the order"));
+
+      expect(await screen.findByTestId("signature-capture")).toBeInTheDocument();
+      expect(screen.queryByText("Photo of the order")).not.toBeInTheDocument();
+    });
+
+    it("reopens the photo sheet when the server answers 422 PICKUP_PHOTO_REQUIRED (client state was stale)", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_AT_VENDOR,
+        fileUploads: [{ category: "pickup_photo" }],
+      });
+      installFetchRejectingPatchOnce(
+        "PICKUP_PHOTO_REQUIRED",
+        "Take a photo of the order at the vendor before marking it picked up.",
+      );
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Picked up the order"));
+      fireEvent.click(await screen.findByRole("button", { name: /finish signature/i }));
+
+      expect(await screen.findByText("Photo of the order")).toBeInTheDocument();
+      expect(toast.error).toHaveBeenCalledWith(
+        "Take a photo of the order at the vendor before marking it picked up.",
+      );
+    });
+
+    it("completes directly when the photo and the recipient are already on file", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_TO_CLIENT,
+        fileUploads: [{ category: "proof_of_delivery" }],
+        deliveryReceivedBy: "Sam Carter",
+      });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({
+            method: "PATCH",
+            body: JSON.stringify({ driverStatus: DriverStatus.COMPLETED }),
+          }),
+        );
+      });
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
+    });
+
+    it("reopens the POD sheet when the server answers 422 POD_REQUIRED", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_TO_CLIENT,
+        fileUploads: [{ category: "proof_of_delivery" }],
+        deliveryReceivedBy: "Sam Carter",
+      });
+      installFetchRejectingPatchOnce(
+        "POD_REQUIRED",
+        "Take a photo of the setup before completing the delivery.",
+      );
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+
+      expect(await screen.findByText("Proof of delivery")).toBeInTheDocument();
+      expect(screen.getByTestId("pod-capture")).toHaveAttribute(
+        "data-endpoint",
+        "/api/orders/CV-12345/pod",
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        "Take a photo of the setup before completing the delivery.",
+      );
+    });
+  });
+
+  describe("recipient signature or name at completion (Gary Jun-1/22)", () => {
+    const patchCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter((c) => c[1]?.method === "PATCH");
+
+    it("states the full completion requirement on the Next-Action", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_TO_CLIENT });
+      renderDetail();
+
+      expect(
+        await screen.findByText(/photo \+ recipient signature or name required/i),
+      ).toBeInTheDocument();
+    });
+
+    it("opens the recipient sheet after the setup photo, and PATCHes COMPLETED only after it", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.ARRIVED_TO_CLIENT });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+      fireEvent.click(await screen.findByRole("button", { name: /finish pod upload/i }));
+
+      const capture = await screen.findByTestId("signature-capture");
+      expect(capture).toHaveAttribute("data-stage", "delivery");
+      expect(capture).toHaveAttribute("data-endpoint", "/api/orders/CV-12345/recipient");
+      expect(screen.getByText("Recipient signature")).toBeInTheDocument();
+      expect(patchCalls()).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole("button", { name: /finish signature/i }));
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({
+            method: "PATCH",
+            body: JSON.stringify({ driverStatus: DriverStatus.COMPLETED }),
+          }),
+        ),
+      );
+    });
+
+    it("goes straight to the recipient sheet when the photo is on file but the recipient is not", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_TO_CLIENT,
+        fileUploads: [{ category: "proof_of_delivery" }],
+      });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+
+      expect(await screen.findByTestId("signature-capture")).toHaveAttribute(
+        "data-stage",
+        "delivery",
+      );
+      expect(screen.queryByTestId("pod-capture")).not.toBeInTheDocument();
+      expect(patchCalls()).toHaveLength(0);
+    });
+
+    it("counts a delivery_signature upload as the recipient confirmation", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_TO_CLIENT,
+        fileUploads: [{ category: "proof_of_delivery" }, { category: "delivery_signature" }],
+      });
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/api/orders/CV-12345"),
+          expect.objectContaining({
+            method: "PATCH",
+            body: JSON.stringify({ driverStatus: DriverStatus.COMPLETED }),
+          }),
+        ),
+      );
+      expect(screen.queryByTestId("signature-capture")).not.toBeInTheDocument();
+    });
+
+    it("reopens the recipient sheet when the server answers 422 RECIPIENT_REQUIRED", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.ARRIVED_TO_CLIENT,
+        fileUploads: [{ category: "proof_of_delivery" }],
+        deliveryReceivedBy: "Sam Carter",
+      });
+      let rejected = false;
+      global.fetch = jest.fn((_url: string, opts?: RequestInit) => {
+        if (opts?.method === "PATCH" && !rejected) {
+          rejected = true;
+          return Promise.resolve({
+            ok: false,
+            status: 422,
+            json: () =>
+              Promise.resolve({
+                error: "RECIPIENT_REQUIRED",
+                code: "RECIPIENT_REQUIRED",
+                message: "Get the recipient's signature, or their name if they refuse to sign.",
+              }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(currentOrder),
+        });
+      }) as unknown as typeof fetch;
+      renderDetail();
+
+      fireEvent.click(await screen.findByText("Complete delivery"));
+
+      expect(await screen.findByTestId("signature-capture")).toHaveAttribute(
+        "data-stage",
+        "delivery",
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        "Get the recipient's signature, or their name if they refuse to sign.",
+      );
+    });
+
+    it("shows who received the order on a completed delivery", async () => {
+      currentOrder = makeOrder({
+        driverStatus: DriverStatus.COMPLETED,
+        deliveryReceivedBy: "Sam Carter",
+      });
+      renderDetail();
+
+      expect(await screen.findByText("Received by")).toBeInTheDocument();
+      expect(screen.getByText("Sam Carter")).toBeInTheDocument();
+    });
+  });
+
   describe("proof-of-delivery photo on a completed delivery", () => {
     const SIGNED_POD_URL =
       "https://supabase.example/storage/v1/object/sign/delivery-proofs/pod.jpg?token=abc";
@@ -651,6 +959,25 @@ describe("DriverDeliveryDetail", () => {
         "/api/orders/CV-12345/files",
         expect.objectContaining({ credentials: "include" }),
       );
+    });
+
+    it("renders every proof-of-delivery photo when the delivery has several", async () => {
+      currentOrder = makeOrder({ driverStatus: DriverStatus.COMPLETED });
+      installFetchWithFiles([
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=1` },
+        { category: "pickup_photo", fileUrl: "https://supabase.example/sign/pickup.jpg" },
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=2` },
+        { category: "proof_of_delivery", fileUrl: `${SIGNED_POD_URL}&n=3` },
+      ]);
+      renderDetail();
+
+      await screen.findByRole("img", { name: /proof of delivery photo 1 of 3/i });
+      const photos = screen.getAllByRole("img", { name: /proof of delivery photo/i });
+      expect(photos.map((img) => img.getAttribute("src"))).toEqual([
+        `${SIGNED_POD_URL}&n=1`,
+        `${SIGNED_POD_URL}&n=2`,
+        `${SIGNED_POD_URL}&n=3`,
+      ]);
     });
 
     it("does not fetch files while the delivery is still in progress", async () => {

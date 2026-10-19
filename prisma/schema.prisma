@@ -1038,6 +1038,7 @@ model Delivery {
   signatureRequired      Boolean?  @default(false) @map("signature_required")
   photoRequired          Boolean?  @default(false) @map("photo_required")
   deliverySignatureUrl   String?   @map("delivery_signature_url")
+  deliveryReceivedBy     String?   @map("delivery_received_by") @db.VarChar(255)
   pickupSignatureUrl     String?   @map("pickup_signature_url")
   pickupReceivedBy       String?   @map("pickup_received_by") @db.VarChar(255)
   deliveryPhotoUrl       String?   @map("delivery_photo_url")

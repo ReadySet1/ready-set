@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Pencil, X } from 'lucide-react';
+import { ArrowLeftRight, MapPin, Pencil, X } from 'lucide-react';
 import type { RouteSlotProps } from '@/types/address-selector';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ const roleConfig = {
   },
 } as const;
 
-export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlotProps) {
+export function RouteSlot({ role, address, isActive, onEdit, onClear, onEditDetails }: RouteSlotProps) {
   const config = roleConfig[role];
 
   // Empty + inactive
@@ -108,13 +108,25 @@ export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlo
           </div>
         </div>
         <div className="flex shrink-0 gap-0.5">
+          {onEditDetails && (
+            <button
+              type="button"
+              onClick={onEditDetails}
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label={`Edit ${config.label.toLowerCase()} address`}
+              title="Edit address details"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
             className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label={`Edit ${config.label.toLowerCase()} address`}
+            aria-label={`Change ${config.label.toLowerCase()} address`}
+            title="Pick a different address"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <ArrowLeftRight className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"

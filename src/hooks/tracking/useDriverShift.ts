@@ -5,6 +5,7 @@ import type { DriverShift, LocationUpdate } from '@/types/tracking';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { withBearerAuth } from '@/lib/auth/bearer-session';
 import { estimateClockOffsetMs, nextClockOffsetMs } from '@/lib/driver/shift-clock';
+import { DeadlineExceededError, withDeadline } from '@/lib/driver/with-deadline';
 import {
   startShiftBreak,
   endShiftBreak
@@ -22,14 +23,28 @@ interface ActiveShiftResult {
   clockOffsetMs: number | null;
 }
 
-async function fetchActiveShift(driverId: string): Promise<ActiveShiftResult> {
+/**
+ * Upper bound for one shift operation (session read + driver id + shift
+ * fetches). 2026-10 field failure: on iOS 16 Safari a hung request left the
+ * Start-shift spinner running until the driver reloaded the page.
+ */
+export const SHIFT_REQUEST_TIMEOUT_MS = 20_000;
+export const START_SHIFT_TIMEOUT_MESSAGE =
+  "Couldn't start your shift. Check your connection and try again.";
+export const LOAD_SHIFT_TIMEOUT_MESSAGE =
+  "Couldn't load your shift. Check your connection and try again.";
+
+async function fetchActiveShift(
+  driverId: string,
+  signal?: AbortSignal,
+): Promise<ActiveShiftResult> {
   const headers = await withBearerAuth();
   const sentAt = Date.now();
   const res = await fetch(
     `/api/tracking/shifts/active?driverId=${encodeURIComponent(driverId)}`,
     // Bearer token + cookies: the token survives the stale-cookie failure
     // mode (see @/lib/auth/bearer-session); cookies remain the fallback.
-    { credentials: 'include', headers },
+    { credentials: 'include', headers, signal },
   );
   if (!res.ok) throw new Error(`Failed to load shift (${res.status})`);
   const data = await res.json();
@@ -64,9 +79,9 @@ export function useDriverShift(): UseDriverShiftReturn {
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
 
   // Get driver ID from session (simplified)
-  const getDriverId = useCallback(async (): Promise<string | null> => {
+  const getDriverId = useCallback(async (signal?: AbortSignal): Promise<string | null> => {
     try {
-      const response = await fetch('/api/auth/session');
+      const response = await fetch('/api/auth/session', { signal });
       if (response.ok) {
         const session = await response.json();
         return session.user?.driverId || null;
@@ -86,28 +101,42 @@ export function useDriverShift(): UseDriverShiftReturn {
 
   // Load current active shift
   const loadActiveShift = useCallback(async () => {
+    // Tracked locally so the error report never re-fetches the session (that
+    // second, unbounded lookup used to hold `loading` too).
+    let driverId: string | null = null;
     try {
       setLoading(true);
       setError(null);
 
-      const driverId = await getDriverId();
-      if (!driverId) {
+      const loaded = await withDeadline(async (signal) => {
+        driverId = await getDriverId(signal);
+        if (!driverId) return null;
+        return fetchActiveShift(driverId, signal);
+      }, SHIFT_REQUEST_TIMEOUT_MS);
+
+      if (!loaded) {
         setError('Driver ID not found');
         return;
       }
 
-      const { shift, clockOffsetMs: measuredOffsetMs } = await fetchActiveShift(driverId);
+      const { shift, clockOffsetMs: measuredOffsetMs } = loaded;
       setClockOffsetMs((prev) => nextClockOffsetMs(prev, measuredOffsetMs));
       setCurrentShift(shift);
     } catch (error) {
       console.error('Error loading active shift:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load shift');
+      setError(
+        error instanceof DeadlineExceededError
+          ? LOAD_SHIFT_TIMEOUT_MESSAGE
+          : error instanceof Error
+            ? error.message
+            : 'Failed to load shift',
+      );
       captureException(error, {
         action: 'load_active_shift',
         feature: 'driver_shift',
         component: 'useDriverShift',
         handled: true,
-        metadata: { driverId: await getDriverId().catch(() => null) ?? undefined },
+        metadata: { driverId: driverId ?? undefined },
       });
     } finally {
       setLoading(false);
@@ -120,41 +149,47 @@ export function useDriverShift(): UseDriverShiftReturn {
       setLoading(true);
       setError(null);
 
-      const driverId = await getDriverId();
-      if (!driverId) {
-        throw new Error('Driver ID not found');
-      }
+      // Every step below (session read, driver id, active-shift check, start
+      // POST) shares one deadline so a hung request can't spin forever.
+      const { driverId, result } = await withDeadline(async (signal) => {
+        const driverId = await getDriverId(signal);
+        if (!driverId) {
+          throw new Error('Driver ID not found');
+        }
 
-      // Check if there's already an active shift
-      const { shift: existingShift } = await fetchActiveShift(driverId);
-      if (existingShift) {
-        throw new Error('You already have an active shift');
-      }
+        // Check if there's already an active shift
+        const { shift: existingShift } = await fetchActiveShift(driverId, signal);
+        if (existingShift) {
+          throw new Error('You already have an active shift');
+        }
 
-      const res = await fetch('/api/tracking/shifts/start', {
-        method: 'POST',
-        credentials: 'include',
-        headers: await withBearerAuth({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          driverId,
-          location,
-          metadata: {
-            startedFromApp: true,
-            appVersion: '2.0.0',
-            deviceInfo: {
-              userAgent: navigator.userAgent,
-              platform: navigator.platform,
+        const res = await fetch('/api/tracking/shifts/start', {
+          method: 'POST',
+          credentials: 'include',
+          headers: await withBearerAuth({ 'Content-Type': 'application/json' }),
+          signal,
+          body: JSON.stringify({
+            driverId,
+            location,
+            metadata: {
+              startedFromApp: true,
+              appVersion: '2.0.0',
+              deviceInfo: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+              },
             },
-          },
-        }),
-      });
-      const result = await res
-        .json()
-        .catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+          }),
+        });
+        const result = await res
+          .json()
+          .catch(() => ({ success: false, error: `HTTP ${res.status}` }));
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to start shift');
-      }
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to start shift');
+        }
+        return { driverId, result };
+      }, SHIFT_REQUEST_TIMEOUT_MS);
 
       // Reload the shift data. When the server reports `resumed: true` it
       // found an open shift (other device / retried POST) and returned that
@@ -167,7 +202,13 @@ export function useDriverShift(): UseDriverShiftReturn {
       return true;
     } catch (error) {
       console.error('Error starting shift:', error);
-      setError(error instanceof Error ? error.message : 'Failed to start shift');
+      setError(
+        error instanceof DeadlineExceededError
+          ? START_SHIFT_TIMEOUT_MESSAGE
+          : error instanceof Error
+            ? error.message
+            : 'Failed to start shift',
+      );
       captureException(error, {
         action: 'start_shift',
         feature: 'driver_shift',
