@@ -17,6 +17,12 @@ import {
 } from '@/lib/tracking/native-location-issue';
 import { useTrackingSettings } from '@/hooks/tracking/useTrackingSettings';
 import { withDeadline } from '@/lib/driver/with-deadline';
+import {
+  createBatchSender,
+  enqueueLocation,
+  flushLocationOutbox,
+  getPendingHint,
+} from '@/lib/tracking/location-outbox';
 
 interface UseLocationTrackingReturn {
   currentLocation: LocationUpdate | null;
@@ -90,12 +96,17 @@ const TRACKING_INTERVAL = 30000; // 30 seconds
 export const DRIVER_ID_LOOKUP_TIMEOUT_MS = 10_000;
 const MAX_RETRY_ATTEMPTS = 3;
 
-// Offline-queue flush pacing. The 2026-08 test drive fired dozens of queued
-// POSTs within one second and 78/84 got 429'd — the flush must trickle, and a
-// 429 must stop it entirely until the backoff elapses (mirrored in
-// public/service-worker.js).
-const OFFLINE_FLUSH_SPACING_MS = 250;
-const OFFLINE_FLUSH_429_BACKOFF_MS = 30_000;
+// Offline backlog (src/lib/tracking/location-outbox.ts). Fixes that could not
+// be sent are queued in IndexedDB and replayed through the batch route — one
+// request per 50 points instead of one cadence-limited POST per point (the
+// 2026-08 drive 429'd 78/84 replayed POSTs; the 2026-10-17 outage never
+// drained). Retried on mount, on the 'online' event, after every successful
+// live post, and on this timer while the driver app is open — also after End
+// shift, so a backlog from the last minutes of a shift still lands.
+const OUTBOX_RETRY_INTERVAL_MS = 60_000;
+
+// Web transport for the backlog: the session cookie authenticates it.
+const webBatchSender = createBatchSender(async () => ({}));
 
 // Consecutive server rejections of live location POSTs before the driver is
 // told. The 2026-08-20 León drive had every point 403'd for a whole shift with
@@ -145,7 +156,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const watchIdRef = useRef<number | null>(null);
   const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
   const lastLocationRef = useRef<LocationUpdate | null>(null);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const locationStoreRef = useRef(getLocationStore());
   const isMountedRef = useRef(true); // Track if component is mounted
   const cachedDriverIdRef = useRef<string | null>(null);
@@ -340,93 +350,24 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     [],
   );
 
-  // Flush coordination: never run two flushes at once (start + online event +
-  // the 2-minute interval can all fire close together), and honor the 429
-  // backoff gate before touching the queue again.
-  const flushInFlightRef = useRef(false);
-  const flushBackoffUntilRef = useRef(0);
-
-  // Sync offline locations to server
+  // Replay the offline backlog. Reads connectivity live: the captured
+  // `isOnline` state went stale across offline -> online and skipped the flush.
+  // Single-flight and the 429 back-off live in the shared outbox, so the
+  // native bridge (same page) never flushes concurrently with this one.
   const syncOfflineLocations = useCallback(async () => {
-    if (!isOnline) return;
-    if (flushInFlightRef.current) return;
-    if (Date.now() < flushBackoffUntilRef.current) return;
-
-    flushInFlightRef.current = true;
-    try {
-      const locationStore = locationStoreRef.current;
-      const unsyncedLocations = await locationStore.getUnsyncedLocations();
-
-      if (unsyncedLocations.length === 0) {
-        setUnsyncedCount(0);
-        return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const locationStore = locationStoreRef.current;
+    const result = await flushLocationOutbox(webBatchSender, locationStore);
+    if (isMountedRef.current) setUnsyncedCount(result.remaining);
+    if (result.sent > 0) {
+      // Legacy rows the pre-outbox flush marked synced instead of deleting.
+      try {
+        await locationStore.clearOldSyncedLocations(7);
+      } catch {
+        /* cleanup is best-effort */
       }
-
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (let i = 0; i < unsyncedLocations.length; i++) {
-        const storedLocation = unsyncedLocations[i]!;
-        try {
-          // Convert stored location back to LocationUpdate format
-          const locationUpdate: LocationUpdate = {
-            driverId: storedLocation.driverId,
-            coordinates: storedLocation.coordinates,
-            accuracy: storedLocation.accuracy,
-            speed: storedLocation.speed,
-            heading: storedLocation.heading,
-            altitude: storedLocation.altitude,
-            batteryLevel: storedLocation.batteryLevel,
-            activityType: storedLocation.activityType,
-            isMoving: storedLocation.isMoving,
-            timestamp: new Date(storedLocation.timestamp)
-          };
-
-          const result = await postLocation(locationUpdate);
-
-          if (result.success) {
-            await locationStore.markAsSynced(storedLocation.id);
-            successCount++;
-          } else if (result.error?.includes('Rate limit')) {
-            // 429: stop the whole flush. The item stays queued untouched (not
-            // a failure of the item itself), and the backoff gate keeps every
-            // caller away until the server has room again.
-            flushBackoffUntilRef.current = Date.now() + OFFLINE_FLUSH_429_BACKOFF_MS;
-            break;
-          } else {
-            await locationStore.incrementSyncAttempts(storedLocation.id);
-            failureCount++;
-
-            // Remove locations that have failed too many times (10 attempts)
-            if (storedLocation.syncAttempts >= 10) {
-              console.warn(`Removing location ${storedLocation.id} after 10 failed attempts`);
-              await locationStore.deleteLocation(storedLocation.id);
-            }
-          }
-        } catch (error) {
-          console.error('Error syncing individual location:', error);
-          await locationStore.incrementSyncAttempts(storedLocation.id);
-          failureCount++;
-        }
-
-        // Trickle the queue instead of bursting it into the rate limiter.
-        if (i < unsyncedLocations.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, OFFLINE_FLUSH_SPACING_MS));
-        }
-      }
-
-      // Update unsynced count
-      const remaining = await locationStore.getUnsyncedCount();
-      setUnsyncedCount(remaining);
-
-      // Cleanup old synced locations (older than 7 days)
-      await locationStore.clearOldSyncedLocations(7);
-    } catch (error) {
-      console.error('Error during offline sync:', error);
-    } finally {
-      flushInFlightRef.current = false;
     }
-  }, [isOnline, postLocation]);
+  }, []);
 
   // Update location to server with client-side throttling
   // Skips server sync if the admin-configured interval hasn't elapsed since
@@ -445,11 +386,16 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         if (result.error?.includes('Rate limit')) {
           // Close the throttle gate too: without this, every subsequent GPS
           // tick re-POSTs immediately and keeps tripping the server limiter
-          // (the 2026-08 429 storm on the live path).
+          // (the 2026-08 429 storm on the live path). A 429 is the cadence
+          // throttle, not a lost fix: never queued.
           lastSyncTimeRef.current = now;
           return;
         }
-        if (result.status !== undefined) {
+        if (result.status === undefined) {
+          // No connection: close the gate as well, so an outage queues one
+          // fix per interval (like the live trail), not one per GPS callback.
+          lastSyncTimeRef.current = now;
+        } else {
           consecutiveSyncRejectionsRef.current += 1;
           if (consecutiveSyncRejectionsRef.current >= SYNC_REJECTION_ALERT_THRESHOLD) {
             setLocationSyncError(describeSyncRejection(result.status));
@@ -460,6 +406,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       lastSyncTimeRef.current = now;
       consecutiveSyncRejectionsRef.current = 0;
       setLocationSyncError(null);
+      // The connection works: send whatever the outage left behind.
+      if (getPendingHint() !== 0) void syncOfflineLocations();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Rate limit')) {
@@ -468,17 +416,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
 
       console.error('Error syncing location to server:', error);
 
-      // Store in IndexedDB for offline sync
-      try {
-        const locationStore = locationStoreRef.current;
-        await locationStore.addLocation(location);
-        const count = await locationStore.getUnsyncedCount();
-        setUnsyncedCount(count);
-      } catch (storageError) {
-        console.error('Failed to store location offline:', storageError);
-      }
+      // Keep the fix (with its GPS time) for replay once the network is back.
+      const count = await enqueueLocation(location, locationStoreRef.current);
+      if (isMountedRef.current) setUnsyncedCount(count);
     }
-  }, [postLocation]);
+  }, [postLocation, syncOfflineLocations]);
 
   // Handle position update
   const handlePositionUpdate = useCallback(async (position: GeolocationPosition) => {
@@ -617,13 +559,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       HIGH_ACCURACY_OPTIONS
     );
 
-    // Set up periodic offline sync (every 2 minutes)
-    syncIntervalRef.current = setInterval(() => {
-      syncOfflineLocations();
-    }, 120000); // 2 minutes
-
-    // Trigger initial sync on start
-    syncOfflineLocations();
+    // Trigger initial sync on start (the retry timer lives for the whole
+    // mount, not just the shift — see OUTBOX_RETRY_INTERVAL_MS).
+    void syncOfflineLocations();
 
     // Keep the screen awake for the active shift (best-effort).
     void requestWakeLock();
@@ -643,11 +581,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     if (intervalIdRef.current !== null) {
       clearInterval(intervalIdRef.current);
       intervalIdRef.current = null;
-    }
-
-    if (syncIntervalRef.current !== null) {
-      clearInterval(syncIntervalRef.current);
-      syncIntervalRef.current = null;
     }
 
     // Reset cached driver ID so it refreshes on next session
@@ -885,7 +818,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      syncOfflineLocations();
+      void syncOfflineLocations();
     };
 
     const handleOffline = () => {
@@ -895,12 +828,20 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     // Set initial state
     setIsOnline(navigator.onLine);
 
+    // A backlog left by a previous page load (reload, app restart) goes out
+    // now; afterwards retry while anything is queued, shift or not.
+    void syncOfflineLocations();
+    const retryId = setInterval(() => {
+      if (getPendingHint() !== 0) void syncOfflineLocations();
+    }, OUTBOX_RETRY_INTERVAL_MS);
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(retryId);
     };
   }, [syncOfflineLocations]);
 
