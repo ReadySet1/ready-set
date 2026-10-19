@@ -32,7 +32,7 @@ Auth facts that matter for scheduling:
   A plain `Authorization: Bearer <CRON_SECRET>` header is the only thing a
   non-interactive caller needs.
 - `CRON_SECRET` must be set in the app container's environment (Dokploy →
-  application → Environment). If it is unset, the four `admin/*` maintenance
+  application → Environment). If it is unset, the `admin/*` maintenance
   routes fall through to the admin-session check and answer **401** to curl;
   the SMS route answers **500** in production.
 - The SMS route derives "today"/"tomorrow" from the container's local clock

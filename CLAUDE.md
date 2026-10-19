@@ -211,7 +211,7 @@ Config lives in `release-please-config.json` + `.release-please-manifest.json`; 
 
 **Independently versioned (NOT managed by release-please):**
 
-- **Partner API contracts** in `docs/catercow/API_CONTRACT.md` and `docs/catervalley/API_CONTRACT.md` — these are partner-facing agreements (currently v0.2 and v1.0 respectively) that evolve on their own cycle. Bumping them is a manual doc edit + changelog entry in the doc itself.
+- **Partner API contracts** in `docs/catercow/API_CONTRACT.md` and `docs/catervalley/API_CONTRACT.md` — these are partner-facing agreements (currently v0.3 and v1.0 respectively) that evolve on their own cycle. Bumping them is a manual doc edit + changelog entry in the doc itself.
 - **Database schema** — versioned implicitly by Prisma's timestamped migration filenames (`prisma/migrations/YYYYMMDDHHMMSS_*`).
 
 `/api/health` returns the current `package.json` version as `version` — useful for verifying which build is live in a given environment.
