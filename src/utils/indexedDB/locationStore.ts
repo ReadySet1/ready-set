@@ -201,6 +201,22 @@ export class LocationStore {
   }
 
   /**
+   * Delete several locations in one transaction (outbox flush / queue cap).
+   */
+  async deleteLocations(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    if (!this.db) await this.init();
+
+    try {
+      const tx = this.db!.transaction(this.STORE_NAME, 'readwrite');
+      await Promise.all([...ids.map((id) => tx.store.delete(id)), tx.done]);
+    } catch (error) {
+      console.error('Failed to delete locations:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get count of unsynced locations
    */
   async getUnsyncedCount(): Promise<number> {

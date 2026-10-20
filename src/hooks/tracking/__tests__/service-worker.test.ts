@@ -131,7 +131,8 @@ function loadServiceWorker(fetchImpl: jest.Mock) {
 
 function dispatchFetch(handlers: Record<string, Handler>, request: any) {
   const respondWith = jest.fn();
-  handlers.fetch!({ request, respondWith });
+  // No fetch listener at all means the browser never routes a request here.
+  handlers.fetch?.({ request, respondWith });
   return respondWith;
 }
 
@@ -159,63 +160,41 @@ describe('public/service-worker.js', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('queues a location POST that fails at network level and answers 202', async () => {
-    // Real fetch consumes the request body before rejecting.
-    const fetchMock = jest.fn(async (req: any) => {
-      await req.text();
-      throw new TypeError('Load failed');
-    });
-    const { handlers, stored } = loadServiceWorker(fetchMock);
+  it('does not intercept location POSTs: the page owns the offline queue', () => {
+    // 2026-10-17: the SW answered a failed location POST with a synthetic 202
+    // and queued it in its own store, which it only replays on a Background
+    // Sync event. Android WebView (the native wrapper) and iOS Safari never
+    // fire one, so every fix of a 5-minute outage was lost, and the page
+    // believed the 202 meant "saved" and never queued them itself.
+    const fetchMock = jest.fn();
+    const { handlers } = loadServiceWorker(fetchMock);
 
     const respondWith = dispatchFetch(
       handlers,
-      makeRequest({
-        url: `${ORIGIN}/api/tracking/locations`,
-        method: 'POST',
-        body: '{"lat":1}',
-      }),
+      makeRequest({ url: `${ORIGIN}/api/tracking/locations`, method: 'POST', body: '{"lat":1}' }),
     );
 
-    expect(respondWith).toHaveBeenCalledTimes(1);
-    const response = await respondWith.mock.calls[0][0];
-    expect(response).toBeTruthy();
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ success: false, queued: true });
-    expect(stored).toHaveLength(1);
-    expect(stored[0].body).toBe('{"lat":1}');
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('still answers with a response when the offline queue cannot be written', async () => {
-    const fetchMock = jest.fn(async () => {
-      throw new TypeError('Load failed');
-    });
-    const { handlers, indexedDB } = loadServiceWorker(fetchMock);
-    indexedDB.open = () => {
-      throw new Error('IndexedDB unavailable');
-    };
-
-    const respondWith = dispatchFetch(
-      handlers,
-      makeRequest({ url: `${ORIGIN}/api/tracking/locations`, method: 'POST', body: '{}' }),
-    );
-
-    const response = await respondWith.mock.calls[0][0];
-    expect(response).toBeTruthy();
-    expect(response.status).toBe(503);
-  });
-
-  it('passes a 429 through without queuing it', async () => {
-    const fetchMock = jest.fn(async () => new FakeResponse('{}', { status: 429 }));
+  it('drains a legacy queued fix only while the server can still file it', async () => {
+    const fetchMock = jest.fn(async () => new FakeResponse('{}', { status: 201 }));
     const { handlers, stored } = loadServiceWorker(fetchMock);
-
-    const respondWith = dispatchFetch(
-      handlers,
-      makeRequest({ url: `${ORIGIN}/api/tracking/locations`, method: 'POST', body: '{}' }),
+    const now = Date.now();
+    stored.push(
+      { id: 1, url: `${ORIGIN}/api/tracking/locations`, method: 'POST', headers: {}, body: '{"old":1}', timestamp: now - 25 * 60 * 60 * 1000 },
+      { id: 2, url: `${ORIGIN}/api/tracking/locations`, method: 'POST', headers: {}, body: '{"recent":1}', timestamp: now - 60 * 1000 },
     );
 
-    const response = await respondWith.mock.calls[0][0];
-    expect(response.status).toBe(429);
-    expect(stored).toHaveLength(0);
+    let work: Promise<unknown> | undefined;
+    handlers.sync!({ tag: 'location-sync', waitUntil: (p: Promise<unknown>) => (work = p) });
+    await work;
+
+    // Replaying a >24 h fix would be stamped NOW() by the server and shown as
+    // the driver's current position — it is discarded unsent.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0] as unknown[])[1]).toMatchObject({ body: '{"recent":1}' });
   });
 
   it('does not precache /driver/tracking and drops the old v1 cache on activate', async () => {

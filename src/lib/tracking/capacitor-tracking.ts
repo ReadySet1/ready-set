@@ -41,6 +41,11 @@ import {
 } from './motion-state';
 import { readBatteryLevel } from './battery';
 import {
+  createBatchSender,
+  enqueueLocation,
+  flushIfPending,
+} from './location-outbox';
+import {
   getNativeLocationIssue,
   setNativeLocationIssue,
   type NativeLocationIssue,
@@ -414,8 +419,14 @@ export function fixTimeToIso(time: number | null | undefined): string | null {
 
 /**
  * POST one fix to the existing ingest route. The relative URL resolves against
- * the loaded origin (the deployed site), so no base URL is needed. Failures are
- * swallowed — the next fix retries; durable buffering is a Phase-1 item.
+ * the loaded origin (the deployed site), so no base URL is needed.
+ *
+ * A fix that cannot be delivered (no network, 5xx, auth) goes to the durable
+ * outbox (location-outbox.ts) with its GPS fix time; a successful live post
+ * proves the connection is back and replays that backlog through the batch
+ * route. Before 2026-10-17 failures were swallowed ("next fix retries"), so a
+ * multi-minute data outage left a permanent hole in the shift trail. A 429 is
+ * the live cadence throttle, not a lost fix — the next one follows in seconds.
  */
 async function postLocation(
   location: Location,
@@ -431,8 +442,14 @@ async function postLocation(
   // stored as old rather than fresh. The server corrects device clock skew
   // (recorded-at.ts) and falls back to NOW() when the field is absent.
   const fixTimestamp = fixTimeToIso(location.time);
+  // A queued fix must carry a time to be filed later; without a plugin time,
+  // the callback moment is the best estimate.
+  const capturedAt = fixTimestamp ? new Date(fixTimestamp) : new Date(Date.now());
+  const isMoving = motionState.isMoving;
+
+  let res: Response;
   try {
-    await fetch('/api/tracking/locations', {
+    res = await fetch('/api/tracking/locations', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -447,7 +464,7 @@ async function postLocation(
         heading: location.bearing ?? undefined,
         altitude: location.altitude ?? undefined,
         battery_level: batteryLevel,
-        is_moving: motionState.isMoving,
+        is_moving: isMoving,
         // Omitted (not null) when the plugin has no fix time: the server then
         // stamps NOW(), exactly as before.
         ...(fixTimestamp ? { timestamp: fixTimestamp } : {}),
@@ -457,6 +474,39 @@ async function postLocation(
       }),
     });
   } catch {
-    /* background network blip — next fix retries */
+    // No connection: keep the fix for replay.
+    await queueFix(location, driverId, batteryLevel, isMoving, capturedAt);
+    return;
   }
+
+  if (res.ok) {
+    await flushIfPending(nativeBatchSender(token));
+    return;
+  }
+  if (res.status === 429) return;
+  await queueFix(location, driverId, batteryLevel, isMoving, capturedAt);
+}
+
+function nativeBatchSender(token: string) {
+  return createBatchSender(async () => ({ Authorization: `Bearer ${token}` }));
+}
+
+async function queueFix(
+  location: Location,
+  driverId: string,
+  batteryLevel: number | null,
+  isMoving: boolean,
+  capturedAt: Date,
+): Promise<void> {
+  await enqueueLocation({
+    driverId,
+    coordinates: { lat: location.latitude, lng: location.longitude },
+    accuracy: location.accuracy ?? 0,
+    speed: location.speed ?? 0,
+    heading: location.bearing ?? 0,
+    altitude: location.altitude ?? undefined,
+    batteryLevel: batteryLevel ?? undefined,
+    isMoving,
+    timestamp: capturedAt,
+  });
 }
