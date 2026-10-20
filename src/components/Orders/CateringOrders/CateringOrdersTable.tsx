@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { encodeOrderNumber } from "@/utils/order";
 import { formatDateForDisplay } from "@/lib/utils/date-display";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 import { Badge } from "@/components/ui/badge";
 import { Order, StatusFilter, UserRole } from "./types";
 import DeleteCateringOrder from "./DeleteCateringOrder";
@@ -104,7 +105,7 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {formatDateForDisplay(order.date)}
+                  {formatDateForDisplay(order.date, orderTimezone(order))}
                 </TableCell>
                 <TableCell className="text-right">
                   $

@@ -55,6 +55,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
+import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
 import { cn } from "@/lib/utils"; // For conditional classes
 import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
@@ -256,7 +257,8 @@ export const CreateCateringOrderForm: React.FC<
         ? { ...data, tempEntityId } as CreateCateringOrderInput
         : data as CreateCateringOrderInput;
 
-      const result = await createCateringOrder(submitData);
+      // The pickers hold browser-local wall-clock; save it in the pickup address zone (PT/CT).
+      const result = await createCateringOrder(orderTimesInPickupZone(submitData));
 
       if (result.error) {
         setGeneralError(result.error);
@@ -386,7 +388,9 @@ export const CreateCateringOrderForm: React.FC<
               }
 
       // Call server action directly - cast to proper type
-      const result = await createCateringOrder(formData as CreateCateringOrderInput);
+      const result = await createCateringOrder(
+        orderTimesInPickupZone(formData as CreateCateringOrderInput),
+      );
       
       if (result.success) {
         // If we have uploaded files, update their entity ID

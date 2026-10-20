@@ -1,7 +1,8 @@
 import { Separator } from "@/components/ui/separator";
 import { Order, isCateringRequest, isOnDemand } from "@/types/order";
 import { formatCurrency, withCurrencySymbol } from "@/utils/currency";
-import { formatDateTimeForDisplay } from "@/lib/utils/date-display";
+import { formatDateTimeWithZone } from "@/lib/utils/date-display";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 import { Clock, Truck } from "lucide-react";
 
 interface OrderDetailsProps {
@@ -21,7 +22,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order }) => {
                 Pickup Time
               </div>
               <div className="mt-0.5 text-sm font-semibold text-slate-800">
-                {formatDateTimeForDisplay(order.pickupDateTime)}
+                {formatDateTimeWithZone(order.pickupDateTime, orderTimezone(order))}
               </div>
             </div>
           </div>
@@ -34,7 +35,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order }) => {
                 Delivery Time
               </div>
               <div className="mt-0.5 text-sm font-semibold text-slate-800">
-                {formatDateTimeForDisplay(order.arrivalDateTime)}
+                {formatDateTimeWithZone(order.arrivalDateTime, orderTimezone(order))}
               </div>
             </div>
           </div>
