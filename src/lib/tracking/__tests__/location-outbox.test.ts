@@ -294,6 +294,87 @@ describe('location outbox', () => {
       expect(await send(DRIVER_ID, [])).toEqual({ ok: false });
     });
 
+    describe('a hung upload', () => {
+      /** fetch that never answers on its own; it only rejects when its signal aborts. */
+      function hangingFetch() {
+        fetchMock.mockImplementation(
+          (_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(init.signal?.reason ?? new DOMException('Aborted', 'AbortError')),
+              );
+            }),
+        );
+      }
+
+      beforeEach(() => {
+        // Date.now is already pinned by the outer beforeEach.
+        jest.useFakeTimers({ doNotFake: ['Date', 'performance'] });
+      });
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      async function settleAfter(promise: Promise<unknown>, ms: number) {
+        let settled = false;
+        void promise.then(() => {
+          settled = true;
+        });
+        await jest.advanceTimersByTimeAsync(ms - 1);
+        const early = settled;
+        await jest.advanceTimersByTimeAsync(1);
+        return { early, settled };
+      }
+
+      it('gives up after OUTBOX_BATCH_TIMEOUT_MS and reports a network failure', async () => {
+        hangingFetch();
+        const send = outbox.createBatchSender(async () => ({}));
+
+        const pending = send(DRIVER_ID, []);
+        const { early, settled } = await settleAfter(pending, outbox.OUTBOX_BATCH_TIMEOUT_MS);
+
+        expect(early).toBe(false);
+        expect(settled).toBe(true);
+        expect(await pending).toEqual({ ok: false });
+        expect(fetchMock.mock.calls[0]![1].signal).toBeDefined();
+      });
+
+      it('also times out on WebViews without AbortSignal.timeout', async () => {
+        const original = AbortSignal.timeout;
+        // @ts-expect-error simulate an older WebView
+        delete AbortSignal.timeout;
+        try {
+          hangingFetch();
+          const send = outbox.createBatchSender(async () => ({}));
+
+          const pending = send(DRIVER_ID, []);
+          const { early, settled } = await settleAfter(pending, outbox.OUTBOX_BATCH_TIMEOUT_MS);
+
+          expect(early).toBe(false);
+          expect(settled).toBe(true);
+          expect(await pending).toEqual({ ok: false });
+        } finally {
+          AbortSignal.timeout = original;
+        }
+      });
+
+      it('keeps the rows queued and lets a later flush run', async () => {
+        await outbox.enqueueLocation(fixAt(T0), store);
+        await outbox.enqueueLocation(fixAt(T0 + 5_000, 1), store);
+        hangingFetch();
+        const send = outbox.createBatchSender(async () => ({}));
+
+        const first = outbox.flushLocationOutbox(send, store);
+        await jest.advanceTimersByTimeAsync(outbox.OUTBOX_BATCH_TIMEOUT_MS);
+        expect(await first).toEqual({ sent: 0, remaining: 2, stoppedBy: 'network' });
+        expect(await store.getUnsyncedLocations()).toHaveLength(2);
+
+        fetchMock.mockReset();
+        fetchMock.mockResolvedValue({ ok: true, status: 201 });
+        expect(await outbox.flushLocationOutbox(send, store)).toEqual({ sent: 2, remaining: 0 });
+      });
+    });
+
     it('reports 401 without calling the network when there are no credentials', async () => {
       const send = outbox.createBatchSender(async () => null);
 

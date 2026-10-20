@@ -40,6 +40,13 @@ export const OUTBOX_MAX_AGE_MS = RECORDED_AT_MAX_PAST_MS - 60 * 60 * 1000;
 export const OUTBOX_BATCH_SIZE = 50;
 /** Quiet period after the server answers 429. */
 export const OUTBOX_429_BACKOFF_MS = 30_000;
+/**
+ * A batch upload that has not answered by then is abandoned and treated as a
+ * network failure: a hung request would otherwise hold the single-flight lock
+ * and block every later flush. The server dedupes a resend of a batch it did
+ * save, so retrying is safe.
+ */
+export const OUTBOX_BATCH_TIMEOUT_MS = 20_000;
 
 export const LOCATION_BATCH_ENDPOINT = '/api/tracking/locations/batch';
 
@@ -238,6 +245,19 @@ export async function flushIfPending(
 }
 
 /**
+ * Abort signal that fires after `ms`. AbortSignal.timeout is missing on older
+ * Android WebViews / iOS Safari, so fall back to a controller + timer.
+ */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return { signal: AbortSignal.timeout(ms), clear: () => {} };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
+
+/**
  * HTTP transport for the batch route. `getHeaders` returns extra headers
  * (Bearer token on native; nothing on web, where the session cookie is sent),
  * or null when there are no credentials — reported as 401 without a request.
@@ -253,9 +273,11 @@ export function createBatchSender(
       headers = null;
     }
     if (!headers) return { ok: false, status: 401 };
+    const timeout = timeoutSignal(OUTBOX_BATCH_TIMEOUT_MS);
     try {
       const res = await fetch(LOCATION_BATCH_ENDPOINT, {
         method: 'POST',
+        signal: timeout.signal,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
@@ -267,7 +289,10 @@ export function createBatchSender(
       });
       return { ok: res.ok, status: res.status };
     } catch {
+      // Offline, DNS, reset, or our timeout: all leave the batch queued.
       return { ok: false };
+    } finally {
+      timeout.clear();
     }
   };
 }
