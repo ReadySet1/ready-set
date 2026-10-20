@@ -23,6 +23,8 @@ import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Form field components
+const NATIVE_PICKER_TYPES = new Set(["date", "time", "datetime-local"]);
+
 const InputField: React.FC<{
   control: any;
   name: string;
@@ -90,7 +92,7 @@ const InputField: React.FC<{
                 min={min}
                 className={`w-full rounded-md border ${
                   error ? "border-red-500" : "border-gray-300"
-                } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
+                } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${NATIVE_PICKER_TYPES.has(type) ? "native-picker-input" : ""}`}
                 placeholder={placeholder}
               />
             )}
