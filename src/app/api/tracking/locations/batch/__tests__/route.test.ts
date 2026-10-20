@@ -385,6 +385,58 @@ describe('POST /api/tracking/locations/batch', () => {
     });
   });
 
+  describe('concurrent resends of the same batch', () => {
+    // Two requests carrying the same backlog (a timed-out request still running
+    // server-side while the client retries, or two tabs flushing) can both pass
+    // the NOT EXISTS check before either commits. A per-driver transaction-scoped
+    // advisory lock makes the second wait until the first commits.
+    function lockCalls() {
+      return mockTxExec.mock.calls
+        .map((call, i) => ({ call, order: mockTxExec.mock.invocationCallOrder[i]! }))
+        .filter(({ call: [sql] }) => /pg_advisory_xact_lock/.test(sql));
+    }
+
+    it('takes a per-driver xact lock in the same transaction before reading or inserting', async () => {
+      setupTx();
+      const now = Date.now();
+
+      await post({ driver_id: DRIVER_ID, client_sent_at: now, points: outagePoints(3, 60_000, now) });
+
+      expect(mockWithRawTx).toHaveBeenCalledTimes(1);
+      const locks = lockCalls();
+      expect(locks).toHaveLength(1);
+      const [sql, key] = locks[0]!.call;
+      // Transaction-scoped only: a session-level lock leaks under pgbouncer
+      // transaction pooling.
+      expect(sql).toMatch(/pg_advisory_xact_lock\(hashtext\('driver_locations:' \|\| \$1\)\)/);
+      expect(sql).not.toMatch(/pg_advisory_lock\(/);
+      expect(key).toBe(DRIVER_ID);
+
+      const lockOrder = locks[0]!.order;
+      const latestReadOrder = mockTxQuery.mock.calls
+        .map(([s], i) => ({ s, order: mockTxQuery.mock.invocationCallOrder[i]! }))
+        .find(({ s }) => /MAX\(recorded_at\)/.test(s))!.order;
+      const firstInsertOrder = Math.min(
+        ...mockTxExec.mock.calls
+          .map(([s], i) => ({ s, order: mockTxExec.mock.invocationCallOrder[i]! }))
+          .filter(({ s }) => /INSERT INTO driver_locations/.test(s))
+          .map(({ order }) => order),
+      );
+      expect(lockOrder).toBeLessThan(latestReadOrder);
+      expect(lockOrder).toBeLessThan(firstInsertOrder);
+    });
+
+    it('does not take the lock for a caller who may not write this driver', async () => {
+      setupTx({ ownsDriver: false });
+      const now = Date.now();
+
+      const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points: outagePoints(1, 60_000, now) });
+
+      expect(res.status).toBe(403);
+      expect(lockCalls()).toHaveLength(0);
+    });
+  });
+
   it('does not look for a closed shift when every point is fresh', async () => {
     setupTx({ latestStoredAt: new Date(Date.now() - 5 * 60_000) });
     const now = Date.now();

@@ -31,6 +31,8 @@ import * as Sentry from '@sentry/nextjs';
  *   (timeout, dropped connection), so a point whose (driver_id, recorded_at)
  *   is already stored is skipped, and repeats inside one batch are filed once.
  *   A fully-duplicate resend still answers success so the client clears it.
+ *   Concurrent resends are serialized per driver by a transaction-scoped
+ *   advisory lock so they cannot both pass the existence check.
  */
 
 /** Upper bound per request — the client sends backlogs in chunks of this size or less. */
@@ -162,6 +164,19 @@ export async function POST(request: NextRequest) {
           error: isDriver ? 'Access denied' : 'Driver not found or inactive',
         });
       }
+
+      // There is no unique key on (driver_id, recorded_at), so two requests
+      // carrying the same batch (a timed-out request still running while the
+      // client retries, or two tabs flushing) could both pass NOT EXISTS below
+      // and double-save. This lock makes the second wait for the first to commit.
+      // Transaction-scoped on purpose: it releases at commit/rollback and is safe
+      // under pgbouncer transaction pooling (a session-level lock is not). The
+      // wait is bounded by withRawTx's statement_timeout. $executeRaw because
+      // Prisma cannot deserialize the void column $queryRaw would return.
+      await tx.$executeRawUnsafe(
+        `SELECT pg_advisory_xact_lock(hashtext('driver_locations:' || $1))`,
+        driverId,
+      );
 
       const latestRows = await tx.$queryRawUnsafe<{ latest_recorded_at: Date | null }[]>(
         `SELECT MAX(recorded_at) AS latest_recorded_at FROM driver_locations WHERE driver_id = $1::uuid AND deleted_at IS NULL`,
