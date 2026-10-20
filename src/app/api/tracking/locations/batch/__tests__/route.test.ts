@@ -288,6 +288,103 @@ describe('POST /api/tracking/locations/batch', () => {
     expect(checked).toEqual([points[0]!.timestamp, points[points.length - 1]!.timestamp]);
   });
 
+  describe('replay of points the server already saved', () => {
+    /** Exec mock that reports 0 rows for any recorded_at already "in the table". */
+    function storeHolds(savedTimestamps: string[]) {
+      const saved = new Set(savedTimestamps);
+      mockTxExec.mockImplementation((sql: string, ...binds: unknown[]) => {
+        if (/INSERT INTO driver_locations/.test(sql)) {
+          const recordedAt = binds[9] as string;
+          if (saved.has(recordedAt)) return Promise.resolve(0);
+          saved.add(recordedAt);
+          return Promise.resolve(1);
+        }
+        return Promise.resolve(1);
+      });
+    }
+
+    it('skips points whose (driver_id, recorded_at) already exists, live rows only', async () => {
+      setupTx();
+      storeHolds([]);
+      const now = Date.now();
+
+      await post({ driver_id: DRIVER_ID, client_sent_at: now, points: outagePoints(1, 60_000, now) });
+
+      const [sql] = insertCalls()[0]!;
+      expect(sql).toMatch(/WHERE NOT EXISTS/);
+      expect(sql).toMatch(/recorded_at = \$10::timestamptz/);
+      expect(sql).toMatch(/deleted_at IS NULL/);
+    });
+
+    it('a resend of an already-saved batch inserts nothing new and still answers success', async () => {
+      const now = Date.now();
+      const points = outagePoints(5, 60_000, now);
+      setupTx({ latestStoredAt: new Date(Date.parse(points[4]!.timestamp)) });
+      storeHolds(points.map((p) => p.timestamp));
+
+      const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
+      const body = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(body).toMatchObject({ success: true, accepted: 5, inserted: 0, duplicates: 5, dropped: 0 });
+      expect(driversUpdateCalls()).toHaveLength(0);
+    });
+
+    it('a partially-saved batch inserts only the missing points', async () => {
+      const now = Date.now();
+      const points = outagePoints(6, 60_000, now);
+      setupTx();
+      storeHolds(points.slice(0, 4).map((p) => p.timestamp));
+
+      const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
+      const body = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(body).toMatchObject({ success: true, accepted: 6, inserted: 2, duplicates: 4 });
+    });
+
+    it('inserts identical recorded_at values within one batch only once', async () => {
+      setupTx();
+      storeHolds([]);
+      const now = Date.now();
+      const [a, b] = outagePoints(2, 60_000, now);
+      const points = [a!, { ...a!, latitude: a!.latitude + 0.01 }, b!, b!];
+
+      const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
+      const body = await res.json();
+
+      expect(insertCalls().map((call) => call[10])).toEqual([a!.timestamp, b!.timestamp]);
+      // The first copy wins.
+      expect(insertCalls()[0]![3]).toBe(a!.latitude);
+      expect(body).toMatchObject({ success: true, accepted: 4, inserted: 2, duplicates: 2, dropped: 0 });
+    });
+
+    it('does not recompute closed-shift mileage for late points that were already saved', async () => {
+      const now = Date.now();
+      const points = outagePoints(10, 5 * 60_000, now);
+      setupTx({ latestStoredAt: new Date(now - 1_000) });
+      storeHolds(points.map((p) => p.timestamp));
+
+      await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockRecompute).not.toHaveBeenCalled();
+    });
+
+    it('recomputes only around the late points this request actually inserted', async () => {
+      const now = Date.now();
+      const points = outagePoints(10, 5 * 60_000, now);
+      setupTx({ latestStoredAt: new Date(now - 1_000) });
+      storeHolds([...points.slice(0, 3), ...points.slice(8)].map((p) => p.timestamp));
+
+      await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
+      await new Promise((r) => setTimeout(r, 0));
+
+      const checked = mockRecompute.mock.calls.map(([, at]) => at);
+      expect(checked).toEqual([points[3]!.timestamp, points[7]!.timestamp]);
+    });
+  });
+
   it('does not look for a closed shift when every point is fresh', async () => {
     setupTx({ latestStoredAt: new Date(Date.now() - 5 * 60_000) });
     const now = Date.now();

@@ -26,7 +26,11 @@ import * as Sentry from '@sentry/nextjs';
  * - only the newest point may move the live marker, and only when it is newer
  *   than the stored trail and recent (same rule as the single-point route);
  * - late points that fall inside an already-closed shift trigger the same
- *   mileage recompute as the single-point route.
+ *   mileage recompute as the single-point route;
+ * - replay is idempotent: the client resends a batch whose answer it never got
+ *   (timeout, dropped connection), so a point whose (driver_id, recorded_at)
+ *   is already stored is skipped, and repeats inside one batch are filed once.
+ *   A fully-duplicate resend still answers success so the client clears it.
  */
 
 /** Upper bound per request — the client sends backlogs in chunks of this size or less. */
@@ -125,6 +129,15 @@ export async function POST(request: NextRequest) {
       .filter((p): p is ResolvedPoint => p !== null)
       .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
     const dropped = points.length - resolved.length;
+    // The same fix time twice in one batch is one fix; keep the first copy.
+    const seen = new Set<number>();
+    const unique = resolved.filter((p) => {
+      const key = Date.parse(p.recordedAt);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const inserted: ResolvedPoint[] = [];
 
     if (resolved.length === 0) {
       return NextResponse.json({ success: true, accepted: 0, dropped }, { status: 200 });
@@ -156,14 +169,20 @@ export async function POST(request: NextRequest) {
       );
       const latestStoredAt = latestRows[0]?.latest_recorded_at ?? null;
 
-      for (const point of resolved) {
-        await tx.$executeRawUnsafe(
+      for (const point of unique) {
+        // No unique key on (driver_id, recorded_at); the (driver_id, recorded_at)
+        // index makes this existence check cheap.
+        const count = await tx.$executeRawUnsafe(
           `
           INSERT INTO driver_locations (
             driver_id, location, latitude, longitude, accuracy, speed, heading,
             altitude, battery_level, is_moving, recorded_at
           )
-          VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, $10::timestamptz)
+          SELECT $1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, $10::timestamptz
+          WHERE NOT EXISTS (
+            SELECT 1 FROM driver_locations
+            WHERE driver_id = $1::uuid AND recorded_at = $10::timestamptz AND deleted_at IS NULL
+          )
           `,
           driverId,
           point.longitude,
@@ -176,10 +195,13 @@ export async function POST(request: NextRequest) {
           point.isMoving,
           point.recordedAt,
         );
+        if (count > 0) inserted.push(point);
       }
 
-      const newest = resolved[resolved.length - 1]!;
+      // Already-saved points were applied when they were first stored.
+      const newest = inserted[inserted.length - 1];
       if (
+        newest &&
         shouldUpdateLastKnownLocation({
           recordedAt: newest.recordedAt,
           latestStoredAt,
@@ -205,7 +227,7 @@ export async function POST(request: NextRequest) {
     // Late points may land in a shift whose miles were computed at End shift.
     // A backlog spans minutes, so its oldest and newest late points bound every
     // shift it can touch; the recompute is idempotent.
-    const late = resolved.filter((p) => shouldCheckClosedShift({ recordedAt: p.recordedAt, serverNowMs }));
+    const late = inserted.filter((p) => shouldCheckClosedShift({ recordedAt: p.recordedAt, serverNowMs }));
     if (late.length > 0) {
       const ends = [...new Set([late[0]!.recordedAt, late[late.length - 1]!.recordedAt])];
       runAfterResponse('late GPS batch mileage recompute failed', async () => {
@@ -239,13 +261,23 @@ export async function POST(request: NextRequest) {
         event: 'tracking.location_batch',
         driverId,
         accepted: resolved.length,
+        inserted: inserted.length,
         dropped,
         oldest: resolved[0]!.recordedAt,
         newest: resolved[resolved.length - 1]!.recordedAt,
       }),
     );
 
-    return NextResponse.json({ success: true, accepted: resolved.length, dropped }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        accepted: resolved.length,
+        inserted: inserted.length,
+        duplicates: resolved.length - inserted.length,
+        dropped,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof DbHttpError) {
       return NextResponse.json(error.body, { status: error.status });
