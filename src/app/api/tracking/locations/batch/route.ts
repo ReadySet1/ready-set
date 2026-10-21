@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
@@ -8,6 +7,14 @@ import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
 import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-point-mileage';
 import { runAfterResponse } from '@/lib/api/after-response';
+import {
+  assertCanWriteDriverLocations,
+  insertDriverLocationIfNew,
+  lockDriverLocations,
+  readLatestRecordedAt,
+  updateLastKnownLocation,
+  type DriverLocationPoint,
+} from '@/services/tracking/driver-location-writes';
 import * as Sentry from '@sentry/nextjs';
 
 /**
@@ -31,8 +38,9 @@ import * as Sentry from '@sentry/nextjs';
  *   (timeout, dropped connection), so a point whose (driver_id, recorded_at)
  *   is already stored is skipped, and repeats inside one batch are filed once.
  *   A fully-duplicate resend still answers success so the client clears it.
- *   Concurrent resends are serialized per driver by a transaction-scoped
- *   advisory lock so they cannot both pass the existence check.
+ *   Concurrent resends, and a live single-point POST of the same fix, are
+ *   serialized per driver by a transaction-scoped advisory lock shared with
+ *   the single-point route, so they cannot both pass the existence check.
  */
 
 /** Upper bound per request — the client sends backlogs in chunks of this size or less. */
@@ -51,15 +59,8 @@ interface BatchPointInput {
   timestamp?: unknown;
 }
 
-interface ResolvedPoint {
-  latitude: number;
-  longitude: number;
-  accuracy: number | null;
-  speed: number | null;
-  heading: number | null;
-  altitude: number | null;
-  batteryLevel: number | null;
-  isMoving: boolean | null;
+/** A replayed point always carries its fix time. */
+interface ResolvedPoint extends DriverLocationPoint {
   recordedAt: string;
 }
 
@@ -145,72 +146,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, accepted: 0, dropped }, { status: 200 });
     }
 
-    const isDriver = auth.context.user.type === 'DRIVER';
-
+    // Same write steps and lock key as the single-point route, so a live POST
+    // and a replay of the same fix serialize (see driver-location-writes.ts).
     await withRawTx(async (tx) => {
-      const driverCheck = isDriver
-        ? await tx.$queryRawUnsafe<{ id: string }[]>(
-            `SELECT id FROM drivers WHERE id = $1::uuid AND ${driverOwnershipCondition(2)} AND is_active = true`,
-            driverId,
-            auth.context.user.id,
-          )
-        : await tx.$queryRawUnsafe<{ id: string }[]>(
-            'SELECT id FROM drivers WHERE id = $1::uuid AND is_active = true',
-            driverId,
-          );
-      if (driverCheck.length === 0) {
-        throw new DbHttpError(isDriver ? 403 : 404, {
-          success: false,
-          error: isDriver ? 'Access denied' : 'Driver not found or inactive',
-        });
-      }
-
-      // There is no unique key on (driver_id, recorded_at), so two requests
-      // carrying the same batch (a timed-out request still running while the
-      // client retries, or two tabs flushing) could both pass NOT EXISTS below
-      // and double-save. This lock makes the second wait for the first to commit.
-      // Transaction-scoped on purpose: it releases at commit/rollback and is safe
-      // under pgbouncer transaction pooling (a session-level lock is not). The
-      // wait is bounded by withRawTx's statement_timeout. $executeRaw because
-      // Prisma cannot deserialize the void column $queryRaw would return.
-      await tx.$executeRawUnsafe(
-        `SELECT pg_advisory_xact_lock(hashtext('driver_locations:' || $1))`,
-        driverId,
-      );
-
-      const latestRows = await tx.$queryRawUnsafe<{ latest_recorded_at: Date | null }[]>(
-        `SELECT MAX(recorded_at) AS latest_recorded_at FROM driver_locations WHERE driver_id = $1::uuid AND deleted_at IS NULL`,
-        driverId,
-      );
-      const latestStoredAt = latestRows[0]?.latest_recorded_at ?? null;
+      await assertCanWriteDriverLocations(tx, driverId, auth.context.user);
+      await lockDriverLocations(tx, driverId);
+      const latestStoredAt = await readLatestRecordedAt(tx, driverId);
 
       for (const point of unique) {
-        // No unique key on (driver_id, recorded_at); the (driver_id, recorded_at)
-        // index makes this existence check cheap.
-        const count = await tx.$executeRawUnsafe(
-          `
-          INSERT INTO driver_locations (
-            driver_id, location, latitude, longitude, accuracy, speed, heading,
-            altitude, battery_level, is_moving, recorded_at
-          )
-          SELECT $1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, $10::timestamptz
-          WHERE NOT EXISTS (
-            SELECT 1 FROM driver_locations
-            WHERE driver_id = $1::uuid AND recorded_at = $10::timestamptz AND deleted_at IS NULL
-          )
-          `,
-          driverId,
-          point.longitude,
-          point.latitude,
-          point.accuracy,
-          point.speed,
-          point.heading,
-          point.altitude,
-          point.batteryLevel,
-          point.isMoving,
-          point.recordedAt,
-        );
-        if (count > 0) inserted.push(point);
+        if (await insertDriverLocationIfNew(tx, driverId, point)) inserted.push(point);
       }
 
       // Already-saved points were applied when they were first stored.
@@ -223,19 +167,7 @@ export async function POST(request: NextRequest) {
           serverNowMs,
         })
       ) {
-        await tx.$executeRawUnsafe(
-          `
-          UPDATE drivers
-          SET
-            last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-            last_location_update = NOW(),
-            updated_at = NOW()
-          WHERE id = $3::uuid
-          `,
-          newest.longitude,
-          newest.latitude,
-          driverId,
-        );
+        await updateLastKnownLocation(tx, driverId, newest);
       }
     });
 
