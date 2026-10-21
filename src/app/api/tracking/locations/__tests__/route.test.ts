@@ -507,7 +507,7 @@ describe("/api/tracking/locations", () => {
         expect(response.status).toBe(500);
         // The UPDATE drivers statement must not run once the insert throws — the
         // transaction rolls back (Prisma), keeping the write atomic.
-        expect(mockTxExec).not.toHaveBeenCalled();
+        expect(mockTxExec.mock.calls.filter(([sql]) => /UPDATE drivers/.test(sql))).toHaveLength(0);
       });
     });
   });
