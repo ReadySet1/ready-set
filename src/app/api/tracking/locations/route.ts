@@ -10,6 +10,13 @@ import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
 import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-point-mileage';
 import { runAfterResponse } from '@/lib/api/after-response';
+import {
+  assertCanWriteDriverLocations,
+  insertDriverLocationIfNew,
+  lockDriverLocations,
+  readLatestRecordedAt,
+  updateLastKnownLocation,
+} from '@/services/tracking/driver-location-writes';
 import * as Sentry from '@sentry/nextjs';
 
 interface LocationUpdate {
@@ -119,116 +126,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isDriver = auth.context.user.type === 'DRIVER';
-
-    // One transaction: ownership/existence check + insert + denormalized update.
-    // A DRIVER may only write their OWN location (drivers row linked to the
-    // auth user via profile_id or legacy user_id); admins may write for any
-    // driver. Coordinates are bound as numeric params via ST_MakePoint (never
-    // string-interpolated).
+    // One transaction: ownership/existence check + per-driver lock + guarded
+    // insert + denormalized update. A DRIVER may only write their OWN location;
+    // admins may write for any driver. Coordinates are bound as numeric params
+    // via ST_MakePoint (never string-interpolated). The lock is shared with the
+    // batch replay route, so a retried POST or a live POST racing a replay of
+    // the same fix cannot store it twice (see driver-location-writes.ts).
     const locationRow = await withRawTx(async (tx) => {
-      const driverCheck = isDriver
-        ? await tx.$queryRawUnsafe<{ id: string }[]>(
-            `SELECT id FROM drivers WHERE id = $1::uuid AND ${existingDriverOwnershipCondition(2)} AND is_active = true`,
-            driver_id,
-            auth.context.user.id,
-          )
-        : await tx.$queryRawUnsafe<{ id: string }[]>(
-            'SELECT id FROM drivers WHERE id = $1::uuid AND deleted_at IS NULL AND is_active = true',
-            driver_id,
-          );
+      await assertCanWriteDriverLocations(tx, driver_id, auth.context.user);
+      await lockDriverLocations(tx, driver_id);
 
-      if (driverCheck.length === 0) {
-        throw new DbHttpError(isDriver ? 403 : 404, {
-          success: false,
-          error: isDriver ? 'Access denied' : 'Driver not found or inactive',
-        });
-      }
-
-      // Newest point already stored (index-backed on driver_id, recorded_at).
       // Read BEFORE the insert so the new point is compared against history.
-      const latestRows = await tx.$queryRawUnsafe<{ latest_recorded_at: Date | null }[]>(
-        `SELECT MAX(recorded_at) AS latest_recorded_at FROM driver_locations WHERE driver_id = $1::uuid AND deleted_at IS NULL`,
-        driver_id,
-      );
-      const isCurrentPosition = shouldUpdateLastKnownLocation({
-        recordedAt,
-        latestStoredAt: latestRows[0]?.latest_recorded_at ?? null,
-        serverNowMs,
-      });
+      const latestStoredAt = await readLatestRecordedAt(tx, driver_id);
 
-      const inserted = await tx.$queryRawUnsafe<any[]>(
-        `
-        INSERT INTO driver_locations (
-          driver_id,
-          location,
-          latitude,
-          longitude,
-          accuracy,
-          speed,
-          heading,
-          altitude,
-          battery_level,
-          is_moving,
-          recorded_at
-        )
-        VALUES ($1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, COALESCE($10::timestamptz, NOW()))
-        RETURNING
-          id,
-          ST_AsGeoJSON(location) as location_geojson,
-          accuracy,
-          speed,
-          heading,
-          altitude,
-          battery_level,
-          is_moving,
-          recorded_at,
-          created_at
-        `,
-        driver_id,
-        longitude,
+      const inserted = await insertDriverLocationIfNew(tx, driver_id, {
         latitude,
-        accuracy ?? null,
-        speed ?? null,
-        heading ?? null,
-        altitude ?? null,
+        longitude,
+        accuracy: accuracy ?? null,
+        speed: speed ?? null,
+        heading: heading ?? null,
+        altitude: altitude ?? null,
         batteryLevel,
-        is_moving ?? null,
+        isMoving: is_moving ?? null,
         recordedAt,
-      );
+      });
+      // Already stored: it was applied (marker, recompute) when first saved.
+      if (!inserted) return null;
 
       // A late / out-of-order point (offline-queue replay) is history: it is
       // stored above for mileage and trails, but must not move the driver's
       // current position on the live maps.
-      if (!isCurrentPosition) {
+      if (!shouldUpdateLastKnownLocation({ recordedAt, latestStoredAt, serverNowMs })) {
         console.warn(
           JSON.stringify({
             event: 'tracking.late_point',
             driverId: driver_id,
             recordedAt,
-            latestStoredAt: latestRows[0]?.latest_recorded_at ?? null,
+            latestStoredAt,
           }),
         );
-        return inserted[0];
+        return inserted;
       }
 
-      // Update driver's last known location
-      await tx.$executeRawUnsafe(
-        `
-        UPDATE drivers
-        SET
-          last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-          last_location_update = NOW(),
-          updated_at = NOW()
-        WHERE id = $3::uuid
-        `,
-        longitude,
-        latitude,
-        driver_id,
-      );
-
-      return inserted[0];
+      await updateLastKnownLocation(tx, driver_id, { latitude, longitude });
+      return inserted;
     });
+
+    // Idempotent retry: success so the client clears it, nothing re-applied.
+    // Same counters as the batch route's response.
+    if (!locationRow) {
+      return NextResponse.json(
+        { success: true, duplicate: true, inserted: 0, duplicates: 1, data: null },
+        { status: 200 },
+      );
+    }
 
     const locationData = {
       ...locationRow,
@@ -265,6 +216,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      duplicate: false,
+      inserted: 1,
+      duplicates: 0,
       data: locationData
     }, { status: 201 });
 

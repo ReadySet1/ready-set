@@ -336,8 +336,8 @@ describe('/api/tracking/locations API', () => {
 
         // Security hardening: coordinates are bound as numeric params via
         // ST_MakePoint, never string-interpolated. The denormalized driver
-        // update is the $executeRawUnsafe call.
-        const updateCall = mockTxExec.mock.calls[0];
+        // update is the $executeRawUnsafe UPDATE drivers call.
+        const updateCall = mockTxExec.mock.calls.find(([sql]) => /UPDATE drivers/.test(sql))!;
         expect(updateCall[0]).toContain('UPDATE drivers');
         expect(updateCall[0]).toContain('ST_MakePoint');
         expect(updateCall.slice(1)).toEqual([-97.7431, 30.2672, 'driver-123']);
@@ -359,7 +359,7 @@ describe('/api/tracking/locations API', () => {
         );
         expect(response.status).toBe(500);
         // Transaction rolls back (Prisma) — the UPDATE drivers statement never runs.
-        expect(mockTxExec).not.toHaveBeenCalled();
+        expect(mockTxExec.mock.calls.filter(([sql]) => /UPDATE drivers/.test(sql))).toHaveLength(0);
       });
     });
 
