@@ -3,6 +3,130 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.11.0",
+      "date": "2026-10-22",
+      "title": "Release 2.11.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "On smaller phones, the bottom of the tracking screen (including the \"Request a return to dispatch\" button) no longer hides behind the bottom menu.",
+          "type": "fixed"
+        },
+        {
+          "text": "Starting a shift no longer gets stuck on a spinning button. If your connection is too slow, you'll see a message asking you to try again.",
+          "type": "fixed"
+        },
+        {
+          "text": "You can now fix a pickup or delivery address directly while creating a catering order, without clearing it and typing it again.",
+          "type": "fixed"
+        },
+        {
+          "text": "Fixed a \"Returned response is null\" error that could appear on the tracking screen when your connection dropped, and pages no longer load an outdated cached version after an update.",
+          "type": "fixed"
+        },
+        {
+          "text": "Admins can now create a new client and enter its delivery pricing directly from the Adjust Vendor Pricing tab.",
+          "type": "new"
+        },
+        {
+          "text": "Fulton County is now available when selecting delivery counties on the quote request form.",
+          "type": "new"
+        },
+        {
+          "text": "The internal tasks board now shows when each card was added and closed.",
+          "type": "improved"
+        },
+        {
+          "text": "The admin dashboard activity feed now shows older dates in the app timezone.",
+          "type": "fixed"
+        },
+        {
+          "text": "Driver location points now carry the time the GPS fix was taken, so stale points no longer look fresh.",
+          "type": "fixed"
+        },
+        {
+          "text": "Shift mileage no longer counts phantom GPS jumps while you are parked.",
+          "type": "fixed"
+        },
+        {
+          "text": "The shift timer on the tracking screen now counts up correctly, even when the phone's clock is wrong.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver map now follows you as you drive, with a button to recenter.",
+          "type": "improved"
+        },
+        {
+          "text": "Order lists and the dashboard now show dates in Pacific time, matching the order pages.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers can start a shift again after a previous one was closed outside the app.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver home now loads your deliveries once per minute instead of twice, saving data and battery.",
+          "type": "improved"
+        },
+        {
+          "text": "The \"View live status\" link in delivery emails now opens your order's live tracking page instead of a missing page.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers using the mobile app now see the proof-of-delivery photo on completed deliveries.",
+          "type": "fixed"
+        },
+        {
+          "text": "The order tracking page now fits on phone screens without sideways scrolling.",
+          "type": "fixed"
+        },
+        {
+          "text": "The driver map now shows the route to your next stop, and your own path is drawn as a faded trail.",
+          "type": "improved"
+        },
+        {
+          "text": "The welcome window after signing up can now be closed on phones.",
+          "type": "fixed"
+        },
+        {
+          "text": "After ending a shift you now see how far you went, in feet or miles.",
+          "type": "fixed"
+        },
+        {
+          "text": "Completed deliveries now show the proof-of-delivery photo you took.",
+          "type": "fixed"
+        },
+        {
+          "text": "Signatures are now visible while signing when your phone is in dark mode.",
+          "type": "fixed"
+        },
+        {
+          "text": "An unexpected error no longer shows \"Authentication Error\" or signs you out.",
+          "type": "fixed"
+        },
+        {
+          "text": "Searching drivers on the tracking dashboard no longer crashes, and you can now search by name.",
+          "type": "fixed"
+        },
+        {
+          "text": "Admins can now end a stuck driver shift from the tracking page.",
+          "type": "new"
+        },
+        {
+          "text": "Driver routes and mileage are now accurate even when a phone's clock is wrong.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order pages now show pickup and arrival times in Pacific time, matching the edit dialog.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.11.0"
+      }
+    },
+    {
       "version": "2.10.1",
       "date": "2026-10-08",
       "title": "Smoother driver start and accurate order times",
