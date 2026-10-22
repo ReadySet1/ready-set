@@ -5,6 +5,89 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0](https://github.com/ReadySet1/ready-set/compare/v2.10.1...v2.11.0) (2026-10-22)
+
+
+### Added
+
+* **admin:** end a driver's shift from the tracking page ([a433890](https://github.com/ReadySet1/ready-set/commit/a433890e87eaa1c9ca70a22061b97aedaf3013cf))
+* **admin:** end a driver's shift from the tracking page ([baaf38d](https://github.com/ReadySet1/ready-set/commit/baaf38debdac2a9eff3a03a1ea2d09bb6338f2ea))
+* **admin:** show added/closed dates on tasks board cards ([881d912](https://github.com/ReadySet1/ready-set/commit/881d9126101455252d0840718ad37daa701f54e5))
+* **admin:** show added/closed dates on tasks board cards ([a0b9bd1](https://github.com/ReadySet1/ready-set/commit/a0b9bd1e20298e58b299c98df30d5d2581f7eabd))
+* **admin:** warn when leftover orders will block the next End Shift ([9145cf3](https://github.com/ReadySet1/ready-set/commit/9145cf3966b2e95b81309e303f964800bc871011))
+* **calculator:** create new client configurations from Adjust Vendor Pricing ([12aaa52](https://github.com/ReadySet1/ready-set/commit/12aaa52ba155ae48526ace49900cf53ccf447c5c))
+* **calculator:** create new client configurations from Adjust Vendor Pricing ([4e5e82c](https://github.com/ReadySet1/ready-set/commit/4e5e82c4183273cd22368b2ba75e6e4c9f42b50a))
+* **counties:** add Fulton county and strict counties typing ([8d56f2a](https://github.com/ReadySet1/ready-set/commit/8d56f2aa071e67660c84b83734f5f18aa2566e83))
+* **counties:** add Fulton county to CountiesSelection ([7abf6d7](https://github.com/ReadySet1/ready-set/commit/7abf6d733003154ae96b56728ead7e73e46e38b0))
+* **driver:** follow the driver on the live map ([c066429](https://github.com/ReadySet1/ready-set/commit/c06642922dc926e9956754ca8c7d1190fc43a1af))
+* **driver:** follow the driver on the live map ([94114ba](https://github.com/ReadySet1/ready-set/commit/94114bae8cbc779ec152fdaa761fcddbcb9d1c0d))
+* **driver:** guide the driver to the next stop on the live map ([a311f15](https://github.com/ReadySet1/ready-set/commit/a311f15603a3211ecc0153e4dc322cee34abddce))
+* **driver:** guide the driver to the next stop on the live map ([8e455f3](https://github.com/ReadySet1/ready-set/commit/8e455f3689f6fa59881e91379ff32425b23b0cdb))
+
+
+### Fixed
+
+* **auth:** stop AuthErrorBoundary treating ordinary crashes as auth errors ([8189b4a](https://github.com/ReadySet1/ready-set/commit/8189b4aca9fc9d0ad3cefe06409b0c99e84315df))
+* **auth:** stop AuthErrorBoundary treating ordinary crashes as auth errors ([118709a](https://github.com/ReadySet1/ready-set/commit/118709af8c6d58804b61fe7dea20305634cc23a1))
+* **calculator:** resolve the new-client template lazily ([eda6625](https://github.com/ReadySet1/ready-set/commit/eda6625ae2961882910cb1fa1e179e379c62e6e5))
+* **client:** make the sign-up success modal closable on mobile ([a0c7e7e](https://github.com/ReadySet1/ready-set/commit/a0c7e7e84ceb18e4c81d89b94dd46946843f0c7f))
+* **dashboard:** show activity feed dates in the app timezone ([8025b6c](https://github.com/ReadySet1/ready-set/commit/8025b6c85cc33b7e51a488b083e3b0a339bb9c6a))
+* **dashboard:** show activity feed dates in the app timezone ([d330e01](https://github.com/ReadySet1/ready-set/commit/d330e01e33149b6de5284e18fb32df3dabc0b14d))
+* driver shift hygiene (resume repair + test-drive reset) ([76df3aa](https://github.com/ReadySet1/ready-set/commit/76df3aa1244b14155942c204b9d5d6d610c6c47f))
+* **driver:** count shift timers on the server clock, not the phone's ([9d5b7ce](https://github.com/ReadySet1/ready-set/commit/9d5b7ce84b412fa04805c1378a70414a361670c6))
+* **driver:** count shift timers on the server clock, not the phone's ([c530b3c](https://github.com/ReadySet1/ready-set/commit/c530b3c046d46ab8c85e59ff939d7e1b5ed74dd8))
+* **driver:** keep signature strokes visible in dark mode ([82a8eec](https://github.com/ReadySet1/ready-set/commit/82a8eecb3fb28445241ebe846a71d938ff5dc16b))
+* **driver:** keep the on-shift card clear of the bottom nav on small phones ([be55784](https://github.com/ReadySet1/ready-set/commit/be55784d6704ea81f85ba2dd262b3430571a8d4e))
+* **driver:** mobile round 1 driver findings (C11, C4, C6) ([579bbf0](https://github.com/ReadySet1/ready-set/commit/579bbf06754e50b83c0f2f815739f21ee5571bf1))
+* **driver:** poll deliveries once for the driver home ([e86a949](https://github.com/ReadySet1/ready-set/commit/e86a949ba2db62af2b64303f24a8e33decda3c4f))
+* **driver:** poll deliveries once for the driver home ([53f5846](https://github.com/ReadySet1/ready-set/commit/53f5846d4f9de8b78b91d4ef6e9f442bfd1e6cb5))
+* **driver:** service worker passthrough, bounded Start shift, bottom-nav clearance ([88ad6c3](https://github.com/ReadySet1/ready-set/commit/88ad6c3f9476a3936a8aa5c825a9641119664322))
+* **driver:** show the proof-of-delivery photo on completed deliveries ([71b085a](https://github.com/ReadySet1/ready-set/commit/71b085a293a967202c0a5c1b64f359be84765e27))
+* **driver:** show the shift distance in feet/miles after ending a shift ([aa7af3b](https://github.com/ReadySet1/ready-set/commit/aa7af3bc9f01347a0bda696dd42acc23d4342802))
+* **driver:** stop the service worker from answering requests it cannot serve ([2f18e99](https://github.com/ReadySet1/ready-set/commit/2f18e99a0d1c0f84bfe31186a6049be303be0beb))
+* **driver:** stop the Start shift spinner from hanging forever ([8e2c717](https://github.com/ReadySet1/ready-set/commit/8e2c7179124f9e8ebffce48451bca55faefd8ee1))
+* **emails:** point the delivery status tracking link at the order-status page ([17b18bf](https://github.com/ReadySet1/ready-set/commit/17b18bfcc668e9135520cf4c3da89709c64e55e4))
+* **emails:** point the delivery status tracking link at the order-status page ([4aca765](https://github.com/ReadySet1/ready-set/commit/4aca7659ad1e04616e013e11caa57d92da5bb80e))
+* let users correct a selected catering order address in place ([b0d5384](https://github.com/ReadySet1/ready-set/commit/b0d538448efbd4154c0050d74c5a1584f6e45baf))
+* let users correct a selected catering order address in place ([a10030f](https://github.com/ReadySet1/ready-set/commit/a10030f95e2332732170888c034b21aed541de32))
+* mobile round 1 client findings (F1 sign-up modal, F3 tracking page) ([d7e039f](https://github.com/ReadySet1/ready-set/commit/d7e039fe541e4a884c99f430ccb3ef74f8f1fefb))
+* **orders:** accept Bearer auth on the order files route ([4196485](https://github.com/ReadySet1/ready-set/commit/419648557755deae710e30693a71c1470a54c353))
+* **orders:** accept Bearer auth on the order files route ([a5c3d1f](https://github.com/ReadySet1/ready-set/commit/a5c3d1f172b0200151135f869c1816c1c21640ef))
+* **orders:** show order header times in the app timezone ([ccc6f81](https://github.com/ReadySet1/ready-set/commit/ccc6f810caf62ba31a74361ffc5f87ed1cbd2095))
+* **orders:** show order header times in the app timezone ([606d5d6](https://github.com/ReadySet1/ready-set/commit/606d5d690fa081eebd3028a807d42457c555efa2))
+* **orders:** show order list dates in the app timezone ([c36738b](https://github.com/ReadySet1/ready-set/commit/c36738b4c2b9bc0f145d4ba8b743b6f2a3381718))
+* **orders:** show order list dates in the app timezone ([a14d057](https://github.com/ReadySet1/ready-set/commit/a14d057b1658ab75a04ddb35f98d55e29017babe))
+* **orders:** skip soft-deleted records in notifyOrderCreated lookups ([010be27](https://github.com/ReadySet1/ready-set/commit/010be27324cec4cba9317266ae881a2c60d5f50d))
+* **orders:** skip soft-deleted records in notifyOrderCreated lookups ([61094d5](https://github.com/ReadySet1/ready-set/commit/61094d5125624bed371ffe474889e7247df1d3f4))
+* **scripts:** retire superseded future-dated test seeds on reset ([f74fcfb](https://github.com/ReadySet1/ready-set/commit/f74fcfb54eead93c03657b30c2d93caab038d187))
+* **tracking:** correct device clock skew on location points ([2be912c](https://github.com/ReadySet1/ready-set/commit/2be912c8e9e00644f60f868bb72b1205ee1e94d7))
+* **tracking:** correct device clock skew on location points ([10009f7](https://github.com/ReadySet1/ready-set/commit/10009f7445b9a47672555eb0e620a07055a7ed11))
+* **tracking:** keep the order tracking page inside a phone screen ([e048951](https://github.com/ReadySet1/ready-set/commit/e04895110bb5afddc1606be266046a9466f32ab0))
+* **tracking:** repair drifted driver row when resuming an open shift ([38d6c95](https://github.com/ReadySet1/ready-set/commit/38d6c95f0e4b0e4aed292209e67b3232bb351526))
+* **tracking:** send the GPS fix time as the location timestamp from the native path ([e6eb264](https://github.com/ReadySet1/ready-set/commit/e6eb26405b55cf1b828397833eeeb9f37c3f6e01))
+* **tracking:** send the GPS fix time as the location timestamp from the native path ([d6fca15](https://github.com/ReadySet1/ready-set/commit/d6fca1511cf705f3d278ece944eb3e00e4498c79))
+* **tracking:** stop billing phantom GPS teleports in shift mileage ([76c101a](https://github.com/ReadySet1/ready-set/commit/76c101a059162f5b96c3aca157be9fb86a29809b))
+* **tracking:** stop billing phantom GPS teleports in shift mileage ([5f11663](https://github.com/ReadySet1/ready-set/commit/5f11663fd5830af26bbb5895439cffafb3c1c623))
+* **tracking:** stop driver search crashing on drivers without an employee ID ([e5e5ef8](https://github.com/ReadySet1/ready-set/commit/e5e5ef898ad2f4b091addfb8fe3da30f00f4e0a8))
+* **tracking:** stop driver search crashing on drivers without an employee ID ([b7fe2cc](https://github.com/ReadySet1/ready-set/commit/b7fe2cc75c97dcdc47acb176f5f9c0c82365f4f1))
+* **tracking:** stop refusing a new shift on a stale current_shift_id pointer ([6bd4c73](https://github.com/ReadySet1/ready-set/commit/6bd4c7319b9774f690cb807196978fa5f008960a))
+* **tracking:** stop refusing a new shift on a stale current_shift_id pointer ([ff65ab5](https://github.com/ReadySet1/ready-set/commit/ff65ab55ed4c346c50dd2df784a5c10383dfd0c0))
+
+
+### Performance
+
+* **driver:** abort superseded and unmounted deliveries polls ([5b594d3](https://github.com/ReadySet1/ready-set/commit/5b594d3a00dc2e9c169fde463c330f9f9d1c57ba))
+* **driver:** abort superseded and unmounted deliveries polls ([dc9de3e](https://github.com/ReadySet1/ready-set/commit/dc9de3ebce90f8e4100e598e051f30c450f4d432))
+* **driver:** keep last good deliveries on failed poll and abort feed fetch on unmount ([aa614b7](https://github.com/ReadySet1/ready-set/commit/aa614b7697290bb4c0ec2228d893926d5174428b))
+* **driver:** keep last good deliveries on failed poll and abort feed fetch on unmount ([7e21efd](https://github.com/ReadySet1/ready-set/commit/7e21efd38e1d0c4c226aba36c692ad2d2310422d))
+
+
+### Changed
+
+* centralize the booking calendar URL ([46b2dd7](https://github.com/ReadySet1/ready-set/commit/46b2dd733487170dc90d2e4e24f8e2d7e686bac1))
+* centralize the booking calendar URL ([88ec8a7](https://github.com/ReadySet1/ready-set/commit/88ec8a72ba652f458bc07514a4a50822b0eb1eaf))
+* **types:** replace counties any with strict types ([b9db052](https://github.com/ReadySet1/ready-set/commit/b9db0529e16b11364f4139cbd8def66c4bb10dad))
+
 ## [2.10.1](https://github.com/ReadySet1/ready-set/compare/v2.10.0...v2.10.1) (2026-10-08)
 
 
