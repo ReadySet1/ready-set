@@ -103,11 +103,11 @@ export interface Geofence {
 export interface TrackedDriver {
   id: string;
   userId?: string;
-  employeeId: string;
+  employeeId: string | null;
   name?: string;
-  vehicleNumber?: string;
+  vehicleNumber?: string | null;
   licenseNumber?: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
   isActive: boolean;
   isOnDuty: boolean;
   lastKnownLocation?: {

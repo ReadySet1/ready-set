@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import DriverLiveMap, { mergeTrailSeed, type TrailEntry } from '../DriverLiveMap';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
@@ -15,6 +15,8 @@ const mockRemoveSource = jest.fn();
 const mockGetSource = jest.fn();
 const mockGetLayer = jest.fn();
 const mockEaseTo = jest.fn();
+const mockFlyTo = jest.fn();
+const mockIsMoving = jest.fn(() => false);
 const mockFitBounds = jest.fn();
 const mockSetLngLat = jest.fn().mockReturnThis();
 const mockMarkerAddTo = jest.fn().mockReturnThis();
@@ -27,13 +29,19 @@ const mockBoundsExtend = jest.fn();
 let mockMapInstance: any;
 let mockMarkerInstance: any;
 let loadCallback: (() => void) | null = null;
+/** Every map.on(event, handler) registration, so tests can fire map events. */
+let mapHandlers: Record<string, Array<(e?: any) => void>> = {};
+const fireMapEvent = (event: string, payload: any = {}) => {
+  for (const handler of mapHandlers[event] ?? []) handler(payload);
+};
 
 const createMockMapInstance = () => ({
   addControl: mockAddControl,
-  on: jest.fn((event: string, callback: () => void) => {
+  on: jest.fn((event: string, callback: (e?: any) => void) => {
     if (event === 'load') {
-      loadCallback = callback;
+      loadCallback = callback as () => void;
     }
+    (mapHandlers[event] ??= []).push(callback);
   }),
   remove: mockRemove,
   addSource: mockAddSource,
@@ -43,6 +51,8 @@ const createMockMapInstance = () => ({
   getSource: mockGetSource,
   getLayer: mockGetLayer,
   easeTo: mockEaseTo,
+  flyTo: mockFlyTo,
+  isMoving: mockIsMoving,
   fitBounds: mockFitBounds,
 });
 
@@ -116,6 +126,7 @@ jest.mock('@/components/ui/card', () => ({
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   AlertTriangleIcon: () => <span data-testid="alert-triangle-icon">Alert</span>,
+  LocateFixed: () => <span data-testid="locate-fixed-icon" />,
 }));
 
 // Mock cn utility
@@ -130,6 +141,8 @@ describe('DriverLiveMap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     loadCallback = null;
+    mapHandlers = {};
+    mockIsMoving.mockReturnValue(false);
     mockMapInstance = null;
     mockMarkerInstance = null;
 
@@ -454,9 +467,10 @@ describe('DriverLiveMap', () => {
         );
       });
 
-      // The 4 markers of the stale deliveries are removed from the map
+      // The 4 markers of the stale deliveries are removed from the map, plus
+      // the "Next" target pill (delivery-3 is completed, so there is no next stop)
       await waitFor(() => {
-        expect(mockMarkerRemove).toHaveBeenCalledTimes(4);
+        expect(mockMarkerRemove).toHaveBeenCalledTimes(5);
       });
 
       // And fresh markers are created for delivery-3 at its coordinates
@@ -697,6 +711,294 @@ describe('DriverLiveMap', () => {
       const mapContainer = screen.getByRole('application');
       expect(mapContainer).toHaveAttribute('role', 'application');
       expect(mapContainer).toHaveAttribute('aria-label', 'Driver live map');
+    });
+  });
+
+  describe('Next-stop guide (2026-10-06 field report)', () => {
+    const pickupOnly: DeliveryTracking[] = [
+      {
+        id: 'delivery-1',
+        status: 'ASSIGNED',
+        pickupLocation: { coordinates: [-122.4294, 37.7649] },
+        deliveryLocation: { coordinates: [-122.4094, 37.7849] },
+      } as unknown as DeliveryTracking,
+    ];
+    const directionsBody = {
+      routes: [
+        {
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-122.4194, 37.7749],
+              [-122.4294, 37.7649],
+            ],
+          },
+          distance: 1609.344,
+          duration: 360,
+        },
+      ],
+    };
+    const fetchMock = global.fetch as jest.Mock;
+
+    afterEach(() => {
+      fetchMock.mockReset();
+    });
+
+    const renderLoaded = async (deliveries: DeliveryTracking[] = pickupOnly) => {
+      const utils = render(
+        <DriverLiveMap currentLocation={mockCurrentLocation} activeDeliveries={deliveries} />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      return utils;
+    };
+
+    it('labels the breadcrumb trail as "Your path" in a legend', async () => {
+      await renderLoaded([]);
+      expect(screen.getByText('Your path')).toBeInTheDocument();
+    });
+
+    it('draws the trail faded and dashed so it does not read as a route', async () => {
+      await renderLoaded([]);
+      const trailLayer = mockAddLayer.mock.calls
+        .map((c: any[]) => c[0])
+        .find((l: any) => l.id === 'driver-trail-line');
+      expect(trailLayer.paint['line-dasharray']).toBeDefined();
+      expect(trailLayer.paint['line-opacity']).toBeLessThanOrEqual(0.6);
+    });
+
+    it('requests Directions from the driver to the pickup and draws a solid route', async () => {
+      const setData = jest.fn();
+      mockGetSource.mockReturnValue({ setData });
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+
+      await renderLoaded();
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toContain(
+        'https://api.mapbox.com/directions/v5/mapbox/driving/-122.4194,37.7749;-122.4294,37.7649',
+      );
+      // Public client token only (same as the admin map), URL-encoded.
+      expect(url).toMatch(/[?&]access_token=[^&]+$/);
+
+      const routeLayer = mockAddLayer.mock.calls
+        .map((c: any[]) => c[0])
+        .find((l: any) => l.id === 'next-stop-route-line');
+      expect(routeLayer).toBeDefined();
+      expect(routeLayer.paint['line-dasharray']).toBeUndefined();
+
+      await waitFor(() =>
+        expect(setData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            geometry: expect.objectContaining({ coordinates: directionsBody.routes[0]!.geometry.coordinates }),
+          }),
+        ),
+      );
+      expect(await screen.findByText('Next: Pickup · 1.0 mi · 6 min')).toBeInTheDocument();
+    });
+
+    it('marks the next stop with a distinct target marker', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+      await renderLoaded();
+      await waitFor(() => expect(getMarkerCallsByClass('next-stop-marker')).toHaveLength(1));
+    });
+
+    it('degrades to a straight-line distance when Directions fails, without breaking the map', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+      await renderLoaded();
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(await screen.findByText(/^Next: Pickup · ~[\d.]+ (mi|ft)$/)).toBeInTheDocument();
+      expect(screen.queryByText('Map Error')).not.toBeInTheDocument();
+    });
+
+    it('does not refetch Directions for small GPS movements', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => directionsBody });
+      const { rerender } = await renderLoaded();
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      await act(async () => {
+        rerender(
+          <DriverLiveMap
+            currentLocation={{
+              ...mockCurrentLocation,
+              coordinates: { lat: 37.7752, lng: -122.4194 }, // ~33 m
+            }}
+            activeDeliveries={pickupOnly}
+          />,
+        );
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows no guide when there is no open stop', async () => {
+      await renderLoaded([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.queryByText(/^Next:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Follow mode (Waze-style camera follow)', () => {
+    // ~1 m of latitude in degrees.
+    const M_LAT = 1 / 111_320;
+    const fixAt = (northMeters: number): LocationUpdate => ({
+      ...mockCurrentLocation,
+      coordinates: { lat: 37.7749 + northMeters * M_LAT, lng: -122.4194 },
+      timestamp: new Date().toISOString(),
+    });
+
+    const renderLoaded = async () => {
+      const utils = render(
+        <DriverLiveMap currentLocation={fixAt(0)} activeDeliveries={[]} />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      return utils;
+    };
+
+    const moveTo = async (rerender: (ui: React.ReactElement) => void, northMeters: number) => {
+      await act(async () => {
+        rerender(<DriverLiveMap currentLocation={fixAt(northMeters)} activeDeliveries={[]} />);
+      });
+    };
+
+    /** A real drag on the map canvas: Mapbox attaches the DOM event. */
+    const userDrag = () => {
+      const canvas = document.createElement('canvas');
+      const originalEvent = new Event('touchstart');
+      Object.defineProperty(originalEvent, 'target', { value: canvas });
+      act(() => {
+        fireMapEvent('dragstart', { originalEvent });
+      });
+    };
+
+    it('eases the camera to each new fix, keeping the current zoom', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+      const opts = mockEaseTo.mock.calls[0][0];
+      expect(opts.center[0]).toBeCloseTo(-122.4194, 6);
+      expect(opts.center[1]).toBeCloseTo(37.7749 + 100 * M_LAT, 6);
+      expect(opts).not.toHaveProperty('zoom');
+      expect(opts.duration).toBeLessThanOrEqual(1000);
+    });
+
+    it('does not move the camera for GPS jitter of a couple of meters', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      await moveTo(rerender, 2);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+    });
+
+    it('keeps following over a long drive without re-zooming or clearing the trail', async () => {
+      const setData = jest.fn();
+      mockGetSource.mockReturnValue({ setData });
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      // 12 km in 1 km steps — past the old 10 km "jump" anchor.
+      for (let km = 1; km <= 12; km++) {
+        await moveTo(rerender, km * 1000);
+      }
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(12);
+      for (const [opts] of mockEaseTo.mock.calls) {
+        expect(opts).not.toHaveProperty('zoom');
+      }
+      const lastTrail = setData.mock.calls[setData.mock.calls.length - 1][0];
+      expect(lastTrail.geometry.coordinates.length).toBe(13);
+    });
+
+    it('pauses follow when the driver pans the map by hand and shows Recenter', async () => {
+      const { rerender } = await renderLoaded();
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+
+      userDrag();
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /recenter/i })).toBeInTheDocument();
+    });
+
+    it('does not pause follow on programmatic camera moves (no originalEvent)', async () => {
+      const { rerender } = await renderLoaded();
+
+      act(() => {
+        fireMapEvent('dragstart', {});
+        fireMapEvent('zoomstart', {});
+        fireMapEvent('rotatestart', {});
+        fireMapEvent('pitchstart', {});
+      });
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+    });
+
+    it('pauses follow on pinch-zoom and rotate gestures too', async () => {
+      const { rerender } = await renderLoaded();
+      const canvas = document.createElement('canvas');
+      const originalEvent = new Event('touchmove');
+      Object.defineProperty(originalEvent, 'target', { value: canvas });
+
+      act(() => {
+        fireMapEvent('rotatestart', { originalEvent });
+      });
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /recenter/i })).toBeInTheDocument();
+    });
+
+    it('Recenter flies to the current position and resumes follow', async () => {
+      const { rerender } = await renderLoaded();
+      userDrag();
+      await moveTo(rerender, 100);
+
+      fireEvent.click(screen.getByRole('button', { name: /recenter/i }));
+
+      expect(mockFlyTo).toHaveBeenCalledTimes(1);
+      const opts = mockFlyTo.mock.calls[0][0];
+      expect(opts.center[1]).toBeCloseTo(37.7749 + 100 * M_LAT, 6);
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 200);
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+    });
+
+    it('Recenter is a comfortable touch target with an accessible label', async () => {
+      await renderLoaded();
+      userDrag();
+
+      const button = screen.getByRole('button', { name: /recenter/i });
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveAttribute('aria-label', 'Recenter map on your location');
+      expect(button.className).toMatch(/min-h-11/);
+    });
+
+    it('does not fight an in-progress programmatic animation (e.g. fit to stops)', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+      mockIsMoving.mockReturnValue(true);
+
+      await moveTo(rerender, 100);
+      expect(mockEaseTo).not.toHaveBeenCalled();
+
+      mockIsMoving.mockReturnValue(false);
+      await moveTo(rerender, 110);
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
     });
   });
 

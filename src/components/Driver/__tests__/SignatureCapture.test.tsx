@@ -170,6 +170,24 @@ describe("SignatureCapture", () => {
     expect(init.headers ?? {}).not.toHaveProperty("Authorization");
   });
 
+  // C4 (2026-08-17 mobile round): the pen ink is dark, so in dark mode a
+  // theme-flipping pad background (bg-driver-surface-alt -> #16202f) made the
+  // strokes invisible while signing. The pad is a fixed light "paper" surface in
+  // both themes; the ink stays dark so the exported PNG reads on light pages.
+  it("draws dark ink on a light pad that does not flip with the theme (dark mode)", () => {
+    const SignaturePad = jest.requireMock("signature_pad").default as jest.Mock;
+    render(
+      <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(SignaturePad).toHaveBeenCalledWith(
+      expect.any(HTMLCanvasElement),
+      expect.objectContaining({ penColor: "#15202e" }),
+    );
+    const well = screen.getByLabelText(/signature pad/i).parentElement!;
+    expect(well).toHaveClass("bg-white");
+    expect(well).not.toHaveClass("bg-driver-surface-alt");
+  });
+
   describe("resize ink preservation", () => {
     const setCanvasSize = (canvas: HTMLElement, w: number, h: number) => {
       Object.defineProperty(canvas, "offsetWidth", { value: w, configurable: true });

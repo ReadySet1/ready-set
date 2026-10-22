@@ -41,6 +41,8 @@ import {
   geofenceHint,
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
+import { formatMiles } from "@/lib/units";
+import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import {
   useDeliveryStatusRealtime,
@@ -135,11 +137,13 @@ export default function DriverTrackingPortal() {
     stopTracking,
     requestLocationPermission,
     currentShift,
+    clockOffsetMs = 0,
     isShiftActive,
     shiftLoading,
     shiftError,
     startShift,
     endShift,
+    lastShiftMiles,
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
@@ -192,28 +196,29 @@ export default function DriverTrackingPortal() {
     }
   }, []);
 
-  // Live shift timer.
+  // Live shift timer. Measured on the server's clock: a phone clock running
+  // behind the server kept this at 0:00 for whole shifts (2026-10-14).
+  const shiftStartTime = currentShift?.startTime;
   useEffect(() => {
-    if (!isShiftActive || !currentShift?.startTime) return;
-    const startedAt = new Date(currentShift.startTime).getTime();
-    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    if (!isShiftActive || !shiftStartTime) return;
+    const tick = () =>
+      setElapsed(shiftElapsedSeconds(shiftStartTime, Date.now(), clockOffsetMs));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [isShiftActive, currentShift?.startTime]);
+  }, [isShiftActive, shiftStartTime, clockOffsetMs]);
 
   // GPS auto-resume for an active shift lives in DriverTrackingProvider (the
   // /driver layout), so it fires on every driver page, not only this portal.
 
+  // Start shift only renders once a location exists (the permission CTA shows
+  // before that), so this render's currentLocation is the position the driver
+  // just granted. The old fallback re-requested permission and then re-read
+  // currentLocation from this same stale closure — always null — so it could
+  // never start a shift.
   const handleStartShift = async () => {
-    let location = currentLocation;
-    if (!location) {
-      const granted = await requestLocationPermission();
-      if (!granted) return;
-      location = currentLocation;
-    }
-    if (!location) return;
-    const ok = await startShift(location);
+    if (!currentLocation) return;
+    const ok = await startShift(currentLocation);
     if (ok) startTracking();
   };
 
@@ -466,8 +471,8 @@ export default function DriverTrackingPortal() {
 
             {/* Shift control bar */}
             <DriverCard className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-semibold text-driver-text">
                     On shift
                   </div>
@@ -481,7 +486,7 @@ export default function DriverTrackingPortal() {
                       : ""}
                   </div>
                   {endShiftBlockers > 0 ? (
-                    <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                    <div className="mt-0.5 break-words text-[11px] font-semibold text-driver-subtle">
                       {endShiftBlockers === 1
                         ? `Order ${firstBlockerOrderNumber} to finish or return first`
                         : `${endShiftBlockers} deliveries to finish or return first`}
@@ -497,11 +502,10 @@ export default function DriverTrackingPortal() {
                   onClick={handleEndShift}
                   loading={shiftLoading}
                   aria-disabled={endShiftBlockers > 0}
-                  className={
-                    endShiftBlockers > 0
-                      ? "cursor-not-allowed opacity-50"
-                      : undefined
-                  }
+                  className={cn(
+                    "shrink-0 whitespace-nowrap",
+                    endShiftBlockers > 0 && "cursor-not-allowed opacity-50",
+                  )}
                 >
                   <Square className="h-4 w-4" />
                   End shift
@@ -686,6 +690,11 @@ export default function DriverTrackingPortal() {
                   ? "Enable location in your browser settings, then try again."
                   : "We use your location to track your shift and deliveries."}
               </p>
+              {lastShiftMiles != null ? (
+                <p className="mt-3 rounded-full bg-driver-surface-alt px-3 py-1.5 text-[13px] font-semibold text-driver-text">
+                  {`Last shift · ${formatMiles(lastShiftMiles)}`}
+                </p>
+              ) : null}
             </div>
 
             {permissionState === "denied" ? (

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
+import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { formatDuration } from "./format";
 
 /** Floating "on shift" pill shown above the bottom nav whenever a shift is
@@ -12,20 +13,27 @@ import { formatDuration } from "./format";
  *  Replaces the legacy DriverTrackingIndicator. Taps through to Live Tracking. */
 export function ShiftPill() {
   const pathname = usePathname() ?? "";
-  const { isShiftActive, currentShift, activeDeliveries } = useDriverTracking();
+  const {
+    isShiftActive,
+    currentShift,
+    activeDeliveries,
+    clockOffsetMs = 0,
+  } = useDriverTracking();
   const [elapsed, setElapsed] = useState(0);
 
   const startedAt = currentShift?.startTime
     ? new Date(currentShift.startTime).getTime()
     : null;
 
+  // Server clock, not the phone's: a phone running behind read 0:00 (2026-10-14).
   useEffect(() => {
     if (!isShiftActive || !startedAt) return;
-    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    const tick = () =>
+      setElapsed(shiftElapsedSeconds(new Date(startedAt), Date.now(), clockOffsetMs));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [isShiftActive, startedAt]);
+  }, [isShiftActive, startedAt, clockOffsetMs]);
 
   const hideOnRoute =
     pathname.startsWith("/driver/tracking") ||

@@ -402,6 +402,17 @@ export async function stopNativeShiftTracking(): Promise<void> {
 }
 
 /**
+ * Convert the plugin's fix time (`Location.time`, epoch ms or null) into the
+ * ISO string the ingest route expects as `timestamp`. Returns null when there
+ * is no usable fix time so the caller omits the field and the server falls
+ * back to NOW().
+ */
+export function fixTimeToIso(time: number | null | undefined): string | null {
+  if (typeof time !== 'number' || !Number.isFinite(time) || time <= 0) return null;
+  return new Date(time).toISOString();
+}
+
+/**
  * POST one fix to the existing ingest route. The relative URL resolves against
  * the loaded origin (the deployed site), so no base URL is needed. Failures are
  * swallowed — the next fix retries; durable buffering is a Phase-1 item.
@@ -414,6 +425,12 @@ async function postLocation(
   motionState = nextMotionState(motionState, location.speed);
   // null on iOS (WKWebView has no Battery API); a real value on Android.
   const batteryLevel = await readBatteryLevel();
+  // The plugin's `time` is when the GPS fix was produced (device clock, epoch
+  // ms). Sending it as `timestamp` lets the server store the real fix time
+  // instead of receipt time, so a stale fix replayed by a leaked watcher is
+  // stored as old rather than fresh. The server corrects device clock skew
+  // (recorded-at.ts) and falls back to NOW() when the field is absent.
+  const fixTimestamp = fixTimeToIso(location.time);
   try {
     await fetch('/api/tracking/locations', {
       method: 'POST',
@@ -431,6 +448,12 @@ async function postLocation(
         altitude: location.altitude ?? undefined,
         battery_level: batteryLevel,
         is_moving: motionState.isMoving,
+        // Omitted (not null) when the plugin has no fix time: the server then
+        // stamps NOW(), exactly as before.
+        ...(fixTimestamp ? { timestamp: fixTimestamp } : {}),
+        // Device clock at send time: the server compares it with its own clock
+        // to correct a skewed phone before storing the fix time.
+        client_sent_at: Date.now(),
       }),
     });
   } catch {

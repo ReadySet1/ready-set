@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { encodeOrderNumber } from "@/utils/order";
+import { formatDateForDisplay } from "@/lib/utils/date-display";
 import { Badge } from "@/components/ui/badge";
 import { Order, StatusFilter, UserRole } from "./types";
 import DeleteCateringOrder from "./DeleteCateringOrder";
@@ -103,7 +104,7 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {new Date(order.date).toLocaleDateString()}
+                  {formatDateForDisplay(order.date)}
                 </TableCell>
                 <TableCell className="text-right">
                   $

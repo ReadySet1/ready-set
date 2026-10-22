@@ -67,6 +67,46 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * Point the driver row back at its open shift when the two have drifted
+ * (e.g. a hand-edited row). The admin dashboard reads
+ * drivers.current_shift_id, so a drifted row shows a working driver as off
+ * duty with no "End shift" button. The guard makes this a no-op write when
+ * the row is already consistent. Best-effort: a failure here must not block
+ * the driver from resuming their shift. Callers must authorize first.
+ */
+async function repairDriverRowForOpenShift(driverId: string, shiftId: string): Promise<void> {
+  try {
+    const repaired = await prisma.$executeRawUnsafe(`
+      UPDATE drivers d
+      SET
+        current_shift_id = $2::uuid,
+        is_on_duty = true,
+        shift_start_time = COALESCE(d.shift_start_time, s.shift_start),
+        updated_at = NOW()
+      FROM driver_shifts s
+      WHERE s.id = $2::uuid
+        AND d.id = $1::uuid
+        AND d.current_shift_id IS DISTINCT FROM $2::uuid
+        AND d.deleted_at IS NULL
+        AND d.is_active = true
+    `, driverId, shiftId);
+    if (repaired > 0) {
+      console.warn('startDriverShift: repaired driver row drifted from open shift', {
+        driverId,
+        shiftId,
+      });
+      revalidatePath('/admin/tracking');
+    }
+  } catch (error) {
+    console.error('startDriverShift: failed to repair driver row on resume', {
+      driverId,
+      shiftId,
+      error,
+    });
+  }
+}
+
+/**
  * Start a new driver shift
  * Creates a new shift record and updates driver status.
  *
@@ -98,6 +138,7 @@ export async function startDriverShift(
     // Application guard: resume an open shift instead of starting a second one.
     const openShiftId = unwrap(await openShiftLookup);
     if (openShiftId) {
+      await repairDriverRowForOpenShift(driverId, openShiftId);
       return { success: true, shiftId: openShiftId, resumed: true };
     }
 
@@ -190,11 +231,15 @@ export async function startDriverShift(
 
 /**
  * End the current driver shift
- * Updates shift record with end time and location, calculates total distance
+ * Updates shift record with end time and location, calculates total distance.
+ *
+ * `endLocation` may be null when there is no device fix (an admin ending the
+ * shift from the dashboard): the shift's end point falls back to the driver's
+ * last known position and the driver row's position is left as it was.
  */
 export async function endDriverShift(
   shiftId: string,
-  endLocation: LocationUpdate,
+  endLocation: LocationUpdate | null,
   finalMileage?: number,
   metadata: Record<string, any> = {}
 ): Promise<{
@@ -204,6 +249,8 @@ export async function endDriverShift(
   activeDeliveries?: number;
   /** The orders keeping the shift open, so the UI can name them. */
   blockingOrders?: BlockingOrder[];
+  /** Shift distance in miles; omitted when the mileage calculation failed. */
+  totalMiles?: number;
 }> {
   try {
     // Get shift info and ensure it is active before proceeding
@@ -397,15 +444,18 @@ export async function endDriverShift(
             AND deleted_at IS NULL
         ),
         shift_end = NOW(),
-        end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+        end_location = COALESCE(
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+          (SELECT d.last_known_location FROM drivers d WHERE d.id = driver_shifts.driver_id)
+        ),
         status = 'completed',
         notes = COALESCE(notes, '') || $4,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shiftId,
-      endLocation.coordinates.lng,
-      endLocation.coordinates.lat,
+      endLocation?.coordinates.lng ?? null,
+      endLocation?.coordinates.lat ?? null,
       metadata.notes ? ` ${metadata.notes}` : (finalMileage ? ` [Client reported mileage: ${finalMileage} km]` : '')
     );
 
@@ -417,30 +467,38 @@ export async function endDriverShift(
         is_on_duty = false,
         current_shift_id = NULL,
         shift_start_time = NULL,
-        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        last_location_update = NOW(),
+        last_known_location = COALESCE(
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+          last_known_location
+        ),
+        last_location_update = CASE WHEN $2::float IS NULL THEN last_location_update ELSE NOW() END,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shift?.driver_id,
-      endLocation.coordinates.lng,
-      endLocation.coordinates.lat
+      endLocation?.coordinates.lng ?? null,
+      endLocation?.coordinates.lat ?? null
     );
     releaseDriver.catch(() => {}); // awaited below
 
     // Calculate mileage from GPS trail. If finalMileage is provided (e.g., odometer reading),
     // use validation to compare GPS vs reported values and log discrepancies.
     let totalMiles = finalMileage ?? 0;
+    // Set only when the calculation succeeded, so the driver is never shown
+    // a made-up 0 after a failure.
+    let reportedMiles: number | undefined;
 
     try {
       if (finalMileage == null) {
         // Pure GPS-based calculation
         const result = await calculateShiftMileage(shiftId);
         totalMiles = result.totalMiles;
+        reportedMiles = result.totalMiles;
       } else {
         // Client provided mileage - validate against GPS and store both for audit
         const result = await calculateShiftMileageWithValidation(shiftId, finalMileage);
         totalMiles = result.totalMiles;
+        reportedMiles = result.totalMiles;
 
         // Log any warnings from the calculation
         if (result.warnings.length > 0) {
@@ -486,7 +544,9 @@ export async function endDriverShift(
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
 
-    return { success: true };
+    return typeof reportedMiles === 'number' && Number.isFinite(reportedMiles)
+      ? { success: true, totalMiles: reportedMiles }
+      : { success: true };
   } catch (error) {
     console.error('Error ending driver shift:', error);
     return {

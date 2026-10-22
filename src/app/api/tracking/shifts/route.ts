@@ -192,16 +192,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if driver already has an active shift
-    if (driver.currentShiftId) {
-      return NextResponse.json(
-        { success: false, error: 'Driver already has an active shift' },
-        { status: 409 }
-      );
-    }
-
-    // Delegate the insert (and the driver on-duty update) to startDriverShift,
-    // which targets the real schema and re-checks caller authorization.
+    // Do NOT gate on driver.currentShiftId here: only endDriverShift clears that
+    // pointer, so a shift closed by hand or by a script leaves it dangling and a
+    // 409 on it would block the driver forever. startDriverShift is the single
+    // source of truth: it checks driver_shifts for an open shift, resumes it
+    // (repairing the driver row) or starts a new one, and re-checks caller
+    // authorization. The insert and the driver on-duty update live there too.
     const started = await startDriverShift(
       driver.id,
       location,

@@ -369,7 +369,10 @@ export function SignatureCapture({
         ) : null}
         <div
           className={cn(
-            "relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-driver-surface-alt",
+            // Fixed light "paper" in both themes: the pen ink is dark (and must
+            // stay dark so the exported PNG reads on light admin pages), so a
+            // theme-flipping surface made strokes invisible in dark mode (C4).
+            "relative overflow-hidden rounded-2xl border-[1.5px] border-driver-border bg-white",
             // min-h-0: let the pad shrink with the viewport instead of its
             // canvas pushing Clear off-screen.
             fullscreen && "min-h-0 flex-1",

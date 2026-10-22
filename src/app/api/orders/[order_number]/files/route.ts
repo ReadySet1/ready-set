@@ -1,7 +1,7 @@
 // src/app/api/orders/[orderNumber]/files/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { withAuth } from '@/lib/auth-middleware';
 import { STORAGE_BUCKETS } from '@/utils/file-service';
 import { POD_BUCKET_NAME } from '@/utils/supabase/storage';
 import { mergeSignedUrlMaps, splitFilePathsByBucket } from '@/utils/file-bucket-split';
@@ -31,30 +31,20 @@ export async function GET(
   const orderNumber = order_number;
     
   try {
-    // Initialize Supabase client for auth check
-    const supabase = await createClient();
-    
-    // Get user session from Supabase
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Check if user is authenticated
-    if (!user || !user.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Bearer-first with cookie fallback (the repo convention for API routes).
+    // The native wrapper apps call this route with only an Authorization
+    // header and no Supabase cookie; a cookie-only check 401'd them and the
+    // driver's proof-of-delivery card silently stayed hidden. Every role may
+    // authenticate here — which orders a caller may read is decided below.
+    const auth = await withAuth(request);
+    if (!auth.success) {
+      return auth.response!;
     }
-
-    // Get user's role from profiles table
-    const userProfile = await prisma.profile.findUnique({
-      where: { id: user.id },
-      select: { type: true }
-    });
-
-    if (!userProfile) {
-            return NextResponse.json({ error: "User profile not found" }, { status: 401 });
-    }
+    const { user } = auth.context;
 
     // Allow access for admin, super_admin, and helpdesk roles
     const allowedRoles = [UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK] as const;
-    const hasAccess = allowedRoles.includes(userProfile.type as typeof allowedRoles[number]);
+    const hasAccess = allowedRoles.includes(user.type as typeof allowedRoles[number]);
     
     // Try to fetch the catering request
         const cateringRequest = await prisma.cateringRequest.findFirst({

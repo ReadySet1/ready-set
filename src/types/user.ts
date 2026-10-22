@@ -71,6 +71,15 @@ export enum ApplicationStatus { // Added from Prisma Schema
 
 // --- Interfaces ---
 
+/**
+ * Shape of the `profiles.counties` Json column.
+ *
+ * Every writer stores a comma-separated string (`"Alameda, Contra Costa"`);
+ * legacy rows may hold a JSON array of county names. Read it through
+ * `parseProfileCounties()` from `@/lib/profile-counties` to get a `string[]`.
+ */
+export type ProfileCounties = string | string[];
+
 // Base User interface mirroring relevant fields from Prisma's `Profile` model
 export interface User {
   id: string;
@@ -91,7 +100,7 @@ export interface User {
   zip?: string | null; // Prisma: String?
   locationNumber?: string | null; // Prisma: String? (camelCase)
   parkingLoading?: string | null; // Prisma: String? (camelCase)
-  counties?: any | null; // Prisma: Json? - Use 'any' or a specific interface if the structure is known, e.g., string[]
+  counties?: ProfileCounties | null; // Prisma: Json? - see ProfileCounties
   timeNeeded?: string | null; // Prisma: String? (camelCase) - Note: Form uses string[]
   cateringBrokerage?: string | null; // Prisma: String? (camelCase) - Note: Form uses string[]
   frequency?: string | null; // Prisma: String?
@@ -136,7 +145,7 @@ export interface UserFormValues {
   // Array representations for multi-select/checkbox form controls
   // These correspond to User fields that might be stored as JSON (counties) or String (others) in DB
   // The transformation (e.g., join/split) happens between the form and the data layer.
-  countiesServed: string[]; // Corresponds to User.counties (Json? -> likely array)
+  countiesServed: string[]; // Corresponds to User.counties (parsed via parseProfileCounties)
   timeNeeded: string[]; // Corresponds to User.timeNeeded (String?)
   cateringBrokerage: string[]; // Corresponds to User.cateringBrokerage (String?)
   provisions: string[]; // Corresponds to User.provide (String?)

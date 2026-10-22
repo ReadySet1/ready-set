@@ -44,6 +44,7 @@ import {
   buildRouteTestDrivePlan,
   buildTestDrivePlan,
   isDisposableTestOrder,
+  shouldUnassignDispatchedOrder,
   type Coords,
   type RouteStop,
 } from '../src/lib/driver/test-drive-plan';
@@ -240,15 +241,6 @@ const prisma = new PrismaClient({ datasourceUrl: resolveConnectionUrl() });
 /** Non-terminal delivery statuses, matching the end-shift guard's first branch. */
 const TERMINAL_DELIVERY_STATUSES = ['COMPLETED', 'CANCELLED', 'DELIVERED'];
 
-/** driverStatus values that mean "in flight", matching the guard's second branch. */
-const IN_FLIGHT_DRIVER_STATUSES = [
-  'EN_ROUTE_TO_VENDOR',
-  'ARRIVED_AT_VENDOR',
-  'PICKED_UP',
-  'EN_ROUTE_TO_CLIENT',
-  'ARRIVED_TO_CLIENT',
-] as const;
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const now = new Date();
@@ -315,18 +307,16 @@ async function main() {
     },
   });
 
-  // An order blocks end-shift if it is in flight, or ASSIGNED with a pickup
-  // that is already due. Future-dated assignments are harmless.
-  const blockingOrders = dispatches
+  // Unassign anything that blocks end-shift now (in flight, or ASSIGNED with a
+  // pickup already due) plus every unfinished disposable test order, whatever
+  // its pickup time. A future-dated seed is NOT harmless: re-seeding earlier
+  // the same day leaves the superseded order ASSIGNED, and it comes due
+  // mid-walk and deadlocks End Shift. Real future assignments stay put.
+  const ordersToUnassign = dispatches
     .map((d) => ({ dispatchId: d.id, order: d.cateringRequest ?? d.onDemand }))
-    .filter((row): row is { dispatchId: string; order: NonNullable<typeof row.order> } => {
-      const o = row.order;
-      if (!o || o.deletedAt) return false;
-      if (o.driverStatus && (IN_FLIGHT_DRIVER_STATUSES as readonly string[]).includes(o.driverStatus)) {
-        return true;
-      }
-      return o.driverStatus === 'ASSIGNED' && o.pickupDateTime !== null && o.pickupDateTime <= now;
-    });
+    .filter((row): row is { dispatchId: string; order: NonNullable<typeof row.order> } =>
+      shouldUnassignDispatchedOrder(row.order, now),
+    );
 
   const openShifts = await prisma.driverShift.findMany({
     where: { driverId: driver.id, deletedAt: null, shiftEnd: null },
@@ -338,8 +328,8 @@ async function main() {
   for (const d of staleDeliveries) {
     console.log(`     · ${d.orderNumber ?? d.id} — ${d.status}`);
   }
-  console.log(`   ${blockingOrders.length} order(s) blocking end-shift`);
-  for (const { order } of blockingOrders) {
+  console.log(`   ${ordersToUnassign.length} order(s) to unassign (blocking end-shift or stale test seeds)`);
+  for (const { order } of ordersToUnassign) {
     console.log(
       `     · ${order.orderNumber} — ${order.driverStatus} · pickup ${order.pickupDateTime?.toISOString() ?? 'n/a'}`,
     );
@@ -353,7 +343,7 @@ async function main() {
   // ------------------------------------------------------------- classify
   const risky = [
     ...staleDeliveries.filter((d) => !isDisposableTestOrder(d.orderNumber)).map((d) => d.orderNumber ?? d.id),
-    ...blockingOrders.filter(({ order }) => !isDisposableTestOrder(order.orderNumber)).map(({ order }) => order.orderNumber),
+    ...ordersToUnassign.filter(({ order }) => !isDisposableTestOrder(order.orderNumber)).map(({ order }) => order.orderNumber),
   ];
 
   if (risky.length > 0 && !args.force) {
@@ -479,7 +469,7 @@ async function main() {
     // Removing the dispatch unassigns the order from the driver without
     // touching the order itself — the guard and the Track list are both keyed
     // on dispatches, so this clears the card cleanly.
-    const dispatchIds = blockingOrders.map((b) => b.dispatchId);
+    const dispatchIds = ordersToUnassign.map((b) => b.dispatchId);
     if (dispatchIds.length > 0) {
       await tx.dispatch.deleteMany({ where: { id: { in: dispatchIds } } });
       console.log(`   ✅ unassigned ${dispatchIds.length} order(s)`);

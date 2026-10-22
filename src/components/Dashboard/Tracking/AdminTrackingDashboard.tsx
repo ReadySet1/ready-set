@@ -53,8 +53,8 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
   // Manual refresh timestamp; the live value comes from the hook (below).
   const [manualRefreshAt, setManualRefreshAt] = useState<Date | null>(null);
 
-  // Settings are editable by admins only (the API enforces this server-side;
-  // hiding the tab keeps HELPDESK's dashboard uncluttered).
+  // Settings and the "End shift" action are admin-only (the APIs enforce this
+  // server-side; hiding them keeps HELPDESK's dashboard uncluttered).
   const { userRole } = useUser();
   const canEditSettings =
     userRole === UserType.ADMIN || userRole === UserType.SUPER_ADMIN;
@@ -448,6 +448,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 drivers={activeDrivers}
                 recentLocations={recentLocations}
                 compact={false}
+                canEndShift={canEditSettings}
               />
             </CardContent>
           </Card>
