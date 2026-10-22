@@ -5,8 +5,8 @@
     {
       "version": "2.11.0",
       "date": "2026-10-22",
-      "title": "Release 2.11.0",
-      "summary": "",
+      "title": "A steadier driver app and accurate times",
+      "summary": "The driver map follows you and shows your route, the shift timer and mileage stay accurate, starting a shift no longer hangs, and order times show in Pacific time everywhere.",
       "changes": [
         {
           "text": "On smaller phones, the bottom of the tracking screen (including the \"Request a return to dispatch\" button) no longer hides behind the bottom menu.",
@@ -70,10 +70,6 @@
         },
         {
           "text": "The \"View live status\" link in delivery emails now opens your order's live tracking page instead of a missing page.",
-          "type": "fixed"
-        },
-        {
-          "text": "Drivers using the mobile app now see the proof-of-delivery photo on completed deliveries.",
           "type": "fixed"
         },
         {
