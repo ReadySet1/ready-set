@@ -23,6 +23,7 @@ are the exact ones that used to run.
 | `/api/admin/driver-summary-generation` | `GET` (POST also accepted) | `0 4 * * 0` — Sundays 04:00 | `Authorization: Bearer $CRON_SECRET`, or an admin / super_admin session | Pre-computes weekly per-driver aggregates: shifts, deliveries, GPS vs reported miles, location density (REA-313). |
 | `/api/admin/sms-reminders/cron?type=next_day` | `GET` only | `0 0 * * *` — daily 00:00 | `Authorization: Bearer $CRON_SECRET`, or an SMS-admin session | Sends next-day delivery reminder SMS (tomorrow's deliveries) via `runSmsReminderBatch`. |
 | `/api/admin/sms-reminders/cron?type=same_day` | `GET` only | `0 13 * * *` — daily 13:00 | `Authorization: Bearer $CRON_SECRET`, or an SMS-admin session | Sends same-day delivery reminder SMS (today's deliveries) via `runSmsReminderBatch`. |
+| `/api/admin/partner-webhook-retry` | `GET` (POST also accepted) | `* * * * *` — every minute | `Authorization: Bearer $CRON_SECRET`, or an admin / super_admin session | Resends failed partner status webhooks (CaterCow and other `api_partners` rows) from the `partner_webhook_deliveries` queue (`runPartnerWebhookRetry`): claims up to 25 due rows (`FOR UPDATE SKIP LOCKED` + 5-min lease, so overlapping runs are safe), retries at +2/4/8/16 min after the in-request attempt (5 attempts over ~30 min, the partner API contract's promise), then marks the row `FAILED` and reports it to GlitchTip. Returns 207 when some rows errored. **Needs the `20261016000100_partner_webhook_deliveries` migration applied first.** Without this job a failed first attempt is never retried. |
 | `/api/admin/purge-deleted-orders` | `GET` (POST also accepted) | `30 3 * * *` — daily 03:30 (**suggested, NOT scheduled yet**) | `Authorization: Bearer $CRON_SECRET`, or an admin / super_admin session | Hard-deletes orders soft-deleted more than 730 days ago (50 per run) together with their dispatches, deliveries mirror, return requests, `file_uploads` rows and storage objects (`runOrderPurge`). `?dryRun=1` previews. Returns 207 when some orders errored. **Not scheduled:** the retention window is still a pending product decision (owner: Emmanuel, 2026-10-06); the default lives in `DEFAULT_ORDER_PURGE_RETENTION_DAYS` in `src/jobs/orderPurge.ts`, and a POST body `{ "retentionDays": N }` overrides it per run (never below 30). |
 
 Auth facts that matter for scheduling:
@@ -31,7 +32,7 @@ Auth facts that matter for scheduling:
   A plain `Authorization: Bearer <CRON_SECRET>` header is the only thing a
   non-interactive caller needs.
 - `CRON_SECRET` must be set in the app container's environment (Dokploy →
-  application → Environment). If it is unset, the four `admin/*` maintenance
+  application → Environment). If it is unset, the `admin/*` maintenance
   routes fall through to the admin-session check and answer **401** to curl;
   the SMS route answers **500** in production.
 - The SMS route derives "today"/"tomorrow" from the container's local clock
@@ -63,6 +64,7 @@ LOG=/var/log/ready-set-cron.log
 0    4  *   *   0    root  curl -fsS -m 900 -X GET -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/admin/driver-summary-generation" >> $LOG 2>&1
 0    0  *   *   *    root  curl -fsS -m 600 -X GET -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/admin/sms-reminders/cron?type=next_day" >> $LOG 2>&1
 0    13 *   *   *    root  curl -fsS -m 600 -X GET -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/admin/sms-reminders/cron?type=same_day" >> $LOG 2>&1
+*    *  *   *   *    root  curl -fsS -m 120 -X GET -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/admin/partner-webhook-retry" >> $LOG 2>&1
 # Not scheduled yet — retention window pending decision. Dry-run first with ?dryRun=1.
 #30   3  *   *   *    root  curl -fsS -m 600 -X GET -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/admin/purge-deleted-orders" >> $LOG 2>&1
 ```
