@@ -10,7 +10,7 @@ export interface AuthContext {
   user: {
     id: string;
     email: string;
-    type: 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
+    type: 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT' | 'VENDOR';
     driverId?: string;
   };
   isAdmin?: boolean;
@@ -139,7 +139,7 @@ export async function withAuth(
       };
     }
 
-    const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
+    const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT' | 'VENDOR';
 
 
     // Check role permissions (normalize to uppercase for case-insensitive comparison)
