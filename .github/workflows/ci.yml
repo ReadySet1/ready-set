@@ -272,15 +272,30 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # OS deps are installed separately from the browser (no `--with-deps`):
+      # Playwright kills its own apt run after a fixed 5 minutes, and a slow
+      # Ubuntu mirror (~40 KB/s on the font packages, PR #713, 2026-10-22)
+      # blows that budget twice in a row. apt keeps the .debs it already
+      # fetched, so each retry only downloads what is still missing.
+      - name: Install Playwright system dependencies
+        timeout-minutes: 15
+        run: |
+          echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
+          sudo apt-get update -o Acquire::Retries=3
+          for attempt in 1 2 3; do
+            if pnpm exec playwright install-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::playwright install-deps failed (attempt $attempt/3), retrying..."
+            sleep 15
+          done
+          echo "::error::playwright install-deps failed after 3 attempts"
+          exit 1
+
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         timeout-minutes: 10
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 5
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install chromium
 
       - name: Validate GitHub Secrets
         id: check-secrets
