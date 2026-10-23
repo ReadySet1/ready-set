@@ -12,6 +12,7 @@ import {
   authorizeDriverAction,
   callerMayActOnDriver,
   driverOwnershipCondition,
+  existingDriverOwnershipCondition,
   getActionCaller,
   getDriverForUser,
   userOwnsDriver,
@@ -50,6 +51,21 @@ describe("driverOwnershipCondition", () => {
     const sql = driverOwnershipCondition(3, "dr");
     expect(sql).toContain("dr.profile_id = $3::uuid");
     expect(sql).toContain("dr.user_id = $3::uuid");
+  });
+});
+
+describe("existingDriverOwnershipCondition", () => {
+  it("adds the soft-delete filter on top of the ownership match", () => {
+    const sql = existingDriverOwnershipCondition(2);
+    expect(sql).toContain("profile_id = $2::uuid");
+    expect(sql).toContain("user_id = $2::uuid");
+    expect(sql).toMatch(/deleted_at IS NULL/);
+  });
+
+  it("prefixes the soft-delete column with the table alias", () => {
+    const sql = existingDriverOwnershipCondition(3, "dr");
+    expect(sql).toContain("dr.profile_id = $3::uuid");
+    expect(sql).toContain("dr.deleted_at IS NULL");
   });
 });
 

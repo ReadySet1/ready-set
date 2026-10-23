@@ -362,6 +362,37 @@ describe('/api/tracking/drivers', () => {
       expect(data.data.is_on_duty).toBe(true);
     });
 
+    it('denies a soft-deleted DRIVER updating their own row (403)', async () => {
+      mockWithAuth.mockResolvedValue({
+        success: true,
+        context: { user: { id: 'driver-user-9', type: 'DRIVER' } },
+      });
+      // The row still links to the caller; only the soft-delete filter can exclude it.
+      mockRawQuery.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('SELECT id FROM drivers') && !sql.includes('deleted_at IS NULL')
+            ? [{ id: 'driver-1' }]
+            : []
+        )
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
+        method: 'PUT',
+        body: JSON.stringify({ driver_id: 'driver-1', is_on_duty: true }),
+      });
+      const response = await PUT(request);
+
+      expect(response.status).toBe(403);
+      const ownershipCall = mockRawQuery.mock.calls.find(
+        ([sql]: [string]) => typeof sql === 'string' && sql.includes('SELECT id FROM drivers')
+      );
+      expect(ownershipCall?.[0]).toContain('profile_id = $2');
+      expect(ownershipCall?.[0]).toContain('user_id = $2');
+      expect(ownershipCall?.[0]).toMatch(/deleted_at IS NULL/);
+      expect(ownershipCall?.[1]).toEqual(['driver-1', 'driver-user-9']);
+      expect(mockRawQuery.mock.calls.some(([sql]: [string]) => /UPDATE drivers/.test(sql))).toBe(false);
+    });
+
     it('returns 400 for invalid update data', async () => {
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'PUT',
