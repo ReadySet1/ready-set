@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
+import { existingDriverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
@@ -150,12 +150,12 @@ export async function POST(request: NextRequest) {
     await withRawTx(async (tx) => {
       const driverCheck = isDriver
         ? await tx.$queryRawUnsafe<{ id: string }[]>(
-            `SELECT id FROM drivers WHERE id = $1::uuid AND ${driverOwnershipCondition(2)} AND is_active = true`,
+            `SELECT id FROM drivers WHERE id = $1::uuid AND ${existingDriverOwnershipCondition(2)} AND is_active = true`,
             driverId,
             auth.context.user.id,
           )
         : await tx.$queryRawUnsafe<{ id: string }[]>(
-            'SELECT id FROM drivers WHERE id = $1::uuid AND is_active = true',
+            'SELECT id FROM drivers WHERE id = $1::uuid AND deleted_at IS NULL AND is_active = true',
             driverId,
           );
       if (driverCheck.length === 0) {

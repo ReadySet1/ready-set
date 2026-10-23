@@ -286,7 +286,7 @@ export async function GET(request: NextRequest) {
               FROM driver_locations dl
               WHERE dl.recorded_at > NOW() - INTERVAL '5 minutes'
               AND dl.driver_id IN (
-                SELECT id FROM drivers WHERE is_active = true AND is_on_duty = true
+                SELECT id FROM drivers WHERE is_active = true AND is_on_duty = true AND deleted_at IS NULL
               )
               AND dl.deleted_at IS NULL
               ORDER BY dl.recorded_at DESC
