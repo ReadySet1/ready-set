@@ -183,6 +183,7 @@ export function TasksBoard({
 }) {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [activeColumn, setActiveColumn] = useState<TaskStatus>("new");
 
   const activeSet = new Set(activeFilters);
   const isVisible = (task: TasksBoardTask) =>
@@ -212,8 +213,8 @@ export function TasksBoard({
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-surface-subtle">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/[.88] px-7 pt-[22px] backdrop-blur">
-        <div className="flex flex-wrap items-baseline gap-4">
+      <header className="z-[5] border-b border-slate-200 bg-white/[.88] px-4 pt-[22px] backdrop-blur md:sticky md:top-0 md:px-7">
+        <div className="flex flex-wrap items-baseline gap-4 md:flex-nowrap">
           <div className="flex items-center gap-3">
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center self-center rounded-[10px] bg-brand">
               <LayoutGrid
@@ -225,8 +226,8 @@ export function TasksBoard({
               Tasks Board
             </h1>
           </div>
-          <span className="text-[13px] text-slate-500">{data.subtitle}</span>
-          <div className="ml-auto flex flex-wrap items-center gap-3.5">
+          <span className="min-w-0 line-clamp-2 text-[13px] text-slate-500 md:flex-1 md:truncate" title={data.subtitle}>{data.subtitle}</span>
+          <div className="ml-auto hidden shrink-0 flex-wrap items-center gap-3.5 md:flex">
             <StatChip
               dotClass="bg-slate-400"
               label={`${data.tasks.length} Total`}
@@ -241,8 +242,8 @@ export function TasksBoard({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pb-4 pt-3.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-[.08em] text-slate-400">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-4 pt-3.5 md:flex-wrap">
+          <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-[.08em] text-slate-400">
             Filter
           </span>
           {FILTERS.map((filter) => {
@@ -255,7 +256,7 @@ export function TasksBoard({
                 aria-pressed={active}
                 onClick={() => toggleFilter(filter.key)}
                 className={cn(
-                  "h-[30px] rounded-full border px-3.5 text-[12px] font-bold transition-all duration-150",
+                  "h-[30px] shrink-0 rounded-full border px-3.5 text-[12px] font-bold transition-all duration-150",
                   active
                     ? filter.activeClass
                     : "border-slate-200 bg-white text-slate-600",
@@ -269,24 +270,55 @@ export function TasksBoard({
             <button
               type="button"
               onClick={() => setActiveFilters([])}
-              className="h-[30px] px-3 text-[12px] font-semibold text-slate-500 underline"
+              className="h-[30px] shrink-0 px-3 text-[12px] font-semibold text-slate-500 underline"
             >
               Clear
             </button>
           )}
-          <span className="ml-auto text-[12px] text-slate-400">
+          <span className="ml-auto hidden text-[12px] text-slate-400 md:inline">
             Click a card for full notes
           </span>
         </div>
+
+        <div role="tablist" aria-label="Board columns" className="flex gap-1.5 overflow-x-auto pb-3 md:hidden">
+          {data.columns.map((col) => {
+            const selected = col.key === activeColumn;
+            return (
+              <button
+                key={col.key}
+                type="button"
+                role="tab"
+                id={`tasks-tab-${col.key}`}
+                aria-selected={selected}
+                aria-controls={`tasks-col-${col.key}`}
+                onClick={() => setActiveColumn(col.key)}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold",
+                  selected ? "border-charcoal bg-charcoal text-white" : "border-slate-200 bg-white text-slate-600",
+                )}
+              >
+                <span className={cn("h-2 w-2 rounded-full", STATUS_META[col.key].dot)} />
+                {STATUS_META[col.key].statLabel}
+                <span className="tabular-nums opacity-70">{(visibleByStatus.get(col.key) ?? []).length}</span>
+              </button>
+            );
+          })}
+        </div>
       </header>
 
-      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-7 pb-2 pt-5">
+      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-4 pb-3 pt-5 md:px-7 md:snap-x md:scroll-px-7">
         {data.columns.map((col) => {
           const tasks = visibleByStatus.get(col.key) ?? [];
           return (
             <section
               key={col.key}
-              className="flex max-h-[calc(100vh-170px)] min-w-[280px] flex-1 flex-col rounded-2xl border border-slate-200 bg-slate-100"
+              id={`tasks-col-${col.key}`}
+              role="tabpanel"
+              aria-labelledby={`tasks-tab-${col.key}`}
+              className={cn(
+                "flex-1 flex-col rounded-2xl border border-slate-200 bg-slate-100 md:flex md:min-w-board-col md:max-h-[calc(100svh-170px)] md:snap-start",
+                col.key === activeColumn ? "flex w-full md:w-auto" : "hidden md:flex",
+              )}
             >
               <div className="flex items-center gap-2 px-4 pb-2.5 pt-3.5">
                 <span
@@ -302,7 +334,7 @@ export function TasksBoard({
                   {tasks.length}
                 </span>
               </div>
-              <div className="flex flex-col gap-2 overflow-y-auto px-2.5 pb-3 pt-1">
+              <div className="flex flex-col gap-2 px-2.5 pb-3 pt-1 md:overflow-y-auto">
                 {tasks.length === 0 ? (
                   <div className="rounded-xl border-[1.5px] border-dashed border-slate-300 px-3 py-[18px] text-center text-[12px] text-slate-400">
                     No matching tasks
@@ -324,7 +356,7 @@ export function TasksBoard({
         })}
       </main>
 
-      <footer className="px-7 pb-[18px] pt-2.5 text-[11.5px] text-slate-400">
+      <footer className="px-4 pb-[18px] pt-2.5 text-[11.5px] text-slate-400 md:px-7">
         Source: meetings/shared/tasks-board.json · Generated {data.generated}
       </footer>
 
@@ -371,11 +403,11 @@ function TaskCard({
       onClick={onOpen}
       className="flex w-full flex-col gap-[7px] rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition-[box-shadow,transform] duration-150 ease-out hover:-translate-y-px hover:shadow-md"
     >
-      <span className="text-[13px] font-semibold leading-[1.35] text-text-primary">
+      <span className="text-[13px] font-semibold leading-[1.35] text-text-primary [overflow-wrap:anywhere]">
         {task.title}
       </span>
       {task.description && (
-        <span className="line-clamp-2 break-words text-[12px] leading-[1.45] text-slate-500">
+        <span className="line-clamp-2 text-[12px] leading-[1.45] text-slate-500 [overflow-wrap:anywhere]">
           <RichText segments={parseRichDescription(task.description)} />
         </span>
       )}
@@ -519,7 +551,7 @@ function TaskModal({
 
           {task.description && (
             <div className="px-[22px] pb-1 pt-1.5">
-              <p className="mt-3 break-words text-[13.5px] leading-[1.65] text-slate-600">
+              <p className="mt-3 text-[13.5px] leading-[1.65] text-slate-600 [overflow-wrap:anywhere]">
                 <RichText segments={parseRichDescription(task.description)} />
               </p>
             </div>
