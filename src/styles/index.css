@@ -291,9 +291,7 @@
   .native-picker-input {
     -webkit-appearance: none;
     appearance: none;
-    width: 100%;
     min-height: 2.5rem;   /* keeps height when the field is empty on iOS */
-    text-align: left;
   }
   .native-picker-input::-webkit-date-and-time-value {
     text-align: left;
