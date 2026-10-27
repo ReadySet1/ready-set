@@ -3,6 +3,62 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.11.1",
+      "date": "2026-10-27",
+      "title": "Proof of delivery and a critical security fix",
+      "summary": "This release closes a critical security hole in the web framework and adds photo and signature proof at every stage of a delivery.",
+      "changes": [
+        {
+          "text": "Security updates that close a critical vulnerability in the web framework, plus two smaller ones.",
+          "type": "fixed"
+        },
+        {
+          "text": "Drivers now take a photo of the order at the vendor before confirming pickup, and a photo of the setup is required to complete a delivery.",
+          "type": "new"
+        },
+        {
+          "text": "Drivers now get the recipient's signature, or their name if they refuse to sign, before completing a delivery.",
+          "type": "new"
+        },
+        {
+          "text": "Drivers can attach up to 3 photos when completing a delivery, see them as thumbnails and remove one before sending.",
+          "type": "new"
+        },
+        {
+          "text": "Admins can see all delivery photos for an order and remove a single one.",
+          "type": "improved"
+        },
+        {
+          "text": "Completed deliveries now show who received the order.",
+          "type": "improved"
+        },
+        {
+          "text": "The Live Tracking screen tells drivers exactly which photo is missing instead of a generic error.",
+          "type": "fixed"
+        },
+        {
+          "text": "Your route is no longer lost when your phone drops signal mid-drive; locations saved offline upload in one go when the signal returns.",
+          "type": "fixed"
+        },
+        {
+          "text": "The live map no longer jumps back to an old position when a driver's phone uploads GPS points it saved while offline.",
+          "type": "fixed"
+        },
+        {
+          "text": "Long pop-ups such as the order confirmation now scroll on phones, so their buttons are always reachable.",
+          "type": "fixed"
+        },
+        {
+          "text": "Taqueria Los Altos is now featured among our food delivery partners.",
+          "type": "new"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.11.1"
+      }
+    },
+    {
       "version": "2.11.0",
       "date": "2026-10-22",
       "title": "A steadier driver app and accurate times",
