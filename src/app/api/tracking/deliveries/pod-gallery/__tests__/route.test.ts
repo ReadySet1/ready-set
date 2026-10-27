@@ -102,6 +102,24 @@ describe('GET /api/tracking/deliveries/pod-gallery — all photos per delivery',
     expect(items[0].photos).toHaveLength(3);
   });
 
+  it('excludes soft-deleted drivers in the JOIN so the delivery still lists as Unknown Driver', async () => {
+    (mockedPrisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
+
+    const res = await GET(request());
+    expect(res.status).toBe(200);
+
+    const joinOn = /LEFT JOIN drivers dr ON d\.driver_id = dr\.id AND dr\.deleted_at IS NULL/;
+    const [dataSql] = (mockedPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0];
+    const [countSql] = (mockedPrisma.$queryRawUnsafe as jest.Mock).mock.calls[1];
+    expect(dataSql).toMatch(/^\s*SELECT\s+d\.id,/);
+    expect(dataSql).toMatch(joinOn);
+    expect(countSql).toMatch(/SELECT COUNT\(\*\)/);
+    expect(countSql).toMatch(joinOn);
+    // The filter lives in the ON clause, never in WHERE, so the row is kept.
+    expect(dataSql).not.toMatch(/WHERE[\s\S]*dr\.deleted_at/);
+    expect(countSql).not.toMatch(/WHERE[\s\S]*dr\.deleted_at/);
+  });
+
   it('falls back to the deliveries mirror URL when the order has no POD rows', async () => {
     (mockedPrisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
 

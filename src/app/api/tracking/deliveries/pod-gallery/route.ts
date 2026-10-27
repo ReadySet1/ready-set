@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         COALESCE(d.customer_name, '') as customer_name,
         COALESCE(d.delivery_address, '') as delivery_address
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
+      LEFT JOIN drivers dr ON d.driver_id = dr.id AND dr.deleted_at IS NULL
       LEFT JOIN profiles p ON dr.profile_id = p.id
       WHERE d.deleted_at IS NULL
         AND d.delivery_photo_url IS NOT NULL
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
+      LEFT JOIN drivers dr ON d.driver_id = dr.id AND dr.deleted_at IS NULL
       LEFT JOIN profiles p ON dr.profile_id = p.id
       WHERE d.deleted_at IS NULL
         AND d.delivery_photo_url IS NOT NULL

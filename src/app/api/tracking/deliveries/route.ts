@@ -349,6 +349,7 @@ export async function POST(request: NextRequest) {
       SELECT id, is_active 
       FROM drivers 
       WHERE id = $1
+      AND deleted_at IS NULL
     `, driverId);
 
     if (driverResult.length === 0 || !driverResult[0]?.is_active) {
