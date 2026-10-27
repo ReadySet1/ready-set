@@ -400,6 +400,80 @@ describe('useDriverDeliveries', () => {
     });
   });
 
+  describe('advanceDeliveryStatus (structured outcome for the stage gates)', () => {
+    it('returns ok on success', async () => {
+      setDeliveries([mockOrder]);
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(
+          mockDeliveryId,
+          DriverStatus.EN_ROUTE_TO_VENDOR,
+        );
+      });
+
+      expect(outcome).toEqual({ ok: true });
+    });
+
+    it('returns the 422 gate code and message instead of a bare false', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () =>
+        okJson(
+          {
+            error: 'PICKUP_PHOTO_REQUIRED',
+            code: 'PICKUP_PHOTO_REQUIRED',
+            message: 'Take a photo of the order at the vendor before marking it picked up.',
+          },
+          422,
+        );
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome).toEqual({
+        ok: false,
+        status: 422,
+        code: 'PICKUP_PHOTO_REQUIRED',
+        message: 'Take a photo of the order at the vendor before marking it picked up.',
+      });
+    });
+
+    it('reads a code-only body (PICKUP_CONFIRMATION_REQUIRED shape)', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () =>
+        okJson({ code: 'PICKUP_CONFIRMATION_REQUIRED', message: 'Record who handed over the order' }, 422);
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: any;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome.code).toBe('PICKUP_CONFIRMATION_REQUIRED');
+    });
+
+    it('returns ok:false without a code on a network error', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () => Promise.reject(new Error('Network error'));
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: any;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome).toEqual({ ok: false, message: 'Network error' });
+    });
+  });
+
   describe('completion two-PATCH sync', () => {
     it('completing a delivery also syncs the order status (second PATCH)', async () => {
       setDeliveries([mockOrder]);

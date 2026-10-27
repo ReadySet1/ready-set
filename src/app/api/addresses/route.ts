@@ -489,9 +489,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Fetch the address to check ownership
+    // Fetch the address to check ownership (soft-deleted rows count as missing)
     const existingAddress = await prisma.address.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
     });
 
     if (!existingAddress) {
@@ -500,14 +500,11 @@ export async function PUT(request: NextRequest) {
 
     // Only allow creator or admin to update
     if (existingAddress.createdBy !== currentUser.id) {
-      // Check if user is admin (you need to implement this check)
       const isAdmin = await checkIfUserIsAdmin(currentUser.id);
 
+      // Answer like a missing row so non-owners can't probe for existence
       if (!isAdmin) {
-        return NextResponse.json(
-          { error: "Unauthorized to update this address" },
-          { status: 403 },
-        );
+        return NextResponse.json({ error: "Address not found" }, { status: 404 });
       }
     }
 
@@ -605,9 +602,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Fetch the address to check ownership
+    // Fetch the address to check ownership (soft-deleted rows count as missing)
     const existingAddress = await prisma.address.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
     });
 
     if (!existingAddress) {
@@ -619,11 +616,9 @@ export async function DELETE(request: NextRequest) {
       // Check if user is admin
       const isAdmin = await checkIfUserIsAdmin(currentUser.id);
 
+      // Answer like a missing row so non-owners can't probe for existence
       if (!isAdmin) {
-        return NextResponse.json(
-          { error: "Unauthorized to delete this address" },
-          { status: 403 },
-        );
+        return NextResponse.json({ error: "Address not found" }, { status: 404 });
       }
     }
 

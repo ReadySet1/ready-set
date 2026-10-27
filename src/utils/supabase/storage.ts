@@ -62,17 +62,25 @@ export const storage = {
  */
 export const POD_BUCKET_NAME = 'delivery-proofs';
 
+/** Which delivery stage a photo documents. Drives the filename prefix only. */
+export type StagePhotoStage = 'delivery' | 'pickup';
+
 /**
  * Upload a Proof of Delivery image
  *
  * @param file - The image file to upload (File or Blob)
  * @param deliveryId - The delivery UUID
+ * @param options.stage - `'pickup'` for the photo of the order at the vendor
+ *   (filename prefix `pickup-`); defaults to the completion photo (`delivery-`).
+ *   Both live under the same `deliveries/` prefix the bucket policy allows.
  * @returns Object with url, path, and optional error message
  */
 export async function uploadPODImage(
   file: File | Blob,
-  deliveryId: string
+  deliveryId: string,
+  options: { stage?: StagePhotoStage } = {}
 ): Promise<{ url: string; path?: string; error?: string }> {
+  const prefix = options.stage === 'pickup' ? 'pickup' : 'delivery';
   try {
     const supabase = await createClient();
 
@@ -89,9 +97,9 @@ export async function uploadPODImage(
       return { url: '', error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.' };
     }
 
-    // Generate unique filename following the pattern: delivery-{deliveryId}-{timestamp}.jpg
+    // Generate unique filename following the pattern: {stage}-{deliveryId}-{timestamp}.jpg
     const timestamp = Date.now();
-    const filename = `deliveries/${deliveryId}/delivery-${deliveryId}-${timestamp}.jpg`;
+    const filename = `deliveries/${deliveryId}/${prefix}-${deliveryId}-${timestamp}.jpg`;
 
     // Upload to Supabase Storage (delivery-proofs bucket)
     const { data, error } = await supabase.storage
@@ -141,7 +149,10 @@ export async function uploadPODImage(
  */
 export async function uploadPickupSignatureImage(
   file: File | Blob,
-  orderId: string
+  orderId: string,
+  // 'delivery' = the recipient's signature at completion (POST .../recipient);
+  // same bucket + rules, distinct filename prefix.
+  options: { stage?: 'pickup' | 'delivery' } = {}
 ): Promise<{ url: string; path?: string; error?: string }> {
   try {
     const supabase = await createClient();
@@ -160,7 +171,8 @@ export async function uploadPickupSignatureImage(
     }
 
     const timestamp = Date.now();
-    const filename = `deliveries/${orderId}/pickup-signature-${timestamp}.png`;
+    const prefix = options.stage === 'delivery' ? 'delivery-signature' : 'pickup-signature';
+    const filename = `deliveries/${orderId}/${prefix}-${timestamp}.png`;
 
     const { data, error } = await supabase.storage
       .from(POD_BUCKET_NAME)

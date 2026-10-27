@@ -78,7 +78,10 @@
     "oct8review": "Oct 8 PR review",
     "oct9review": "Oct 9 merge follow-ups",
     "oct14drive": "Drive Test 10/14",
-    "oct15batch": "Oct 15 batch"
+    "oct15batch": "Oct 15 batch",
+    "oct15retest": "Fernando iPhone re-test 10/15",
+    "oct16readiness": "Readiness re-run 10/16",
+    "oct17ride": "Oct 17 Guillermo ride"
   },
   "tasks": [
     {
@@ -526,12 +529,13 @@
     },
     {
       "id": "driver-photo-signature-required",
-      "status": "progress",
+      "status": "done",
       "title": "Mandatory driver photo + signature capture",
       "owner": "emmanuel",
       "source": "jun1",
       "created": "2026-06-01",
-      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration.<br><br><strong>Oct 15:</strong> PR #699 (draft) — pickup photo endpoint + server gates (422 <code>PICKUP_PHOTO_REQUIRED</code> / <code>POD_REQUIRED</code>). Finding: the signature pad lives at <em>pickup</em>, not completion. The \"refused to sign → recipient name\" fallback needs a new <code>deliveries</code> column (e.g. <code>delivery_received_by</code>), not built — Emmanuel to decide."
+      "description": "<strong>Decision aligned Jun 1.</strong> Driver interface must enforce as mandatory fields: photo of food at the vendor (pickup), photo of the setup at completion, and a signature on completion — or the recipient's name if a signature is refused. For driver accountability.<br><br><strong>Jun 16 update:</strong> the walk test confirmed this; POD photo now uploads reliably (PR #446). Signature + recipient-name capture is scaffolded for its own PR, awaiting the Claude Design mockup (see <code>walk-test-fixes-pr1</code>).<br><br><strong>Jun 22 update — finalized as a meeting decision:</strong> the vendor-pickup workflow now mandates <strong>both a signature and a photo at the vendor location</strong> (today only enforced at final delivery — Gary confirmed the gap during the live test).<br><br><strong>The pickup-signature half is split into its own card</strong> (<code>driver-pickup-signature</code>) since it's the immediate committed next step; this card continues to track the <em>photo</em> requirements (vendor pickup + setup-at-completion) and the <em>completion-stage</em> signature / recipient-name fallback. All signature capture is a <em>manual</em> in-app capture (restaurant staff at pickup, recipient at completion), NOT a DocuSign integration.<br><br><strong>Oct 15:</strong> PR #699 (draft) — pickup photo endpoint + server gates (422 <code>PICKUP_PHOTO_REQUIRED</code> / <code>POD_REQUIRED</code>). Finding: the signature pad lives at <em>pickup</em>, not completion. The \"refused to sign → recipient name\" fallback needs a new <code>deliveries</code> column (e.g. <code>delivery_received_by</code>), not built — Emmanuel to decide.<br><br><strong>Oct 16:</strong> Emmanuel chose the column. #699 now has <code>deliveries.delivery_received_by</code> (migration <code>20261016000000_add_delivery_received_by</code>, applied on rs-dev 10-16, NOT prod), 422 <code>RECIPIENT_REQUIRED</code>, and Live Tracking opens the pickup/setup photo and recipient sheets.<br><br><strong>Merged into development 10-16: #699 (c6e90ede).</strong> Not on prod until the promotion after 2.11.0; migration <code>20261016000000_add_delivery_received_by</code> must be applied on prod first. Device check: Fernando matrix 10-19 groups B/C.",
+      "closed": "2026-10-16"
     },
     {
       "id": "driver-pickup-signature",
@@ -598,11 +602,11 @@
     },
     {
       "id": "catercow-durable-webhook-retry",
-      "status": "open",
+      "status": "progress",
       "owner": "emmanuel",
       "source": "catercow",
       "title": "Durable webhook retry queue (fast-follow)",
-      "description": "v1 dispatcher does in-request retries (3 attempts, short backoff). The contract promises “5 attempts over ~30 min”, which needs a queue/cron, not in-request retries. Build a <code>partner_webhook_deliveries</code> table + cron worker on top of the existing <code>order_status_history</code> table.<br><br>Not a go-live blocker — missed callbacks are recoverable via <code>GET /orders/{id}</code>.",
+      "description": "v1 dispatcher does in-request retries (3 attempts, short backoff). The contract promises “5 attempts over ~30 min”, which needs a queue/cron, not in-request retries. Build a <code>partner_webhook_deliveries</code> table + cron worker on top of the existing <code>order_status_history</code> table.<br><br>Not a go-live blocker — missed callbacks are recoverable via <code>GET /orders/{id}</code>.<br><br>Draft <strong>#703</strong>: migration <code>20261016000100_partner_webhook_deliveries</code> (applied on rs-dev 10-16, NOT prod), 1-min VPS cron, retries now include 4xx (contract v0.3). Next release. 10-19: CI green on <code>04da06f1</code>, ready to leave draft. HELD: Emmanuel is asking Gary whether CaterCow is still an active partner before merging.",
       "tags": []
     },
     {
@@ -668,7 +672,7 @@
     },
     {
       "id": "web-mobile-round1-findings-triage",
-      "status": "open",
+      "status": "done",
       "title": "Triage + fix the 5 findings from Fernando's mobile test round 1",
       "owner": "emmanuel",
       "source": "aug17",
@@ -676,7 +680,8 @@
       "tags": [
         "bug"
       ],
-      "description": "Fernando's full-round report (2026-08-17, iPhone X / iOS 16.7.16 / Safari / LTE) — Group W clean end-to-end, 5 findings need triage: <strong>C11</strong> (FAIL-GATE) no feet/miles shown after completing the walk; <strong>C4</strong> dark-mode signature-pad strokes invisible while signing; <strong>C6</strong> POD photo uploads but doesn't render on the driver dashboard completed-order screen; <strong>F1</strong> client sign-up onboarding modal can't be closed on mobile without a hard refresh; <strong>F3</strong> public track-order page needs horizontal scrolling on mobile.<br><br>Triage leads: C4 → re-check on the current dev build (his round may predate the #512/#513 signature rework); C6 → verify against the #506 bucket-split fix (different read surface?); C11 → mileage/units path (<code>src/lib/units.ts</code>). F1/F3 are client-facing, new. Full summary + email refs: <code>docs/ready-set/reports/2026-08-17-web-mobile-test-round1-results.md</code>. ⚠️ Download the 13K result-log attachment from Gmail into <code>reports/</code> for the per-case detail."
+      "description": "Fernando's full-round report (2026-08-17, iPhone X / iOS 16.7.16 / Safari / LTE) — Group W clean end-to-end, 5 findings need triage: <strong>C11</strong> (FAIL-GATE) no feet/miles shown after completing the walk; <strong>C4</strong> dark-mode signature-pad strokes invisible while signing; <strong>C6</strong> POD photo uploads but doesn't render on the driver dashboard completed-order screen; <strong>F1</strong> client sign-up onboarding modal can't be closed on mobile without a hard refresh; <strong>F3</strong> public track-order page needs horizontal scrolling on mobile.<br><br>Triage leads: C4 → re-check on the current dev build (his round may predate the #512/#513 signature rework); C6 → verify against the #506 bucket-split fix (different read surface?); C11 → mileage/units path (<code>src/lib/units.ts</code>). F1/F3 are client-facing, new. Full summary + email refs: <code>docs/ready-set/reports/2026-08-17-web-mobile-test-round1-results.md</code>. ⚠️ Download the 13K result-log attachment from Gmail into <code>reports/</code> for the per-case detail.<br><br><strong>Verified 2026-10-15</strong> on Fernando's iPhone X (iOS 16.7.16, rs-dev): C4, C6, C11, F1, F3 all PASS. His two new findings are tracked in <code>driver-sw-null-response-start-shift-hang</code>.",
+      "closed": "2026-10-15"
     },
     {
       "id": "manage-dev-budget",
@@ -1020,12 +1025,13 @@
     },
     {
       "id": "dynamic-pricing-per-client",
-      "status": "progress",
+      "status": "done",
       "title": "Dynamic per-client pricing config — create new clients without hardcoded values",
       "owner": "emmanuel",
       "source": "jul13",
       "created": "2026-07-13",
-      "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors.<br><br><strong>Oct 15:</strong> PR #698 — \"New client\" flow on the Adjust Vendor Pricing tab: creates a DB-only config from the generic template, auto-slugged key, 409 on duplicates, audit kept. No migration."
+      "description": "7/13 decision (Gary explicit): the admin panel must support creating a <em>new</em> client and entering its pricing values directly — no hardcoded configurations. Builds on the existing Adjust Vendor Pricing tab (DB-first config resolution already in place); the gap is new-client creation rather than editing pre-seeded vendors.<br><br><strong>Oct 15:</strong> PR #698 — \"New client\" flow on the Adjust Vendor Pricing tab: creates a DB-only config from the generic template, auto-slugged key, 409 on duplicates, audit kept. No migration. <strong>Merged 10-15</strong> (<code>12aaa52b</code>).",
+      "closed": "2026-10-15"
     },
     {
       "id": "sms-provider-final-call",
@@ -1691,7 +1697,7 @@
       "tags": [
         "critical"
       ],
-      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again.<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Gate NOT cleared on Android.</strong> iOS locked-screen walk still owed separately (profile re-signed 2026-09-02, valid to 09-09).<br><br><strong>Update 2026-09-25 (board audit):</strong> The \"~Sep 2\" date is stale. iOS profile re-signed 09-21, <strong>expires 09-28</strong>; the iOS 27 UIScene fix is local only; the wrapper loaded blank after the 09-21 drive. iOS walk still not run. <strong>10/14 partial (Guillermo, Android, motorcycle):</strong> locked only 2–3 min per window (asked for ≥10). Locked while driving 17:12–17:14: 22 pts, steady 5.5 s cadence, max gap 7.3 s = good. Locked standing still 17:06–17:09: about 1 ping/min (gaps 81/56/67 s), probably Android throttling a stationary fix. Still owed: one ≥10 min locked stretch while moving."
+      "description": "The one remaining gate before wrapper rollout: 15–20 min walk with the phone locked / Waze in front, pass bar = no trail gap &gt;~30s, both platforms. <strong>iOS free-signing profile expires ~Sep 2</strong> (reinstalled 08-26) — walk before then or re-sign again.<br><br><strong>2026-09-02 Android walk — RESULT: FAIL (hard numbers).</strong> Aziel, real device, CDMX Chapultepec, shift <code>52bf8a9c</code> 83.4 min, <strong>230 GPS points</strong>, 2.33 km, avg accuracy 2.6 m (accuracy was never the problem). Trail gap analysis vs the ~30 s pass bar: <strong>22 gaps &gt;30 s, 13 &gt;60 s, 7 &gt;120 s, worst 564 s (9.4 min)</strong>.<br>The split is the finding — cut at the pickup (23:59:03Z, when the phone was backgrounded):<br>• <em>Screen on</em> (176 intervals): avg <strong>8.3 s</strong>, median 7.9 s, max 45.9 s, <strong>1</strong> gap &gt;30 s.<br>• <em>Backgrounded</em> (53 intervals): avg <strong>66.6 s</strong>, median 19.7 s, max <strong>564.5 s</strong>, <strong>21</strong> gaps &gt;30 s.<br>8× degradation the moment the app stops being foreground. Foreground tracking is healthy; background tracking is not — this is the Android-side reproduction of the bug, not a permissions or accuracy artifact.<br><br><strong>Gate NOT cleared on Android.</strong> iOS locked-screen walk still owed separately (profile re-signed 2026-09-02, valid to 09-09).<br><br><strong>Update 2026-09-25 (board audit):</strong> The \"~Sep 2\" date is stale. iOS profile re-signed 09-21, <strong>expires 09-28</strong>; the iOS 27 UIScene fix is local only; the wrapper loaded blank after the 09-21 drive. iOS walk still not run. <strong>10/14 partial (Guillermo, Android, motorcycle):</strong> locked only 2–3 min per window (asked for ≥10). Locked while driving 17:12–17:14: 22 pts, steady 5.5 s cadence, max gap 7.3 s = good. Locked standing still 17:06–17:09: about 1 ping/min (gaps 81/56/67 s), probably Android throttling a stationary fix. Still owed: one ≥10 min locked stretch while moving. 10-17: Guillermo rode ~4 min locked (shift <code>c6e2583a</code>): median 6 s cadence, one 80 s gap whose point uploaded 44 s late (queue flushed). Good sign, but short of the 10 min bar."
     },
     {
       "id": "api-health-unhealthy-check",
@@ -1909,7 +1915,7 @@
       "created": "2026-09-06",
       "tags": [],
       "title": "Run the pilot: 2–3 real drivers, mobile web, foreground-only, 1 week, admin watching",
-      "description": "Web only (Chrome/Safari, no wrapper; Android Chrome preferred). Driver rules: start shift on Tracking before touching an order; screen on + app in front between stops; reopen Tracking after a reload; advance status only with signal; end shift from Tracking; if blocked → Return to dispatch or call admin. Admin watches stale markers &gt;5 min, double active shifts, stuck End Shift (force-end via <code>PUT /api/tracking/shifts/{id}</code> <code>metadata.force</code>). Starts after D1–D3, S1–S2, O1–O2 land and dev→main is promoted.<br><br><strong>Update 2026-09-25 (board audit):</strong> All prerequisite PRs are merged and on prod (v2.8.0). Blocked on prod backups (<code>pilot-db-backup-workflow</code>) and on Fernando/Gary for the start week + driver names."
+      "description": "Web only (Chrome/Safari, no wrapper; Android Chrome preferred). Driver rules: start shift on Tracking before touching an order; screen on + app in front between stops; reopen Tracking after a reload; advance status only with signal; end shift from Tracking; if blocked → Return to dispatch or call admin. Admin watches stale markers &gt;5 min, double active shifts, stuck End Shift (force-end via <code>PUT /api/tracking/shifts/{id}</code> <code>metadata.force</code>). Starts after D1–D3, S1–S2, O1–O2 land and dev→main is promoted.<br><br><strong>Update 2026-09-25 (board audit):</strong> All prerequisite PRs are merged and on prod (v2.8.0). Blocked on prod backups (<code>pilot-db-backup-workflow</code>) and on Fernando/Gary for the start week + driver names.<br><br><strong>Readiness G0-09 (parked 10-16):</strong> pilot kickoff message to Fernando + Gary still unsent; pick a start week after the 10-19 test round."
     },
     {
       "id": "admin-actions-null-user",
@@ -1938,16 +1944,17 @@
     },
     {
       "id": "delivery-finalize-multi-photo",
-      "status": "new",
+      "status": "done",
       "title": "Allow up to 3 photos when driver finalizes delivery",
       "owner": "gary",
       "source": "sep7",
       "created": "2026-09-07",
-      "description": "Requested by Gary. The delivery-completion flow should accept a maximum of 3 photos (currently limited to one). Update the finalize-delivery UI and API to support multi-photo upload with a cap of three."
+      "description": "Requested by Gary. The delivery-completion flow should accept a maximum of 3 photos (currently limited to one). Update the finalize-delivery UI and API to support multi-photo upload with a cap of three.<br><br>Draft <strong>#702</strong> (stacked on #699): up to 3 POD photos, 409 <code>POD_PHOTO_LIMIT</code>, admin gallery + order-page POD card + per-photo delete. No migration.<br><br><strong>Merged into development 10-16: #702 (3c255d0a).</strong> Not on prod until the promotion after 2.11.0; migration <code>20261016000000_add_delivery_received_by</code> must be applied on prod first. Device check: Fernando matrix 10-19 groups B/C.",
+      "closed": "2026-10-16"
     },
     {
       "id": "catering-order-address-not-editable",
-      "status": "new",
+      "status": "done",
       "title": "Address cannot be edited during new catering order creation",
       "owner": "fernando",
       "source": "sep7",
@@ -1955,7 +1962,8 @@
       "tags": [
         "bug"
       ],
-      "description": "The address field on the new catering order flow does not allow editing an existing address. Users must clear and re-enter the full address instead of correcting it in place."
+      "description": "The address field on the new catering order flow does not allow editing an existing address. Users must clear and re-enter the full address instead of correcting it in place.<br><br><strong>Fixed in #700 (merged 10-16):</strong> the pencil now opens the address form prefilled; owners edit the saved record (shared everywhere it is used), shared/foreign addresses save as a private copy. Follow-up: <code>PUT /api/addresses</code> lacks a soft-delete filter (pre-existing).",
+      "closed": "2026-10-16"
     },
     {
       "id": "post-qr-scan-role-modal",
@@ -1968,12 +1976,13 @@
     },
     {
       "id": "pr-followup-fulton-counties-typing",
-      "status": "progress",
+      "status": "done",
       "title": "PR follow-up — Fulton in CountiesSelection.tsx + counties strict typing",
       "owner": "fernando",
       "source": "sep7",
       "created": "2026-09-07",
-      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types.<br><br><strong>Oct 15:</strong> PR #697 — Fulton added to the quote-request picker (the other four county lists already had it) and <code>counties: any</code> replaced by <code>string | string[]</code> + <code>parseProfileCounties()</code>. Shape inferred from code, not the DB."
+      "description": "Update <code>CountiesSelection.tsx</code> to include and handle the Fulton county option. Separately: verify the counties data shapes in the dev DB, then open a dedicated PR replacing the <code>counties: any</code> typing in <code>src/types/user.ts</code> with strict types.<br><br><strong>Oct 15:</strong> PR #697 — Fulton added to the quote-request picker (the other four county lists already had it) and <code>counties: any</code> replaced by <code>string | string[]</code> + <code>parseProfileCounties()</code>. Shape inferred from code, not the DB. <strong>Merged 10-15</strong> (<code>8d56f2aa</code>).",
+      "closed": "2026-10-15"
     },
     {
       "id": "notify-order-created-findunique-bug",
@@ -2203,7 +2212,7 @@
         "critical",
         "bug"
       ],
-      "description": "Found while mapping the job-application upload flow (2026-09-25). <code>src/app/api/file-uploads/route.ts</code> GET (~L41–98) returns a signed URL for any <code>?path=</code> to any authenticated user, with no ownership check on the object. Any driver/client account could read other users&#39; documents (job-application licenses, order files) if they know or guess a path. Fix: resolve the path to a <code>fileUpload</code> row and authorize by owner / admin role. <strong>2026-09-28:</strong> GET had no callers (only its own tests since #84), so it is deleted rather than hardened; PR #593, regression guard in <code>removed-endpoints.test.ts</code>."
+      "description": "Found while mapping the job-application upload flow (2026-09-25). <code>src/app/api/file-uploads/route.ts</code> GET (~L41–98) returns a signed URL for any <code>?path=</code> to any authenticated user, with no ownership check on the object. Any driver/client account could read other users' documents (job-application licenses, order files) if they know or guess a path. Fix: resolve the path to a <code>fileUpload</code> row and authorize by owner / admin role. <strong>2026-09-28:</strong> GET had no callers (only its own tests since #84), so it is deleted rather than hardened; PR #593, regression guard in <code>removed-endpoints.test.ts</code>."
     },
     {
       "id": "download-email-dead-domain",
@@ -2227,7 +2236,7 @@
       "source": "sep28drive",
       "created": "2026-09-28",
       "tags": [],
-      "description": "Driver button actions lag because of distance: phone→VPS 205–280 ms and VPS→prod DB ~100 ms per query. Ashburn puts prod Supabase at 1–3 ms and lets CI drop the 75-min ARM cross-build. Plan: <code>docs/ready-set/specs/2026-09-28-vps-ashburn-migration-plan.md</code>. Est. ~$31/mo vs ~$13 today. <strong>Blocked on Gary:</strong> cost OK + expected concurrent drivers + a 1 h evening window (destino-sf lives on the same box)."
+      "description": "Driver button actions lag because of distance: phone→VPS 205–280 ms and VPS→prod DB ~100 ms per query. Ashburn puts prod Supabase at 1–3 ms and lets CI drop the 75-min ARM cross-build. Plan: <code>docs/ready-set/specs/2026-09-28-vps-ashburn-migration-plan.md</code>. Est. ~$31/mo vs ~$13 today. <strong>Blocked on Gary:</strong> cost OK + expected concurrent drivers + a 1 h evening window (destino-sf lives on the same box).<br><br><strong>10-16 evidence:</strong> rs-dev health \"degraded\" is pure network distance (Nuremberg VPS → rs-dev us-west-1, ~175 ms per round trip; DB queries take 0.1–1.3 ms). Dev health ~850 ms vs the 1000 ms threshold; prod (us-east-1, ~100 ms RTT) ~620–740 ms. Real requests pay the same per-query cost. Ashburn would bring prod to 1–3 ms and dev to ~65 ms per round trip; dev at prod speed also needs rs-dev recreated in us-east-1. Decision parked for the week of 10-19."
     },
     {
       "owner": "emmanuel",
@@ -2307,7 +2316,7 @@
         "bug"
       ],
       "title": "Orders assume Pacific time everywhere: Austin (Central) orders shift by 2 hours",
-      "description": "The app has one global timezone (<code>TIMEZONE_CONFIG.LOCAL_TIMEZONE = America/Los_Angeles</code> in <code>src/lib/config/timezone.ts</code>) plus hardcoded <code>America/Los_Angeles</code> in client screens; no address or order stores a timezone. Ready Set is taking orders in <strong>Austin, TX (Central)</strong>, and sign-up already offers Fulton, GA (Eastern). A time typed as local is saved as Pacific (11:00 CT entered = stored 11:00 PT = 13:00 CT), and every screen agrees on the wrong time. <strong>First:</strong> measure impact on prod (Austin orders, entry path: web form vs CaterValley/CaterCow API). <strong>Fix:</strong> IANA timezone per address/order derived from location; convert input and display with the order's zone; show the zone label (CT/PT). <strong>Prod read 2026-10-08:</strong> 0 orders (catering or on-demand, pickup or delivery) touch Texas yet; 10 TX addresses saved (7 Austin, last 2026-07-25) with no orders. No existing order is wrong today; it breaks on the first Austin order entered in the app. Also: <code>addresses.state</code> is dirty (\"CA\", \"CALIFORNIA\", \"CALIFORNIA (95054)\", \"SAN FRANCISCO\", \"CAIFORNIA\"), so derive the zone from ZIP or coordinates, not the state text.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/694\">#694</a> open against <code>development</code> (DRAFT: design note in <code>docs/ready-set/specs/2026-10-15-order-timezone-per-location.md</code>, migration <code>address_timezone</code> not applied anywhere yet)."
+      "description": "The app has one global timezone (<code>TIMEZONE_CONFIG.LOCAL_TIMEZONE = America/Los_Angeles</code> in <code>src/lib/config/timezone.ts</code>) plus hardcoded <code>America/Los_Angeles</code> in client screens; no address or order stores a timezone. Ready Set is taking orders in <strong>Austin, TX (Central)</strong>, and sign-up already offers Fulton, GA (Eastern). A time typed as local is saved as Pacific (11:00 CT entered = stored 11:00 PT = 13:00 CT), and every screen agrees on the wrong time. <strong>First:</strong> measure impact on prod (Austin orders, entry path: web form vs CaterValley/CaterCow API). <strong>Fix:</strong> IANA timezone per address/order derived from location; convert input and display with the order's zone; show the zone label (CT/PT). <strong>Prod read 2026-10-08:</strong> 0 orders (catering or on-demand, pickup or delivery) touch Texas yet; 10 TX addresses saved (7 Austin, last 2026-07-25) with no orders. No existing order is wrong today; it breaks on the first Austin order entered in the app. Also: <code>addresses.state</code> is dirty (\"CA\", \"CALIFORNIA\", \"CALIFORNIA (95054)\", \"SAN FRANCISCO\", \"CAIFORNIA\"), so derive the zone from ZIP or coordinates, not the state text.<br><br><strong>2026-10-15:</strong> PR <a href=\"https://github.com/ReadySet1/ready-set/pull/694\">#694</a> open against <code>development</code> (DRAFT: design note in <code>docs/ready-set/specs/2026-10-15-order-timezone-per-location.md</code>, migration <code>address_timezone</code> not applied anywhere yet).<br><br><strong>Decision owed (parked 10-16):</strong> approve the design note in #694 and answer its 4 questions; migration <code>20261015000000_address_timezone</code> then goes to rs-dev/E2E."
     },
     {
       "id": "android-pod-camera-opens-gallery",
@@ -2386,7 +2395,7 @@
         "critical"
       ],
       "title": "Stationary shift billed 2.31 mi: phantom pings at the old pickup point get past the odometer",
-      "description": "Guillermo stood still for all of shift <code>7ce59c6b</code> (10/14, 17:18–17:28 CST), yet it closed at 2.31 mi. Of 92 GPS points, 9 jump about 465 m in 3–6 s (over 300 km/h) to a spot 14 m from shift 1's pickup, then back. Those jumps make up 4,174 of 4,190 raw meters. Two defects: (1) <strong>source</strong>: something replays an old position (accuracy 2.7–3.5 m, speed about 1–1.5 m/s, <code>source=realtime</code>). Unverified suspects: a cached or stale fix from the native wrapper, or a second location watcher. (2) <strong>odometer</strong>: <code>computeAnchorDistanceMeters</code> (<code>src/services/tracking/mileage.ts:122,137</code>) measures the speed gate from the last <em>accepted</em> anchor, not the previous raw point, so a long stationary stretch makes a 465 m jump look slow. 4 phantom pings × about 930 m round trip = 3,718 m = the 2.31 mi billed. Miles drive pay, so this blocks the pilot. <strong>Reproduced again:</strong> shift <code>ee153c36</code> (17:31–17:36, stationary) closed at 0.29 mi = exactly one 465 m phantom jump. <strong>Fix 10/14 (commit <code>5f11663f</code>, branch <code>fix/mileage-phantom-pings</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/686\">#686</a>):</strong> new <code>rejectTeleportSpikes</code> pre-pass checks each hop against the previous fix (drops A→B→A spikes up to 5 points, else re-anchors without billing the impossible hop); real travel across 90 s–2 min lock gaps still counts. Replayed rs-dev points: <code>7ce59c6b</code> 2.31→0.00 mi, <code>ee153c36</code> 0.29→0.00, <code>7d11538c</code> 0.92→0.65. Stored values not recomputed. Ping source split into <code>phantom-ping-source-stale-watcher</code>. <strong>MERGED 10/14</strong> (#686 <code>76c101a0</code>); device check pending.",
+      "description": "Guillermo stood still for all of shift <code>7ce59c6b</code> (10/14, 17:18–17:28 CST), yet it closed at 2.31 mi. Of 92 GPS points, 9 jump about 465 m in 3–6 s (over 300 km/h) to a spot 14 m from shift 1's pickup, then back. Those jumps make up 4,174 of 4,190 raw meters. Two defects: (1) <strong>source</strong>: something replays an old position (accuracy 2.7–3.5 m, speed about 1–1.5 m/s, <code>source=realtime</code>). Unverified suspects: a cached or stale fix from the native wrapper, or a second location watcher. (2) <strong>odometer</strong>: <code>computeAnchorDistanceMeters</code> (<code>src/services/tracking/mileage.ts:122,137</code>) measures the speed gate from the last <em>accepted</em> anchor, not the previous raw point, so a long stationary stretch makes a 465 m jump look slow. 4 phantom pings × about 930 m round trip = 3,718 m = the 2.31 mi billed. Miles drive pay, so this blocks the pilot. <strong>Reproduced again:</strong> shift <code>ee153c36</code> (17:31–17:36, stationary) closed at 0.29 mi = exactly one 465 m phantom jump. <strong>Fix 10/14 (commit <code>5f11663f</code>, branch <code>fix/mileage-phantom-pings</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/686\">#686</a>):</strong> new <code>rejectTeleportSpikes</code> pre-pass checks each hop against the previous fix (drops A→B→A spikes up to 5 points, else re-anchors without billing the impossible hop); real travel across 90 s–2 min lock gaps still counts. Replayed rs-dev points: <code>7ce59c6b</code> 2.31→0.00 mi, <code>ee153c36</code> 0.29→0.00, <code>7d11538c</code> 0.92→0.65. Stored values not recomputed. Ping source split into <code>phantom-ping-source-stale-watcher</code>. <strong>MERGED 10/14</strong> (#686 <code>76c101a0</code>); device check pending. 10-17 ride: the 5-min stationary check was NOT done (Guillermo forgot); still unverified on device.",
       "sourceRef": "#686",
       "created": "2026-10-14"
     },
@@ -2399,7 +2408,7 @@
         "bug"
       ],
       "title": "Live tracking shift timer stuck at 0:00 during an active shift",
-      "description": "On 10/14 Guillermo's Live tracking header showed <code>0:00</code> at 5:23 p.m. on a shift that started at 5:18, so it should have read about 5:00. The timer is the shift-elapsed clock (<code>src/components/Driver/DriverTrackingPortal.tsx:195-202</code>), not per order. Suspects: <code>currentShift.startTime</code> is missing (the effect returns early and <code>elapsed</code> stays 0), or the device clock is ahead of the server (negative delta clamped to 0 in <code>formatDuration</code>). Retest requested: start a shift, wait 1 min, screenshot. <strong>Confirmed 10/14 17:33</strong> (shift <code>ee153c36</code>, started 17:31): still 0:00. The <code>development</code> code (2.10.1) matches this branch. \"Since 5:31 p.m.\" renders from the same <code>currentShift.startTime</code>, so startTime is present and parses. The empty-startTime theory is out: either <code>Date.now() - startedAt</code> stays ≤ 0 in the WebView, or the interval never updates. Next: reproduce with a driver account in a browser and read the console. <strong>Root cause 10/14:</strong> the phone clock runs about 1 h behind the server (#668 measured 3,648 s on 10/06), so <code>Date.now() - startedAt</code> is negative and clamps to 0:00 for the first hour. <strong>Fix (commit <code>c530b3c0</code>, branch <code>fix/driver-shift-timer-zero</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/687\">#687</a>):</strong> <code>/api/tracking/shifts/active</code> returns <code>serverNow</code>, <code>useDriverShift</code> derives the offset, and <code>shiftElapsedSeconds()</code> drives the header, ShiftPill and the home \"Active for\" card. Follow-up: <code>DriverLiveMap.tsx:277</code> still sizes the trail window on the phone clock. Ask Guillermo whether automatic date/time is on. <strong>MERGED 10/14</strong> (#687 <code>9d5b7ce8</code>); device check pending.",
+      "description": "On 10/14 Guillermo's Live tracking header showed <code>0:00</code> at 5:23 p.m. on a shift that started at 5:18, so it should have read about 5:00. The timer is the shift-elapsed clock (<code>src/components/Driver/DriverTrackingPortal.tsx:195-202</code>), not per order. Suspects: <code>currentShift.startTime</code> is missing (the effect returns early and <code>elapsed</code> stays 0), or the device clock is ahead of the server (negative delta clamped to 0 in <code>formatDuration</code>). Retest requested: start a shift, wait 1 min, screenshot. <strong>Confirmed 10/14 17:33</strong> (shift <code>ee153c36</code>, started 17:31): still 0:00. The <code>development</code> code (2.10.1) matches this branch. \"Since 5:31 p.m.\" renders from the same <code>currentShift.startTime</code>, so startTime is present and parses. The empty-startTime theory is out: either <code>Date.now() - startedAt</code> stays ≤ 0 in the WebView, or the interval never updates. Next: reproduce with a driver account in a browser and read the console. <strong>Root cause 10/14:</strong> the phone clock runs about 1 h behind the server (#668 measured 3,648 s on 10/06), so <code>Date.now() - startedAt</code> is negative and clamps to 0:00 for the first hour. <strong>Fix (commit <code>c530b3c0</code>, branch <code>fix/driver-shift-timer-zero</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/687\">#687</a>):</strong> <code>/api/tracking/shifts/active</code> returns <code>serverNow</code>, <code>useDriverShift</code> derives the offset, and <code>shiftElapsedSeconds()</code> drives the header, ShiftPill and the home \"Active for\" card. Follow-up: <code>DriverLiveMap.tsx:277</code> still sizes the trail window on the phone clock. Ask Guillermo whether automatic date/time is on. <strong>MERGED 10/14</strong> (#687 <code>9d5b7ce8</code>); device check pending. <strong>Device-verified 10-17</strong> by Guillermo on Android (rs-dev). Close when 2.11.0 is live on prod.",
       "sourceRef": "#687",
       "created": "2026-10-14"
     },
@@ -2409,7 +2418,7 @@
       "owner": "emmanuel",
       "source": "oct14drive",
       "title": "Driver live map does not follow the driver: the marker drives off-screen",
-      "description": "Guillermo (10/14): the Ready Set map is better than before, but it doesn't \"follow\" him; the marker moves until it leaves the screen. Confirmed in <code>src/components/Driver/DriverLiveMap.tsx:389-411</code>: <code>shouldRecenter()</code> only fires on the first fix or a jump of more than 10 km, so normal driving never moves the camera. Ask: Waze-style follow mode (ease the camera to each fix, pause when the driver pans or zooms by hand) plus a \"recenter\" button to resume. Drivers who prefer the in-app map over Google Maps or Waze to save phone resources depend on this. <strong>Built 10/14 (commit <code>94114bae</code>, branch <code>feat/driver-map-follow-mode</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/688\">#688</a>):</strong> follow on by default (600 ms ease, &lt;5 m fixes skipped), hand gestures pause it (Mapbox <code>originalEvent</code>), Recenter button while paused; jump detection now compares consecutive fixes, so a long drive no longer wipes the trail after 10 km. Needs a device check (pinch/rotate, smoothness, button on the 256 px map). <strong>MERGED 10/14</strong> (#688 <code>c0664292</code>); device check pending.",
+      "description": "Guillermo (10/14): the Ready Set map is better than before, but it doesn't \"follow\" him; the marker moves until it leaves the screen. Confirmed in <code>src/components/Driver/DriverLiveMap.tsx:389-411</code>: <code>shouldRecenter()</code> only fires on the first fix or a jump of more than 10 km, so normal driving never moves the camera. Ask: Waze-style follow mode (ease the camera to each fix, pause when the driver pans or zooms by hand) plus a \"recenter\" button to resume. Drivers who prefer the in-app map over Google Maps or Waze to save phone resources depend on this. <strong>Built 10/14 (commit <code>94114bae</code>, branch <code>feat/driver-map-follow-mode</code>, PR <a href=\"https://github.com/ReadySet1/ready-set/pull/688\">#688</a>):</strong> follow on by default (600 ms ease, &lt;5 m fixes skipped), hand gestures pause it (Mapbox <code>originalEvent</code>), Recenter button while paused; jump detection now compares consecutive fixes, so a long drive no longer wipes the trail after 10 km. Needs a device check (pinch/rotate, smoothness, button on the 256 px map). <strong>MERGED 10/14</strong> (#688 <code>c0664292</code>); device check pending. <strong>Device-verified 10-17</strong> by Guillermo on Android (rs-dev). Close when 2.11.0 is live on prod.",
       "sourceRef": "#688",
       "created": "2026-10-14"
     },
@@ -2427,7 +2436,7 @@
     },
     {
       "id": "dashboard-activity-feed-browser-timezone",
-      "status": "progress",
+      "status": "done",
       "title": "Admin dashboard activity feed shows week-old dates in the browser timezone",
       "owner": "emmanuel",
       "source": "oct15batch",
@@ -2435,7 +2444,82 @@
         "bug"
       ],
       "created": "2026-10-15",
-      "description": "Found when the DashboardHome timezone test went red on every branch on 2026-10-15: <code>formatTimeAgo</code> in <code>src/components/Dashboard/DashboardHome.tsx</code> fell back to <code>toLocaleDateString()</code> (browser zone + locale) for items older than 7 days, while the rest of the page uses the app timezone since #685. The test only hit that branch once its fixed fixture turned a week old. Fix: route the fallback through <code>formatDateForDisplay</code> and pin the test clock with fake timers. PR open against <code>development</code>; merge first, then update-branch #690-#694."
+      "description": "Found when the DashboardHome timezone test went red on every branch on 2026-10-15: <code>formatTimeAgo</code> in <code>src/components/Dashboard/DashboardHome.tsx</code> fell back to <code>toLocaleDateString()</code> (browser zone + locale) for items older than 7 days, while the rest of the page uses the app timezone since #685. The test only hit that branch once its fixed fixture turned a week old. Fix: route the fallback through <code>formatDateForDisplay</code> and pin the test clock with fake timers. PR open against <code>development</code>; merge first, then update-branch #690-#694. <strong>Merged 10-15</strong> (#695, <code>8025b6c8</code>).",
+      "closed": "2026-10-15"
+    },
+    {
+      "id": "driver-sw-null-response-start-shift-hang",
+      "status": "progress",
+      "title": "Driver app: service-worker \"response is null\" banner + Start shift spinner stuck",
+      "owner": "emmanuel",
+      "source": "oct15retest",
+      "created": "2026-10-16",
+      "tags": [
+        "bug"
+      ],
+      "description": "Fernando (10/15, iPhone X iOS 16.7): (1) red banner <code>FetchEvent.respondWith received an error: Returned response is null</code> on Live tracking. Cause: <code>public/service-worker.js</code> intercepts every fetch and falls back to <code>caches.match()</code>, which resolves undefined on any network failure/abort. It also caches authenticated API GETs and serves stale <code>/driver/tracking</code> HTML. Fix: SW only handles the offline location queue, cache name bumped. (2) Start shift spun forever after granting location until reload; start-shift awaits have no timeout. (3) on-shift hint + return link hidden under the bottom nav at 375 px.<br><br><strong>#701 merged 10-16</strong> (on rs-dev after deploy). Needs Fernando to re-check Start shift + no banner on his iPhone before the promotion."
+    },
+    {
+      "id": "late-queued-gps-point-after-shift-end",
+      "status": "progress",
+      "title": "Queued GPS point arrives hours later, after its shift closed",
+      "owner": "emmanuel",
+      "source": "oct15retest",
+      "created": "2026-10-16",
+      "tags": [
+        "bug"
+      ],
+      "description": "Found in the 10-16 readiness re-run. Fernando's iPhone recorded a point at 10-15 21:04Z (shift <code>ddf14bac</code>) that reached the server at 10-16 00:04Z, 3 h later, during his next shift (<code>55df7546</code>). Almost certainly the service-worker offline queue (<code>public/service-worker.js</code>) replaying on the next page load.<br><br>What is fine: <code>/api/tracking/locations</code> keeps the device time (<code>resolveRecordedAt</code> accepts up to 24 h back) and mileage (<code>src/services/tracking/mileage.ts</code>) selects by <code>recorded_at</code>, so the point is filed under the right shift.<br><br>What is not: (1) the first shift's miles were computed at End shift, before the point arrived, so stored mileage misses late points; (2) the realtime broadcast fires on insert, so the live admin map may jump to a 3-hour-old position mid-shift (verify). <strong>Fix:</strong> skip the live broadcast / marker update when <code>recorded_at</code> is older than the driver's latest point; recompute a closed shift's mileage when a late point lands inside it (or drop queued points older than the shift end). Low severity: 1 point in the 60-day data.",
+      "sourceRef": "#705"
+    },
+    {
+      "id": "decision-cancel-dispatch-calls-driver",
+      "status": "open",
+      "title": "Decision: dispatch phones the driver when an order is cancelled (pilot)",
+      "owner": "emmanuel",
+      "source": "oct16readiness",
+      "created": "2026-10-16",
+      "description": "Readiness G0-11 (amber). Cancel reaches the driver in-app only (#530, confirmed on Guillermo's phone 10-14); SMS is dead on dev + prod (no <code>TWILIO_*</code>, see <code>sms-provider-final-call</code>). Decide whether the pilot brief makes dispatch call the driver on every cancel. Parked 10-16 (Friday) for the week of 10-19."
+    },
+    {
+      "id": "decision-outage-paging-pilot",
+      "status": "open",
+      "title": "Decision: outage paging for the pilot week (email-only vs phone push)",
+      "owner": "emmanuel",
+      "source": "oct16readiness",
+      "created": "2026-10-16",
+      "description": "Readiness G0-06 (amber). Uptime alerts reach email only. Accept email-only for the pilot week or add a phone push channel. Parked 10-16 for the week of 10-19."
+    },
+    {
+      "id": "pilot-prod-driver-accounts",
+      "status": "open",
+      "title": "Real pilot driver accounts on prod (names from Gary + .env.prod fix)",
+      "owner": "emmanuel",
+      "source": "oct16readiness",
+      "created": "2026-10-16",
+      "description": "Readiness G0-08 (red). Need 2–3 driver names from Gary; <code>.env.prod</code> is missing <code>NEXT_PUBLIC_SUPABASE_URL</code>; then <code>pnpm driver:account:prod</code> (#666, ships in 2.11.0). Parked 10-16 for the week of 10-19."
+    },
+    {
+      "id": "prod-leftover-test-orders",
+      "status": "done",
+      "title": "Delete the 6 leftover test orders on prod",
+      "owner": "emmanuel",
+      "source": "oct16readiness",
+      "created": "2026-10-16",
+      "description": "Readiness G0-14 (amber). Bulk-delete the last 6 test orders from the prod admin panel (cancel/soft-delete, never hard delete). Parked 10-16 for the week of 10-19. <strong>Done 10-19:</strong> soft-deleted all 6 by SQL, reproducing the admin bulk delete (<code>softDeleteOrders</code>): order rows soft-deleted, their 6 dispatch rows removed (copied into the undo note), files kept. Undo SQL in <code>infra/backups/prod/orders-leftover-test-softdelete-prod-2026-10-19.md</code>. Only live prod order left: <code>CV-F24WXV/1</code> (CaterValley API, pickup 10-22).",
+      "closed": "2026-10-19"
+    },
+    {
+      "id": "gps-points-lost-during-data-outage",
+      "status": "open",
+      "title": "GPS points lost while mobile data is down (Android wrapper)",
+      "owner": "emmanuel",
+      "source": "oct17ride",
+      "created": "2026-10-19",
+      "tags": [
+        "bug"
+      ],
+      "description": "Guillermo 10-17, outbound shift <code>c8f2f0f2</code> on rs-dev: his mobile data dropped for ~5 min and the shift has a 294 s hole with no late uploads (upload lag 0 on every point), so fixes taken during the outage were never queued. That leg recorded 0.35 mi vs 0.76 mi for the return. Contrast: on the return leg (screen locked) a failed point was queued and uploaded 44 s late, so the queue works for single failures. Find where the native path drops fixes when the network is down for minutes (queue cap? retry gives up? watcher paused?). Matters for the pilot: dead zones undercount miles."
     }
   ]
 }

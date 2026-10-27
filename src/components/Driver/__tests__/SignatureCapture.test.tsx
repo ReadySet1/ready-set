@@ -628,4 +628,74 @@ describe("SignatureCapture", () => {
       expect(screen.getByLabelText(/signature pad/i).parentElement).toHaveClass("flex-1", "min-h-0");
     });
   });
+
+  describe("delivery stage (completion: signature, or name if the recipient refuses)", () => {
+    const renderDelivery = (onComplete = jest.fn()) =>
+      render(
+        <SignatureCapture
+          stage="delivery"
+          orderNumber="CAT-001"
+          onUploadComplete={onComplete}
+          onCancel={jest.fn()}
+        />,
+      );
+    const recipientInput = () => screen.getByLabelText(/recipient name/i);
+    const confirmButton = () => screen.getByRole("button", { name: /confirm delivery/i });
+
+    it("states the requirement on screen", () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      renderDelivery();
+      expect(screen.getByText(/required/i)).toHaveTextContent(/signature/i);
+      expect(screen.getByText(/required/i)).toHaveTextContent(/refuse/i);
+    });
+
+    it("keeps Confirm disabled until there is a signature or a recipient name", () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      renderDelivery();
+      expect(confirmButton()).toBeDisabled();
+
+      fireEvent.change(recipientInput(), { target: { value: "Sam Carter" } });
+      expect(confirmButton()).toBeEnabled();
+    });
+
+    it("enables Confirm with a signature alone", () => {
+      renderDelivery();
+      expect(confirmButton()).toBeDisabled();
+      act(() => mockPad._handlers["endStroke"]?.());
+      expect(confirmButton()).toBeEnabled();
+    });
+
+    it("posts a signature-only confirmation to the recipient endpoint", async () => {
+      const onComplete = jest.fn();
+      renderDelivery(onComplete);
+      act(() => mockPad._handlers["endStroke"]?.());
+      fireEvent.click(confirmButton());
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledWith(SIG_URL));
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/orders/CAT-001/recipient",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const fd = lastFormData();
+      expect(fd.get("file")).not.toBeNull();
+      expect(fd.get("receivedBy")).toBeNull();
+    });
+
+    it("posts a name-only confirmation when the recipient refused to sign", async () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, url: null, receivedBy: "Sam Carter" }),
+      });
+      const onComplete = jest.fn();
+      renderDelivery(onComplete);
+      fireEvent.change(recipientInput(), { target: { value: " Sam Carter " } });
+      fireEvent.click(confirmButton());
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledWith(null));
+      const fd = lastFormData();
+      expect(fd.get("receivedBy")).toBe("Sam Carter");
+      expect(fd.get("file")).toBeNull();
+    });
+  });
 });

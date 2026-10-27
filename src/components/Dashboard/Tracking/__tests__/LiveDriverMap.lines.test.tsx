@@ -138,6 +138,33 @@ describe('LiveDriverMap trails', () => {
     expect(trailCalls).toHaveLength(1);
   });
 
+  it('does not append a ping older than the trail tip (late offline-queue replay)', async () => {
+    const setData = jest.fn();
+    const { rerender } = render(
+      <LiveDriverMap drivers={[driver]} deliveries={[]} recentLocations={[]} />,
+    );
+    const map = loadMap();
+    await waitFor(() => expect(map.addSource).toHaveBeenCalledWith('trail-driver-1', expect.anything()));
+    map.getSource.mockImplementation((id: string) => (id === 'trail-driver-1' ? { setData } : undefined));
+
+    const live = ping(-101.58, 21.115, '2026-08-21T19:05:00Z');
+    rerender(<LiveDriverMap drivers={[driver]} deliveries={[]} recentLocations={[live]} />);
+    await waitFor(() => expect(setData).toHaveBeenCalledTimes(1));
+
+    // An older point arrives after the live one: it is in the DB trail
+    // already, but appending it would draw a line back to the old position.
+    rerender(
+      <LiveDriverMap
+        drivers={[driver]}
+        deliveries={[]}
+        recentLocations={[live, ping(-101.9, 21.5, '2026-08-21T19:01:00Z')]}
+      />,
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(setData).toHaveBeenCalledTimes(1);
+  });
+
   it('removes the trail layer and source when the driver drops off the map', async () => {
     const { rerender } = render(
       <LiveDriverMap drivers={[driver]} deliveries={[]} recentLocations={[]} />,

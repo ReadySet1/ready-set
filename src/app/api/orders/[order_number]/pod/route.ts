@@ -1,231 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestUser } from '@/utils/supabase/request-user';
 import { prisma } from '@/utils/prismaDB';
-import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
-import {
-  POD_MAX_UPLOAD_SIZE_BYTES,
-  POD_MAX_UPLOAD_SIZE_MB,
-} from '@/types/proof-of-delivery';
+import { deletePODImage } from '@/utils/supabase/storage';
 import * as Sentry from '@sentry/nextjs';
+import { handleStagePhotoUpload } from './stage-photo-upload';
+import { DELIVERY_PHOTO_CATEGORY, POD_MAX_PHOTOS } from '@/lib/driver/stage-photos';
 
 /**
- * POST - Upload a Proof of Delivery photo for an order
+ * POST - Upload a Proof of Delivery photo for an order (one per request, up
+ * to POD_MAX_PHOTOS per order; a further photo answers 409 POD_PHOTO_LIMIT)
  *
- * This endpoint creates a FileUpload record linked to either a
- * CateringRequest or OnDemand order with category='proof_of_delivery'
+ * Creates a FileUpload record linked to either a CateringRequest or OnDemand
+ * order with category='proof_of_delivery' and mirrors the URL onto the
+ * `deliveries` row. The handler is shared with the pickup-photo route; see
+ * ./stage-photo-upload.ts.
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ order_number: string }> }
+  context: { params: Promise<{ order_number: string }> }
 ) {
-  try {
-    const { order_number: encodedOrderNumber } = await params;
-    const orderNumber = decodeURIComponent(encodedOrderNumber);
-
-    // Authenticate user (Bearer token first, cookie session fallback)
-    const user = await getRequestUser(request);
-
-    if (!user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Get user profile to check role
-    const userProfile = await prisma.profile.findUnique({
-      where: { id: user.id },
-      select: { id: true, type: true },
-    });
-
-    if (!userProfile) {
-      return NextResponse.json(
-        { success: false, error: 'User profile not found' },
-        { status: 404 }
-      );
-    }
-
-    // Only DRIVER, ADMIN, or SUPER_ADMIN can upload POD
-    const allowedRoles = ['DRIVER', 'ADMIN', 'SUPER_ADMIN'];
-    if (!allowedRoles.includes(userProfile.type)) {
-      return NextResponse.json(
-        { success: false, error: 'Access denied' },
-        { status: 403 }
-      );
-    }
-
-    // Find the order (try catering first, then on-demand)
-    let orderId: string | null = null;
-    let orderType: 'catering' | 'on_demand' | null = null;
-
-    const cateringRequest = await prisma.cateringRequest.findFirst({
-      where: {
-        orderNumber: { equals: orderNumber, mode: 'insensitive' },
-        deletedAt: null,
-      },
-      select: { id: true, orderNumber: true },
-    });
-
-    if (cateringRequest) {
-      orderId = cateringRequest.id;
-      orderType = 'catering';
-    } else {
-      const onDemandOrder = await prisma.onDemand.findFirst({
-        where: {
-          orderNumber: { equals: orderNumber, mode: 'insensitive' },
-          deletedAt: null,
-        },
-        select: { id: true, orderNumber: true },
-      });
-
-      if (onDemandOrder) {
-        orderId = onDemandOrder.id;
-        orderType = 'on_demand';
-      }
-    }
-
-    if (!orderId || !orderType) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
-    }
-
-    // If user is DRIVER, verify they are assigned to this order
-    if (userProfile.type === 'DRIVER') {
-      const dispatch = await prisma.dispatch.findFirst({
-        where: {
-          driverId: user.id,
-          ...(orderType === 'catering'
-            ? { cateringRequestId: orderId }
-            : { onDemandId: orderId }),
-        },
-      });
-
-      if (!dispatch) {
-        return NextResponse.json(
-          { success: false, error: 'Access denied - not assigned to this order' },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Parse form data
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided' },
-        { status: 400 }
-      );
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.',
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size — shared cap (client compresses well under this, but
-    // compression is best-effort so the server allows generous headroom).
-    if (file.size > POD_MAX_UPLOAD_SIZE_BYTES) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `File too large. Maximum size is ${POD_MAX_UPLOAD_SIZE_MB}MB.`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Upload to Supabase Storage
-    const uploadResult = await uploadPODImage(file, orderId);
-
-    if (uploadResult.error) {
-      return NextResponse.json(
-        { success: false, error: uploadResult.error },
-        { status: 500 }
-      );
-    }
-
-    // Delete any existing POD FileUpload for this order
-    await prisma.fileUpload.deleteMany({
-      where: {
-        category: 'proof_of_delivery',
-        ...(orderType === 'catering'
-          ? { cateringRequestId: orderId }
-          : { onDemandId: orderId }),
-      },
-    });
-
-    // Create FileUpload record
-    const fileUpload = await prisma.fileUpload.create({
-      data: {
-        userId: user.id,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        fileUrl: uploadResult.url,
-        filePath: uploadResult.path,
-        category: 'proof_of_delivery',
-        isTemporary: false,
-        ...(orderType === 'catering'
-          ? { cateringRequestId: orderId }
-          : { onDemandId: orderId }),
-      },
-    });
-
-    // Mirror the photo URL onto the standalone `deliveries` row so the admin
-    // tracking map + POD gallery (which read delivery_photo_url) see it too.
-    // The driver-facing source of truth is the FileUpload above; this keeps the
-    // two stores in sync. No-op if no deliveries row exists yet (it is created
-    // by the orders status PATCH on the first stage advance). Non-fatal.
-    try {
-      await prisma.$executeRawUnsafe(
-        `UPDATE deliveries
-           SET delivery_photo_url = $1, updated_at = NOW()
-         WHERE LOWER(order_number) = LOWER($2) AND deleted_at IS NULL`,
-        uploadResult.url,
-        orderNumber,
-      );
-    } catch (mirrorErr) {
-      Sentry.captureException(mirrorErr, {
-        tags: { operation: 'pod_mirror_deliveries', route: 'orders' },
-        extra: { orderNumber },
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      url: uploadResult.url,
-      path: uploadResult.path,
-      fileUploadId: fileUpload.id,
-      message: 'Proof of delivery uploaded successfully',
-    });
-  } catch (error) {
-    Sentry.captureException(error, {
-      tags: { operation: 'pod_upload', route: 'orders' },
-    });
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to upload proof of delivery',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
+  return handleStagePhotoUpload(request, context, 'delivery');
 }
 
 /**
- * GET - Get the Proof of Delivery photo URL for an order
+ * GET - Get the Proof of Delivery photos for an order
+ *
+ * `photos` lists every POD photo oldest first; `url` / `fileUploadId` /
+ * `uploadedAt` describe the first one (kept for single-photo callers).
  */
 export async function GET(
   request: NextRequest,
@@ -245,8 +46,8 @@ export async function GET(
       );
     }
 
-    // Find the order and its POD
-    let fileUpload = null;
+    // Find the order and its POD photos
+    let photos: Array<{ id: string; fileUrl: string; uploadedAt: Date }> = [];
 
     // Try catering request first
     const cateringRequest = await prisma.cateringRequest.findFirst({
@@ -256,15 +57,16 @@ export async function GET(
       },
       include: {
         fileUploads: {
-          where: { category: 'proof_of_delivery' },
-          orderBy: { uploadedAt: 'desc' },
-          take: 1,
+          where: { category: DELIVERY_PHOTO_CATEGORY },
+          orderBy: { uploadedAt: 'asc' },
+          take: POD_MAX_PHOTOS,
         },
       },
     });
 
+    let orderFound = !!cateringRequest;
     if (cateringRequest) {
-      fileUpload = cateringRequest.fileUploads[0] || null;
+      photos = cateringRequest.fileUploads;
     } else {
       // Try on-demand order
       const onDemandOrder = await prisma.onDemand.findFirst({
@@ -274,39 +76,47 @@ export async function GET(
         },
         include: {
           fileUploads: {
-            where: { category: 'proof_of_delivery' },
-            orderBy: { uploadedAt: 'desc' },
-            take: 1,
+            where: { category: DELIVERY_PHOTO_CATEGORY },
+            orderBy: { uploadedAt: 'asc' },
+            take: POD_MAX_PHOTOS,
           },
         },
       });
 
       if (onDemandOrder) {
-        fileUpload = onDemandOrder.fileUploads[0] || null;
+        orderFound = true;
+        photos = onDemandOrder.fileUploads;
       }
     }
 
-    if (!cateringRequest && !fileUpload) {
+    if (!orderFound) {
       return NextResponse.json(
         { success: false, error: 'Order not found' },
         { status: 404 }
       );
     }
 
-    if (!fileUpload) {
+    const [first] = photos;
+    if (!first) {
       return NextResponse.json({
         success: true,
         hasPhoto: false,
         url: null,
+        photos: [],
       });
     }
 
     return NextResponse.json({
       success: true,
       hasPhoto: true,
-      url: fileUpload.fileUrl,
-      uploadedAt: fileUpload.uploadedAt,
-      fileUploadId: fileUpload.id,
+      url: first.fileUrl,
+      uploadedAt: first.uploadedAt,
+      fileUploadId: first.id,
+      photos: photos.map((photo) => ({
+        id: photo.id,
+        url: photo.fileUrl,
+        uploadedAt: photo.uploadedAt,
+      })),
     });
   } catch (error) {
     Sentry.captureException(error, {
@@ -324,7 +134,14 @@ export async function GET(
 }
 
 /**
- * DELETE - Remove a Proof of Delivery photo from an order
+ * DELETE - Remove one Proof of Delivery photo from an order (ADMIN/SUPER_ADMIN)
+ *
+ * `?fileUploadId=<id>` removes that photo — it must be a proof-of-delivery
+ * photo of this order, else 404. Without an id the most recent photo is
+ * removed (the pre-multi-photo behaviour). Removing the last remaining photo
+ * stays allowed, as before: admins are exempt from the POD_REQUIRED gate and
+ * may need to pull a wrong or sensitive photo. The `deliveries` mirror is
+ * re-pointed at the newest remaining photo (NULL when none is left).
  */
 export async function DELETE(
   request: NextRequest,
@@ -333,6 +150,7 @@ export async function DELETE(
   try {
     const { order_number: encodedOrderNumber } = await params;
     const orderNumber = decodeURIComponent(encodedOrderNumber);
+    const requestedId = new URL(request.url).searchParams.get('fileUploadId');
 
     // Authenticate user (Bearer token first, cookie session fallback)
     const user = await getRequestUser(request);
@@ -357,8 +175,14 @@ export async function DELETE(
       );
     }
 
-    // Find the POD file upload
-    let fileUpload = null;
+    // Every POD photo on the order, newest first
+    const podInclude = {
+      fileUploads: {
+        where: { category: DELIVERY_PHOTO_CATEGORY },
+        orderBy: { uploadedAt: 'desc' as const },
+      },
+    };
+    let photos: Array<{ id: string; fileUrl: string; filePath: string | null }> = [];
 
     // Try catering request first
     const cateringRequest = await prisma.cateringRequest.findFirst({
@@ -366,16 +190,11 @@ export async function DELETE(
         orderNumber: { equals: orderNumber, mode: 'insensitive' },
         deletedAt: null,
       },
-      include: {
-        fileUploads: {
-          where: { category: 'proof_of_delivery' },
-          take: 1,
-        },
-      },
+      include: podInclude,
     });
 
     if (cateringRequest) {
-      fileUpload = cateringRequest.fileUploads[0] || null;
+      photos = cateringRequest.fileUploads;
     } else {
       // Try on-demand order
       const onDemandOrder = await prisma.onDemand.findFirst({
@@ -383,18 +202,17 @@ export async function DELETE(
           orderNumber: { equals: orderNumber, mode: 'insensitive' },
           deletedAt: null,
         },
-        include: {
-          fileUploads: {
-            where: { category: 'proof_of_delivery' },
-            take: 1,
-          },
-        },
+        include: podInclude,
       });
 
       if (onDemandOrder) {
-        fileUpload = onDemandOrder.fileUploads[0] || null;
+        photos = onDemandOrder.fileUploads;
       }
     }
+
+    const fileUpload = requestedId
+      ? photos.find((photo) => photo.id === requestedId)
+      : photos[0];
 
     if (!fileUpload) {
       return NextResponse.json(
@@ -421,9 +239,29 @@ export async function DELETE(
       where: { id: fileUpload.id },
     });
 
+    // Keep the deliveries mirror (admin tracking map) on a photo that still
+    // exists. Non-fatal, like the mirror write on upload.
+    const remaining = photos.filter((photo) => photo.id !== fileUpload.id);
+    try {
+      await prisma.$executeRawUnsafe(
+        `UPDATE deliveries
+           SET delivery_photo_url = $1, updated_at = NOW()
+         WHERE LOWER(order_number) = LOWER($2) AND deleted_at IS NULL`,
+        remaining[0]?.fileUrl ?? null,
+        orderNumber,
+      );
+    } catch (mirrorErr) {
+      Sentry.captureException(mirrorErr, {
+        tags: { operation: 'pod_delete_mirror_deliveries', route: 'orders' },
+        extra: { orderNumber },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Proof of delivery deleted successfully',
+      deletedFileUploadId: fileUpload.id,
+      remainingPhotos: remaining.length,
     });
   } catch (error) {
     Sentry.captureException(error, {

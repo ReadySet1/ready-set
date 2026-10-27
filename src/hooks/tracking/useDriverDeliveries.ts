@@ -24,6 +24,28 @@ export interface DriverDeliveriesFeedSource {
   refresh: () => Promise<void>;
 }
 
+/**
+ * Result of a driver status advance. On failure `code` carries the orders
+ * PATCH gate code when the server sent one (e.g. 422 PICKUP_PHOTO_REQUIRED,
+ * POD_REQUIRED, RECIPIENT_REQUIRED, PICKUP_CONFIRMATION_REQUIRED,
+ * SHIFT_REQUIRED) so the caller can reopen the right capture sheet.
+ */
+export type StatusAdvanceOutcome =
+  | { ok: true }
+  | { ok: false; status?: number; code?: string; message?: string };
+
+/** Thrown inside the advance so the catch keeps the server's gate details. */
+class StatusAdvanceError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly serverMessage?: string,
+  ) {
+    super(message);
+  }
+}
+
 interface UseDriverDeliveriesReturn {
   activeDeliveries: DeliveryTracking[];
   loading: boolean;
@@ -37,6 +59,12 @@ interface UseDriverDeliveriesReturn {
     proofOfDelivery?: string,
     notes?: string
   ) => Promise<boolean>;
+  /** Same advance as `updateDeliveryStatus`, returning the failure details. */
+  advanceDeliveryStatus: (
+    orderNumber: string,
+    status: DriverStatus,
+    location?: LocationUpdate,
+  ) => Promise<StatusAdvanceOutcome>;
 }
 
 const TERMINAL_STATUSES = new Set<string>(['COMPLETED', 'CANCELLED', 'DELIVERED']);
@@ -179,14 +207,12 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
 
   // Advance an order via the orders API — the single source of truth shared with
   // the Home + Detail screens. `orderNumber` is DeliveryTracking.id from the portal.
-  const updateDeliveryStatus = useCallback(
+  const advanceDeliveryStatus = useCallback(
     async (
       orderNumber: string,
       status: DriverStatus,
       _location?: LocationUpdate,
-      _proofOfDelivery?: string,
-      _notes?: string,
-    ): Promise<boolean> => {
+    ): Promise<StatusAdvanceOutcome> => {
       try {
         setError(null);
         const token = await getToken();
@@ -201,13 +227,23 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         });
         if (!res.ok) {
           let detail = '';
+          let code: string | undefined;
+          let serverMessage: string | undefined;
           try {
             const body = await res.json();
             detail = body.error || body.message || '';
+            if (typeof body.code === 'string') code = body.code;
+            else if (typeof body.error === 'string' && /^[A-Z_]+$/.test(body.error)) code = body.error;
+            if (typeof body.message === 'string') serverMessage = body.message;
           } catch {
             /* non-JSON error body */
           }
-          throw new Error(detail || `Failed to update status (${res.status})`);
+          throw new StatusAdvanceError(
+            detail || `Failed to update status (${res.status})`,
+            res.status,
+            code,
+            serverMessage,
+          );
         }
 
         // Mirror the Detail screen: a completed delivery also completes the order.
@@ -227,7 +263,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
 
         await loadActiveDeliveries();
         addSentryBreadcrumb('Driver updated delivery status', { orderNumber, status });
-        return true;
+        return { ok: true };
       } catch (err) {
         console.error('Error updating delivery status:', err);
         setError(err instanceof Error ? err.message : 'Failed to update delivery');
@@ -238,10 +274,32 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
           handled: true,
           metadata: { orderNumber, status },
         });
-        return false;
+        if (err instanceof StatusAdvanceError) {
+          return {
+            ok: false,
+            status: err.status,
+            ...(err.code ? { code: err.code } : {}),
+            ...(err.serverMessage ? { message: err.serverMessage } : {}),
+          };
+        }
+        return { ok: false, message: err instanceof Error ? err.message : undefined };
       }
     },
     [getToken, loadActiveDeliveries],
+  );
+
+  // Boolean form kept for existing callers. The trailing legacy arguments
+  // (proof URL, notes) were never sent; the POD/recipient have their own routes.
+  const updateDeliveryStatus = useCallback(
+    async (
+      orderNumber: string,
+      status: DriverStatus,
+      location?: LocationUpdate,
+      _proofOfDelivery?: string,
+      _notes?: string,
+    ): Promise<boolean> =>
+      (await advanceDeliveryStatus(orderNumber, status, location)).ok,
+    [advanceDeliveryStatus],
   );
 
   const refreshDeliveries = useCallback(async () => {
@@ -285,5 +343,6 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     feedSource,
     refreshDeliveries,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
   };
 }
