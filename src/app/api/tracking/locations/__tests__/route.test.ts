@@ -682,6 +682,46 @@ describe("/api/tracking/locations", () => {
       expect(ownershipCall?.slice(1)).toEqual([mockDriverId, "user-owner"]);
     });
 
+    it("POST: rejects a soft-deleted driver even when the row links to the caller (403)", async () => {
+      mockWithAuth.mockResolvedValue({ success: true, context: { user: { id: "user-owner", type: "DRIVER" } } });
+      // The DB predicate is what excludes the deleted row; the mock honours
+      // the filter only if the route actually asks for it.
+      mockTxQuery.mockImplementation((sql: string) => {
+        if (sql.includes("SELECT id FROM drivers")) {
+          return Promise.resolve(sql.includes("deleted_at IS NULL") ? [] : [{ id: mockDriverId }]);
+        }
+        return Promise.resolve([]);
+      });
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(403);
+      const ownershipCall = mockTxQuery.mock.calls.find(
+        ([sql]: any[]) => typeof sql === "string" && sql.includes("SELECT id FROM drivers"),
+      );
+      expect(ownershipCall?.[0]).toMatch(/deleted_at IS NULL/);
+      expect(ownershipCall?.[0]).toMatch(/is_active = true/);
+      expect(mockTxExec).not.toHaveBeenCalled();
+    });
+
+    it("POST: admin writes also skip soft-deleted drivers (404)", async () => {
+      mockTxQuery.mockImplementation((sql: string) => {
+        if (sql.includes("SELECT id FROM drivers")) {
+          return Promise.resolve(sql.includes("deleted_at IS NULL") ? [] : [{ id: mockDriverId }]);
+        }
+        return Promise.resolve([]);
+      });
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/tracking/locations", mockLocationData),
+      );
+      expect(response.status).toBe(404);
+      const existenceCall = mockTxQuery.mock.calls.find(
+        ([sql]: any[]) => typeof sql === "string" && sql.includes("SELECT id FROM drivers"),
+      );
+      expect(existenceCall?.[0]).toMatch(/deleted_at IS NULL/);
+      expect(existenceCall?.[0]).toMatch(/is_active = true/);
+    });
+
     it("GET: returns 401 when unauthenticated", async () => {
       mockWithAuth.mockResolvedValue({ success: false, response: { status: 401 }, context: {} });
       const response = await GET(
@@ -697,6 +737,26 @@ describe("/api/tracking/locations", () => {
         createRequestWithParams("http://localhost:3000/api/tracking/locations", { driver_id: "driver-victim" }),
       );
       expect(response.status).toBe(403);
+    });
+
+    it("GET: denies a soft-deleted driver reading their own history (403)", async () => {
+      mockWithAuth.mockResolvedValue({ success: true, context: { user: { id: "user-owner", type: "DRIVER" } } });
+      mockRawQuery.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes("SELECT id FROM drivers") && !sql.includes("deleted_at IS NULL")
+            ? [{ id: mockDriverId }]
+            : [],
+        ),
+      );
+      const response = await GET(
+        createRequestWithParams("http://localhost:3000/api/tracking/locations", { driver_id: mockDriverId }),
+      );
+      expect(response.status).toBe(403);
+      const ownershipCall = mockRawQuery.mock.calls.find(
+        ([sql]: any[]) => typeof sql === "string" && sql.includes("SELECT id FROM drivers"),
+      );
+      expect(ownershipCall?.[0]).toContain("profile_id");
+      expect(ownershipCall?.[0]).toMatch(/deleted_at IS NULL/);
     });
   });
 });

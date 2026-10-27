@@ -249,6 +249,43 @@ describe('POST /api/tracking/locations/batch', () => {
     expect(insertCalls()).toHaveLength(0);
   });
 
+  it('refuses a soft-deleted driver even when the row links to the caller', async () => {
+    mockTxQuery.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM drivers')) {
+        return Promise.resolve(sql.includes('deleted_at IS NULL') ? [] : [{ id: DRIVER_ID }]);
+      }
+      return Promise.resolve([]);
+    });
+    const now = Date.now();
+
+    const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points: outagePoints(2, 60_000, now) });
+
+    expect(res.status).toBe(403);
+    expect(insertCalls()).toHaveLength(0);
+    const ownershipCall = mockTxQuery.mock.calls.find(([sql]) => /SELECT id FROM drivers/.test(sql));
+    expect(ownershipCall?.[0]).toMatch(/deleted_at IS NULL/);
+    expect(ownershipCall?.[0]).toMatch(/is_active = true/);
+  });
+
+  it('refuses admin writes for a soft-deleted driver (404)', async () => {
+    mockWithAuth.mockResolvedValue({
+      success: true,
+      context: { user: { id: 'admin-1', type: 'ADMIN' } },
+    });
+    mockTxQuery.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT id FROM drivers')) {
+        return Promise.resolve(sql.includes('deleted_at IS NULL') ? [] : [{ id: DRIVER_ID }]);
+      }
+      return Promise.resolve([]);
+    });
+    const now = Date.now();
+
+    const res = await post({ driver_id: DRIVER_ID, client_sent_at: now, points: outagePoints(2, 60_000, now) });
+
+    expect(res.status).toBe(404);
+    expect(insertCalls()).toHaveLength(0);
+  });
+
   it('passes through the abuse rate limit response', async () => {
     const { NextResponse } = jest.requireActual('next/server');
     mockEnforceRateLimit.mockResolvedValue(NextResponse.json({ error: 'slow down' }, { status: 429 }));
