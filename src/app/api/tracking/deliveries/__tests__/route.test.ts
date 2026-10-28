@@ -702,6 +702,46 @@ describe("/api/tracking/deliveries", () => {
         expect(response.status).toBe(201);
       });
 
+      it("rejects assigning a delivery to a soft-deleted driver (404)", async () => {
+        mockWithAuth.mockResolvedValueOnce({
+          success: true,
+          context: {
+            user: {
+              id: "admin-id",
+              type: "ADMIN",
+            },
+          },
+        } as any);
+
+        // The driver row still exists and is active; only the soft-delete
+        // filter can exclude it from the lookup.
+        mockPrisma.$queryRawUnsafe.mockImplementationOnce((sql: string) =>
+          Promise.resolve(
+            sql.includes("FROM drivers") && !sql.includes("deleted_at IS NULL")
+              ? [{ id: "driver-1", is_active: true }]
+              : []
+          )
+        );
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/tracking/deliveries",
+          validDeliveryRequest
+        );
+        const response = await POST(request);
+
+        expect(response.status).toBe(404);
+        const driverLookup = mockPrisma.$queryRawUnsafe.mock.calls.find(
+          ([sql]) => typeof sql === "string" && sql.includes("FROM drivers")
+        );
+        expect(driverLookup?.[0]).toMatch(/WHERE id = \$1\s+AND deleted_at IS NULL/);
+        expect(driverLookup?.[1]).toBe("driver-1");
+        expect(
+          mockPrisma.$queryRawUnsafe.mock.calls.some(
+            ([sql]) => typeof sql === "string" && /INSERT INTO deliveries/.test(sql)
+          )
+        ).toBe(false);
+      });
+
       it("should allow SUPER_ADMIN role", async () => {
         mockWithAuth.mockResolvedValueOnce({
           success: true,
