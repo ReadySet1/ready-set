@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
+import { existingDriverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import type { DriverStatus } from '@/types/user';
 
 // GET - Get deliveries (filtered by driver for driver role, all for admin)
@@ -58,10 +59,11 @@ export async function GET(request: NextRequest) {
       const deliveryParams: any[] = [];
       let deliveryParamCounter = 1;
 
-      // If user is DRIVER, only show their own deliveries
-      // Note: driver_id in deliveries table should match the profile/user ID
+      // If user is DRIVER, only show their own deliveries.
+      // deliveries.driver_id is a drivers.id, not the auth user id — resolve
+      // the caller's (non-deleted) driver row through the ownership module.
       if (authResult.context.user.type === 'DRIVER') {
-        deliveryQuery += ` AND d.driver_id = $${deliveryParamCounter}::uuid`;
+        deliveryQuery += ` AND d.driver_id IN (SELECT own_drv.id FROM drivers own_drv WHERE ${existingDriverOwnershipCondition(deliveryParamCounter, 'own_drv')})`;
         deliveryParams.push(authResult.context.user.id);
         deliveryParamCounter++;
       } else if (driverId) {
