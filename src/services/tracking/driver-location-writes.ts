@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { existingDriverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { DbHttpError } from '@/lib/db/raw';
+import { SAME_FIX_WINDOW_MS } from '@/lib/tracking/recorded-at';
 
 /**
  * Shared driver_locations write steps for the single-point route
@@ -26,7 +27,7 @@ export interface DriverLocationPoint {
   altitude: number | null;
   batteryLevel: number | null;
   isMoving: boolean | null;
-  /** Fix time; null lets the database stamp NOW() (no dedupe possible). */
+  /** Fix time; null lets the database stamp NOW(). */
   recordedAt: string | null;
 }
 
@@ -101,9 +102,15 @@ export async function readLatestRecordedAt(tx: Tx, driverId: string): Promise<Da
 }
 
 /**
- * Insert one point unless a live row already holds the same
- * (driver_id, recorded_at). Returns the stored row, or null for a duplicate.
- * A null recordedAt is stamped NOW() and never matches the guard.
+ * Insert one point unless a live row of the driver already holds it. Returns
+ * the stored row, or null for a duplicate. A row is the same fix when it has
+ * the same recorded_at, or the same coordinates with a recorded_at within
+ * SAME_FIX_WINDOW_MS: recorded_at is clock-skew corrected per request, so a
+ * resend of one fix from a skewed phone (or a DB-stamped live POST and its
+ * outbox replay) does not resolve to the identical instant. The trade-off: a
+ * genuinely new fix at bit-identical coordinates within the window (a parked
+ * phone repeating its position) is skipped, which loses no distance.
+ * A null recordedAt is matched against NOW().
  */
 export async function insertDriverLocationIfNew(
   tx: Tx,
@@ -119,7 +126,11 @@ export async function insertDriverLocationIfNew(
     SELECT $1::uuid, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $3, $2, $4, $5, $6, $7, $8, $9, COALESCE($10::timestamptz, NOW())
     WHERE NOT EXISTS (
       SELECT 1 FROM driver_locations
-      WHERE driver_id = $1::uuid AND recorded_at = $10::timestamptz AND deleted_at IS NULL
+      WHERE driver_id = $1::uuid
+        AND deleted_at IS NULL
+        AND recorded_at BETWEEN COALESCE($10::timestamptz, NOW()) - $11::double precision * INTERVAL '1 millisecond'
+                            AND COALESCE($10::timestamptz, NOW()) + $11::double precision * INTERVAL '1 millisecond'
+        AND (recorded_at = $10::timestamptz OR (latitude = $3 AND longitude = $2))
     )
     RETURNING
       id,
@@ -143,6 +154,7 @@ export async function insertDriverLocationIfNew(
     point.batteryLevel,
     point.isMoving,
     point.recordedAt,
+    SAME_FIX_WINDOW_MS,
   );
   return rows[0] ?? null;
 }

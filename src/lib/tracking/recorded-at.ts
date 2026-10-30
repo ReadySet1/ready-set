@@ -22,6 +22,23 @@
 /** Offsets at or below this are latency/jitter, not a wrong clock. */
 export const CLOCK_SKEW_TOLERANCE_MS = 30 * 1000;
 
+/**
+ * How far apart two stored recorded_at values of ONE physical fix can land.
+ * The correction above is per request, so a resend of the same fix (retried
+ * POST, outbox replay of a live POST whose answer was lost) resolves again:
+ * - phone fast by <= tolerance: clamped to each request's receive time, so
+ *   resends differ by up to the tolerance;
+ * - phone off by > tolerance: shifted by each request's measured offset, so
+ *   resends differ by the difference in network latency;
+ * - phone near the edge: corrected on one resend and not the other, so they
+ *   differ by up to the tolerance plus that latency difference.
+ * Twice the tolerance leaves 30 s for latency. The write guard
+ * (driver-location-writes.ts) treats the same coordinates within this window
+ * as the same fix. No raw device fix time is stored, so this is the stable
+ * identity available without a schema change.
+ */
+export const SAME_FIX_WINDOW_MS = 2 * CLOCK_SKEW_TOLERANCE_MS;
+
 /** Fix times older than this (after correction) fall back to DB NOW(). */
 export const RECORDED_AT_MAX_PAST_MS = 24 * 60 * 60 * 1000;
 
