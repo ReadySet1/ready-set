@@ -72,8 +72,9 @@ jest.mock("@/utils/supabase/client", () => ({
 
 // The catering page reads the caller's role from UserContext.
 let mockUserRole: string | null = "admin";
+let mockUserId: string | null = "test-user-id";
 jest.mock("@/contexts/UserContext", () => ({
-  useUser: () => ({ userRole: mockUserRole }),
+  useUser: () => ({ userRole: mockUserRole, user: mockUserId ? { id: mockUserId } : null }),
 }));
 
 jest.mock("@/hooks/tracking/useDriverRealtimeLocation", () => ({
@@ -149,6 +150,18 @@ jest.mock("@/components/Orders/ui/EditOrderDialog", () => ({
       />
     ) : null,
 }));
+jest.mock("@/components/Orders/ui/CustomerEditOrderDialog", () => ({
+  __esModule: true,
+  default: ({ isOpen, order }: any) =>
+    isOpen ? (
+      <div
+        role="dialog"
+        data-testid="customer-edit-order-dialog"
+        data-order-type={order.order_type}
+        data-order-number={order.orderNumber}
+      />
+    ) : null,
+}));
 
 import SingleOrder from "@/components/Orders/SingleOrder";
 import SingleOnDemandOrder from "@/components/Orders/OnDemand/SingleOnDemandOrder";
@@ -205,6 +218,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockProfileType = "ADMIN";
   mockUserRole = "admin";
+  mockUserId = "test-user-id";
 });
 
 describe("Edit Order button on the admin order detail pages", () => {
@@ -282,6 +296,15 @@ describe("Edit Order button on the admin order detail pages", () => {
       mockParams.mockReturnValue({ order_number: "CAT001" });
     });
 
+    it("hides Edit Order while role is still loading, even with canEditOrder=true", async () => {
+      mockUserRole = null; // role not yet resolved
+      mockOrderApi(() => jsonResponse(200, cateringOrder()));
+      renderCatering();
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
     it("still shows Edit Order and opens the dialog with the catering order", async () => {
       mockOrderApi(() => jsonResponse(200, cateringOrder()));
       renderCatering();
@@ -313,6 +336,140 @@ describe("Edit Order button on the admin order detail pages", () => {
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("heading", { name: "Order Not Found" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Customer edit (vendor / client) on catering orders
+  // -----------------------------------------------------------------------
+
+  describe("customer edit on catering order (SingleOrder)", () => {
+    beforeEach(() => {
+      mockPathname.mockReturnValue("/order-status/CAT001");
+      mockParams.mockReturnValue({ order_number: "CAT001" });
+    });
+
+    it("vendor owner sees Edit Order and gets the customer dialog", async () => {
+      mockUserRole = "vendor";
+      mockUserId = "vendor-owner-id";
+      mockOrderApi(() =>
+        jsonResponse(200, cateringOrder({ userId: "vendor-owner-id" })),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      const button = await screen.findByRole("button", { name: /Edit Order/i });
+      await userEvent.click(button);
+
+      expect(screen.getByTestId("customer-edit-order-dialog")).toBeInTheDocument();
+      expect(screen.queryByTestId("edit-order-dialog")).not.toBeInTheDocument();
+    });
+
+    it("client owner sees Edit Order and gets the customer dialog", async () => {
+      mockUserRole = "client";
+      mockUserId = "client-owner-id";
+      mockOrderApi(() =>
+        jsonResponse(200, cateringOrder({ userId: "client-owner-id" })),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      const button = await screen.findByRole("button", { name: /Edit Order/i });
+      await userEvent.click(button);
+
+      expect(screen.getByTestId("customer-edit-order-dialog")).toBeInTheDocument();
+    });
+
+    it("vendor who is not the owner sees no Edit Order button", async () => {
+      mockUserRole = "vendor";
+      mockUserId = "different-vendor";
+      mockOrderApi(() =>
+        jsonResponse(200, cateringOrder({ userId: "vendor-owner-id" })),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
+    it("owner on a picked-up order sees no Edit Order button", async () => {
+      mockUserRole = "vendor";
+      mockUserId = "vendor-owner-id";
+      mockOrderApi(() =>
+        jsonResponse(
+          200,
+          cateringOrder({
+            userId: "vendor-owner-id",
+            driverStatus: "PICKED_UP",
+          }),
+        ),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
+    it("owner on an ASSIGNED order (driver assigned, not yet picked up) sees no Edit Order button", async () => {
+      mockUserRole = "vendor";
+      mockUserId = "vendor-owner-id";
+      mockOrderApi(() =>
+        jsonResponse(
+          200,
+          cateringOrder({
+            userId: "vendor-owner-id",
+            status: "ACTIVE",
+            driverStatus: "ASSIGNED",
+          }),
+        ),
+      );
+      render(
+        <SingleOrder
+          onDeleteSuccess={jest.fn()}
+          showHeader={false}
+          canEditOrder={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "Quick Actions" });
+      expect(editOrderButton()).not.toBeInTheDocument();
+    });
+
+    it("admin still gets the full edit dialog, not the customer dialog", async () => {
+      mockUserRole = "admin";
+      mockUserId = "admin-id";
+      mockOrderApi(() => jsonResponse(200, cateringOrder()));
+      renderCatering();
+
+      const button = await screen.findByRole("button", { name: /Edit Order/i });
+      await userEvent.click(button);
+
+      expect(screen.getByTestId("edit-order-dialog")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("customer-edit-order-dialog"),
       ).not.toBeInTheDocument();
     });
   });
