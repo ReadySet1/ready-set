@@ -60,7 +60,7 @@ export default function AdminLayout({
 
             {/* SidebarInset: Added flex-1 to make it grow horizontally */}
             {/* Removed w-full as flex-1 handles width in flex row */}
-            <SidebarInset className="flex flex-1 flex-col p-0"> 
+            <SidebarInset className="flex min-w-0 flex-1 flex-col p-0"> 
               {/* <TopNav /> */}
               <AdminMobileTopBar />
 
