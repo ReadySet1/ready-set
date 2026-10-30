@@ -35,8 +35,9 @@ import * as Sentry from '@sentry/nextjs';
  * - late points that fall inside an already-closed shift trigger the same
  *   mileage recompute as the single-point route;
  * - replay is idempotent: the client resends a batch whose answer it never got
- *   (timeout, dropped connection), so a point whose (driver_id, recorded_at)
- *   is already stored is skipped, and repeats inside one batch are filed once.
+ *   (timeout, dropped connection), so a point already stored is skipped (same
+ *   recorded_at, or same coordinates within SAME_FIX_WINDOW_MS since the skew
+ *   correction differs per request), and repeats inside one batch are filed once.
  *   A fully-duplicate resend still answers success so the client clears it.
  *   Concurrent resends, and a live single-point POST of the same fix, are
  *   serialized per driver by a transaction-scoped advisory lock shared with

@@ -56,6 +56,7 @@ import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-po
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
 import { POST } from '../route';
 import { POST as POST_BATCH } from '../batch/route';
+import { SAME_FIX_WINDOW_MS } from '@/lib/tracking/recorded-at';
 
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
@@ -67,15 +68,24 @@ const DRIVER_ID = '11111111-1111-4111-8111-111111111111';
 const URL = 'http://localhost:3000/api/tracking/locations';
 
 /**
- * Fake tx whose INSERT behaves like the NOT EXISTS guard: a recorded_at
- * already in `saved` returns no row.
+ * Fake tx whose INSERT emulates the NOT EXISTS guard: a live row of the same
+ * driver blocks the insert when it has the same recorded_at, or the same
+ * coordinates with a recorded_at within the window bound as $11. A null
+ * recorded_at is stamped with the (mocked) clock, like the DB's NOW().
+ * `saved` seeds rows at the default fix coordinates.
  */
+type StoredRow = { latitude: number; longitude: number; recordedAtMs: number };
+
 function setupTx({
   latestStoredAt = null as Date | null,
   ownsDriver = true,
   saved = [] as string[],
 } = {}) {
-  const stored = new Set(saved);
+  const stored: StoredRow[] = saved.map((t) => ({
+    latitude: 37.7,
+    longitude: -122.4,
+    recordedAtMs: Date.parse(t),
+  }));
   mockTxQuery.mockImplementation((sql: string, ...binds: unknown[]) => {
     if (sql.includes('SELECT id FROM drivers')) {
       return Promise.resolve(ownsDriver ? [{ id: DRIVER_ID }] : []);
@@ -84,19 +94,30 @@ function setupTx({
       return Promise.resolve([{ latest_recorded_at: latestStoredAt }]);
     }
     if (sql.includes('INSERT INTO driver_locations')) {
+      const longitude = binds[1] as number;
+      const latitude = binds[2] as number;
       const recordedAt = binds[9] as string | null;
-      if (recordedAt && stored.has(recordedAt)) return Promise.resolve([]);
-      if (recordedAt) stored.add(recordedAt);
+      const windowMs = typeof binds[10] === 'number' ? binds[10] : 0;
+      const atMs = recordedAt ? Date.parse(recordedAt) : Date.now();
+      const duplicate = stored.some(
+        (row) =>
+          Math.abs(row.recordedAtMs - atMs) <= windowMs &&
+          (row.recordedAtMs === atMs ||
+            (row.latitude === latitude && row.longitude === longitude)),
+      );
+      if (duplicate) return Promise.resolve([]);
+      stored.push({ latitude, longitude, recordedAtMs: atMs });
       return Promise.resolve([
         {
           id: 'loc-1',
-          location_geojson: JSON.stringify({ type: 'Point', coordinates: [-122.4, 37.7] }),
-          recorded_at: recordedAt ?? new Date().toISOString(),
+          location_geojson: JSON.stringify({ type: 'Point', coordinates: [longitude, latitude] }),
+          recorded_at: new Date(atMs).toISOString(),
         },
       ]);
     }
     return Promise.resolve([]);
   });
+  return stored;
 }
 
 function insertCalls() {
@@ -256,5 +277,129 @@ describe('POST /api/tracking/locations — duplicate fixes', () => {
     expect(singleLock).toBeDefined();
     expect(batchLock).toBeDefined();
     expect(singleLock!.call).toEqual(batchLock!.call);
+  });
+
+  describe('the same physical fix resent from a skewed phone clock (review nit on #711)', () => {
+    const T = Date.parse('2026-10-28T18:00:00.000Z');
+    const LAT = 37.77493;
+    const LNG = -122.41942;
+    let nowSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      nowSpy = jest.spyOn(Date, 'now').mockReturnValue(T);
+    });
+    afterEach(() => nowSpy.mockRestore());
+
+    /** Server clock for the next request. */
+    const serverAt = (ms: number) => nowSpy.mockReturnValue(ms);
+
+    function livePost(fixDeviceMs: number | null, deviceSendMs: number) {
+      return post({
+        driver_id: DRIVER_ID,
+        latitude: LAT,
+        longitude: LNG,
+        ...(fixDeviceMs === null ? {} : { timestamp: new Date(fixDeviceMs).toISOString() }),
+        client_sent_at: deviceSendMs,
+      });
+    }
+
+    function batchReplay(fixDeviceMs: number, deviceSendMs: number) {
+      return POST_BATCH(
+        createPostRequest(`${URL}/batch`, {
+          driver_id: DRIVER_ID,
+          client_sent_at: deviceSendMs,
+          points: [
+            { latitude: LAT, longitude: LNG, timestamp: new Date(fixDeviceMs).toISOString() },
+          ],
+        }),
+      );
+    }
+
+    it('guards on the same coordinates within the same-fix window', async () => {
+      setupTx();
+
+      await livePost(T - 1_000, T);
+
+      const [sql, ...binds] = insertCalls()[0]!;
+      expect(sql).toMatch(/latitude = \$3/);
+      expect(sql).toMatch(/longitude = \$2/);
+      expect(sql).toMatch(/\$11/);
+      expect(binds[10]).toBe(SAME_FIX_WINDOW_MS);
+    });
+
+    it('phone fast by <30 s: a retry clamped to a later receive time is a duplicate', async () => {
+      const skew = 20_000;
+      const fixDeviceMs = T + skew - 1_000; // in the future by server time
+      setupTx();
+
+      serverAt(T);
+      const first = await livePost(fixDeviceMs, T + skew);
+      serverAt(T + 12_000);
+      const retry = await livePost(fixDeviceMs, T + 12_000 + skew);
+
+      expect(first.status).toBe(201);
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toMatchObject({ duplicate: true, inserted: 0 });
+    });
+
+    it('phone slow by >30 s: a live retry with a fresh client_sent_at is a duplicate', async () => {
+      const skew = -3_648_000;
+      const fixDeviceMs = T + skew - 2_000;
+      setupTx();
+
+      serverAt(T + 200);
+      const first = await livePost(fixDeviceMs, T + skew);
+      serverAt(T + 20_000 + 6_000); // retried 20 s later, 6 s slower network
+      const retry = await livePost(fixDeviceMs, T + 20_000 + skew);
+
+      expect(first.status).toBe(201);
+      expect(retry.status).toBe(200);
+    });
+
+    it('phone slow by >30 s: a batch replay of a stored live fix is a duplicate', async () => {
+      const skew = -3_648_000;
+      const fixDeviceMs = T + skew - 2_000;
+      setupTx();
+
+      serverAt(T + 200);
+      await livePost(fixDeviceMs, T + skew);
+      serverAt(T + 5 * 60_000 + 3_000);
+      const replay = await batchReplay(fixDeviceMs, T + 5 * 60_000 + skew);
+
+      expect(await replay.json()).toMatchObject({ inserted: 0, duplicates: 1 });
+    });
+
+    it('no plugin fix time: the DB-stamped live fix and its outbox replay are one point', async () => {
+      // Live POST omits `timestamp` (stamped NOW() server side); the outbox copy
+      // carries the device callback time instead. Phone 2 min slow.
+      const skew = -120_000;
+      const callbackDeviceMs = T + skew;
+      setupTx();
+
+      serverAt(T + 300);
+      const live = await livePost(null, callbackDeviceMs);
+      serverAt(T + 90_000);
+      const replay = await batchReplay(callbackDeviceMs, T + 89_000 + skew);
+
+      expect(live.status).toBe(201);
+      expect(await replay.json()).toMatchObject({ inserted: 0, duplicates: 1 });
+    });
+
+    it('a different fix inside the window is still stored', async () => {
+      const stored = setupTx();
+
+      await livePost(T - 6_000, T);
+      serverAt(T + 6_000);
+      const next = await post({
+        driver_id: DRIVER_ID,
+        latitude: LAT + 0.0001,
+        longitude: LNG,
+        timestamp: new Date(T).toISOString(),
+        client_sent_at: T + 6_000,
+      });
+
+      expect(next.status).toBe(201);
+      expect(stored).toHaveLength(2);
+    });
   });
 });

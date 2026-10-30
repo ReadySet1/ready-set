@@ -9,6 +9,7 @@
  */
 import {
   CLOCK_SKEW_TOLERANCE_MS,
+  SAME_FIX_WINDOW_MS,
   resolveRecordedAt,
 } from '../recorded-at';
 
@@ -221,5 +222,58 @@ describe('resolveRecordedAt', () => {
       clockOffsetMs: 3_648_000,
       clockCorrected: true,
     });
+  });
+});
+
+/**
+ * Retries of ONE physical fix (review nit on #711). The stored recorded_at is
+ * corrected per request, so the same fix resent later — a retried POST, or a
+ * live POST whose answer was lost and the outbox replays — can resolve to a
+ * different recorded_at. The write guard therefore matches the same
+ * coordinates within SAME_FIX_WINDOW_MS. These cases bound how far apart two
+ * resolutions of one fix can land.
+ */
+describe('SAME_FIX_WINDOW_MS', () => {
+  /** Resolve one fix sent at true time `trueSendMs` from a phone `skewMs` off. */
+  function attempt(fixDeviceMs: number, skewMs: number, trueSendMs: number, latencyMs: number) {
+    const resolved = resolveRecordedAt({
+      timestamp: iso(fixDeviceMs),
+      clientSentAt: trueSendMs + skewMs,
+      serverNowMs: trueSendMs + latencyMs,
+    }).recordedAt;
+    return Date.parse(resolved!);
+  }
+
+  it('covers a retry from a phone fast by less than the tolerance (clamped to receive time)', () => {
+    const skew = 20_000; // phone 20 s ahead: not corrected, fix lands in the future
+    const fixDeviceMs = SERVER_NOW + skew - 1_000;
+
+    const first = attempt(fixDeviceMs, skew, SERVER_NOW, 100);
+    const retry = attempt(fixDeviceMs, skew, SERVER_NOW + 15_000, 100);
+
+    expect(first).not.toBe(retry); // the reviewer's case: the clamp moves with the clock
+    expect(Math.abs(first - retry)).toBeLessThanOrEqual(SAME_FIX_WINDOW_MS);
+  });
+
+  it('covers a replay from a phone slow by more than the tolerance (corrected per request)', () => {
+    const skew = -3_648_000; // phone ~1 h behind
+    const fixDeviceMs = SERVER_NOW + skew - 2_000;
+
+    const live = attempt(fixDeviceMs, skew, SERVER_NOW, 150);
+    const replay = attempt(fixDeviceMs, skew, SERVER_NOW + 10 * 60_000, 9_000);
+
+    expect(live).not.toBe(replay);
+    expect(Math.abs(live - replay)).toBeLessThanOrEqual(SAME_FIX_WINDOW_MS);
+  });
+
+  it('covers a phone near the tolerance edge, corrected on one attempt and not the other', () => {
+    const skew = -(CLOCK_SKEW_TOLERANCE_MS - 200);
+    const fixDeviceMs = SERVER_NOW + skew - 1_000;
+
+    const uncorrected = attempt(fixDeviceMs, skew, SERVER_NOW, 50); // offset 29.85 s
+    const corrected = attempt(fixDeviceMs, skew, SERVER_NOW + 5_000, 5_000); // offset 34.8 s
+
+    expect(Math.abs(uncorrected - corrected)).toBeGreaterThan(CLOCK_SKEW_TOLERANCE_MS);
+    expect(Math.abs(uncorrected - corrected)).toBeLessThanOrEqual(SAME_FIX_WINDOW_MS);
   });
 });
