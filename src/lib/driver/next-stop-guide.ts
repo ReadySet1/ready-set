@@ -11,6 +11,7 @@
 
 import { distanceToTargetM, isValidTarget, type LngLatTuple } from '@/lib/driver/geofence';
 import { FEET_PER_MILE, METERS_TO_FEET } from '@/lib/units';
+import type { NavTarget } from '@/lib/driver-navigation';
 
 /** Refetch the route only after the driver moved this far (meters). */
 export const ROUTE_REFETCH_DISTANCE_M = 100;
@@ -29,8 +30,8 @@ export interface GuideDelivery {
   status: string;
   pendingReturn?: boolean;
   scheduledPickupAt?: Date | string;
-  pickupLocation?: { coordinates?: unknown } | null;
-  deliveryLocation?: { coordinates?: unknown } | null;
+  pickupLocation?: { coordinates?: unknown; address?: string | null } | null;
+  deliveryLocation?: { coordinates?: unknown; address?: string | null } | null;
 }
 
 /** Progress rank per status: higher = further along. Pickup phase < 10. */
@@ -59,14 +60,35 @@ const scheduledMs = (value: Date | string | undefined): number => {
  * route to the vendor because the card always used the drop-off).
  */
 export function deliveryStop(d: GuideDelivery): NextStop | null {
+  const kind = stopKind(d);
+  if (!kind) return null;
+  const coordinates = stopLocation(d, kind)?.coordinates;
+  if (!isValidTarget(coordinates)) return null;
+  return { deliveryId: d.id, kind, coordinates };
+}
+
+/** Which stop is current (null for terminal orders and pending returns). */
+function stopKind(d: GuideDelivery): NextStopKind | null {
   const status = String(d.status ?? '').toUpperCase();
   if (TERMINAL_STATUSES.has(status) || d.pendingReturn) return null;
   const rank = STATUS_RANK[status] ?? 0;
-  const kind: NextStopKind = rank >= DROPOFF_PHASE_MIN_RANK ? 'dropoff' : 'pickup';
-  const coordinates =
-    kind === 'pickup' ? d.pickupLocation?.coordinates : d.deliveryLocation?.coordinates;
-  if (!isValidTarget(coordinates)) return null;
-  return { deliveryId: d.id, kind, coordinates };
+  return rank >= DROPOFF_PHASE_MIN_RANK ? 'dropoff' : 'pickup';
+}
+
+const stopLocation = (d: GuideDelivery, kind: NextStopKind) =>
+  kind === 'pickup' ? d.pickupLocation : d.deliveryLocation;
+
+/**
+ * Navigate target for one order's card: the current stop's coordinates, or —
+ * when that stop is ungeocoded — its address, like the delivery detail screen.
+ * Null only when the stop has neither (or the order is terminal / returned).
+ */
+export function deliveryNavTarget(d: GuideDelivery): NavTarget | null {
+  const stop = deliveryStop(d);
+  if (stop) return { lat: stop.coordinates[1], lng: stop.coordinates[0] };
+  const kind = stopKind(d);
+  const address = kind ? stopLocation(d, kind)?.address : null;
+  return address ? { address } : null;
 }
 
 /**

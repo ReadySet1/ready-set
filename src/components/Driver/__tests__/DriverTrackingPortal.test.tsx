@@ -622,6 +622,51 @@ describe("DriverTrackingPortal (redesigned)", () => {
       fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
       expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe(`${DROPOFF[1]},${DROPOFF[0]}`);
     });
+
+    describe("ungeocoded stops fall back to the address (same as the detail screen)", () => {
+      const ungeocoded = (status: DriverStatus, withAddress = true) =>
+        baseCtx({
+          isShiftActive: true,
+          currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+          currentLocation: sampleLocation,
+          activeDeliveries: [
+            {
+              id: "del-1",
+              cateringRequestId: "cr-1",
+              driverId: "driver-1",
+              status,
+              pickupLocation: {
+                coordinates: [0, 0],
+                ...(withAddress ? { address: "1 Vendor St, SF, CA" } : {}),
+              },
+              deliveryLocation: {
+                coordinates: [0, 0],
+                ...(withAddress ? { address: "9 Client Ave, SF, CA" } : {}),
+              },
+            },
+          ],
+        });
+
+      it("navigates to the pickup address before pickup", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_VENDOR));
+        renderPortal();
+        fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+        expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe("1 Vendor St, SF, CA");
+      });
+
+      it("navigates to the drop-off address after pickup", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_CLIENT));
+        renderPortal();
+        fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+        expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe("9 Client Ave, SF, CA");
+      });
+
+      it("hides Navigate when the stop has neither coordinates nor an address", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_VENDOR, false));
+        renderPortal();
+        expect(screen.queryByRole("button", { name: /^navigate$/i })).toBeNull();
+      });
+    });
   });
 
   describe("stage gates (same rules as the delivery detail screen)", () => {
