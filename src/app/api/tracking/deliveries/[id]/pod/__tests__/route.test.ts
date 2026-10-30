@@ -84,6 +84,27 @@ describe('/api/tracking/deliveries/[id]/pod — soft-deleted deliveries', () => 
       expect(res.status).toBe(200);
       expect(deliveryUpdate()?.[0]).toMatch(/WHERE id = \$1::uuid\s+AND deleted_at IS NULL/);
     });
+
+    it('returns 404 and removes the uploaded object when the UPDATE matches no row', async () => {
+      queryRaw.mockResolvedValue([{ id: DELIVERY_ID, driver_id: 'driver-1' }]);
+      executeRaw.mockResolvedValue(0);
+
+      const res = await POST(postRequest(), params);
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ success: false, error: 'Delivery not found' });
+      expect(deletePODImage).toHaveBeenCalledWith('pod/1.jpg');
+    });
+
+    it('still returns 404 when the orphan cleanup fails', async () => {
+      queryRaw.mockResolvedValue([{ id: DELIVERY_ID, driver_id: 'driver-1' }]);
+      executeRaw.mockResolvedValue(0);
+      (deletePODImage as jest.Mock).mockResolvedValue({ error: 'storage down' });
+
+      const res = await POST(postRequest(), params);
+
+      expect(res.status).toBe(404);
+    });
   });
 
   describe('GET', () => {
@@ -116,6 +137,16 @@ describe('/api/tracking/deliveries/[id]/pod — soft-deleted deliveries', () => 
 
       expect(res.status).toBe(200);
       expect(deliveryUpdate()?.[0]).toMatch(/WHERE id = \$1::uuid\s+AND deleted_at IS NULL/);
+    });
+
+    it('returns 404 when the clearing UPDATE matches no row', async () => {
+      queryRaw.mockResolvedValue([{ delivery_photo_url: PHOTO_URL }]);
+      executeRaw.mockResolvedValue(0);
+
+      const res = await DELETE(new NextRequest(url, { method: 'DELETE' }), params);
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ success: false, error: 'Delivery not found' });
     });
   });
 });
