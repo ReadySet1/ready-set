@@ -75,12 +75,16 @@ function setupTx({
     if (sql.includes('MAX(recorded_at)')) {
       return Promise.resolve([{ latest_recorded_at: latestStoredAt }]);
     }
+    if (sql.includes('INSERT INTO driver_locations')) {
+      // The guarded insert returns the stored row; no row means duplicate.
+      return Promise.resolve([{ id: 'loc' }]);
+    }
     return Promise.resolve([]);
   });
 }
 
 function insertCalls() {
-  return mockTxExec.mock.calls.filter(([sql]) => /INSERT INTO driver_locations/.test(sql));
+  return mockTxQuery.mock.calls.filter(([sql]) => /INSERT INTO driver_locations/.test(sql));
 }
 
 function driversUpdateCalls() {
@@ -326,17 +330,18 @@ describe('POST /api/tracking/locations/batch', () => {
   });
 
   describe('replay of points the server already saved', () => {
-    /** Exec mock that reports 0 rows for any recorded_at already "in the table". */
+    /** Insert returns no row for any recorded_at already "in the table". */
     function storeHolds(savedTimestamps: string[]) {
       const saved = new Set(savedTimestamps);
-      mockTxExec.mockImplementation((sql: string, ...binds: unknown[]) => {
+      const base = mockTxQuery.getMockImplementation()!;
+      mockTxQuery.mockImplementation((sql: string, ...binds: unknown[]) => {
         if (/INSERT INTO driver_locations/.test(sql)) {
           const recordedAt = binds[9] as string;
-          if (saved.has(recordedAt)) return Promise.resolve(0);
+          if (saved.has(recordedAt)) return Promise.resolve([]);
           saved.add(recordedAt);
-          return Promise.resolve(1);
+          return Promise.resolve([{ id: 'loc' }]);
         }
-        return Promise.resolve(1);
+        return base(sql, ...binds);
       });
     }
 
@@ -454,8 +459,8 @@ describe('POST /api/tracking/locations/batch', () => {
         .map(([s], i) => ({ s, order: mockTxQuery.mock.invocationCallOrder[i]! }))
         .find(({ s }) => /MAX\(recorded_at\)/.test(s))!.order;
       const firstInsertOrder = Math.min(
-        ...mockTxExec.mock.calls
-          .map(([s], i) => ({ s, order: mockTxExec.mock.invocationCallOrder[i]! }))
+        ...mockTxQuery.mock.calls
+          .map(([s], i) => ({ s, order: mockTxQuery.mock.invocationCallOrder[i]! }))
           .filter(({ s }) => /INSERT INTO driver_locations/.test(s))
           .map(({ order }) => order),
       );

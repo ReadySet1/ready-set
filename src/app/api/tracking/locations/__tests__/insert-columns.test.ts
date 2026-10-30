@@ -169,8 +169,8 @@ describe('locations POST — uuid cast regression', () => {
     );
     expect(insertCall).toBeDefined();
     // driver_id ($1) goes into a uuid column; Prisma binds it as text, so the
-    // VALUES expression must cast or PG throws "column is of type uuid but
-    // expression is of type text".
-    expect(insertCall![0]).toContain('VALUES ($1::uuid');
+    // inserted expression (VALUES tuple or guarded INSERT ... SELECT) must cast
+    // or PG throws "column is of type uuid but expression is of type text".
+    expect(insertCall![0]).toMatch(/(VALUES \(|SELECT )\$1::uuid/);
   });
 });
