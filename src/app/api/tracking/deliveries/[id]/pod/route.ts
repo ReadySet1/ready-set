@@ -40,6 +40,7 @@ export async function POST(
       SELECT d.id, d.driver_id
       FROM deliveries d
       WHERE d.id = $1
+        AND d.deleted_at IS NULL
     `;
 
     const verifyResult = await prisma.$queryRawUnsafe<
@@ -128,6 +129,7 @@ export async function POST(
         delivery_notes = COALESCE(delivery_notes, '') || $3,
         updated_at = NOW()
       WHERE id = $1::uuid
+        AND deleted_at IS NULL
     `,
       deliveryId,
       uploadResult.url,
@@ -183,6 +185,7 @@ export async function GET(
         d.driver_id
       FROM deliveries d
       WHERE d.id = $1
+        AND d.deleted_at IS NULL
     `;
 
     const result = await prisma.$queryRawUnsafe<
@@ -266,6 +269,7 @@ export async function DELETE(
       SELECT delivery_photo_url
       FROM deliveries
       WHERE id = $1
+        AND deleted_at IS NULL
     `;
 
     const result = await prisma.$queryRawUnsafe<
@@ -314,6 +318,7 @@ export async function DELETE(
         delivery_notes = COALESCE(delivery_notes, '') || $2,
         updated_at = NOW()
       WHERE id = $1::uuid
+        AND deleted_at IS NULL
     `,
       deliveryId,
       ` [POD deleted ${new Date().toISOString()} by ${authResult.context.user.id}]`
