@@ -15,6 +15,7 @@
 import { GET, POST } from "../route";
 import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/utils/prismaDB";
+import { existingDriverOwnershipCondition } from "@/lib/auth/driver-ownership";
 import {
   createGetRequest,
   createPostRequest,
@@ -257,14 +258,38 @@ describe("/api/tracking/deliveries", () => {
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         await GET(request);
 
-        // First query is for deliveries table - should filter by driver_id using user.id
-        const deliveryQuery = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        expect(deliveryQuery).toContain("d.driver_id = $");
-        expect(deliveryQuery).toContain("::uuid");
-
-        // Verify user ID is passed as parameter
+        // First query is for deliveries table. deliveries.driver_id is a
+        // drivers.id, NOT the auth user id: the driver row must be resolved
+        // through the ownership module (profile_id OR user_id, not deleted).
+        const deliveryQuery: string = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
         const deliveryParams = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(deliveryParams).toContain("driver-user-id");
+        const userParamIndex = deliveryParams.indexOf("driver-user-id") + 1;
+        expect(userParamIndex).toBeGreaterThan(0);
+
+        expect(deliveryQuery).not.toContain(`d.driver_id = $${userParamIndex}`);
+        expect(deliveryQuery).toContain("d.driver_id IN (SELECT");
+        expect(deliveryQuery).toContain("FROM drivers");
+        expect(deliveryQuery).toContain(
+          existingDriverOwnershipCondition(userParamIndex, "own_drv")
+        );
+      });
+
+      it("keeps filtering the legacy dispatches by the auth user id for DRIVER role", async () => {
+        // dispatches.driverId is a profiles.id (same id space as the auth user).
+        mockWithAuth.mockResolvedValueOnce({
+          success: true,
+          context: { user: { id: "driver-user-id", type: "DRIVER" } },
+        } as any);
+
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+
+        await GET(createGetRequest("http://localhost:3000/api/tracking/deliveries"));
+
+        const dispatchQuery: string = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[1][0];
+        const dispatchParams = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[1].slice(1);
+        expect(dispatchQuery).toContain('disp."driverId" = $1::uuid');
+        expect(dispatchParams[0]).toBe("driver-user-id");
       });
 
       it("should not filter by driver ID for ADMIN role without driver_id param", async () => {
