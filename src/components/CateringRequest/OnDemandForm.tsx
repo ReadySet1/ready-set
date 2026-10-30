@@ -23,6 +23,8 @@ import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Form field components
+const NATIVE_PICKER_TYPES = new Set(["date", "time", "datetime-local"]);
+
 const InputField: React.FC<{
   control: any;
   name: string;
@@ -68,7 +70,7 @@ const InputField: React.FC<{
         <div>
           <div className="relative">
             {icon && (
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                 {icon}
               </div>
             )}
@@ -90,7 +92,7 @@ const InputField: React.FC<{
                 min={min}
                 className={`w-full rounded-md border ${
                   error ? "border-red-500" : "border-gray-300"
-                } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
+                } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${NATIVE_PICKER_TYPES.has(type) ? "native-picker-input" : ""}`}
                 placeholder={placeholder}
               />
             )}
@@ -141,7 +143,7 @@ const SelectField: React.FC<{
         <div>
           <div className="relative">
             {icon && (
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                 {icon}
               </div>
             )}
