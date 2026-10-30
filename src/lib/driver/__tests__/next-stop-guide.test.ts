@@ -1,6 +1,7 @@
 import {
   ROUTE_REFETCH_DISTANCE_M,
   buildDirectionsUrl,
+  deliveryStop,
   formatGuideDistance,
   formatGuideDuration,
   formatNextStopLabel,
@@ -20,6 +21,35 @@ const delivery = (overrides: Partial<GuideDelivery> & { id: string }): GuideDeli
   pickupLocation: { coordinates: PICKUP_A },
   deliveryLocation: { coordinates: DROPOFF_A },
   ...overrides,
+});
+
+describe('deliveryStop', () => {
+  it('points at the pickup until the food is on board', () => {
+    for (const status of ['ASSIGNED', 'EN_ROUTE_TO_VENDOR', 'ARRIVED_AT_VENDOR']) {
+      expect(deliveryStop(delivery({ id: 'a', status }))).toEqual({
+        deliveryId: 'a',
+        kind: 'pickup',
+        coordinates: PICKUP_A,
+      });
+    }
+  });
+
+  it('points at the drop-off once picked up', () => {
+    for (const status of ['PICKED_UP', 'EN_ROUTE_TO_CLIENT', 'ARRIVED_TO_CLIENT']) {
+      expect(deliveryStop(delivery({ id: 'a', status }))).toEqual({
+        deliveryId: 'a',
+        kind: 'dropoff',
+        coordinates: DROPOFF_A,
+      });
+    }
+  });
+
+  it('returns null for terminal orders, pending returns, and ungeocoded stops', () => {
+    expect(deliveryStop(delivery({ id: 'a', status: 'COMPLETED' }))).toBeNull();
+    expect(deliveryStop(delivery({ id: 'a', pendingReturn: true }))).toBeNull();
+    expect(deliveryStop(delivery({ id: 'a', pickupLocation: { coordinates: [0, 0] } }))).toBeNull();
+    expect(deliveryStop(delivery({ id: 'a', pickupLocation: null }))).toBeNull();
+  });
 });
 
 describe('selectNextStop', () => {

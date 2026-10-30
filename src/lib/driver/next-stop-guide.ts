@@ -52,23 +52,35 @@ const scheduledMs = (value: Date | string | undefined): number => {
 };
 
 /**
- * Pick the one stop the driver should head to now: the pickup until the food
- * is on board, then the drop-off. With several open orders, the one furthest
- * along wins (food already on board beats a fresh pickup), then the earliest
- * scheduled pickup. Terminal orders, orders handed back to dispatch, and
- * ungeocoded targets are skipped.
+ * The stop one order needs next: the pickup until the food is on board, then
+ * the drop-off. Null for terminal orders, orders handed back to dispatch, and
+ * ungeocoded targets. Shared by the map guide and the per-card Navigate button
+ * (2026-10-23 drives: Navigate sent the driver to the client while still en
+ * route to the vendor because the card always used the drop-off).
+ */
+export function deliveryStop(d: GuideDelivery): NextStop | null {
+  const status = String(d.status ?? '').toUpperCase();
+  if (TERMINAL_STATUSES.has(status) || d.pendingReturn) return null;
+  const rank = STATUS_RANK[status] ?? 0;
+  const kind: NextStopKind = rank >= DROPOFF_PHASE_MIN_RANK ? 'dropoff' : 'pickup';
+  const coordinates =
+    kind === 'pickup' ? d.pickupLocation?.coordinates : d.deliveryLocation?.coordinates;
+  if (!isValidTarget(coordinates)) return null;
+  return { deliveryId: d.id, kind, coordinates };
+}
+
+/**
+ * Pick the one stop the driver should head to now. With several open orders,
+ * the one furthest along wins (food already on board beats a fresh pickup),
+ * then the earliest scheduled pickup.
  */
 export function selectNextStop(deliveries: readonly GuideDelivery[]): NextStop | null {
   const candidates = deliveries
     .map((d, index) => {
-      const status = String(d.status ?? '').toUpperCase();
-      if (TERMINAL_STATUSES.has(status) || d.pendingReturn) return null;
-      const rank = STATUS_RANK[status] ?? 0;
-      const kind: NextStopKind = rank >= DROPOFF_PHASE_MIN_RANK ? 'dropoff' : 'pickup';
-      const coordinates =
-        kind === 'pickup' ? d.pickupLocation?.coordinates : d.deliveryLocation?.coordinates;
-      if (!isValidTarget(coordinates)) return null;
-      return { deliveryId: d.id, kind, coordinates, rank, scheduled: scheduledMs(d.scheduledPickupAt), index };
+      const stop = deliveryStop(d);
+      if (!stop) return null;
+      const rank = STATUS_RANK[String(d.status ?? '').toUpperCase()] ?? 0;
+      return { ...stop, rank, scheduled: scheduledMs(d.scheduledPickupAt), index };
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)
     .sort((a, b) => b.rank - a.rank || a.scheduled - b.scheduled || a.index - b.index);

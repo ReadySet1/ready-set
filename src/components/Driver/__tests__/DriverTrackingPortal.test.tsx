@@ -581,6 +581,49 @@ describe("DriverTrackingPortal (redesigned)", () => {
     );
   });
 
+  describe("Navigate target (2026-10-23 drives: Navigate sent the driver to the client while en route to the vendor)", () => {
+    const PICKUP: [number, number] = [-101.6731, 21.1172];
+    const DROPOFF: [number, number] = [-101.6861, 21.1236];
+    const withStatus = (status: DriverStatus) =>
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status,
+            pickupLocation: { coordinates: PICKUP },
+            deliveryLocation: { coordinates: DROPOFF },
+          },
+        ],
+      });
+    const destinationOf = (url: string) =>
+      decodeURIComponent(new URL(url).searchParams.get("destination") ?? "");
+
+    let openSpy: jest.SpyInstance;
+    beforeEach(() => {
+      openSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+    });
+    afterEach(() => openSpy.mockRestore());
+
+    it("navigates to the pickup while en route to the vendor", () => {
+      mockUseDriverTracking.mockReturnValue(withStatus(DriverStatus.EN_ROUTE_TO_VENDOR));
+      renderPortal();
+      fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+      expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe(`${PICKUP[1]},${PICKUP[0]}`);
+    });
+
+    it("navigates to the drop-off once the food is on board", () => {
+      mockUseDriverTracking.mockReturnValue(withStatus(DriverStatus.EN_ROUTE_TO_CLIENT));
+      renderPortal();
+      fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+      expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe(`${DROPOFF[1]},${DROPOFF[0]}`);
+    });
+  });
+
   describe("stage gates (same rules as the delivery detail screen)", () => {
     const onShift = (delivery: Record<string, unknown>) =>
       mockUseDriverTracking.mockReturnValue(
