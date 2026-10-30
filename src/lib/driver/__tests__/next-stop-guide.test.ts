@@ -1,6 +1,7 @@
 import {
   ROUTE_REFETCH_DISTANCE_M,
   buildDirectionsUrl,
+  deliveryNavTarget,
   deliveryStop,
   formatGuideDistance,
   formatGuideDuration,
@@ -49,6 +50,55 @@ describe('deliveryStop', () => {
     expect(deliveryStop(delivery({ id: 'a', pendingReturn: true }))).toBeNull();
     expect(deliveryStop(delivery({ id: 'a', pickupLocation: { coordinates: [0, 0] } }))).toBeNull();
     expect(deliveryStop(delivery({ id: 'a', pickupLocation: null }))).toBeNull();
+    expect(deliveryStop(delivery({ id: 'a', status: 'CANCELLED' }))).toBeNull();
+  });
+
+  it('falls back to the pickup for unknown or lowercase statuses', () => {
+    expect(deliveryStop(delivery({ id: 'a', status: 'SOMETHING_NEW' }))?.kind).toBe('pickup');
+    expect(deliveryStop(delivery({ id: 'a', status: 'en_route_to_client' }))?.kind).toBe('dropoff');
+    expect(deliveryStop(delivery({ id: 'a', status: 'assigned' }))?.kind).toBe('pickup');
+  });
+});
+
+describe('deliveryNavTarget (Track-card Navigate button)', () => {
+  const PICKUP_ADDR = '1 Vendor St, San Francisco, CA, 94103';
+  const DROPOFF_ADDR = '9 Client Ave, San Francisco, CA, 94107';
+  const ungeocoded = (status: string): GuideDelivery =>
+    delivery({
+      id: 'a',
+      status,
+      pickupLocation: { coordinates: [0, 0], address: PICKUP_ADDR },
+      deliveryLocation: { coordinates: [0, 0], address: DROPOFF_ADDR },
+    });
+
+  it('uses the coordinates of the current stop when they are usable', () => {
+    expect(deliveryNavTarget(delivery({ id: 'a', status: 'ASSIGNED' }))).toEqual({
+      lat: PICKUP_A[1],
+      lng: PICKUP_A[0],
+    });
+    expect(deliveryNavTarget(delivery({ id: 'a', status: 'PICKED_UP' }))).toEqual({
+      lat: DROPOFF_A[1],
+      lng: DROPOFF_A[0],
+    });
+  });
+
+  it('falls back to the address of the SAME stop when it has no coordinates', () => {
+    expect(deliveryNavTarget(ungeocoded('EN_ROUTE_TO_VENDOR'))).toEqual({ address: PICKUP_ADDR });
+    expect(deliveryNavTarget(ungeocoded('EN_ROUTE_TO_CLIENT'))).toEqual({ address: DROPOFF_ADDR });
+    // The map guide still needs coordinates: an address alone is no map stop.
+    expect(deliveryStop(ungeocoded('ASSIGNED'))).toBeNull();
+  });
+
+  it('returns null when the stop has neither coordinates nor an address', () => {
+    expect(
+      deliveryNavTarget(delivery({ id: 'a', pickupLocation: { coordinates: [0, 0], address: null } })),
+    ).toBeNull();
+    expect(deliveryNavTarget(delivery({ id: 'a', pickupLocation: null }))).toBeNull();
+  });
+
+  it('returns null for terminal orders and pending returns', () => {
+    expect(deliveryNavTarget(ungeocoded('COMPLETED'))).toBeNull();
+    expect(deliveryNavTarget({ ...ungeocoded('ASSIGNED'), pendingReturn: true })).toBeNull();
   });
 });
 

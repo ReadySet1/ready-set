@@ -1,4 +1,5 @@
 import {
+  addressQuery,
   buildNavigationUrl,
   getPreferredNavApp,
   setPreferredNavApp,
@@ -77,5 +78,19 @@ describe("navigation-app preference", () => {
     expect(isNavApp("waze")).toBe(true);
     expect(isNavApp("bogus")).toBe(false);
     expect(NAV_APPS.map((a) => a.id)).toEqual(["google", "apple", "waze"]);
+  });
+});
+
+describe("addressQuery", () => {
+  it("joins the non-empty address parts into one search string", () => {
+    expect(
+      addressQuery({ street1: "1 Main St", street2: null, city: "SF", state: "CA", zip: "94103" }),
+    ).toBe("1 Main St, SF, CA, 94103");
+  });
+
+  it("returns null when there is no address or no usable part", () => {
+    expect(addressQuery(null)).toBeNull();
+    expect(addressQuery(undefined)).toBeNull();
+    expect(addressQuery({ street1: "", city: null })).toBeNull();
   });
 });
