@@ -13,7 +13,10 @@ jest.mock('../mileage', () => ({
 
 import { prisma } from '@/utils/prismaDB';
 import { calculateShiftMileage, calculateShiftMileageWithValidation } from '../mileage';
-import { recomputeClosedShiftMileageForPoint } from '../late-point-mileage';
+import {
+  recomputeClosedShiftMileageForPoint,
+  recomputeClosedShiftsMileageInWindow,
+} from '../late-point-mileage';
 
 const mockQuery = prisma.$queryRawUnsafe as jest.Mock;
 const mockCalc = calculateShiftMileage as jest.Mock;
@@ -87,6 +90,62 @@ describe('recomputeClosedShiftMileageForPoint', () => {
     const result = await recomputeClosedShiftMileageForPoint(DRIVER_ID, RECORDED_AT);
 
     expect(result).toEqual({ shiftId: null, recomputed: false });
+    expect(mockCalc).not.toHaveBeenCalled();
+    expect(mockCalcValidated).not.toHaveBeenCalled();
+  });
+});
+
+describe('recomputeClosedShiftsMileageInWindow', () => {
+  const FROM = '2026-10-15T18:00:00.000Z';
+  const TO = '2026-10-15T21:00:00.000Z';
+  const OUTBOUND = '33333333-3333-4333-8333-333333333333';
+  const MIDDLE = '44444444-4444-4444-8444-444444444444';
+  const RETURN = '55555555-5555-4555-8555-555555555555';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCalc.mockResolvedValue({ totalMiles: 12.3 });
+    mockCalcValidated.mockResolvedValue({ totalMiles: 14 });
+  });
+
+  it('recomputes every closed shift a backlog spans, including one wholly inside it', async () => {
+    // A backlog whose oldest point is in the outbound shift and newest in the
+    // return shift also covers the whole middle shift: checking only its two
+    // ends would leave the middle shift's miles stale.
+    mockQuery.mockResolvedValue([
+      { id: OUTBOUND, mileage_source: 'gps', reported_distance_miles: null },
+      { id: MIDDLE, mileage_source: 'gps', reported_distance_miles: null },
+      { id: RETURN, mileage_source: 'odometer', reported_distance_miles: 20 },
+    ]);
+
+    const results = await recomputeClosedShiftsMileageInWindow(DRIVER_ID, FROM, TO);
+
+    expect(results).toEqual([
+      { shiftId: OUTBOUND, recomputed: true },
+      { shiftId: MIDDLE, recomputed: true },
+      { shiftId: RETURN, recomputed: true },
+    ]);
+    expect(mockCalc.mock.calls).toEqual([[OUTBOUND], [MIDDLE]]);
+    expect(mockCalcValidated).toHaveBeenCalledWith(RETURN, 20);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, ...params] = mockQuery.mock.calls[0]!;
+    expect(sql).toMatch(/shift_end IS NOT NULL/);
+    expect(sql).toMatch(/deleted_at IS NULL/);
+    expect(sql).toMatch(/shift_start <= \$3::timestamptz/);
+    expect(sql).toMatch(/shift_end >= \$2::timestamptz/);
+    expect(params).toEqual([DRIVER_ID, FROM, TO]);
+  });
+
+  it('skips manual mileage and does nothing when no closed shift overlaps', async () => {
+    mockQuery.mockResolvedValueOnce([
+      { id: MIDDLE, mileage_source: 'manual', reported_distance_miles: 9 },
+    ]);
+    expect(await recomputeClosedShiftsMileageInWindow(DRIVER_ID, FROM, TO)).toEqual([
+      { shiftId: MIDDLE, recomputed: false },
+    ]);
+
+    mockQuery.mockResolvedValueOnce([]);
+    expect(await recomputeClosedShiftsMileageInWindow(DRIVER_ID, FROM, TO)).toEqual([]);
     expect(mockCalc).not.toHaveBeenCalled();
     expect(mockCalcValidated).not.toHaveBeenCalled();
   });
