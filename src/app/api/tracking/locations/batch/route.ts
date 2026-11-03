@@ -5,7 +5,7 @@ import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
 import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
-import { recomputeClosedShiftsMileageInWindow } from '@/services/tracking/late-point-mileage';
+import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
 import { runAfterResponse } from '@/lib/api/after-response';
 import {
   assertCanWriteDriverLocations,
@@ -173,15 +173,18 @@ export async function POST(request: NextRequest) {
     });
 
     // Late points may land in shifts whose miles were computed at End shift.
-    // Every closed shift overlapping [oldest, newest] late point is
-    // recomputed, including one wholly inside the backlog; idempotent.
+    // Every closed shift holding one of them is recomputed, including one
+    // wholly inside the backlog; idempotent.
     const late = inserted.filter((p) => shouldCheckClosedShift({ recordedAt: p.recordedAt, serverNowMs }));
     if (late.length > 0) {
       const from = late[0]!.recordedAt;
       const to = late[late.length - 1]!.recordedAt;
       runAfterResponse('late GPS batch mileage recompute failed', async () => {
         try {
-          const results = await recomputeClosedShiftsMileageInWindow(driverId, from, to);
+          const results = await recomputeClosedShiftsMileageForPoints(
+            driverId,
+            late.map((p) => p.recordedAt),
+          );
           for (const result of results) {
             if (!result.recomputed) continue;
             console.info(

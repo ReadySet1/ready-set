@@ -37,7 +37,7 @@ jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
   },
 }));
 jest.mock('@/services/tracking/late-point-mileage', () => ({
-  recomputeClosedShiftsMileageInWindow: jest.fn(),
+  recomputeClosedShiftsMileageForPoints: jest.fn(),
 }));
 jest.mock('@/lib/api/after-response', () => ({
   runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
@@ -50,14 +50,14 @@ import { withAuth } from '@/lib/auth-middleware';
 import { withRawTx } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
-import { recomputeClosedShiftsMileageInWindow } from '@/services/tracking/late-point-mileage';
+import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
 import { POST, MAX_BATCH_POINTS } from '../route';
 
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
 const mockEnforceRateLimit = enforceRateLimit as jest.Mock;
-const mockRecompute = recomputeClosedShiftsMileageInWindow as jest.Mock;
+const mockRecompute = recomputeClosedShiftsMileageForPoints as jest.Mock;
 const mockTxQuery = jest.fn();
 const mockTxExec = jest.fn();
 
@@ -299,7 +299,7 @@ describe('POST /api/tracking/locations/batch', () => {
     expect(res.status).toBe(429);
   });
 
-  it('recomputes every closed shift between the oldest and newest late point in one call', async () => {
+  it('hands every late point to one recompute call, so a shift holding neither end is found', async () => {
     setupTx({ latestStoredAt: new Date(Date.now() - 1_000) });
     // The backlog spans three closed shifts; the middle one holds neither end.
     mockRecompute.mockResolvedValue([
@@ -313,9 +313,7 @@ describe('POST /api/tracking/locations/batch', () => {
     await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(mockRecompute.mock.calls).toEqual([
-      [DRIVER_ID, points[0]!.timestamp, points[points.length - 1]!.timestamp],
-    ]);
+    expect(mockRecompute.mock.calls).toEqual([[DRIVER_ID, points.map((p) => p.timestamp)]]);
   });
 
   describe('replay of points the server already saved', () => {
@@ -412,7 +410,7 @@ describe('POST /api/tracking/locations/batch', () => {
       await new Promise((r) => setTimeout(r, 0));
 
       expect(mockRecompute.mock.calls).toEqual([
-        [DRIVER_ID, points[3]!.timestamp, points[7]!.timestamp],
+        [DRIVER_ID, points.slice(3, 8).map((p) => p.timestamp)],
       ]);
     });
   });

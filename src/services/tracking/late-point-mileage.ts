@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { prisma } from '@/utils/prismaDB';
 import { calculateShiftMileage, calculateShiftMileageWithValidation } from './mileage';
 
@@ -7,11 +8,18 @@ interface ClosedShiftRow {
   reported_distance_miles: number | string | null;
 }
 
+interface ClosedShiftWindowRow extends ClosedShiftRow {
+  shift_start: Date | string;
+  shift_end: Date | string;
+}
+
 export interface LatePointRecomputeResult {
   /** The closed shift whose window holds the point, if any. */
   shiftId: string | null;
   /** True when that shift's stored mileage was recomputed. */
   recomputed: boolean;
+  /** True when recomputing that shift threw (already reported to Sentry). */
+  failed?: true;
 }
 
 /**
@@ -51,20 +59,27 @@ export async function recomputeClosedShiftMileageForPoint(
 }
 
 /**
- * Batch variant: recompute EVERY closed shift whose window overlaps
- * [fromRecordedAt, toRecordedAt] (the oldest and newest late point of an
- * offline backlog). Checking only the two end points misses a closed shift
- * that lies wholly inside the backlog. A shift that overlaps the window but
- * received none of its points is recomputed to the same value (idempotent).
+ * Batch variant: recompute every closed shift that holds at least one of the
+ * late points of an offline backlog. Candidates are the closed shifts
+ * overlapping [oldest, newest] late point (one query), so a shift lying wholly
+ * inside the backlog is found even though it holds neither end. A candidate
+ * that received none of the points is left alone: recomputing it would apply
+ * today's tracking settings to an old shift and silently rewrite its miles.
+ *
+ * One shift failing does not stop the others; it is reported with its shiftId.
  */
-export async function recomputeClosedShiftsMileageInWindow(
+export async function recomputeClosedShiftsMileageForPoints(
   driverId: string,
-  fromRecordedAt: string,
-  toRecordedAt: string,
+  recordedAts: string[],
 ): Promise<LatePointRecomputeResult[]> {
-  const rows = await prisma.$queryRawUnsafe<ClosedShiftRow[]>(
+  const pointTimes = recordedAts.map((at) => Date.parse(at)).filter(Number.isFinite);
+  if (pointTimes.length === 0) return [];
+  const from = new Date(Math.min(...pointTimes)).toISOString();
+  const to = new Date(Math.max(...pointTimes)).toISOString();
+
+  const rows = await prisma.$queryRawUnsafe<ClosedShiftWindowRow[]>(
     `
-    SELECT id, mileage_source, reported_distance_miles
+    SELECT id, shift_start, shift_end, mileage_source, reported_distance_miles
     FROM driver_shifts
     WHERE driver_id = $1::uuid
       AND deleted_at IS NULL
@@ -74,13 +89,24 @@ export async function recomputeClosedShiftsMileageInWindow(
     ORDER BY shift_start ASC
     `,
     driverId,
-    fromRecordedAt,
-    toRecordedAt,
+    from,
+    to,
   );
 
   const results: LatePointRecomputeResult[] = [];
   for (const shift of rows) {
-    results.push(await recomputeClosedShift(shift));
+    const start = new Date(shift.shift_start).getTime();
+    const end = new Date(shift.shift_end).getTime();
+    if (!pointTimes.some((t) => t >= start && t <= end)) continue;
+    try {
+      results.push(await recomputeClosedShift(shift));
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { component: 'late-gps-point-mileage' },
+        extra: { driverId, shiftId: shift.id, from, to, source: 'batch' },
+      });
+      results.push({ shiftId: shift.id, recomputed: false, failed: true });
+    }
   }
   return results;
 }
