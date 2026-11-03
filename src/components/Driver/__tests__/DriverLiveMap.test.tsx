@@ -1026,7 +1026,11 @@ describe('DriverLiveMap', () => {
       fetchMock.mockReset();
     });
 
-    const renderSeeded = async (seed: unknown[], liveFixDeviceMs: number) => {
+    const renderSeeded = async (
+      seed: unknown[],
+      liveFixDeviceMs: number,
+      offsetMs: number = clockOffsetMs,
+    ) => {
       let resolveSeed: (value: unknown) => void = () => {};
       fetchMock.mockImplementation(
         () =>
@@ -1044,7 +1048,7 @@ describe('DriverLiveMap', () => {
           activeDeliveries={[]}
           driverId="driver-1"
           shiftStartedAt={new Date(shiftStartMs).toISOString()}
-          clockOffsetMs={clockOffsetMs}
+          clockOffsetMs={offsetMs}
         />,
       );
       await act(async () => {
@@ -1081,6 +1085,124 @@ describe('DriverLiveMap', () => {
         [-122.41, 37.77],
         [-122.39, 37.79],
       ]);
+    });
+  });
+
+  describe('Trail on a phone clock ahead, behind slightly, or exact', () => {
+    // Same seeded-trail harness, but the device clock is pinned per case so the
+    // server clock stays fixed at serverNowMs.
+    const HOUR = 3_600_000;
+    const shiftStartMs = Date.parse('2026-11-03T15:00:00.000Z');
+    const serverNowMs = shiftStartMs + 3 * HOUR;
+    const fetchMock = global.fetch as jest.Mock;
+    const A: [number, number] = [-122.43, 37.75];
+    const X: [number, number] = [-122.39, 37.79]; // the live fix
+    const B: [number, number] = [-122.41, 37.77];
+
+    const seedPoint = ([lng, lat]: [number, number], recordedAtMs: number) => ({
+      location: { coordinates: [lng, lat] },
+      recorded_at: new Date(recordedAtMs).toISOString(),
+    });
+
+    afterEach(() => {
+      (Date.now as jest.Mock).mockRestore();
+      fetchMock.mockReset();
+    });
+
+    const renderSeeded = async (seed: unknown[], clockOffsetMs: number) => {
+      const deviceNowMs = serverNowMs - clockOffsetMs;
+      jest.spyOn(Date, 'now').mockReturnValue(deviceNowMs);
+      let resolveSeed: (value: unknown) => void = () => {};
+      fetchMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveSeed = resolve;
+          }),
+      );
+      render(
+        <DriverLiveMap
+          currentLocation={{
+            ...mockCurrentLocation,
+            coordinates: { lat: X[1], lng: X[0] },
+            // the fix was taken just now, stamped on the phone clock
+            timestamp: new Date(deviceNowMs).toISOString(),
+          }}
+          activeDeliveries={[]}
+          driverId="driver-1"
+          shiftStartedAt={new Date(shiftStartMs).toISOString()}
+          clockOffsetMs={clockOffsetMs}
+        />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      await act(async () => {
+        resolveSeed({ ok: true, json: async () => ({ data: seed }) });
+      });
+      return deviceNowMs;
+    };
+
+    const lastTrail = () => {
+      const setData = mockGetSource.mock.results[0]?.value.setData as jest.Mock;
+      return setData.mock.calls[setData.mock.calls.length - 1]?.[0].geometry.coordinates;
+    };
+
+    it.each([
+      ['ahead of the server by 1 h', -HOUR],
+      ['on the server clock', 0],
+    ])('sizes the history window on the server clock when the phone is %s', async (_label, offset) => {
+      await renderSeeded([], offset);
+
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain('hours=3&');
+    });
+
+    it('keeps the raw fix time when the phone is behind by less than the server tolerance', async () => {
+      // 10 s behind: the server stores this fix uncorrected (recorded-at.ts),
+      // and a later fix B landed in the history before the seed was fetched.
+      const offset = 10_000;
+      const fixMs = serverNowMs - offset;
+      await renderSeeded(
+        [seedPoint(A, fixMs - 20_000), seedPoint(X, fixMs), seedPoint(B, fixMs + 5_000)],
+        offset,
+      );
+
+      // Shifting the live copy by the offset would sort it after B and draw
+      // A -> X -> B -> X.
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('lines the live fix up with its stored copy when the phone is ahead by less than the tolerance', async () => {
+      // 10 s ahead: the server clamps the future fix time to its receive time.
+      const offset = -10_000;
+      await renderSeeded(
+        [
+          seedPoint(A, serverNowMs - 25_000),
+          seedPoint(X, serverNowMs + 200), // stored at receive time (+latency)
+          seedPoint(B, serverNowMs + 4_000), // a later fix, also clamped
+        ],
+        offset,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('stamps the live fix as-is when the phone is on the server clock', async () => {
+      await renderSeeded(
+        [seedPoint(A, serverNowMs - 20_000), seedPoint(X, serverNowMs), seedPoint(B, serverNowMs + 5_000)],
+        0,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('moves the live fix onto the server clock when the phone is ahead by more than the tolerance', async () => {
+      // 1 h ahead: the server shifts the fix back by the measured offset.
+      await renderSeeded(
+        [seedPoint(A, serverNowMs - 20_000), seedPoint(X, serverNowMs), seedPoint(B, serverNowMs + 5_000)],
+        -HOUR,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
     });
   });
 

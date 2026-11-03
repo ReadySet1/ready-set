@@ -11,6 +11,7 @@ import { DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { distanceToTargetM } from '@/lib/driver/geofence';
 import { shiftElapsedSeconds } from '@/lib/driver/shift-clock';
+import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import {
   buildDirectionsUrl,
   formatNextStopLabel,
@@ -230,6 +231,31 @@ export function mergeTrailSeed(
     capped = capTrail(capped);
   }
   return capped;
+}
+
+/**
+ * Trail time for a live GPS fix: the recorded_at the server will store for it.
+ *
+ * The fix time is on the device clock and the seeded history on the server
+ * clock. Rather than shift by the raw offset, this runs the server's own
+ * resolution (recorded-at.ts): uncorrected inside its skew tolerance, clamped
+ * to the server's now, shifted beyond it. A live fix then lands on its stored
+ * copy in the seed, so mergeTrailSeed dedupes it instead of zigzagging.
+ */
+export function liveFixTrailMs(
+  fixTime: Date | string | number | null | undefined,
+  deviceNowMs: number,
+  clockOffsetMs: number,
+): number {
+  const serverNowMs = deviceNowMs + clockOffsetMs;
+  const fixMs = fixTime == null ? NaN : new Date(fixTime).getTime();
+  const { recordedAt } = resolveRecordedAt({
+    timestamp: Number.isFinite(fixMs) ? fixMs : null,
+    clientSentAt: deviceNowMs,
+    serverNowMs,
+  });
+  // Null means the server would fall back to its NOW().
+  return recordedAt === null ? serverNowMs : Date.parse(recordedAt);
 }
 
 /**
@@ -525,10 +551,11 @@ export default function DriverLiveMap({
 
       // Update the in-memory trail (thinned, never truncated from the head),
       // stamping each entry with the GPS fix time so seed merges stay ordered.
-      // The fix time is on the device clock and the seed on the server clock,
-      // so shift it by the offset before the two are sorted together.
-      const fixMs = new Date(currentLocation.timestamp as Date | string).getTime();
-      const t = (Number.isFinite(fixMs) ? fixMs : Date.now()) + clockOffsetRef.current;
+      const t = liveFixTrailMs(
+        currentLocation.timestamp as Date | string,
+        Date.now(),
+        clockOffsetRef.current,
+      );
       trailRef.current.push({ coord: [lng, lat], t });
       trailRef.current = capTrail(trailRef.current);
 
