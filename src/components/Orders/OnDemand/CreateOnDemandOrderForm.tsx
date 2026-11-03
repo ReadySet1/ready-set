@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
+import { OrderTimezoneHint } from "@/components/Orders/ui/OrderTimezoneHint";
 import { cn } from "@/lib/utils";
 import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
@@ -556,7 +557,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Pickup Date & Time */}
           <div className="space-y-2">
-            <Label htmlFor="pickupDateTime">Pickup Date & Time *</Label>
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="pickupDateTime">Pickup Date & Time *</Label>
+              <OrderTimezoneHint pickupAddress={watch("pickupAddress")} />
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
