@@ -188,6 +188,12 @@ export interface LifecycleEventInput {
   changedBy?: string | null;
   driver?: { name: string; phone: string };
   location?: { lat: number; lng: number };
+  /**
+   * Position recorded on the history row only (see
+   * resolveStatusHistoryLocation). The webhook payload keeps `location`, so
+   * partner payloads are unchanged. Falls back to `location` when absent.
+   */
+  historyLocation?: { lat: number; lng: number } | null;
   notes?: string;
 }
 
@@ -218,7 +224,7 @@ export async function recordAndDispatchLifecycleEvent(input: LifecycleEventInput
           partnerStatus: input.partnerStatus,
           driverStatus: input.driverStatus ?? null,
           changedBy: input.changedBy ?? null,
-          location: input.location ?? undefined,
+          location: input.historyLocation ?? input.location ?? undefined,
           notes: input.notes,
         },
       });

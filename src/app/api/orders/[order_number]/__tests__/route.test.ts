@@ -55,6 +55,15 @@ jest.mock('@/lib/services/order-status-history', () => {
     ),
   };
 });
+// Position on the history row: the resolver (server point first, client point
+// as fallback) is unit-tested on its own; here it is controlled per test.
+jest.mock('@/lib/services/status-history-location', () => {
+  const actual = jest.requireActual('@/lib/services/status-history-location');
+  return {
+    parseClientLocation: actual.parseClientLocation,
+    resolveStatusHistoryLocation: jest.fn().mockResolvedValue(null),
+  };
+});
 jest.mock('@/lib/logging/realtime-logger', () => ({
   realtimeLogger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
@@ -72,8 +81,10 @@ import {
   shouldRecordDriverHistory,
 } from '@/lib/services/order-status-history';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
+import { resolveStatusHistoryLocation } from '@/lib/services/status-history-location';
 
 // Get mocked versions
+const mockedResolveLocation = jest.mocked(resolveStatusHistoryLocation);
 const mockedPrisma = jest.mocked(prisma);
 const mockedCreateClient = jest.mocked(createClient);
 const mockedCreateAdminClient = jest.mocked(createAdminClient);
@@ -1235,6 +1246,77 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
           notes: 'driver:ARRIVED_AT_VENDOR',
         },
       });
+    });
+
+    it("records the dispatched driver's resolved position on the history row", async () => {
+      mockedResolveLocation.mockResolvedValue({ lat: 37.7749, lng: -122.4194 });
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(
+        createPatchRequest({ driverStatus: 'PICKED_UP', location: { lat: 37.1, lng: -122.1 } }),
+        { params: Promise.resolve({ order_number: 'CAT-001' }) },
+      );
+
+      expect(response.status).toBe(200);
+      // Resolved for the DISPATCHED driver (profile id), not the caller, with
+      // the client point passed along only as the fallback.
+      expect(mockedResolveLocation).toHaveBeenCalledWith({
+        driverProfileId: 'driver-456',
+        clientLocation: { lat: 37.1, lng: -122.1 },
+      });
+      expect(historyCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ location: { lat: 37.7749, lng: -122.4194 } }),
+      });
+      // `location` is not an order field: it must never reach the order update.
+      const updateArgs = (mockedPrisma.cateringRequest.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data).not.toHaveProperty('location');
+    });
+
+    it('leaves location empty and still succeeds when no position is known', async () => {
+      mockedResolveLocation.mockResolvedValue(null);
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveLocation).toHaveBeenCalledWith({
+        driverProfileId: 'driver-456',
+        clientLocation: null,
+      });
+      expect(historyCreate).toHaveBeenCalledTimes(1);
+      expect(historyCreate.mock.calls[0][0].data.location).toBeUndefined();
+    });
+
+    it('passes the resolved position to the partner lifecycle history row', async () => {
+      mockedResolveLocation.mockResolvedValue({ lat: 37.7749, lng: -122.4194 });
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+      // runAfterResponse defers the lifecycle call; let it drain.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partnerStatus: 'PICKED_UP',
+          historyLocation: { lat: 37.7749, lng: -122.4194 },
+        }),
+      );
     });
 
     it('logs an insert failure and still returns 200 with the updated order', async () => {
