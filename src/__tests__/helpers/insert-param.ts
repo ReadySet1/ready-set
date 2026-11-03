@@ -10,18 +10,27 @@ export function insertParamFor(call: unknown[], column: string): unknown {
   const index = columns.split(',').map((c) => c.trim()).indexOf(column);
   if (index < 0) throw new Error(`Column ${column} not in INSERT`);
 
-  // Split the VALUES tuple on top-level commas (function args nest in parens).
-  const valuesStart = sql.search(/VALUES\s*\(/i);
-  const body = sql.slice(sql.indexOf('(', valuesStart) + 1);
+  // The value list is either a VALUES (...) tuple or, for a guarded insert,
+  // an INSERT ... SELECT <list> WHERE ... projection. Split it on top-level
+  // commas (function args nest in parens).
+  const afterColumns = sql.slice(sql.indexOf(columns) + columns.length + 1);
+  const valuesMatch = /VALUES\s*\(/i.exec(afterColumns);
+  const selectMatch = /\bSELECT\b/i.exec(afterColumns);
+  const isSelect = !!selectMatch && (!valuesMatch || selectMatch.index < valuesMatch.index);
+  const body = isSelect
+    ? afterColumns.slice(selectMatch!.index + selectMatch![0].length)
+    : afterColumns.slice(valuesMatch ? valuesMatch.index + valuesMatch[0].length : 0);
   const items: string[] = [];
   let depth = 0;
   let current = '';
-  for (const ch of body) {
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
     if (ch === '(') depth++;
     if (ch === ')') {
       if (depth === 0) break;
       depth--;
     }
+    if (isSelect && depth === 0 && /^\s+(WHERE|FROM|RETURNING)\b/i.test(body.slice(i))) break;
     if (ch === ',' && depth === 0) {
       items.push(current);
       current = '';

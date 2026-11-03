@@ -33,6 +33,8 @@ interface VendorPricingEditorProps {
   onSave: (config: ClientDeliveryConfiguration) => Promise<void>;
   isSaving: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
+  /** Draft for a client that does not exist yet: Save is allowed even when untouched. */
+  isNew?: boolean;
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -44,6 +46,7 @@ export function VendorPricingEditor({
   onSave,
   isSaving,
   onDirtyChange,
+  isNew = false,
 }: VendorPricingEditorProps) {
   const [editingConfig, setEditingConfig] = useState<ClientDeliveryConfiguration>(
     () => JSON.parse(JSON.stringify(config))
@@ -66,6 +69,7 @@ export function VendorPricingEditor({
     JSON.parse(originalRef.current),
     editingConfig
   );
+  const canSave = (isDirty || isNew) && validation.valid && !isSaving;
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -451,7 +455,15 @@ export function VendorPricingEditor({
                 {validation.errors.length} Error{validation.errors.length !== 1 ? 's' : ''}
               </Badge>
             )}
-            {isDirty && validation.valid && (
+            {isNew && validation.valid && (
+              <Badge
+                variant="secondary"
+                className="bg-blue-50 text-blue-700 border-blue-200"
+              >
+                New client — not saved yet
+              </Badge>
+            )}
+            {!isNew && isDirty && validation.valid && (
               <Badge
                 variant="secondary"
                 className="bg-amber-50 text-amber-700 border-amber-200"
@@ -475,7 +487,7 @@ export function VendorPricingEditor({
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={!isDirty || !validation.valid || isSaving}
+              disabled={!canSave}
               className="gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
             >
               {isSaving ? (
@@ -486,7 +498,7 @@ export function VendorPricingEditor({
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save Changes
+                  {isNew ? 'Create Client' : 'Save Changes'}
                 </>
               )}
             </Button>

@@ -13,6 +13,7 @@ import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import {
   useDriverDeliveries,
   type DriverDeliveriesFeedSource,
+  type StatusAdvanceOutcome,
 } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { DriverStatus } from '@/types/user';
@@ -62,6 +63,13 @@ interface DriverTrackingContextValue {
     status: DriverStatus,
     location?: LocationUpdate
   ) => Promise<boolean>;
+  /** Same advance, returning the server's gate code (422 PICKUP_PHOTO_REQUIRED,
+   *  POD_REQUIRED, RECIPIENT_REQUIRED, …) so the caller can reopen a sheet. */
+  advanceDeliveryStatus: (
+    deliveryId: string,
+    status: DriverStatus,
+    location?: LocationUpdate
+  ) => Promise<StatusAdvanceOutcome>;
   /** Re-fetch the active deliveries feed on demand (e.g. after a status change
    *  made outside this context, so guards don't wait on the 60s poll). */
   refreshDeliveries: () => Promise<void>;
@@ -211,6 +219,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   const {
     activeDeliveries,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
     feedSource: deliveriesFeed,
     loading: deliveriesLoading,
@@ -249,6 +258,7 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
     deliveriesFeed,
 

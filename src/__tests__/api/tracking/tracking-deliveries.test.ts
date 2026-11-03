@@ -264,12 +264,17 @@ describe('/api/tracking/deliveries API', () => {
 
         expect(data.data).toHaveLength(1);
 
-        // Verify driver filtering was applied
+        // Verify driver filtering was applied: deliveries.driver_id is a
+        // drivers.id, so the auth user id must go through the drivers row
+        // (profile_id OR user_id, not soft-deleted), never compared directly.
         const deliveryQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        expect(deliveryQuery).toContain('d.driver_id = $');
+        expect(deliveryQuery).toContain('d.driver_id IN (SELECT own_drv.id FROM drivers own_drv');
+        expect(deliveryQuery).toContain('own_drv.profile_id = $1::uuid OR own_drv.user_id = $1::uuid');
+        expect(deliveryQuery).toContain('own_drv.deleted_at IS NULL');
+        expect(deliveryQuery).not.toContain('d.driver_id = $');
 
         const deliveryParams = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(deliveryParams).toContain('driver-user-123');
+        expect(deliveryParams).toEqual(['driver-user-123']);
       });
 
       it('should parse GeoJSON coordinates correctly', async () => {

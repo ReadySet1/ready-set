@@ -1,5 +1,10 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useDriverShift } from '../useDriverShift';
+import {
+  useDriverShift,
+  SHIFT_REQUEST_TIMEOUT_MS,
+  START_SHIFT_TIMEOUT_MESSAGE,
+  LOAD_SHIFT_TIMEOUT_MESSAGE,
+} from '../useDriverShift';
 
 // Mock the server actions that are STILL used by the hook (break ops).
 // The shift start/end/active operations moved to fetch() API routes and are
@@ -791,6 +796,110 @@ describe('useDriverShift', () => {
         expect.stringContaining('/api/tracking/shifts/active'),
         expect.anything(),
       );
+    });
+  });
+  describe('bounded shift requests (2026-10 stuck Start-shift spinner)', () => {
+    const never = <T,>() => new Promise<T>(() => undefined);
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('gives up on a hung start request, clears loading and explains why', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      startShiftResult = () => never<FetchResult>();
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+      expect(result.current.loading).toBe(true);
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+      const startCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/start',
+      );
+      expect(startCall![1].signal.aborted).toBe(true);
+    });
+
+    it('gives up when the Supabase session read hangs', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      (createClient as jest.Mock).mockReturnValue({
+        auth: { getSession: jest.fn(() => never()) },
+      });
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+    });
+
+    it('gives up when the driver-id session lookup hangs', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      sessionResponse = () => never<FetchResult>() as unknown as FetchResult;
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+    });
+
+    it('does not leave the initial shift load spinning when the session hangs', async () => {
+      jest.useFakeTimers();
+      sessionResponse = () => never<FetchResult>() as unknown as FetchResult;
+
+      const { result } = renderHook(() => useDriverShift());
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(LOAD_SHIFT_TIMEOUT_MESSAGE);
     });
   });
 });

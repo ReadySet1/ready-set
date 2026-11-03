@@ -11,6 +11,10 @@ import {
   recordAndDispatchLifecycleEvent,
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
+import {
+  resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
+} from '@/lib/services/status-history-location';
 import { DriverStatus } from '@/types/prisma';
 import { DriverStatus as DriverStatusEnum } from '@/types/user';
 import { getEmailPreferencesForUser } from "@/lib/email-preferences";
@@ -170,6 +174,15 @@ export async function PATCH(
       );
     }
 
+    // Assigning (or reassigning) a driver is a staff action; there is no
+    // driver self-assignment flow. Reject before anything is written.
+    if (!isStaff && validatedData.driverStatus === 'ASSIGNED') {
+      return NextResponse.json(
+        { error: 'Only staff can assign a driver' },
+        { status: 403 }
+      );
+    }
+
     // 3. Validate + write via the centralized state machine.
     //    completeDateTime is route-owned (not state) — kept in the same tx.
     let updatedOrder: Awaited<ReturnType<typeof prisma.cateringRequest.update>>;
@@ -310,22 +323,41 @@ export async function PATCH(
         driverProfile?.name && driverProfile?.contactNumber
           ? { name: driverProfile.name, phone: driverProfile.contactNumber }
           : undefined;
+      const clientLocation = validatedData.location
+        ? { lat: validatedData.location.latitude, lng: validatedData.location.longitude }
+        : undefined;
       await recordAndDispatchLifecycleEvent({
         orderId: order.id,
         orderNumber: order.orderNumber,
         partnerStatus: partnerLifecycle,
         driverStatus: validatedData.driverStatus,
-        changedBy: validatedData.driverId ?? driverProfile?.id ?? null,
+        // A driver is always recorded as themselves; only staff may name
+        // the driver in the body.
+        changedBy: isStaff
+          ? validatedData.driverId ?? driverProfile?.id ?? null
+          : caller.id,
         driver,
-        location: validatedData.location
-          ? { lat: validatedData.location.latitude, lng: validatedData.location.longitude }
-          : undefined,
+        location: clientLocation,
+        // History row: the driver's fresh server-side point wins; the
+        // client-sent point is only the fallback. The webhook keeps `location`.
+        // A driver only ever gets their own position; the body driverId is
+        // trusted only when staff assign a driver.
+        historyLocation: await resolveStatusHistoryLocation({
+          driverProfileId: statusHistoryDriverProfileId({
+            callerId: caller.id,
+            callerIsStaff: isStaff,
+            dispatches: order.dispatches,
+            driverStatus: validatedData.driverStatus,
+            requestedDriverId: validatedData.driverId,
+          }),
+          clientLocation,
+        }),
         notes: validatedData.notes,
       });
     }
 
-    // 6. Create dispatch record if driver is assigned
-    if (validatedData.driverStatus === 'ASSIGNED' && validatedData.driverId) {
+    // 6. Create dispatch record if staff assigned a driver
+    if (isStaff && validatedData.driverStatus === 'ASSIGNED' && validatedData.driverId) {
       await prisma.dispatch.create({
         data: {
           cateringRequestId: orderId,

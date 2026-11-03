@@ -68,7 +68,10 @@ export function DriverScreen({
       <main
         className={cn(
           "mx-auto w-full max-w-2xl flex-1 px-4 lg:max-w-5xl",
-          flush ? "pt-4" : "pb-28 pt-4",
+          // Clear the fixed bottom nav (~64px) + floating shift pill (sits
+          // 74px up, ~42px tall) + the iOS home-indicator inset, so the last
+          // card scrolls fully above the nav (2026-10 iPhone X, 375px).
+          flush ? "pt-4" : "pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4",
           className,
         )}
       >

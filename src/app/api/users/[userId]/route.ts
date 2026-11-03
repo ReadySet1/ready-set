@@ -18,6 +18,7 @@ import { PrismaTransaction } from '@/types/prisma-types';
 import { UserAuditService } from '@/services/userAuditService';
 import { AuditAction } from '@/types/audit';
 import { setProfileAddress, getProfileAddress } from '@/lib/profile/address';
+import { parseProfileCounties } from '@/lib/profile-counties';
 
 export async function GET(request: NextRequest) {
     try {
@@ -177,7 +178,7 @@ export async function GET(request: NextRequest) {
       provide: profile.provide,
       frequency: profile.frequency,
       headCount: profile.headCount,
-      countiesServed: parseCommaSeparatedString(profile.counties),
+      countiesServed: parseProfileCounties(profile.counties),
       provisions: parseCommaSeparatedString(profile.provide)
     };
 

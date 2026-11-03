@@ -84,6 +84,14 @@ describe('/api/tracking/deliveries/[id] API', () => {
         expect(data.data.status).toBe('ASSIGNED');
         expect(data.data.driverInfo).toBeDefined();
         expect(data.data.driverInfo.employeeId).toBe('EMP-001');
+
+        // Soft-deleted drivers are excluded in the JOIN's ON clause (not the
+        // WHERE) so the delivery row itself is never dropped.
+        const [sql] = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0];
+        expect(sql).toMatch(
+          /LEFT JOIN drivers dr ON d\.driver_id = dr\.id AND dr\.deleted_at IS NULL/
+        );
+        expect(sql).not.toMatch(/WHERE[\s\S]*dr\.deleted_at/);
       });
 
       it('should return delivery without driver info for DRIVER users', async () => {
@@ -352,6 +360,12 @@ describe('/api/tracking/deliveries/[id] API', () => {
           'driver-1',
           expect.stringContaining('POINT')
         );
+
+        // A soft-deleted driver row must not receive location writes.
+        const driverUpdate = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.find(
+          ([sql]: [string]) => typeof sql === 'string' && /UPDATE drivers/.test(sql)
+        );
+        expect(driverUpdate?.[0]).toMatch(/WHERE id = \$1::uuid\s+AND deleted_at IS NULL/);
       });
 
       it('should update delivery with proof of delivery', async () => {

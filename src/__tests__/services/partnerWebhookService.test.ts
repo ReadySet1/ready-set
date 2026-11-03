@@ -147,6 +147,41 @@ describe('recordAndDispatchLifecycleEvent', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('records historyLocation on the history row without changing the webhook location', async () => {
+    (getPartnerByOrderNumber as jest.Mock).mockResolvedValueOnce(PARTNER);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
+
+    await recordAndDispatchLifecycleEvent({
+      orderId: 'order-uuid',
+      orderNumber: 'CC-12345',
+      partnerStatus: 'PICKED_UP',
+      driverStatus: 'PICKED_UP',
+      historyLocation: { lat: 37.7749, lng: -122.4194 },
+    });
+
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ location: { lat: 37.7749, lng: -122.4194 } }),
+    });
+    const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(sent).not.toHaveProperty('location');
+  });
+
+  it('falls back to the event location on the history row when no historyLocation is given', async () => {
+    (getPartnerByOrderNumber as jest.Mock).mockResolvedValueOnce(PARTNER);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
+
+    await recordAndDispatchLifecycleEvent({
+      orderId: 'order-uuid',
+      orderNumber: 'CC-12345',
+      partnerStatus: 'ON_THE_WAY',
+      location: { lat: 1, lng: 2 },
+    });
+
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ location: { lat: 1, lng: 2 } }),
+    });
+  });
+
   it('no-ops when the order is not owned by any registry partner', async () => {
     (getPartnerByOrderNumber as jest.Mock).mockResolvedValueOnce(null);
 

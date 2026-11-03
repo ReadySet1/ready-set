@@ -152,14 +152,16 @@ export async function notifyOrderCreated(
   if (!config.enabled) return { sent: false, reason: "disabled" };
 
   try {
+    // findFirst, not findUnique: findUnique cannot filter on the non-unique
+    // deletedAt column, so a soft-deleted order would still be notified.
     const order =
       input.orderType === "catering"
-        ? await prisma.cateringRequest.findUnique({
-            where: { id: input.orderId },
+        ? await prisma.cateringRequest.findFirst({
+            where: { id: input.orderId, deletedAt: null },
             include: { user: true, pickupAddress: true, deliveryAddress: true },
           })
-        : await prisma.onDemand.findUnique({
-            where: { id: input.orderId },
+        : await prisma.onDemand.findFirst({
+            where: { id: input.orderId, deletedAt: null },
             include: { user: true, pickupAddress: true, deliveryAddress: true },
           });
 

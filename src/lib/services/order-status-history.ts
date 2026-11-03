@@ -22,7 +22,7 @@ export interface DriverTransitionHistoryInput {
   partnerStatus: string;
   /** Profile id of whoever made the change. */
   changedBy: string | null;
-  /** Driver's last known position, only when the caller already has it. */
+  /** Where the driver was — resolve it with resolveStatusHistoryLocation. */
   location?: { lat: number; lng: number } | null;
 }
 

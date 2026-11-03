@@ -2,8 +2,9 @@
  * Local harness: fire an admin order notification for an existing order.
  *
  * Skips the UI entirely and calls the dispatcher against a real order already
- * in the dev database. Requires ORDER_NOTIFICATION_RECIPIENTS in .env.local
- * (the NODE_ENV guard blocks sends without it).
+ * in the dev database. Requires ORDER_NOTIFICATION_RECIPIENTS in .env.local:
+ * outside production the recipient config fails closed without it, so the
+ * dispatcher returns `{ sent: false, reason: "disabled" }` and nothing is sent.
  *
  * Usage:
  *   pnpm test:order-notification <orderId> [catering|on_demand]

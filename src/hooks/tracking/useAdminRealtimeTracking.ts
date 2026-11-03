@@ -22,6 +22,7 @@ import {
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
 import { MEMORY_CONFIG } from '@/constants/realtime-config';
+import { isOutOfOrderPoint } from '@/lib/tracking/late-point';
 
 interface LocationData {
   driverId: string;
@@ -512,8 +513,15 @@ export function useAdminRealtimeTracking(
 
       // Update driver in Realtime drivers map
       setRealtimeDrivers((prev) => {
+        const existing = prev.get(payload.driverId);
+
+        // A ping older than the position already shown (offline-queue replay)
+        // is history: it stays in recentLocations, but must not move the marker.
+        if (existing && isOutOfOrderPoint(payload.timestamp, existing.lastLocationUpdate)) {
+          return prev;
+        }
+
         const updated = new Map(prev);
-        const existing = updated.get(payload.driverId);
 
         // Look up driver info from SSE data first (has complete info like name, employeeId)
         const sseDriver = sseActiveDriversRef.current.find(d => d.id === payload.driverId);
