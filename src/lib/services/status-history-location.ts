@@ -21,6 +21,9 @@ export interface ResolveStatusHistoryLocationInput {
   now?: Date;
 }
 
+/** How far in the future a recorded_at may be (device clock skew) and still count as fresh. */
+const FUTURE_SKEW_TOLERANCE_MS = 60_000;
+
 interface LatestPointRow {
   latitude: number;
   longitude: number;
@@ -48,6 +51,60 @@ export function parseClientLocation(raw: unknown): StatusHistoryPoint | null {
   const lat = r.lat ?? r.latitude;
   const lng = r.lng ?? r.longitude;
   return isValidPoint(lat, lng) ? { lat: lat as number, lng: lng as number } : null;
+}
+
+interface DispatchLike {
+  createdAt?: Date | string | null;
+  driverId?: string | null;
+  driver?: { id?: string | null } | null;
+}
+
+/**
+ * Profile id of the order's dispatched driver, chosen deterministically: the
+ * newest dispatch row that names a driver (rows without `createdAt` sort
+ * oldest). Callers may load dispatches without an `orderBy`.
+ */
+function dispatchedDriverProfileId(dispatches: unknown): string | null {
+  if (!Array.isArray(dispatches)) return null;
+  const time = (d: DispatchLike) => (d.createdAt ? new Date(d.createdAt).getTime() || 0 : 0);
+  let best: { id: string; at: number } | null = null;
+  for (const raw of dispatches as Array<DispatchLike | null | undefined>) {
+    if (!raw) continue;
+    const id = raw.driverId ?? raw.driver?.id ?? null;
+    if (!id) continue;
+    const at = time(raw);
+    if (!best || at > best.at) best = { id, at };
+  }
+  return best?.id ?? null;
+}
+
+export interface StatusHistoryDriverInput {
+  /** Authenticated caller (auth uid === profile id). */
+  callerId: string;
+  /** ADMIN / SUPER_ADMIN / HELPDESK. */
+  callerIsStaff: boolean;
+  /** The order's dispatch rows (`driverId` and/or `driver.id`). */
+  dispatches?: unknown;
+  /** Driver status being set. */
+  driverStatus?: string | null;
+  /** Driver named in the request body. Trusted only on a staff ASSIGNED call. */
+  requestedDriverId?: string | null;
+}
+
+/**
+ * Whose position may go on the history row. A non-staff caller (already
+ * verified as assigned to the order) only ever gets their OWN identity, so a
+ * request body cannot make the server write another driver's position. Staff
+ * get the order's dispatched driver, or the body driver when they are
+ * assigning one. The id is resolved to a drivers row inside the lookup via
+ * the driver-ownership module.
+ */
+export function statusHistoryDriverProfileId(input: StatusHistoryDriverInput): string | null {
+  if (!input.callerIsStaff) return input.callerId;
+  if (input.driverStatus === 'ASSIGNED' && input.requestedDriverId) {
+    return input.requestedDriverId;
+  }
+  return dispatchedDriverProfileId(input.dispatches);
 }
 
 /** Latest non-deleted GPS point of the (non-deleted) driver linked to this profile. */
@@ -93,7 +150,12 @@ export async function resolveStatusHistoryLocation(
     if (point && isValidPoint(point.latitude, point.longitude)) {
       const nowMs = (input.now ?? new Date()).getTime();
       const ageMs = nowMs - new Date(point.recorded_at).getTime();
-      if (ageMs <= settings.staleGpsThresholdSeconds * 1000) {
+      // A phone clock running ahead stamps points in the future; beyond the
+      // skew tolerance a negative age would read as fresh forever.
+      if (
+        ageMs >= -FUTURE_SKEW_TOLERANCE_MS &&
+        ageMs <= settings.staleGpsThresholdSeconds * 1000
+      ) {
         return { lat: point.latitude, lng: point.longitude };
       }
     }

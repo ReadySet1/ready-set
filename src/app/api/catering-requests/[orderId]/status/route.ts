@@ -11,7 +11,10 @@ import {
   recordAndDispatchLifecycleEvent,
   DRIVER_STATUS_TO_PARTNER_LIFECYCLE,
 } from '@/lib/services/partnerWebhookService';
-import { resolveStatusHistoryLocation } from '@/lib/services/status-history-location';
+import {
+  resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
+} from '@/lib/services/status-history-location';
 import { DriverStatus } from '@/types/prisma';
 import { DriverStatus as DriverStatusEnum } from '@/types/user';
 import { getEmailPreferencesForUser } from "@/lib/email-preferences";
@@ -324,8 +327,16 @@ export async function PATCH(
         location: clientLocation,
         // History row: the driver's fresh server-side point wins; the
         // client-sent point is only the fallback. The webhook keeps `location`.
+        // A driver only ever gets their own position; the body driverId is
+        // trusted only when staff assign a driver.
         historyLocation: await resolveStatusHistoryLocation({
-          driverProfileId: validatedData.driverId ?? driverProfile?.id ?? null,
+          driverProfileId: statusHistoryDriverProfileId({
+            callerId: caller.id,
+            callerIsStaff: isStaff,
+            dispatches: order.dispatches,
+            driverStatus: validatedData.driverStatus,
+            requestedDriverId: validatedData.driverId,
+          }),
           clientLocation,
         }),
         notes: validatedData.notes,

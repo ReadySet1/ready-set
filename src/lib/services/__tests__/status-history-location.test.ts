@@ -29,6 +29,7 @@ import { TRACKING_SETTINGS_DEFAULTS } from '@/types/tracking-settings';
 import {
   parseClientLocation,
   resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
 } from '../status-history-location';
 
 const mockedQuery = prisma.$queryRawUnsafe as jest.Mock;
@@ -74,6 +75,26 @@ describe('resolveStatusHistoryLocation', () => {
     await expect(
       resolveStatusHistoryLocation({ driverProfileId: 'profile-1', now: NOW }),
     ).resolves.toBeNull();
+  });
+
+  it('treats a point recorded more than 60 s in the future (phone clock ahead) as not fresh', async () => {
+    mockedQuery.mockResolvedValue([
+      { latitude: 37.7749, longitude: -122.4194, recorded_at: secondsAgo(-61) },
+    ]);
+
+    await expect(
+      resolveStatusHistoryLocation({ driverProfileId: 'profile-1', clientLocation: CLIENT, now: NOW }),
+    ).resolves.toEqual(CLIENT);
+  });
+
+  it('tolerates up to 60 s of clock skew ahead', async () => {
+    mockedQuery.mockResolvedValue([
+      { latitude: 37.7749, longitude: -122.4194, recorded_at: secondsAgo(-60) },
+    ]);
+
+    await expect(
+      resolveStatusHistoryLocation({ driverProfileId: 'profile-1', clientLocation: CLIENT, now: NOW }),
+    ).resolves.toEqual({ lat: 37.7749, lng: -122.4194 });
   });
 
   it('returns null when there is neither a server point nor a client point', async () => {
@@ -148,5 +169,74 @@ describe('parseClientLocation', () => {
     expect(parseClientLocation({ lat: '1', lng: 2 })).toBeNull();
     expect(parseClientLocation({ lat: Number.NaN, lng: 2 })).toBeNull();
     expect(parseClientLocation({ lat: 10, lng: 200 })).toBeNull();
+  });
+});
+
+describe('statusHistoryDriverProfileId', () => {
+  const dispatches = [
+    { createdAt: new Date('2026-11-01T10:00:00Z'), driverId: 'old-driver', driver: { id: 'old-driver' } },
+    { createdAt: new Date('2026-11-02T10:00:00Z'), driverId: 'new-driver', driver: { id: 'new-driver' } },
+  ];
+
+  it("a non-staff caller only ever gets their own identity, whatever the body or dispatches say", () => {
+    expect(
+      statusHistoryDriverProfileId({
+        callerId: 'caller-driver',
+        callerIsStaff: false,
+        dispatches,
+        driverStatus: 'ASSIGNED',
+        requestedDriverId: 'someone-else',
+      }),
+    ).toBe('caller-driver');
+  });
+
+  it("staff get the order's newest dispatch, regardless of row order", () => {
+    expect(
+      statusHistoryDriverProfileId({ callerId: 'admin', callerIsStaff: true, dispatches }),
+    ).toBe('new-driver');
+    expect(
+      statusHistoryDriverProfileId({
+        callerId: 'admin',
+        callerIsStaff: true,
+        dispatches: [...dispatches].reverse(),
+      }),
+    ).toBe('new-driver');
+  });
+
+  it('staff: the body driverId is trusted only on an ASSIGNED call', () => {
+    expect(
+      statusHistoryDriverProfileId({
+        callerId: 'admin',
+        callerIsStaff: true,
+        dispatches,
+        driverStatus: 'ASSIGNED',
+        requestedDriverId: 'assignee',
+      }),
+    ).toBe('assignee');
+    expect(
+      statusHistoryDriverProfileId({
+        callerId: 'admin',
+        callerIsStaff: true,
+        dispatches,
+        driverStatus: 'PICKED_UP',
+        requestedDriverId: 'assignee',
+      }),
+    ).toBe('new-driver');
+  });
+
+  it('accepts either dispatch shape (driverId or driver.id) and is null with no driver', () => {
+    expect(
+      statusHistoryDriverProfileId({
+        callerId: 'admin',
+        callerIsStaff: true,
+        dispatches: [{ driver: { id: 'nested-only' } }],
+      }),
+    ).toBe('nested-only');
+    expect(
+      statusHistoryDriverProfileId({ callerId: 'admin', callerIsStaff: true, dispatches: [] }),
+    ).toBeNull();
+    expect(
+      statusHistoryDriverProfileId({ callerId: 'admin', callerIsStaff: true, dispatches: undefined }),
+    ).toBeNull();
   });
 });

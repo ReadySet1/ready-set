@@ -47,7 +47,15 @@ jest.mock('@/services/notifications/email', () => ({
   sendDeliveryStatusEmail: jest.fn(async () => undefined),
 }));
 
+// The history-row position resolver is unit-tested on its own; here we only
+// check WHOSE position the route asks for.
+jest.mock('@/lib/services/status-history-location', () => ({
+  ...jest.requireActual('@/lib/services/status-history-location'),
+  resolveStatusHistoryLocation: jest.fn(async () => null),
+}));
+
 import { GET, PATCH } from '@/app/api/catering-requests/[orderId]/status/route';
+import { resolveStatusHistoryLocation } from '@/lib/services/status-history-location';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
@@ -737,5 +745,74 @@ describe('/api/catering-requests/[orderId]/status - auth', () => {
     mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
     const res = await GET(getRequest(), context);
     expect(res.status).toBe(200);
+  });
+});
+
+describe('/api/catering-requests/[orderId]/status - history-row position driver', () => {
+  const OTHER_DRIVER = '22222222-2222-4222-8222-222222222222';
+  const ASSIGNEE = '33333333-3333-4333-8333-333333333333';
+  const context = { params: Promise.resolve({ orderId: 'order-123' }) };
+  const mockedResolve = jest.mocked(resolveStatusHistoryLocation);
+  const orderAt = (driverStatus: string | null) => ({
+    id: 'order-123',
+    orderNumber: 'CAT-9',
+    status: driverStatus ? 'IN_PROGRESS' : 'ACTIVE',
+    driverStatus,
+    userId: 'client-1',
+    user: { email: 'c@example.com', name: 'C' },
+    pickupAddress: null,
+    deliveryAddress: null,
+    dispatches: [
+      {
+        id: 'd-1',
+        driverId: 'driver-1',
+        createdAt: new Date('2026-11-01T10:00:00Z'),
+        driver: { id: 'driver-1', name: 'D', contactNumber: '555' },
+      },
+    ],
+  });
+  const arrange = (driverStatus: string | null) => {
+    const order = orderAt(driverStatus);
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(order);
+    (prisma.cateringRequest.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      ...order,
+      updatedAt: new Date(),
+    });
+  };
+  const patch = (body: object) =>
+    PATCH(
+      createPatchRequest('http://localhost:3000/api/catering-requests/order-123/status', body),
+      context,
+    );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("a driver cannot get ANOTHER driver's position written by naming them in the body", async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
+    arrange('ARRIVED_AT_VENDOR');
+
+    const res = await patch({ driverStatus: 'PICKED_UP', driverId: OTHER_DRIVER });
+
+    expect(res.status).toBe(200);
+    expect(mockedResolve).toHaveBeenCalledTimes(1);
+    expect(mockedResolve.mock.calls[0]![0].driverProfileId).toBe('driver-1');
+  });
+
+  it("staff: the order's dispatched driver, not the body driverId, outside ASSIGNED", async () => {
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    arrange('ARRIVED_AT_VENDOR');
+
+    await patch({ driverStatus: 'PICKED_UP', driverId: OTHER_DRIVER });
+
+    expect(mockedResolve.mock.calls[0]![0].driverProfileId).toBe('driver-1');
+  });
+
+  it('staff: the body driverId is used on an ASSIGNED call (the driver being assigned)', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    arrange(null);
+
+    await patch({ driverStatus: 'ASSIGNED', driverId: ASSIGNEE });
+
+    expect(mockedResolve.mock.calls[0]![0].driverProfileId).toBe(ASSIGNEE);
   });
 });

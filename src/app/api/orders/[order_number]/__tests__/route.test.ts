@@ -60,7 +60,7 @@ jest.mock('@/lib/services/order-status-history', () => {
 jest.mock('@/lib/services/status-history-location', () => {
   const actual = jest.requireActual('@/lib/services/status-history-location');
   return {
-    parseClientLocation: actual.parseClientLocation,
+    ...actual,
     resolveStatusHistoryLocation: jest.fn().mockResolvedValue(null),
   };
 });
@@ -1317,6 +1317,97 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
           historyLocation: { lat: 37.7749, lng: -122.4194 },
         }),
       );
+    });
+
+    const mockHistoryCaller = (userId: string, type: string) => {
+      mockedCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({ data: { user: { id: userId } }, error: null }),
+        },
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: { type }, error: null }),
+        }),
+      } as any);
+    };
+    const twoDispatches = [
+      // Deliberately newest LAST: the include has no orderBy.
+      {
+        id: 'dispatch-old',
+        createdAt: new Date('2026-11-01T10:00:00Z'),
+        driver: { id: 'driver-old', name: 'Old', email: 'o@x.com', contactNumber: '1' },
+      },
+      {
+        id: 'dispatch-new',
+        createdAt: new Date('2026-11-02T10:00:00Z'),
+        driver: { id: 'driver-456', name: 'New', email: 'n@x.com', contactNumber: '2' },
+      },
+    ];
+
+    it('a non-privileged caller: the position is looked up for the verified caller, not dispatches[0]', async () => {
+      mockedResolveOpenShiftIdForUser.mockResolvedValue('shift-1');
+      setupMocks({ status: 'ASSIGNED', driverStatus: 'ASSIGNED', dispatches: twoDispatches });
+      mockHistoryCaller('driver-456', 'DRIVER');
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'EN_ROUTE_TO_VENDOR' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveLocation).toHaveBeenCalledTimes(1);
+      expect(mockedResolveLocation.mock.calls[0]![0].driverProfileId).toBe('driver-456');
+    });
+
+    it("staff: the newest dispatch's driver, whatever the row order", async () => {
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR', dispatches: twoDispatches });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(mockedResolveLocation.mock.calls[0]![0].driverProfileId).toBe('driver-456');
+    });
+
+    it('skips the lookup when no history row and no partner lifecycle event will be written', async () => {
+      // A partner order (no internal row) moving to a status with no partner
+      // lifecycle mapping: nothing would carry the position.
+      mockedShouldRecordHistory.mockResolvedValue(false);
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'EN_ROUTE_TO_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' }),
+      );
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ driverStatus: 'ARRIVED_AT_VENDOR' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedResolveLocation).not.toHaveBeenCalled();
+    });
+
+    it('still looks up the position for a partner lifecycle event without an internal row', async () => {
+      mockedShouldRecordHistory.mockResolvedValue(false);
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      (mockedPrisma.cateringRequest.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ status: 'IN_PROGRESS', driverStatus: 'PICKED_UP' }),
+      );
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }), {
+        params: Promise.resolve({ order_number: 'CAT-001' }),
+      });
+
+      expect(mockedResolveLocation).toHaveBeenCalledTimes(1);
     });
 
     it('logs an insert failure and still returns 200 with the updated order', async () => {

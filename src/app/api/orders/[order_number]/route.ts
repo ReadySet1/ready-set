@@ -53,6 +53,7 @@ import {
 import {
   parseClientLocation,
   resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
   type StatusHistoryPoint,
 } from '@/lib/services/status-history-location';
 import {
@@ -860,17 +861,29 @@ export async function PATCH(
       driverStatus !== currentDriverStatus &&
       (await shouldRecordDriverHistory(orderType, dbOrderNumber));
 
-    // Where the dispatched driver was for this transition: their latest fresh
+    // Where the driver was for this transition: their latest fresh
     // driver_locations point, else the client-sent point, else null. Started
     // now so the lookup overlaps the status transaction; it never rejects.
-    // Feeds both the internal history row and the partner lifecycle row.
-    const historyLocation: Promise<StatusHistoryPoint | null> = driverStatus
-      ? resolveStatusHistoryLocation({
-          driverProfileId:
-            ((existingOrder as any).dispatches?.[0]?.driver?.id as string | undefined) ?? null,
-          clientLocation: parseClientLocation(rawClientLocation),
-        })
-      : Promise.resolve(null);
+    // Feeds the internal history row and the partner lifecycle row, so it is
+    // skipped when neither will be written. A non-privileged caller was
+    // verified as assigned above, so their own identity is used; staff get the
+    // newest dispatch (the include has no orderBy).
+    const writesPartnerLifecycle =
+      !!driverStatus &&
+      !!DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
+        driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
+      ];
+    const historyLocation: Promise<StatusHistoryPoint | null> =
+      recordHistory || writesPartnerLifecycle
+        ? resolveStatusHistoryLocation({
+            driverProfileId: statusHistoryDriverProfileId({
+              callerId: user.id,
+              callerIsStaff: callerIsPrivileged,
+              dispatches: (existingOrder as any).dispatches,
+            }),
+            clientLocation: parseClientLocation(rawClientLocation),
+          })
+        : Promise.resolve(null);
 
     // Perform the order update + deliveries-mirror upsert atomically. If the
     // mirror upsert throws, the whole transaction rolls back (a retryable 500 via
