@@ -1002,6 +1002,88 @@ describe('DriverLiveMap', () => {
     });
   });
 
+  describe('Trail seed on a skewed device clock', () => {
+    // The server says the shift started 3 h ago, but the phone runs 1 h
+    // behind the server (same class as the 10/14 shift-timer bug, #687).
+    const HOUR = 3_600_000;
+    const shiftStartMs = Date.parse('2026-11-03T15:00:00.000Z');
+    const serverNowMs = shiftStartMs + 3 * HOUR;
+    const clockOffsetMs = 1 * HOUR; // server minus device
+    const deviceNowMs = serverNowMs - clockOffsetMs;
+    const fetchMock = global.fetch as jest.Mock;
+
+    const seedPoint = (lng: number, lat: number, recordedAtMs: number) => ({
+      location: { coordinates: [lng, lat] },
+      recorded_at: new Date(recordedAtMs).toISOString(),
+    });
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(deviceNowMs);
+    });
+
+    afterEach(() => {
+      (Date.now as jest.Mock).mockRestore();
+      fetchMock.mockReset();
+    });
+
+    const renderSeeded = async (seed: unknown[], liveFixDeviceMs: number) => {
+      let resolveSeed: (value: unknown) => void = () => {};
+      fetchMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveSeed = resolve;
+          }),
+      );
+      render(
+        <DriverLiveMap
+          currentLocation={{
+            ...mockCurrentLocation,
+            coordinates: { lat: 37.79, lng: -122.39 },
+            timestamp: new Date(liveFixDeviceMs).toISOString(),
+          }}
+          activeDeliveries={[]}
+          driverId="driver-1"
+          shiftStartedAt={new Date(shiftStartMs).toISOString()}
+          clockOffsetMs={clockOffsetMs}
+        />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      await act(async () => {
+        resolveSeed({ ok: true, json: async () => ({ data: seed }) });
+      });
+    };
+
+    it('sizes the history window on the server clock, not the phone clock', async () => {
+      await renderSeeded([], deviceNowMs);
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).toContain('/api/tracking/locations?');
+      // 3 h on the server clock; the phone clock alone would ask for 2 h and
+      // drop the first hour of the route.
+      expect(url).toContain('hours=3&');
+    });
+
+    it('orders a live fix after the seeded history when the phone clock is behind', async () => {
+      await renderSeeded(
+        [
+          seedPoint(-122.43, 37.75, shiftStartMs + 1 * HOUR),
+          seedPoint(-122.41, 37.77, shiftStartMs + 2.9 * HOUR),
+        ],
+        deviceNowMs, // the newest fix, stamped on the phone clock
+      );
+
+      const setData = mockGetSource.mock.results[0]?.value.setData as jest.Mock;
+      const lastCall = setData.mock.calls[setData.mock.calls.length - 1]?.[0];
+      expect(lastCall.geometry.coordinates).toEqual([
+        [-122.43, 37.75],
+        [-122.41, 37.77],
+        [-122.39, 37.79],
+      ]);
+    });
+  });
+
   describe('mergeTrailSeed (trail seed hygiene)', () => {
     const entry = (lng: number, lat: number, t: number): TrailEntry => ({
       coord: [lng, lat],

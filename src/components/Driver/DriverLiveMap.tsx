@@ -10,6 +10,7 @@ import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
 import { DELIVERY_MARKER_COLOR, PICKUP_MARKER_COLOR } from '@/constants/tracking-colors';
 import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { distanceToTargetM } from '@/lib/driver/geofence';
+import { shiftElapsedSeconds } from '@/lib/driver/shift-clock';
 import {
   buildDirectionsUrl,
   formatNextStopLabel,
@@ -45,6 +46,11 @@ interface DriverLiveMapProps {
    *  only the points this browser session happened to observe. */
   driverId?: string | null;
   shiftStartedAt?: string | Date | null;
+  /** Server-minus-device clock offset (ms) from useDriverShift. The shift
+   *  start and the seeded history are on the server clock; this moves the
+   *  device clock onto it so a wrong phone clock can't truncate or reorder
+   *  the trail. */
+  clockOffsetMs?: number;
   className?: string;
 }
 
@@ -242,6 +248,7 @@ export default function DriverLiveMap({
   activeDeliveries,
   driverId,
   shiftStartedAt,
+  clockOffsetMs = 0,
   className,
 }: DriverLiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -249,6 +256,11 @@ export default function DriverLiveMap({
   const driverMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+
+  // Read by the seed and GPS effects without re-running them (a re-run of the
+  // seed effect would abort its in-flight fetch).
+  const clockOffsetRef = useRef(clockOffsetMs);
+  clockOffsetRef.current = clockOffsetMs;
 
   // Maintain an in-memory trail of recent coordinates for the session
   const trailRef = useRef<TrailEntry[]>([]);
@@ -301,10 +313,10 @@ export default function DriverLiveMap({
     seededShiftKeyRef.current = shiftKey;
 
     const startMs = new Date(shiftStartedAt).getTime();
-    const hours = Math.min(
-      Math.max(Math.ceil((Date.now() - startMs) / 3_600_000), 1),
-      24,
-    );
+    // Elapsed on the server clock: a phone running behind would otherwise ask
+    // for too short a window and drop the start of the route.
+    const elapsedS = shiftElapsedSeconds(shiftStartedAt, Date.now(), clockOffsetRef.current);
+    const hours = Math.min(Math.max(Math.ceil(elapsedS / 3_600), 1), 24);
     const controller = new AbortController();
     (async () => {
       try {
@@ -513,8 +525,10 @@ export default function DriverLiveMap({
 
       // Update the in-memory trail (thinned, never truncated from the head),
       // stamping each entry with the GPS fix time so seed merges stay ordered.
+      // The fix time is on the device clock and the seed on the server clock,
+      // so shift it by the offset before the two are sorted together.
       const fixMs = new Date(currentLocation.timestamp as Date | string).getTime();
-      const t = Number.isFinite(fixMs) ? fixMs : Date.now();
+      const t = (Number.isFinite(fixMs) ? fixMs : Date.now()) + clockOffsetRef.current;
       trailRef.current.push({ coord: [lng, lat], t });
       trailRef.current = capTrail(trailRef.current);
 

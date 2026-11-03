@@ -484,6 +484,7 @@ export default function DriverTrackingPortal() {
                     activeDeliveries={activeDeliveries}
                     driverId={currentShift?.driverId}
                     shiftStartedAt={currentShift?.startTime}
+                    clockOffsetMs={clockOffsetMs}
                   />
                 </div>
               ) : (
