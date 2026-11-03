@@ -54,8 +54,16 @@ jest.mock('@/lib/services/status-history-location', () => ({
   resolveStatusHistoryLocation: jest.fn(async () => null),
 }));
 
+// Partner lifecycle recording is unit-tested on its own; here we only check
+// the `changedBy` the route hands it.
+jest.mock('@/lib/services/partnerWebhookService', () => ({
+  ...jest.requireActual('@/lib/services/partnerWebhookService'),
+  recordAndDispatchLifecycleEvent: jest.fn(async () => undefined),
+}));
+
 import { GET, PATCH } from '@/app/api/catering-requests/[orderId]/status/route';
 import { resolveStatusHistoryLocation } from '@/lib/services/status-history-location';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
@@ -719,7 +727,18 @@ describe('/api/catering-requests/[orderId]/status - auth', () => {
 
   it('PATCH lets the assigned driver update', async () => {
     mockedWithAuth.mockResolvedValue(authAs('DRIVER', 'driver-1'));
-    const res = await PATCH(patchRequest(), context);
+    // Drivers can't send ASSIGNED (staff-only); they advance an assigned order.
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+      ...order,
+      status: 'ASSIGNED',
+      driverStatus: 'ASSIGNED',
+    });
+    const res = await PATCH(
+      createPatchRequest('http://localhost:3000/api/catering-requests/order-123/status', {
+        driverStatus: 'ARRIVED_AT_VENDOR',
+      }),
+      context,
+    );
     expect(res.status).toBe(200);
   });
 
@@ -814,5 +833,114 @@ describe('/api/catering-requests/[orderId]/status - history-row position driver'
     await patch({ driverStatus: 'ASSIGNED', driverId: ASSIGNEE });
 
     expect(mockedResolve.mock.calls[0]![0].driverProfileId).toBe(ASSIGNEE);
+  });
+});
+
+describe('/api/catering-requests/[orderId]/status - a driver acts only as themselves', () => {
+  const ASSIGNED_DRIVER = '11111111-1111-4111-8111-111111111111';
+  const OTHER_DRIVER = '22222222-2222-4222-8222-222222222222';
+  const ASSIGNEE = '33333333-3333-4333-8333-333333333333';
+  const context = { params: Promise.resolve({ orderId: 'order-123' }) };
+  const mockedRecord = jest.mocked(recordAndDispatchLifecycleEvent);
+  const arrange = (driverStatus: string | null) => {
+    const order = {
+      id: 'order-123',
+      orderNumber: 'CAT-9',
+      status: driverStatus ? 'IN_PROGRESS' : 'ACTIVE',
+      driverStatus,
+      userId: 'client-1',
+      user: { email: 'c@example.com', name: 'C' },
+      pickupAddress: null,
+      deliveryAddress: null,
+      dispatches: [
+        {
+          id: 'd-1',
+          driverId: ASSIGNED_DRIVER,
+          createdAt: new Date('2026-11-01T10:00:00Z'),
+          driver: { id: ASSIGNED_DRIVER, name: 'D', contactNumber: '555' },
+        },
+      ],
+    };
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(order);
+    (prisma.cateringRequest.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      ...order,
+      updatedAt: new Date(),
+    });
+  };
+  const patch = (body: object) =>
+    PATCH(
+      createPatchRequest('http://localhost:3000/api/catering-requests/order-123/status', body),
+      context,
+    );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('records the calling driver as changedBy, ignoring a body driverId naming someone else', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', ASSIGNED_DRIVER));
+    arrange('ARRIVED_AT_VENDOR');
+
+    const res = await patch({ driverStatus: 'PICKED_UP', driverId: OTHER_DRIVER });
+
+    expect(res.status).toBe(200);
+    expect(mockedRecord).toHaveBeenCalledTimes(1);
+    expect(mockedRecord.mock.calls[0]![0].changedBy).toBe(ASSIGNED_DRIVER);
+  });
+
+  it('rejects a driver ASSIGNED call that names another driver, without assigning anyone', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', ASSIGNED_DRIVER));
+    arrange(null);
+
+    const res = await patch({ driverStatus: 'ASSIGNED', driverId: OTHER_DRIVER });
+
+    expect(res.status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.dispatch.create).not.toHaveBeenCalled();
+    expect(mockedRecord).not.toHaveBeenCalled();
+  });
+
+  it('rejects a driver ASSIGNED call even without a body driverId (assignment is staff-only)', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', ASSIGNED_DRIVER));
+    arrange(null);
+
+    const res = await patch({ driverStatus: 'ASSIGNED' });
+
+    expect(res.status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.dispatch.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a driver on an order they are not dispatched to, even naming themselves', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', OTHER_DRIVER));
+    arrange('ARRIVED_AT_VENDOR');
+
+    const res = await patch({ driverStatus: 'PICKED_UP', driverId: OTHER_DRIVER });
+
+    expect(res.status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(mockedRecord).not.toHaveBeenCalled();
+  });
+
+  it('staff ASSIGNED still assigns the body driver and records them as changedBy', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    arrange(null);
+
+    const res = await patch({ driverStatus: 'ASSIGNED', driverId: ASSIGNEE });
+
+    expect(res.status).toBe(200);
+    expect(prisma.dispatch.create).toHaveBeenCalledWith({
+      data: { cateringRequestId: 'order-123', driverId: ASSIGNEE, userId: 'client-1' },
+    });
+    expect(mockedRecord.mock.calls[0]![0].changedBy).toBe(ASSIGNEE);
+  });
+
+  it('staff outside ASSIGNED keep the body driverId as changedBy (unchanged behavior)', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
+    arrange('ARRIVED_AT_VENDOR');
+
+    const res = await patch({ driverStatus: 'PICKED_UP', driverId: OTHER_DRIVER });
+
+    expect(res.status).toBe(200);
+    expect(mockedRecord.mock.calls[0]![0].changedBy).toBe(OTHER_DRIVER);
+    expect(prisma.dispatch.create).not.toHaveBeenCalled();
   });
 });

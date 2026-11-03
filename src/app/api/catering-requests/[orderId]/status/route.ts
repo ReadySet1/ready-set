@@ -174,6 +174,15 @@ export async function PATCH(
       );
     }
 
+    // Assigning (or reassigning) a driver is a staff action; there is no
+    // driver self-assignment flow. Reject before anything is written.
+    if (!isStaff && validatedData.driverStatus === 'ASSIGNED') {
+      return NextResponse.json(
+        { error: 'Only staff can assign a driver' },
+        { status: 403 }
+      );
+    }
+
     // 3. Validate + write via the centralized state machine.
     //    completeDateTime is route-owned (not state) — kept in the same tx.
     let updatedOrder: Awaited<ReturnType<typeof prisma.cateringRequest.update>>;
@@ -322,7 +331,11 @@ export async function PATCH(
         orderNumber: order.orderNumber,
         partnerStatus: partnerLifecycle,
         driverStatus: validatedData.driverStatus,
-        changedBy: validatedData.driverId ?? driverProfile?.id ?? null,
+        // A driver is always recorded as themselves; only staff may name
+        // the driver in the body.
+        changedBy: isStaff
+          ? validatedData.driverId ?? driverProfile?.id ?? null
+          : caller.id,
         driver,
         location: clientLocation,
         // History row: the driver's fresh server-side point wins; the
@@ -343,8 +356,8 @@ export async function PATCH(
       });
     }
 
-    // 6. Create dispatch record if driver is assigned
-    if (validatedData.driverStatus === 'ASSIGNED' && validatedData.driverId) {
+    // 6. Create dispatch record if staff assigned a driver
+    if (isStaff && validatedData.driverStatus === 'ASSIGNED' && validatedData.driverId) {
       await prisma.dispatch.create({
         data: {
           cateringRequestId: orderId,
