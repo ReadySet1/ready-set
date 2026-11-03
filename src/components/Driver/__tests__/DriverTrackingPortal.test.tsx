@@ -38,8 +38,10 @@ jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
 // Light map mock (real one needs Mapbox + a token).
 jest.mock("@/components/Driver/DriverLiveMap", () => ({
   __esModule: true,
-  default: ({ activeDeliveries }: any) => (
-    <div data-testid="driver-live-map">map ({activeDeliveries?.length ?? 0})</div>
+  default: ({ activeDeliveries, clockOffsetMs }: any) => (
+    <div data-testid="driver-live-map" data-clock-offset-ms={clockOffsetMs}>
+      map ({activeDeliveries?.length ?? 0})
+    </div>
   ),
 }));
 
@@ -1260,6 +1262,15 @@ describe("DriverTrackingPortal (redesigned)", () => {
         jest.advanceTimersByTime(3_000);
       });
       expect(screen.getByText("2:03")).toBeInTheDocument();
+    });
+
+    it("hands the clock offset to the live map so its trail window uses the server clock", () => {
+      mockUseDriverTracking.mockReturnValue(activeShiftCtx({ clockOffsetMs: 3_648_000 }));
+      renderPortal();
+      expect(screen.getByTestId("driver-live-map")).toHaveAttribute(
+        "data-clock-offset-ms",
+        "3648000",
+      );
     });
   });
 

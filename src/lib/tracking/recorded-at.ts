@@ -16,7 +16,8 @@
  * clock error is removed, never the point's real age. Old clients that do not
  * send `client_sent_at` keep the previous behavior.
  *
- * Pure and server-only (no I/O) so it is unit-testable in isolation.
+ * Pure (no I/O) so it is unit-testable in isolation. The driver map also runs
+ * it client-side (liveFixTrailMs) to stamp live fixes the way they are stored.
  */
 
 /** Offsets at or below this are latency/jitter, not a wrong clock. */
