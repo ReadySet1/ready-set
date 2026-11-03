@@ -54,10 +54,11 @@ jobs:
             exit 1
           fi
 
-          # Threshold accounts for known transitive dependency false positives:
-          # - 4x node-forge (firebase-admin > node-forge <1.4.0) — upstream hasn't updated
-          # - 2x picomatch (jest > micromatch/picomatch) — dev dependency, not in production
-          # - 1x path-to-regexp (sanity > path-to-regexp) — transitive, waiting on sanity update
+          # Tolerates up to 10 high advisories as headroom for transitive
+          # dependencies that lag behind upstream fixes. After the pnpm
+          # overrides in #728 the audit is 0 high / 0 moderate / 2 low
+          # (esbuild via tsx, deepmerge via jest), so this limit is slack
+          # and could be tightened.
           if [ "$HIGH" -gt 10 ]; then
             echo "⚠️  Too many high vulnerabilities found!"
             exit 1
