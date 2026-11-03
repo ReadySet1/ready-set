@@ -39,7 +39,8 @@ because the pickup time is what the restaurant and driver act on. Cross-zone ord
   helpers take the order zone instead of the default; the time label reads `Time (CT)` / `Time (PT)`.
 - Create forms (catering, on-demand): today the pickers build a `Date` from the browser's clock, so
   the typed wall-clock is interpreted in the viewer's zone. On submit the wall-clock components are
-  re-read in the pickup address zone (`reinterpretWallClock`). A CA admin typing 11:00 for an Austin
+  re-read in the pickup address zone (`reinterpretWallClock`). A "Times in CT" hint next to the
+  pickup picker shows that zone before submit. A CA admin typing 11:00 for an Austin
   order now stores 16:00Z (11:00 CDT), and a viewer outside Pacific no longer skews CA orders.
 - API partners (CaterValley, CaterCow) keep their current parsing: their contracts define the zone
   they send. Not touched here.
@@ -77,10 +78,12 @@ column through Prisma, so the migration must be applied on rs-dev and prod befor
 the deploy; it is not applied anywhere yet. Rollback: `ALTER TABLE addresses DROP COLUMN timezone`.
 Zero existing orders touch Texas (prod read 2026-10-08), so no stored instant needs correcting.
 
-## Open questions for Emmanuel
+## Decisions (approved 2026-11-03)
 
-1. Pickup zone for both times: confirm, or should arrival follow the delivery address?
-2. Should the admin forms show the resolved zone next to the pickers before submit (small UX add)?
-3. CaterValley sends `deliveryDate` + `deliveryTime` as Pacific wall-clock today. When Austin
-   partners go live, does the contract add a zone field or do we derive it from the delivery ZIP?
-4. Driver app and notification emails: same card now, or after the first Austin pilot?
+1. The pickup address zone applies to both pickup and arrival times. Kept as designed.
+2. The create forms (catering, on-demand) show the resolved zone next to the pickup time picker
+   before submit (`OrderTimezoneHint`: "Times in CT"). It updates when the pickup address changes
+   and falls back to the default zone label (PT) when no pickup address is chosen yet. It resolves
+   the zone with the same `resolveAddressTimezone` input that `orderTimesInPickupZone` uses on submit.
+3. CaterValley and other partner APIs: out of scope, no change.
+4. Driver app, notification emails and SMS: out of scope here; separate follow-up card.
