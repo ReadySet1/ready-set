@@ -5,7 +5,7 @@ import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
 import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
-import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-point-mileage';
+import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
 import { runAfterResponse } from '@/lib/api/after-response';
 import {
   assertCanWriteDriverLocations,
@@ -172,34 +172,38 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Late points may land in a shift whose miles were computed at End shift.
-    // A backlog spans minutes, so its oldest and newest late points bound every
-    // shift it can touch; the recompute is idempotent.
+    // Late points may land in shifts whose miles were computed at End shift.
+    // Every closed shift holding one of them is recomputed, including one
+    // wholly inside the backlog; idempotent.
     const late = inserted.filter((p) => shouldCheckClosedShift({ recordedAt: p.recordedAt, serverNowMs }));
     if (late.length > 0) {
-      const ends = [...new Set([late[0]!.recordedAt, late[late.length - 1]!.recordedAt])];
+      const from = late[0]!.recordedAt;
+      const to = late[late.length - 1]!.recordedAt;
       runAfterResponse('late GPS batch mileage recompute failed', async () => {
-        for (const recordedAt of ends) {
-          try {
-            const result = await recomputeClosedShiftMileageForPoint(driverId, recordedAt);
-            if (result.recomputed) {
-              console.info(
-                JSON.stringify({
-                  event: 'tracking.late_point_mileage_recomputed',
-                  driverId,
-                  shiftId: result.shiftId,
-                  recordedAt,
-                  source: 'batch',
-                }),
-              );
-            }
-          } catch (error) {
-            Sentry.captureException(error, {
-              tags: { component: 'late-gps-point-mileage' },
-              extra: { driverId, recordedAt, source: 'batch' },
-            });
-            throw error;
+        try {
+          const results = await recomputeClosedShiftsMileageForPoints(
+            driverId,
+            late.map((p) => p.recordedAt),
+          );
+          for (const result of results) {
+            if (!result.recomputed) continue;
+            console.info(
+              JSON.stringify({
+                event: 'tracking.late_point_mileage_recomputed',
+                driverId,
+                shiftId: result.shiftId,
+                from,
+                to,
+                source: 'batch',
+              }),
+            );
           }
+        } catch (error) {
+          Sentry.captureException(error, {
+            tags: { component: 'late-gps-point-mileage' },
+            extra: { driverId, from, to, source: 'batch' },
+          });
+          throw error;
         }
       });
     }

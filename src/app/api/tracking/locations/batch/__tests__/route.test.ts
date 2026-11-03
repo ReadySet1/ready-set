@@ -37,7 +37,7 @@ jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
   },
 }));
 jest.mock('@/services/tracking/late-point-mileage', () => ({
-  recomputeClosedShiftMileageForPoint: jest.fn(),
+  recomputeClosedShiftsMileageForPoints: jest.fn(),
 }));
 jest.mock('@/lib/api/after-response', () => ({
   runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
@@ -50,14 +50,14 @@ import { withAuth } from '@/lib/auth-middleware';
 import { withRawTx } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
-import { recomputeClosedShiftMileageForPoint } from '@/services/tracking/late-point-mileage';
+import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
 import { POST, MAX_BATCH_POINTS } from '../route';
 
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
 const mockEnforceRateLimit = enforceRateLimit as jest.Mock;
-const mockRecompute = recomputeClosedShiftMileageForPoint as jest.Mock;
+const mockRecompute = recomputeClosedShiftsMileageForPoints as jest.Mock;
 const mockTxQuery = jest.fn();
 const mockTxExec = jest.fn();
 
@@ -121,7 +121,7 @@ describe('POST /api/tracking/locations/batch', () => {
       fn({ $queryRawUnsafe: mockTxQuery, $executeRawUnsafe: mockTxExec }),
     );
     mockTxExec.mockResolvedValue(1);
-    mockRecompute.mockResolvedValue({ shiftId: null, recomputed: false });
+    mockRecompute.mockResolvedValue([]);
   });
 
   it('accepts a 5-minute outage backlog in one request and files every point by its fix time', async () => {
@@ -299,34 +299,21 @@ describe('POST /api/tracking/locations/batch', () => {
     expect(res.status).toBe(429);
   });
 
-  it('recomputes the closed shift the late points fall into (checks the oldest and newest late point)', async () => {
+  it('hands every late point to one recompute call, so a shift holding neither end is found', async () => {
     setupTx({ latestStoredAt: new Date(Date.now() - 1_000) });
-    mockRecompute.mockResolvedValue({ shiftId: 'shift-outbound', recomputed: true });
+    // The backlog spans three closed shifts; the middle one holds neither end.
+    mockRecompute.mockResolvedValue([
+      { shiftId: 'shift-outbound', recomputed: true },
+      { shiftId: 'shift-middle', recomputed: true },
+      { shiftId: 'shift-return', recomputed: true },
+    ]);
     const now = Date.now();
     const points = outagePoints(60, 5 * 60_000, now);
 
     await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
     await new Promise((r) => setTimeout(r, 0));
 
-    // Oldest late point first; the newest is only checked when it is not in
-    // the shift that was just recomputed. Both are the same shift here.
-    expect(mockRecompute).toHaveBeenCalledTimes(2);
-    expect(mockRecompute.mock.calls[0]).toEqual([DRIVER_ID, points[0]!.timestamp]);
-  });
-
-  it('checks both ends when a backlog spans two closed shifts', async () => {
-    setupTx({ latestStoredAt: new Date(Date.now() - 1_000) });
-    mockRecompute
-      .mockResolvedValueOnce({ shiftId: 'shift-outbound', recomputed: true })
-      .mockResolvedValueOnce({ shiftId: 'shift-return', recomputed: true });
-    const now = Date.now();
-    const points = outagePoints(60, 5 * 60_000, now);
-
-    await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
-    await new Promise((r) => setTimeout(r, 0));
-
-    const checked = mockRecompute.mock.calls.map(([, at]) => at);
-    expect(checked).toEqual([points[0]!.timestamp, points[points.length - 1]!.timestamp]);
+    expect(mockRecompute.mock.calls).toEqual([[DRIVER_ID, points.map((p) => p.timestamp)]]);
   });
 
   describe('replay of points the server already saved', () => {
@@ -422,8 +409,9 @@ describe('POST /api/tracking/locations/batch', () => {
       await post({ driver_id: DRIVER_ID, client_sent_at: now, points });
       await new Promise((r) => setTimeout(r, 0));
 
-      const checked = mockRecompute.mock.calls.map(([, at]) => at);
-      expect(checked).toEqual([points[3]!.timestamp, points[7]!.timestamp]);
+      expect(mockRecompute.mock.calls).toEqual([
+        [DRIVER_ID, points.slice(3, 8).map((p) => p.timestamp)],
+      ]);
     });
   });
 
