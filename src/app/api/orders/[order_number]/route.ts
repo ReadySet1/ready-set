@@ -51,6 +51,12 @@ import {
   shouldRecordDriverHistory,
 } from '@/lib/services/order-status-history';
 import {
+  parseClientLocation,
+  resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
+  type StatusHistoryPoint,
+} from '@/lib/services/status-history-location';
+import {
   POST_PICKUP_DRIVER_STATUSES,
   voidPendingReturnRequests,
 } from '@/lib/services/return-requests';
@@ -376,7 +382,7 @@ export async function PATCH(
     const order_number = decodeURIComponent(encodedOrderNumber);
 
     const body = await request.json();
-    const { status, driverStatus, ...updateFields } = body;
+    const { status, driverStatus, location: rawClientLocation, ...updateFields } = body;
 
     // Check if any update data is provided
     const hasStatusUpdate = status || driverStatus;
@@ -855,6 +861,30 @@ export async function PATCH(
       driverStatus !== currentDriverStatus &&
       (await shouldRecordDriverHistory(orderType, dbOrderNumber));
 
+    // Where the driver was for this transition: their latest fresh
+    // driver_locations point, else the client-sent point, else null. Started
+    // now so the lookup overlaps the status transaction; it never rejects.
+    // Feeds the internal history row and the partner lifecycle row, so it is
+    // skipped when neither will be written. A non-privileged caller was
+    // verified as assigned above, so their own identity is used; staff get the
+    // newest dispatch (the include has no orderBy).
+    const writesPartnerLifecycle =
+      !!driverStatus &&
+      !!DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
+        driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
+      ];
+    const historyLocation: Promise<StatusHistoryPoint | null> =
+      recordHistory || writesPartnerLifecycle
+        ? resolveStatusHistoryLocation({
+            driverProfileId: statusHistoryDriverProfileId({
+              callerId: user.id,
+              callerIsStaff: callerIsPrivileged,
+              dispatches: (existingOrder as any).dispatches,
+            }),
+            clientLocation: parseClientLocation(rawClientLocation),
+          })
+        : Promise.resolve(null);
+
     // Perform the order update + deliveries-mirror upsert atomically. If the
     // mirror upsert throws, the whole transaction rolls back (a retryable 500 via
     // the outer catch) instead of silently stranding a terminal order.
@@ -955,14 +985,13 @@ export async function PATCH(
     // Written after commit with one INSERT on the global client, awaited but
     // never thrown: a failed audit write is logged and the transition stands
     // (the row can then be missing — accepted trade-off, see the helper).
-    // The PATCH carries no driver position, so location stays empty rather
-    // than costing an extra query.
     if (recordHistory) {
       await recordDriverStatusTransition({
         cateringRequestId: (updatedRaw as any).id,
         driverStatus: driverStatus as DriverStatus,
         partnerStatus: String((updatedRaw as any).status),
         changedBy: user.id,
+        location: await historyLocation,
       });
     }
 
@@ -1101,7 +1130,7 @@ export async function PATCH(
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          runAfterResponse('Failed to dispatch partner lifecycle webhook:', () =>
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () =>
             recordAndDispatchLifecycleEvent({
               orderId: (updatedOrder as any).id,
               orderNumber: (updatedOrder as any).orderNumber,
@@ -1109,6 +1138,7 @@ export async function PATCH(
               driverStatus,
               changedBy: user.id ?? driverProfile?.id ?? null,
               driver,
+              historyLocation: await historyLocation,
             }),
           );
         }
