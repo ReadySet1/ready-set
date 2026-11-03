@@ -54,7 +54,7 @@ import { UserType } from "@/types/user";
 import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
-import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
@@ -159,6 +159,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   canViewDeliveryTime = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  // Order times are entered and shown in the pickup address zone (PT/CT), never the browser zone.
+  const orderZone = orderTimezone(order);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
   const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
@@ -972,7 +974,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
-                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                                timeZone: orderZone,
                               },
                             )}
                           </span>
@@ -989,9 +991,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 hour12: true,
-                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                                timeZone: orderZone,
                               },
                             )}
+                          </span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {timezoneAbbreviation(orderZone)}
                           </span>
                         </div>
                       )}

@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { utcToLocalTime, setZonedTime, setZonedDate, zonedCalendarDay } from "@/lib/utils/timezone";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import {
   Dialog,
   DialogContent,
@@ -161,6 +162,8 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     label: string
   ) => {
     const value = watch(fieldName);
+    // Pickers read and write wall-clock time in the order's (pickup address) zone.
+    const zone = orderTimezone(order);
 
     return (
       <div className="space-y-2">
@@ -176,14 +179,14 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {value ? formatDateTimeForDisplay(value, "PPPp") : "Select date and time"}
+              {value ? formatDateTimeForDisplay(value, "PPPp", zone) : "Select date and time"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="z-[1100] w-auto p-0" align="start" sideOffset={4}>
             <Calendar
               mode="single"
-              selected={value ? zonedCalendarDay(value) : undefined}
-              defaultMonth={value ? zonedCalendarDay(value) : undefined}
+              selected={value ? zonedCalendarDay(value, zone) : undefined}
+              defaultMonth={value ? zonedCalendarDay(value, zone) : undefined}
               onSelect={(day) => {
                 if (!day) {
                   setValue(fieldName, null, { shouldDirty: true });
@@ -191,28 +194,28 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
                 }
                 setValue(
                   fieldName,
-                  setZonedDate(watch(fieldName) ?? null, format(day, "yyyy-MM-dd")),
+                  setZonedDate(watch(fieldName) ?? null, format(day, "yyyy-MM-dd"), zone),
                   { shouldDirty: true },
                 );
               }}
               captionLayout="dropdown"
               disabled={(day) =>
-                format(day, "yyyy-MM-dd") < utcToLocalTime(new Date()).date
+                format(day, "yyyy-MM-dd") < utcToLocalTime(new Date(), zone).date
               }
             />
             <div className="border-t p-4">
               <div className="flex items-center gap-4">
-                <Label className="min-w-fit">Time (PT)</Label>
+                <Label className="min-w-fit">Time ({timezoneAbbreviation(zone)})</Label>
                 <Input
                   type="time"
                   className="w-full"
-                  value={value ? utcToLocalTime(value).time : ""}
+                  value={value ? utcToLocalTime(value, zone).time : ""}
                   onChange={(e) => {
                     const timeValue = e.target.value;
                     if (!/^\d{2}:\d{2}$/.test(timeValue)) return;
                     setValue(
                       fieldName,
-                      setZonedTime(watch(fieldName) ?? new Date(), timeValue),
+                      setZonedTime(watch(fieldName) ?? new Date(), timeValue, zone),
                       { shouldDirty: true },
                     );
                   }}

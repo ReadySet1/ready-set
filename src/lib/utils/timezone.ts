@@ -88,3 +88,15 @@ export function zonedCalendarDay(
   }
   return new Date(year, month - 1, dayNum);
 }
+/**
+ * Re-read a Date's browser-local wall-clock (year, month, day, hour, minute) as
+ * wall-clock time in `timezone`. The create-order pickers build their Date from
+ * the browser clock, so this is how "11:00 typed for an Austin order" becomes
+ * 11:00 Central rather than 11:00 wherever the admin happens to sit.
+ */
+export function reinterpretWallClock(date: Date, timezone: string): Date {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return fromZonedTime(`${day} ${time}`, timezone);
+}

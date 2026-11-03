@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getStatusColorClasses } from "@/types/order-status";
+import { resolveAddressTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 
 interface OrderDetails {
   id: string;
@@ -136,18 +137,24 @@ const OrderDetailsPage = () => {
     }).format(numAmount);
   };
 
+  // Times are shown in the pickup location's zone (PT/CT), never the browser zone.
+  const orderZone = resolveAddressTimezone(
+    orderDetails ? { zip: orderDetails.pickupAddress?.zipCode } : null,
+  );
+
   const formatDateTime = (dateString: string) => {
     if (!dateString) return "N/A";
 
     const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
+    const formatted = date.toLocaleString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      timeZone: "America/Los_Angeles",
+      timeZone: orderZone,
     });
+    return `${formatted} ${timezoneAbbreviation(orderZone)}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -158,7 +165,7 @@ const OrderDetailsPage = () => {
       year: "numeric",
       month: "long",
       day: "numeric",
-      timeZone: "America/Los_Angeles",
+      timeZone: orderZone,
     });
   };
 

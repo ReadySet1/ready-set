@@ -7,6 +7,7 @@ import { withDatabaseRetry } from "@/utils/prismaDB";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeAddress } from "@/utils/address-normalization";
+import { deriveAddressTimezone } from "@/lib/utils/address-timezone";
 
 // Simple in-memory rate limiting (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -404,6 +405,8 @@ export async function POST(request: NextRequest) {
         state: formData.state.trim().toUpperCase(),
         // Normalize ZIP code
         zip: formData.zip.trim(),
+        // IANA zone derived from the ZIP (addresses.state is unreliable)
+        timezone: deriveAddressTimezone({ zip: formData.zip.trim() }),
         // Normalize city and street
         city: formData.city.trim(),
         street1: formData.street1.trim(),
@@ -521,7 +524,10 @@ export async function PUT(request: NextRequest) {
         if (formData.street2 !== undefined) updateData.street2 = formData.street2;
         if (formData.city !== undefined) updateData.city = formData.city;
         if (formData.state !== undefined) updateData.state = formData.state;
-        if (formData.zip !== undefined) updateData.zip = formData.zip;
+        if (formData.zip !== undefined) {
+          updateData.zip = formData.zip;
+          updateData.timezone = deriveAddressTimezone({ zip: formData.zip });
+        }
         if (formData.county !== undefined) updateData.county = formData.county;
         if (formData.locationNumber !== undefined) updateData.locationNumber = formData.locationNumber;
         if (formData.parkingLoading !== undefined) updateData.parkingLoading = formData.parkingLoading;
