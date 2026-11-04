@@ -26,7 +26,7 @@ interface RateLimitDecision {
   reset: number;
 }
 
-type Decider = (key: string) => Promise<RateLimitDecision>;
+type Decider = (key: string, limit: number) => Promise<RateLimitDecision>;
 
 let cachedDecider: Decider | null = null;
 
@@ -40,15 +40,24 @@ async function buildUpstashDecider(): Promise<Decider | null> {
     import('@upstash/redis'),
   ]);
   const redis = new Redis({ url, token, automaticDeserialization: true });
-  const limiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(DEFAULT_LIMIT, `${WINDOW_SECONDS} s`),
-    analytics: false,
-    prefix: 'rl',
-  });
+  // One limiter per ceiling: the window algorithm is fixed at construction.
+  const limiters = new Map<number, InstanceType<typeof Ratelimit>>();
+  const limiterFor = (limit: number) => {
+    let limiter = limiters.get(limit);
+    if (!limiter) {
+      limiter = new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(limit, `${WINDOW_SECONDS} s`),
+        analytics: false,
+        prefix: 'rl',
+      });
+      limiters.set(limit, limiter);
+    }
+    return limiter;
+  };
 
-  return async (key: string) => {
-    const result = await limiter.limit(key);
+  return async (key: string, limit: number) => {
+    const result = await limiterFor(limit).limit(key);
     return {
       success: result.success,
       remaining: result.remaining,
@@ -58,14 +67,14 @@ async function buildUpstashDecider(): Promise<Decider | null> {
 }
 
 function buildInMemoryDecider(client: RedisLike): Decider {
-  return async (key: string) => {
+  return async (key: string, limit: number) => {
     const fullKey = `rl:${key}`;
     const count = (await client.incr(fullKey)) as number;
     if (count === 1) await client.expire(fullKey, WINDOW_SECONDS);
-    const success = count <= DEFAULT_LIMIT;
+    const success = count <= limit;
     return {
       success,
-      remaining: Math.max(0, DEFAULT_LIMIT - count),
+      remaining: Math.max(0, limit - count),
       reset: Date.now() + WINDOW_SECONDS * 1000,
     };
   };
@@ -78,20 +87,33 @@ async function getDecider(): Promise<Decider> {
   return cachedDecider;
 }
 
+/** A positive integer ceiling, else the 100/min default. */
+function resolveLimit(limitPerMin: number | null | undefined): number {
+  return typeof limitPerMin === 'number' && Number.isInteger(limitPerMin) && limitPerMin > 0
+    ? limitPerMin
+    : DEFAULT_LIMIT;
+}
+
 /**
  * Apply per-partner rate limiting at the top of an order route.
  * Returns a 429 NextResponse if the limit is exceeded, or null if the
  * request should proceed.
+ *
+ * `limitPerMin` is the ceiling for this (partner, route) bucket — partner
+ * routes pass `api_partners.rate_limit_per_min`; anything missing or not a
+ * positive integer falls back to 100/min.
  */
 export async function enforceRateLimit(
   partnerSlug: string,
-  routeName: string
+  routeName: string,
+  limitPerMin?: number | null
 ): Promise<NextResponse | null> {
   const key = `${partnerSlug}:${routeName}`;
+  const limit = resolveLimit(limitPerMin);
   let decision: RateLimitDecision;
   try {
     const decide = await getDecider();
-    decision = await decide(key);
+    decision = await decide(key, limit);
   } catch (error) {
     console.warn('[rate-limit] backend error, falling open:', error);
     return null;
@@ -109,7 +131,7 @@ export async function enforceRateLimit(
       status: 429,
       headers: {
         'Retry-After': String(retryAfterSeconds),
-        'X-RateLimit-Limit': String(DEFAULT_LIMIT),
+        'X-RateLimit-Limit': String(limit),
         'X-RateLimit-Remaining': String(decision.remaining),
         'X-RateLimit-Reset': String(decision.reset),
       },

@@ -60,6 +60,24 @@ describe('enforceRateLimit (in-memory fallback)', () => {
     expect(await enforceRateLimit('catervalley', 'orders.update')).toBeNull();
   });
 
+  it("uses the caller's per-minute limit when given", async () => {
+    for (let i = 0; i < 5; i++) {
+      expect(await enforceRateLimit('catercow', 'orders.confirm', 5)).toBeNull();
+    }
+    const overflow = await enforceRateLimit('catercow', 'orders.confirm', 5);
+    expect(overflow?.status).toBe(429);
+    expect(overflow!.headers.get('X-RateLimit-Limit')).toBe('5');
+  });
+
+  it.each([0, -3, Number.NaN, 2.5])('falls back to 100/min for an unusable limit (%p)', async (limit) => {
+    for (let i = 0; i < 100; i++) {
+      expect(await enforceRateLimit('catercow', 'orders.get', limit)).toBeNull();
+    }
+    const overflow = await enforceRateLimit('catercow', 'orders.get', limit);
+    expect(overflow?.status).toBe(429);
+    expect(overflow!.headers.get('X-RateLimit-Limit')).toBe('100');
+  });
+
   // The "falls open on backend error" path is exercised by enforceRateLimit's
   // try/catch around the decider call. Verifying it requires intercepting
   // a module-level export, which jest.spyOn can't do for const-exported

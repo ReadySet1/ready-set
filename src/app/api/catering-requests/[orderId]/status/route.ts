@@ -27,6 +27,7 @@ import {
 } from '@/lib/state-machine/transition';
 import type { OrderStatus } from '@/lib/state-machine/transition';
 import { withAuth, type AuthContext } from '@/lib/auth-middleware';
+import { runAfterResponse } from '@/lib/api/after-response';
 
 const STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
 
@@ -316,8 +317,14 @@ export async function PATCH(
     //     it to order_status_history, and POSTs a signed webhook. The
     //     helper self-guards against legacy carriers and non-partner
     //     orders, and never throws.
+    //     Only on a real change (a re-sent status must not emit the event
+    //     twice), except a staff ASSIGNED naming a driver: a reassignment the
+    //     partner must hear about.
     const partnerLifecycle = DRIVER_STATUS_TO_PARTNER_LIFECYCLE[validatedData.driverStatus];
-    if (partnerLifecycle) {
+    const driverStatusChanged = validatedData.driverStatus !== order.driverStatus;
+    const isReassignment =
+      isStaff && validatedData.driverStatus === 'ASSIGNED' && !!validatedData.driverId;
+    if (partnerLifecycle && (driverStatusChanged || isReassignment)) {
       const driverProfile = order.dispatches[0]?.driver;
       const driver =
         driverProfile?.name && driverProfile?.contactNumber
@@ -326,34 +333,39 @@ export async function PATCH(
       const clientLocation = validatedData.location
         ? { lat: validatedData.location.latitude, lng: validatedData.location.longitude }
         : undefined;
-      await recordAndDispatchLifecycleEvent({
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        partnerStatus: partnerLifecycle,
-        driverStatus: validatedData.driverStatus,
-        // A driver is always recorded as themselves; only staff may name
-        // the driver in the body.
-        changedBy: isStaff
-          ? validatedData.driverId ?? driverProfile?.id ?? null
-          : caller.id,
-        driver,
-        location: clientLocation,
-        // History row: the driver's fresh server-side point wins; the
-        // client-sent point is only the fallback. The webhook keeps `location`.
-        // A driver only ever gets their own position; the body driverId is
-        // trusted only when staff assign a driver.
-        historyLocation: await resolveStatusHistoryLocation({
-          driverProfileId: statusHistoryDriverProfileId({
-            callerId: caller.id,
-            callerIsStaff: isStaff,
-            dispatches: order.dispatches,
-            driverStatus: validatedData.driverStatus,
-            requestedDriverId: validatedData.driverId,
+      // Deferred past the response so the driver's request never waits on
+      // the partner's server (or on the location lookup); a failed send is
+      // retried from the durable queue.
+      runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () =>
+        recordAndDispatchLifecycleEvent({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          partnerStatus: partnerLifecycle,
+          driverStatus: validatedData.driverStatus,
+          // A driver is always recorded as themselves; only staff may name
+          // the driver in the body.
+          changedBy: isStaff
+            ? validatedData.driverId ?? driverProfile?.id ?? null
+            : caller.id,
+          driver,
+          location: clientLocation,
+          // History row: the driver's fresh server-side point wins; the
+          // client-sent point is only the fallback. The webhook keeps `location`.
+          // A driver only ever gets their own position; the body driverId is
+          // trusted only when staff assign a driver.
+          historyLocation: await resolveStatusHistoryLocation({
+            driverProfileId: statusHistoryDriverProfileId({
+              callerId: caller.id,
+              callerIsStaff: isStaff,
+              dispatches: order.dispatches,
+              driverStatus: validatedData.driverStatus,
+              requestedDriverId: validatedData.driverId,
+            }),
+            clientLocation,
           }),
-          clientLocation,
+          notes: validatedData.notes,
         }),
-        notes: validatedData.notes,
-      });
+      );
     }
 
     // 6. Create dispatch record if staff assigned a driver

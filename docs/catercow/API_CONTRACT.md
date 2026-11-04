@@ -2,10 +2,10 @@
 
 **Audience:** CaterCow Engineering
 **Status:** Reflects current Ready Set implementation
-**Last Updated:** 2026-10-16
-**Version:** 0.3
+**Last Updated:** 2026-11-04
+**Version:** 0.4
 
-> This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). v0.3 makes status-webhook retries durable: every non-2xx response (4xx included), timeout or connection error is retried on the schedule in [Delivery and retries](#delivery-and-retries), so expect at-least-once delivery. All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
+> This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). v0.3 makes status-webhook retries durable: every non-2xx response (4xx included), timeout or connection error is retried on the schedule in [Delivery and retries](#delivery-and-retries), so expect at-least-once delivery. v0.4 documents `GET /orders/{id}`, sends `CANCELLED` when Ready Set cancels or deletes an order, and aligns the documented limits, error shapes and webhook `location` with the live routes — see the [Changelog](#changelog). All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
 
 ---
 
@@ -22,7 +22,7 @@ Ready Set provides **two separate environments** for the integration:
 
 Each environment has its own API key — the staging key cannot be used against production and vice versa. We strongly recommend completing full integration testing against staging before cutting over to production.
 
-All endpoints accept and return `application/json`.
+All endpoints accept and return `application/json`. Paths below are relative to the base URL (e.g. `POST /orders/draft` is `https://readysetllc.com/api/partners/orders/draft` in production).
 
 ---
 
@@ -36,6 +36,8 @@ partner: catercow
 x-api-key: <issued-by-ready-set>
 ```
 
+`Content-Type` is required on every `POST`; anything other than `application/json` (parameters such as `; charset=utf-8` are fine) is rejected with `415`. Request bodies are limited to **256 KB**, counted on the bytes actually received (chunked bodies included); larger bodies get `413`.
+
 Optional but **strongly recommended**:
 
 ```
@@ -48,7 +50,7 @@ Ready Set will issue CaterCow a unique `x-api-key` for production and a separate
 ```json
 {
   "status": "ERROR",
-  "message": "Invalid authentication credentials"
+  "message": "Unauthorized - Invalid API key or partner header"
 }
 ```
 
@@ -208,6 +210,8 @@ On error, returns one of the codes in the [Error Codes](#error-codes) section wi
 
 ### Request
 
+Only an order you have not confirmed yet can be updated. Once confirmed, the order stays locked for `/orders/update` and `/orders/confirm` (`422`) even if Ready Set later puts it back in the dispatch pool. A driver assigned before you confirm does not lock the draft.
+
 Update is a **full-body replace**, not a partial update. Send every field exactly as you would for `/orders/draft`, plus the `id` returned from the original draft. Fields you don't intend to change should be sent with their current value. Sending a partial body will return `400 Bad Request`.
 
 ```ts
@@ -243,7 +247,7 @@ Same shape as `/orders/draft` response, but returned with HTTP **200 OK** instea
 
 ## Endpoint 3 — Confirm Order
 
-**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft.
+**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft; Ready Set then sends a `CANCELLED` status webhook (after responding — the confirm response does not wait for your webhook endpoint). An order that was already confirmed can no longer be confirmed or cancelled here (`422`).
 
 **`POST /orders/confirm`**
 
@@ -284,7 +288,60 @@ The `status` field distinguishes the two success branches:
 
 ---
 
-## Endpoint 4 — Status Webhook (Ready Set → CaterCow)
+## Endpoint 4 — Get Order
+
+**Purpose:** Read an order's current state and its recent status events — use it to resync after a missed or failed webhook.
+
+**`GET /orders/{id}`**
+
+### Request
+
+No body. Same `partner` + `x-api-key` headers as every other endpoint; `{id}` is the order UUID returned by `/orders/draft`. A partner can only read its own orders.
+
+### Response (200 OK)
+
+```ts
+{
+  status: "SUCCESS";
+  order: {
+    id: string;                     // Ready Set UUID
+    orderCode: string;              // Your order code (Ready Set prefix stripped)
+    orderNumber: string;            // Ready Set's order number, e.g. "CC-12345"
+    orderStatus: string;            // Ready Set order state: "ACTIVE" / "PENDING" (draft), "CONFIRMED",
+                                    // "ASSIGNED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "CANCELLED"
+    lifecycleStatus:                // Latest lifecycle event (same values as the webhook `status`);
+      | "ASSIGNED" | "PICKED_UP" | "ON_THE_WAY"
+      | "ARRIVED" | "DELIVERED" | "CANCELLED"
+      | null;                       // null until the first lifecycle event (CONFIRMED doesn't count)
+    deliveryDate: string | null;    // ISO 8601 UTC delivery date-time
+    events: Array<{                 // Up to the 10 most recent events, newest first
+      status: string;               // A lifecycleStatus value, or "CONFIRMED" (your confirm;
+                                    // never sent as a webhook)
+      driverStatus: string | null;  // Ready Set's internal driver step behind the event (informational)
+      timestamp: string;            // ISO 8601 UTC
+      location?: { lat: number; lng: number };
+      notes?: string;
+    }>;
+  };
+}
+```
+
+### Errors
+
+| HTTP | Meaning |
+|------|---------|
+| 400 | `{id}` is not a valid UUID |
+| 401 | Missing or invalid auth headers |
+| 403 | The order exists but does not belong to your partner account |
+| 404 | No such order (a deleted order also reads as not found) |
+| 429 | Rate limit exceeded — see [Rate Limiting](#rate-limiting) |
+| 500 | Internal error — retry |
+
+All errors use the `{ "status": "ERROR", "message": string }` shape.
+
+---
+
+## Endpoint 5 — Status Webhook (Ready Set → CaterCow)
 
 **Purpose:** Ready Set notifies CaterCow when order status changes. CaterCow hosts a webhook endpoint and provides the URL during onboarding.
 
@@ -318,13 +375,17 @@ x-readyset-signature: <HMAC-SHA256 of body using shared secret>
     name: string;
     phone: string;
   };
-  location?: {                    // Present for ON_THE_WAY pings
+  location?: {                    // ON_THE_WAY only, when the driver's position is known
     lat: number;
     lng: number;
   };
   notes?: string;
 }
 ```
+
+- An event is sent once per real status change; a driver re-sending the status they already hold does not produce a second event.
+- `location` is the driver's latest GPS point if it is fresh, otherwise the position the driver app sent with the status change. It is omitted when neither is known, and never sent on other statuses.
+- `CANCELLED` is sent when you reject an order (`/orders/confirm` with `isAccepted: false`, `notes` = your `reason`), when Ready Set cancels it, and when Ready Set deletes an order that was not yet delivered (`notes: "Order cancelled by Ready Set"`). An order is cancelled at most once, so you receive at most one `CANCELLED` per order (subject to at-least-once delivery below).
 
 ### Expected response
 
@@ -405,29 +466,41 @@ Delivery fee is typically calculated as the **lesser** of headcount tier or food
 
 | HTTP | Status field | Meaning |
 |------|--------------|---------|
-| 200 | `SUCCESS` / `CONFIRMED` / `CANCELLED` | Request succeeded (update, confirm) |
+| 200 | `SUCCESS` / `CONFIRMED` / `CANCELLED` | Request succeeded (update, confirm, get) |
 | 201 | `SUCCESS` | Order draft created (draft endpoint only) |
 | 400 | `ERROR` | Invalid request payload — `message` describes the failure; `details` includes field-level errors (Zod-formatted) |
 | 401 | `ERROR` | Missing or invalid auth headers |
-| 404 | `ERROR` | Order not found (update / confirm) |
-| 409 | `ERROR` | Duplicate `orderCode` for this partner — an active order with the same code already exists. The conflicting order's `id` is included in `details.existingOrderId`. Treat this as a successful idempotent retry: use the existing `id` for subsequent update / confirm calls. |
+| 403 | `ERROR` | The order belongs to another partner |
+| 404 | `ERROR` | Order not found (update / confirm / get) |
+| 409 | `ERROR` | Draft: duplicate `orderCode` for this partner — an active order with the same code already exists. The conflicting order's `id` is included in `details.existingOrderId` (see below). Treat this as a successful idempotent retry: use the existing `id` for subsequent update / confirm calls. `details` is absent when the code belonged to an order that was since deleted; codes are not reusable. Update: renaming to an `orderCode` another active order already uses (no `details`). |
 | 413 | `ERROR` | Request body exceeds the 256 KB size limit |
 | 415 | `ERROR` | Wrong `Content-Type` (must be `application/json`) |
-| 422 | `ERROR` | Pricing calculation failed — typically a malformed pickup / drop-off address. Retry with corrected values. |
+| 422 | `ERROR` | Pricing calculation failed — typically a malformed pickup / drop-off address. Retry with corrected values. Also returned when the order can no longer be updated or confirmed (its status, or it was already confirmed) and when the delivery time is not available. |
 | 429 | `ERROR` | Rate limit exceeded — see [Rate Limiting](#rate-limiting). Response includes a `Retry-After` header (seconds) indicating when to retry. |
 | 500 | `ERROR` | Internal error — please retry (idempotent via `Idempotency-Key`) or contact support |
+
+409 body from `/orders/draft`:
+
+```json
+{
+  "status": "ERROR",
+  "message": "Order with code CC-12345 already exists",
+  "details": { "existingOrderId": "ac59dadb-0ca0-45f4-ab9e-2e009d3c5b3b" }
+}
+```
 
 ---
 
 ## Rate Limiting
 
-All partner endpoints enforce a per-partner rate limit. The default ceiling is **100 requests / minute** per partner (sliding window), measured across all endpoints combined. Rates can be raised on request via the support contact below.
+All partner endpoints enforce a per-partner rate limit, counted **per route**: `/orders/draft`, `/orders/update`, `/orders/confirm` and `GET /orders/{id}` each have their own bucket. The default ceiling is **100 requests / minute** per partner per route (sliding window). Your ceiling is configured on your partner account and can be raised on request via the support contact below; the ceiling applied is echoed in the `X-RateLimit-Limit` header of a 429.
 
 Exceeding the limit returns:
 
 - HTTP `429 Too Many Requests`
 - `Retry-After: <seconds>` header — the number of seconds to wait before the next attempt
-- Response body: `{ "status": "ERROR", "message": "Rate limit exceeded" }`
+- `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers
+- Response body: `{ "status": "ERROR", "message": "Rate limit exceeded for orders.draft. Retry in 12s." }` (the message starts with `Rate limit exceeded`)
 
 Respect the `Retry-After` value rather than guessing — the limiter is sliding-window and an arbitrary retry can hit a fresh rejection. Combined with `Idempotency-Key`, you can safely retry a 429 once the window opens without risk of duplicate processing.
 
@@ -440,7 +513,8 @@ Respect the `Retry-After` value rather than guessing — the limiter is sliding-
 2. CaterCow → POST /orders/update      → optional, recalculates quote
 3. CaterCow → POST /orders/confirm     → finalizes order, Ready Set dispatches
 4. Ready Set → CaterCow webhook        → status updates as driver progresses
-   (ASSIGNED → PICKED_UP → ON_THE_WAY → ARRIVED → DELIVERED)
+   (ASSIGNED → PICKED_UP → ON_THE_WAY → ARRIVED → DELIVERED, or CANCELLED)
+5. CaterCow → GET /orders/{id}         → optional, resync after a missed webhook
 ```
 
 ---
@@ -477,6 +551,19 @@ Ready Set will provide:
 ---
 
 ## Changelog
+
+### v0.4 (2026-11-04)
+- Added `GET /orders/{id}` (Endpoint 4): current order state plus the 10 most recent status events, for resyncing after a missed webhook. The webhook is now Endpoint 5.
+- `CANCELLED` webhook is now also sent when Ready Set cancels your order or deletes one that was not yet delivered (`notes: "Order cancelled by Ready Set"` on delete). At most one `CANCELLED` per order.
+- The `CANCELLED` webhook after `/orders/confirm` with `isAccepted: false` is sent after the response, so the confirm call no longer waits on your webhook endpoint.
+- Status webhooks are sent once per real status change; a re-sent driver status no longer produces a duplicate event.
+- `ON_THE_WAY` webhooks now carry `location` when the driver's position is known; documented that it can be absent and is never sent on other statuses (was "Present for ON_THE_WAY pings").
+- A confirmed order stays locked for `/orders/update` and `/orders/confirm` (`422`) even after Ready Set returns it to the dispatch pool. A driver assigned before you confirm does not lock the draft.
+- A successful confirm is recorded as a `CONFIRMED` event: it appears in `GET /orders/{id}` `events` (not in `lifecycleStatus`) and is never sent as a webhook.
+- 409 from `/orders/draft` now includes `details.existingOrderId`, as documented in v0.2 (it was missing). Absent when the code belonged to a deleted order.
+- Body limit enforced at **256 KB** on the bytes received, chunked bodies included (previously only `Content-Length` was checked, against 1 MB). Non-`application/json` `Content-Type` on a `POST` is now rejected with `415`, as documented.
+- Rate limit: corrected to **per route** (each endpoint has its own bucket; previously documented as "across all endpoints combined"); your account's configured ceiling now applies (was a fixed 100/min). Documented the real 429 message and `X-RateLimit-*` headers.
+- Corrected the documented 401 message, added 403, and listed the other 422 causes.
 
 ### v0.3 (2026-10-16)
 - Status webhook retries are now durable: failed callbacks are retried from a persisted queue, so the existing "5 attempts over ~30 minutes" promise holds even when the original request has finished. Previously Ready Set retried 3 times within a few seconds and never retried a 4xx.

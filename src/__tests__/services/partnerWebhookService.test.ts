@@ -253,6 +253,7 @@ describe('recordAndDispatchLifecycleEvent', () => {
 
     expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ location: { lat: 37.7749, lng: -122.4194 } }),
+      select: { id: true },
     });
     const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(sent).not.toHaveProperty('location');
@@ -271,6 +272,7 @@ describe('recordAndDispatchLifecycleEvent', () => {
 
     expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ location: { lat: 1, lng: 2 } }),
+      select: { id: true },
     });
   });
 

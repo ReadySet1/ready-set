@@ -4,6 +4,7 @@ import { runAfterResponse } from '@/lib/api/after-response';
 import { broadcastDeliveryStatus } from '@/lib/realtime/server-broadcast';
 import type { DeliveryStatusUpdatedPayload } from '@/lib/realtime/schemas';
 import { notifyDriverOrderCancelled } from '@/services/notifications/driver-cancellation';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 import {
   releaseCancelledOrder,
   type ReturnOrderType,
@@ -94,6 +95,12 @@ export function toDeleteOrderActionResult(
 
 /** Order statuses after which a "cancelled, stop working it" alert is wrong. */
 const SETTLED_ORDER_STATUSES = ['COMPLETED', 'CANCELLED', 'DELIVERED'];
+
+/**
+ * Note on the partner CANCELLED event a delete emits. Fixed text on purpose:
+ * the admin's deletion reason is internal and never leaves Ready Set.
+ */
+const PARTNER_DELETE_NOTE = 'Order cancelled by Ready Set';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -280,6 +287,23 @@ export async function softDeleteOrder(
       if (driver) drivers.set(driver.id, driver);
     }
     alertAssignedDrivers({ ...deleted, driverStatus }, [...drivers.values()]);
+
+    // A deleted partner order is a cancelled one for the partner. Settled
+    // orders are skipped, so a cancel followed by a delete sends CANCELLED
+    // once. Partner orders are catering rows; the helper no-ops for anything
+    // else and never throws.
+    if (deleted.orderType === 'catering') {
+      runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+        recordAndDispatchLifecycleEvent({
+          orderId: deleted.orderId,
+          orderNumber: deleted.orderNumber,
+          partnerStatus: 'CANCELLED',
+          driverStatus: null,
+          changedBy: actor.deletedBy,
+          notes: PARTNER_DELETE_NOTE,
+        }),
+      );
+    }
   }
 
   return {

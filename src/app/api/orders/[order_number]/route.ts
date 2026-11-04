@@ -873,8 +873,11 @@ export async function PATCH(
     // skipped when neither will be written. A non-privileged caller was
     // verified as assigned above, so their own identity is used; staff get the
     // newest dispatch (the include has no orderBy).
+    // Partner lifecycle events fire on a real change only: a re-sent status
+    // (client retry, double tap) must not emit the same event twice.
     const writesPartnerLifecycle =
       !!driverStatus &&
+      driverStatus !== currentDriverStatus &&
       !!DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
         driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
       ];
@@ -1051,6 +1054,28 @@ export async function PATCH(
         );
       }
 
+      // Tell the owning partner (e.g. CaterCow) the order is cancelled. Only on
+      // the actual transition, so re-sending CANCELLED never emits twice.
+      // Partner orders are catering rows; the helper no-ops for anything that
+      // isn't a registry partner order and never throws.
+      if (
+        updateData.status === 'CANCELLED' &&
+        currentStatus !== 'CANCELLED' &&
+        orderType === 'catering'
+      ) {
+        const cancelledOrderId: string = (updatedOrder as any).id;
+        const cancelledOrderNumber: string = (updatedOrder as any).orderNumber ?? order_number;
+        runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+          recordAndDispatchLifecycleEvent({
+            orderId: cancelledOrderId,
+            orderNumber: cancelledOrderNumber,
+            partnerStatus: 'CANCELLED',
+            driverStatus: null,
+            changedBy: user.id,
+          }),
+        );
+      }
+
       // Send notifications for driver status updates (non-blocking)
       if (driverStatus) {
         const dispatchStatus = DRIVER_STATUS_TO_DISPATCH_STATUS[driverStatus];
@@ -1129,23 +1154,27 @@ export async function PATCH(
           DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
             driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
           ];
-        if (partnerLifecycle) {
+        if (partnerLifecycle && writesPartnerLifecycle) {
           const driverProfile = (updatedOrder as any).dispatches?.[0]?.driver;
           const driver =
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () =>
-            recordAndDispatchLifecycleEvent({
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () => {
+            const point = await historyLocation;
+            await recordAndDispatchLifecycleEvent({
               orderId: (updatedOrder as any).id,
               orderNumber: (updatedOrder as any).orderNumber,
               partnerStatus: partnerLifecycle,
               driverStatus,
               changedBy: user.id ?? driverProfile?.id ?? null,
               driver,
-              historyLocation: await historyLocation,
-            }),
-          );
+              // Contract: ON_THE_WAY carries the driver's position when we
+              // know it (fresh server GPS point, else the client-sent one).
+              location: partnerLifecycle === 'ON_THE_WAY' ? point ?? undefined : undefined,
+              historyLocation: point,
+            });
+          });
         }
       }
 
