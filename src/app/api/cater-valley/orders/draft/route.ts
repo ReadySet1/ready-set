@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
       return storeAndReturnResponse(idempotency, 409, {
         status: 'ERROR',
         message: `Order with code ${validatedData.orderCode} already exists`,
+        details: { existingOrderId: existingOrder.id },
       });
     }
 
@@ -249,9 +250,16 @@ export async function POST(request: NextRequest) {
       // P2002 (unique constraint). Convert to a deterministic 409 instead
       // of a 500.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Name the live order that won, so the partner can treat this as an
+        // idempotent retry. A code held only by a deleted order has none.
+        const conflicting = await prisma.cateringRequest.findFirst({
+          where: { orderNumber: normalizedOrderNumber, deletedAt: null },
+          select: { id: true },
+        });
         return storeAndReturnResponse(idempotency, 409, {
           status: 'ERROR',
           message: `Order with code ${validatedData.orderCode} already exists`,
+          ...(conflicting ? { details: { existingOrderId: conflicting.id } } : {}),
         });
       }
       throw error;
