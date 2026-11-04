@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
-import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforcePartnerBodyPolicy, readJsonBody } from '@/lib/security/body-size-limit';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import {
   readIdempotencyContext,
@@ -85,7 +85,8 @@ interface UpdateOrderResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const sizeReject = enforceBodySizeLimit(request);
+    // Content-Type (415 on /api/partners) + declared size, before auth.
+    const sizeReject = enforcePartnerBodyPolicy(request);
     if (sizeReject) return sizeReject;
 
     const auth = await authenticatePartnerRequest(request);
@@ -99,18 +100,11 @@ export async function POST(request: NextRequest) {
     const replay = await replayCachedResponse(idempotency);
     if (replay) return replay;
 
-    let requestBody: UpdateOrderRequest;
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      return NextResponse.json(
-        {
-          status: 'ERROR',
-          message: 'Invalid JSON in request body',
-        },
-        { status: 400 }
-      );
-    }
+    // Read with the size limit enforced on the bytes actually received
+    // (a chunked body has no Content-Length to check up front).
+    const read = await readJsonBody(request);
+    if (!read.ok) return read.response;
+    const requestBody = read.body as UpdateOrderRequest;
 
     const validationResult = UpdateOrderSchema.safeParse(requestBody);
     if (!validationResult.success) {
