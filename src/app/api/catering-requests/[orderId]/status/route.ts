@@ -316,8 +316,14 @@ export async function PATCH(
     //     it to order_status_history, and POSTs a signed webhook. The
     //     helper self-guards against legacy carriers and non-partner
     //     orders, and never throws.
+    //     Only on a real change (a re-sent status must not emit the event
+    //     twice), except a staff ASSIGNED naming a driver: a reassignment the
+    //     partner must hear about.
     const partnerLifecycle = DRIVER_STATUS_TO_PARTNER_LIFECYCLE[validatedData.driverStatus];
-    if (partnerLifecycle) {
+    const driverStatusChanged = validatedData.driverStatus !== order.driverStatus;
+    const isReassignment =
+      isStaff && validatedData.driverStatus === 'ASSIGNED' && !!validatedData.driverId;
+    if (partnerLifecycle && (driverStatusChanged || isReassignment)) {
       const driverProfile = order.dispatches[0]?.driver;
       const driver =
         driverProfile?.name && driverProfile?.contactNumber

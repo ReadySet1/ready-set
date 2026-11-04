@@ -933,6 +933,27 @@ describe('/api/catering-requests/[orderId]/status - a driver acts only as themse
     expect(mockedRecord.mock.calls[0]![0].changedBy).toBe(ASSIGNEE);
   });
 
+  it('does not emit a partner event again when the driver re-sends the status they hold', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', ASSIGNED_DRIVER));
+    arrange('PICKED_UP');
+
+    const res = await patch({ driverStatus: 'PICKED_UP' });
+
+    expect(res.status).toBe(200);
+    expect(mockedRecord).not.toHaveBeenCalled();
+  });
+
+  it('staff re-assigning an ASSIGNED order still emits ASSIGNED (new driver)', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('ADMIN'));
+    arrange('ASSIGNED');
+
+    const res = await patch({ driverStatus: 'ASSIGNED', driverId: ASSIGNEE });
+
+    expect(res.status).toBe(200);
+    expect(mockedRecord).toHaveBeenCalledTimes(1);
+    expect(mockedRecord.mock.calls[0]![0].partnerStatus).toBe('ASSIGNED');
+  });
+
   it('staff outside ASSIGNED keep the body driverId as changedBy (unchanged behavior)', async () => {
     mockedWithAuth.mockResolvedValue(authAs('HELPDESK'));
     arrange('ARRIVED_AT_VENDOR');

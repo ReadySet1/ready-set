@@ -335,6 +335,24 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(mockedRecordLifecycle).not.toHaveBeenCalled();
     });
 
+    it('does NOT dispatch again when the driver re-sends the status they already hold', async () => {
+      setupMocks({
+        orderNumber: 'CC-12345',
+        status: 'IN_PROGRESS',
+        driverStatus: 'EN_ROUTE_TO_CLIENT',
+      });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(
+        createPatchRequest({ driverStatus: 'EN_ROUTE_TO_CLIENT' }, 'CC-12345'),
+        { params: Promise.resolve({ order_number: 'CC-12345' }) },
+      );
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(response.status).toBe(200);
+      expect(mockedRecordLifecycle).not.toHaveBeenCalled();
+    });
+
     it('dispatches CANCELLED when an admin cancels a catering order', async () => {
       setupMocks({ orderNumber: 'CC-12345', status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
       const { PATCH } = await importRoute();

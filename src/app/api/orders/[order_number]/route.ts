@@ -873,8 +873,11 @@ export async function PATCH(
     // skipped when neither will be written. A non-privileged caller was
     // verified as assigned above, so their own identity is used; staff get the
     // newest dispatch (the include has no orderBy).
+    // Partner lifecycle events fire on a real change only: a re-sent status
+    // (client retry, double tap) must not emit the same event twice.
     const writesPartnerLifecycle =
       !!driverStatus &&
+      driverStatus !== currentDriverStatus &&
       !!DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
         driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
       ];
@@ -1151,7 +1154,7 @@ export async function PATCH(
           DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
             driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
           ];
-        if (partnerLifecycle) {
+        if (partnerLifecycle && writesPartnerLifecycle) {
           const driverProfile = (updatedOrder as any).dispatches?.[0]?.driver;
           const driver =
             driverProfile?.name && driverProfile?.contactNumber
