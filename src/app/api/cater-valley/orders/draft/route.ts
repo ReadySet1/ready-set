@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // 1a. Per-partner rate limit (after auth so we can attribute the count
     //     to a specific partner).
-    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.draft');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.draft', partner.rateLimitPerMin);
     if (rateLimitReject) return rateLimitReject;
 
     // 1b. Idempotency-Key replay — namespaced by partner slug.

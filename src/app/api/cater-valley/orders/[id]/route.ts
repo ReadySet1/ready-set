@@ -30,7 +30,7 @@ export async function GET(
     if (!auth.ok) return auth.response;
     const { partner } = auth;
 
-    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.get');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.get', partner.rateLimitPerMin);
     if (rateLimitReject) return rateLimitReject;
 
     const { id } = await context.params;

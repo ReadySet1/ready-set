@@ -61,6 +61,22 @@ jest.mock('@/lib/services/partner-registry', () => ({
         },
       };
     }
+    if (slug === 'tinycow' && apiKey === 'tiny-key') {
+      // A partner whose api_partners row sets a 2 requests/minute ceiling.
+      return {
+        ok: true,
+        partner: {
+          id: 'partner-tiny-id',
+          slug: 'tinycow',
+          displayName: 'TinyCow',
+          orderPrefix: 'TC-',
+          webhookUrl: null,
+          webhookSecret: null,
+          rateLimitPerMin: 2,
+          isActive: true,
+        },
+      };
+    }
     if (slug === 'catervalley' && apiKey === 'cv-test-key') {
       return {
         ok: true,
@@ -236,5 +252,16 @@ describe('POST /api/partners/orders/draft (CaterCow)', () => {
       expect(response.status).not.toBe(413);
       expect(response.status).not.toBe(415);
     });
+  });
+
+  it("applies the partner's own rateLimitPerMin, per route", async () => {
+    const headers = { partner: 'tinycow', 'x-api-key': 'tiny-key' };
+    const send = () => draftPOST(buildPartnerDraftRequest(headers, { orderCode: 'TC-1' }) as any);
+
+    expect((await send()).status).not.toBe(429);
+    expect((await send()).status).not.toBe(429);
+    const limited = await send();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('X-RateLimit-Limit')).toBe('2');
   });
 });

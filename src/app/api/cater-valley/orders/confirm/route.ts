@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.response;
     const { partner } = auth;
 
-    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.confirm');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.confirm', partner.rateLimitPerMin);
     if (rateLimitReject) return rateLimitReject;
 
     const idempotency = readIdempotencyContext(request, partner.slug);
