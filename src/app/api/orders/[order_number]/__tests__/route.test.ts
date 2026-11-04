@@ -1390,6 +1390,52 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       );
     });
 
+    it("sends the driver's resolved position as the ON_THE_WAY webhook location", async () => {
+      mockedResolveLocation.mockResolvedValue({ lat: 37.7749, lng: -122.4194 });
+      setupMocks({ orderNumber: 'CC-12345', status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_CLIENT' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partnerStatus: 'ON_THE_WAY',
+          location: { lat: 37.7749, lng: -122.4194 },
+        }),
+      );
+    });
+
+    it('omits the webhook location on ON_THE_WAY when no position is known', async () => {
+      mockedResolveLocation.mockResolvedValue(null);
+      setupMocks({ orderNumber: 'CC-12345', status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'EN_ROUTE_TO_CLIENT' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).toHaveBeenCalledTimes(1);
+      expect(mockedRecordLifecycle.mock.calls[0]![0].location).toBeUndefined();
+    });
+
+    it('keeps the webhook location off non-ON_THE_WAY events', async () => {
+      mockedResolveLocation.mockResolvedValue({ lat: 37.7749, lng: -122.4194 });
+      setupMocks({ orderNumber: 'CC-12345', status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ driverStatus: 'PICKED_UP' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).toHaveBeenCalledTimes(1);
+      expect(mockedRecordLifecycle.mock.calls[0]![0].location).toBeUndefined();
+    });
+
     const mockHistoryCaller = (userId: string, type: string) => {
       mockedCreateClient.mockResolvedValue({
         auth: {

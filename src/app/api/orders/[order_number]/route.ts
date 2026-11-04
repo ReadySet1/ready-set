@@ -1160,17 +1160,21 @@ export async function PATCH(
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () =>
-            recordAndDispatchLifecycleEvent({
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () => {
+            const point = await historyLocation;
+            await recordAndDispatchLifecycleEvent({
               orderId: (updatedOrder as any).id,
               orderNumber: (updatedOrder as any).orderNumber,
               partnerStatus: partnerLifecycle,
               driverStatus,
               changedBy: user.id ?? driverProfile?.id ?? null,
               driver,
-              historyLocation: await historyLocation,
-            }),
-          );
+              // Contract: ON_THE_WAY carries the driver's position when we
+              // know it (fresh server GPS point, else the client-sent one).
+              location: partnerLifecycle === 'ON_THE_WAY' ? point ?? undefined : undefined,
+              historyLocation: point,
+            });
+          });
         }
       }
 
