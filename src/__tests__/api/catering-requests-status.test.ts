@@ -61,7 +61,15 @@ jest.mock('@/lib/services/partnerWebhookService', () => ({
   recordAndDispatchLifecycleEvent: jest.fn(async () => undefined),
 }));
 
+// Post-response work runs inline by default; a test can capture it instead.
+jest.mock('@/lib/api/after-response', () => ({
+  runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
+    void work();
+  }),
+}));
+
 import { GET, PATCH } from '@/app/api/catering-requests/[orderId]/status/route';
+import { runAfterResponse } from '@/lib/api/after-response';
 import { resolveStatusHistoryLocation } from '@/lib/services/status-history-location';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 import { prisma } from '@/lib/db/prisma';
@@ -931,6 +939,23 @@ describe('/api/catering-requests/[orderId]/status - a driver acts only as themse
       data: { cateringRequestId: 'order-123', driverId: ASSIGNEE, userId: 'client-1' },
     });
     expect(mockedRecord.mock.calls[0]![0].changedBy).toBe(ASSIGNEE);
+  });
+
+  it('dispatches the partner lifecycle event after the response, not inline', async () => {
+    mockedWithAuth.mockResolvedValue(authAs('DRIVER', ASSIGNED_DRIVER));
+    arrange('ARRIVED_AT_VENDOR');
+    const deferred: Array<() => Promise<unknown>> = [];
+    (runAfterResponse as jest.Mock).mockImplementationOnce((_label, work) => {
+      deferred.push(work);
+    });
+
+    const res = await patch({ driverStatus: 'PICKED_UP' });
+
+    expect(res.status).toBe(200);
+    expect(mockedRecord).not.toHaveBeenCalled();
+    await Promise.all(deferred.map((work) => work()));
+    expect(mockedRecord).toHaveBeenCalledTimes(1);
+    expect(mockedRecord.mock.calls[0]![0].partnerStatus).toBe('PICKED_UP');
   });
 
   it('does not emit a partner event again when the driver re-sends the status they hold', async () => {

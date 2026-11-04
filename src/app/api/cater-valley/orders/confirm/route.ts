@@ -170,14 +170,18 @@ export async function POST(request: NextRequest) {
       });
 
       // Notify the partner of the cancellation (records to
-      // order_status_history + POSTs a signed CANCELLED webhook). The
-      // helper self-guards against legacy carriers and never throws.
-      await recordAndDispatchLifecycleEvent({
-        orderId: cancelledOrder.id,
-        orderNumber: cancelledOrder.orderNumber,
-        partnerStatus: 'CANCELLED',
-        notes: validatedData.reason,
-      });
+      // order_status_history + POSTs a signed CANCELLED webhook). Deferred
+      // past the response so it never waits on the partner's server; a
+      // failed send is retried from the durable queue. The helper
+      // self-guards against legacy carriers and never throws.
+      runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+        recordAndDispatchLifecycleEvent({
+          orderId: cancelledOrder.id,
+          orderNumber: cancelledOrder.orderNumber,
+          partnerStatus: 'CANCELLED',
+          notes: validatedData.reason,
+        }),
+      );
 
       return storeAndReturnResponse(idempotency, 200, {
         id: cancelledOrder.id,

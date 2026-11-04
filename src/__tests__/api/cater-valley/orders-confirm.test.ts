@@ -3,6 +3,8 @@
 import { POST } from '@/app/api/cater-valley/orders/confirm/route';
 import { prisma } from '@/lib/db/prisma';
 import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
+import { runAfterResponse } from '@/lib/api/after-response';
 import {
   createPostRequest,
   expectSuccessResponse,
@@ -20,6 +22,9 @@ jest.mock('@/lib/db/prisma', () => ({
 }));
 
 jest.mock('@/services/orders/notifyOrderCreated');
+jest.mock('@/lib/services/partnerWebhookService', () => ({
+  recordAndDispatchLifecycleEvent: jest.fn(async () => undefined),
+}));
 jest.mock('@/lib/api/after-response', () => ({
   runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => { void work(); }),
 }));
@@ -208,6 +213,44 @@ describe('POST /api/cater-valley/orders/confirm - Confirm/Cancel Order', () => {
 
       // Admin notification must NOT fire on cancellation
       expect(notifyOrderCreated).not.toHaveBeenCalled();
+    });
+
+    it('sends the CANCELLED webhook after the response, not inline', async () => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockOrder);
+      (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        status: 'CANCELLED',
+      });
+      const deferred: Array<() => Promise<unknown>> = [];
+      (runAfterResponse as jest.Mock).mockImplementation((_label, work) => {
+        deferred.push(work);
+      });
+
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify({ id: mockOrder.id, isAccepted: false, reason: 'Customer request' }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      // The partner's server never sits on our response path.
+      expect(recordAndDispatchLifecycleEvent).not.toHaveBeenCalled();
+
+      await Promise.all(deferred.map((work) => work()));
+      expect(recordAndDispatchLifecycleEvent).toHaveBeenCalledWith({
+        orderId: mockOrder.id,
+        orderNumber: 'CV-TEST-001',
+        partnerStatus: 'CANCELLED',
+        notes: 'Customer request',
+      });
+      (runAfterResponse as jest.Mock).mockImplementation((_label, work) => {
+        void work();
+      });
     });
 
     it('should append cancellation reason to notes', async () => {
