@@ -127,26 +127,37 @@ export function isOrderEditable(status: string): boolean {
 }
 
 /**
- * Include for the order lookup that tells whether the order already left
- * the draft stage. Return-to-dispatch puts a confirmed, assigned order back
- * to ACTIVE, so status alone reads it as a fresh draft again; any
- * `order_status_history` row (lifecycle events start at ASSIGNED) shows it
- * was dispatched.
+ * `order_status_history.partner_status` of the row the partner confirm route
+ * writes on a successful confirm. Ours alone: it is never sent as a webhook.
  */
-export const DISPATCH_HISTORY_PROBE = { select: { id: true }, take: 1 } as const;
+export const CONFIRMED_HISTORY_STATUS = 'CONFIRMED';
 
 /**
- * True when the order was already dispatched (see DISPATCH_HISTORY_PROBE).
- * Partner API only: such an order stays locked for partner update / confirm
- * even when its status is back to ACTIVE. Internal admin flows don't use it.
+ * Include for the order lookup that tells whether the partner already
+ * confirmed the order. Return-to-dispatch puts a confirmed order back to
+ * ACTIVE, so status alone reads it as a fresh draft again. Only the CONFIRMED
+ * row counts: ops may assign a driver to a draft before the partner confirms
+ * (an ASSIGNED row on an ACTIVE draft), which must not lock it.
  */
-export function wasDispatched(order: { statusHistory?: ReadonlyArray<unknown> | null }): boolean {
+export const CONFIRMED_HISTORY_PROBE = {
+  where: { partnerStatus: CONFIRMED_HISTORY_STATUS },
+  select: { id: true },
+  take: 1,
+} as const;
+
+/**
+ * True when the partner already confirmed the order (see
+ * CONFIRMED_HISTORY_PROBE). Partner API only: such an order stays locked for
+ * partner update / confirm even when its status is back to ACTIVE. Internal
+ * admin flows don't use it.
+ */
+export function wasConfirmed(order: { statusHistory?: ReadonlyArray<unknown> | null }): boolean {
   return (order.statusHistory?.length ?? 0) > 0;
 }
 
-/** Partner-facing 422 message for an order that wasDispatched(). */
-export const DISPATCHED_ORDER_MESSAGE =
-  'Order can no longer be modified: it has already been dispatched';
+/** Partner-facing 422 message for an order that wasConfirmed(). */
+export const CONFIRMED_ORDER_MESSAGE =
+  'Order can no longer be modified: it has already been confirmed';
 
 // ---------------------------------------------------------------------
 // Backward-compat wrappers — pinned to CaterValley.

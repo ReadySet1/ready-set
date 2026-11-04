@@ -27,9 +27,9 @@ import {
   ensureAddress,
   buildOrderNumber,
   isOrderEditable,
-  wasDispatched,
-  DISPATCH_HISTORY_PROBE,
-  DISPATCHED_ORDER_MESSAGE,
+  wasConfirmed,
+  CONFIRMED_HISTORY_PROBE,
+  CONFIRMED_ORDER_MESSAGE,
   isPartnerOrder,
   calculateCaterValleyPricing,
   type PricingCalculationResult,
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         user: true,
         pickupAddress: true,
         deliveryAddress: true,
-        statusHistory: DISPATCH_HISTORY_PROBE,
+        statusHistory: CONFIRMED_HISTORY_PROBE,
       },
     });
 
@@ -164,9 +164,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (wasDispatched(existingOrder)) {
+    if (wasConfirmed(existingOrder)) {
       return NextResponse.json(
-        { status: 'ERROR', message: DISPATCHED_ORDER_MESSAGE },
+        { status: 'ERROR', message: CONFIRMED_ORDER_MESSAGE },
         { status: 422 }
       );
     }

@@ -12,14 +12,20 @@ import {
 } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
+jest.mock('@/lib/db/prisma', () => {
+  const mockPrisma: any = {
     cateringRequest: {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-  },
-}));
+    orderStatusHistory: {
+      create: jest.fn(async () => ({ id: 'hist-confirmed' })),
+    },
+  };
+  // The transaction hands the callback the same mock client.
+  mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/services/orders/notifyOrderCreated');
 jest.mock('@/lib/services/partnerWebhookService', () => ({
@@ -470,31 +476,111 @@ describe('POST /api/cater-valley/orders/confirm - Confirm/Cancel Order', () => {
       await expectErrorResponse(response, 422, /cannot be confirmed in current status/i);
     });
 
-    it.each([true, false])(
-      'rejects an ACTIVE order that was already dispatched (isAccepted=%s)',
-      async (isAccepted) => {
-        // Confirmed -> assigned -> returned to dispatch leaves the order
-        // ACTIVE again; it must not be re-confirmed or cancelled as a draft.
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+    const orderWithHistory = (rows: Array<{ id: string; partnerStatus: string }>) => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockImplementation(async (args: any) => {
+        const probe = args?.include?.statusHistory;
+        const wanted = probe?.where?.partnerStatus;
+        const matching = rows.filter((r) => !wanted || r.partnerStatus === wanted);
+        return {
           ...mockOrder,
-          statusHistory: [{ id: 'hist-1' }],
+          statusHistory: probe ? matching.slice(0, probe.take ?? matching.length) : undefined,
+        };
+      });
+    };
+    const confirmRequest = (isAccepted: boolean) =>
+      new Request('http://localhost:3000/api/cater-valley/orders/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify({ id: mockOrder.id, isAccepted }),
+      });
+
+    it.each([
+      [true, 'CONFIRMED'],
+      [false, 'CANCELLED'],
+    ])(
+      'still confirms a draft ops assigned a driver to before the partner confirmed (isAccepted=%s)',
+      async (isAccepted, expected) => {
+        // assignDriver wrote an ASSIGNED row; the order is still an ACTIVE draft.
+        orderWithHistory([{ id: 'hist-a', partnerStatus: 'ASSIGNED' }]);
+        (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+          ...mockOrder,
+          status: expected,
         });
 
-        const request = new Request('http://localhost:3000/api/cater-valley/orders/confirm', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': 'test-api-key',
-            'partner': 'catervalley',
-          },
-          body: JSON.stringify({ id: mockOrder.id, isAccepted }),
-        });
+        const response = await POST(confirmRequest(isAccepted));
+        const data = await expectSuccessResponse(response, 200);
+        expect(data.status).toBe(expected);
+      },
+    );
 
-        const response = await POST(request);
-        await expectErrorResponse(response, 422, /already been dispatched/i);
+    it.each([true, false])(
+      'rejects a confirmed order that return-to-dispatch put back to ACTIVE (isAccepted=%s)',
+      async (isAccepted) => {
+        orderWithHistory([
+          { id: 'hist-a', partnerStatus: 'ASSIGNED' },
+          { id: 'hist-c', partnerStatus: 'CONFIRMED' },
+        ]);
+
+        const response = await POST(confirmRequest(isAccepted));
+        await expectErrorResponse(response, 422, /already been confirmed/i);
         expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
       },
     );
+
+    it('records a CONFIRMED history row with the status update and sends no webhook', async () => {
+      orderWithHistory([]);
+      (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        status: 'CONFIRMED',
+      });
+
+      const response = await POST(confirmRequest(true));
+
+      expect(response.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledTimes(1);
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          cateringRequestId: mockOrder.id,
+          partnerStatus: 'CONFIRMED',
+          driverStatus: null,
+          changedBy: null,
+        },
+      });
+      // A CONFIRMED event is ours to lock on, not a partner webhook.
+      expect(recordAndDispatchLifecycleEvent).not.toHaveBeenCalled();
+    });
+
+    it('does not record a CONFIRMED row when the partner rejects the order', async () => {
+      orderWithHistory([]);
+      (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        status: 'CANCELLED',
+      });
+
+      await POST(confirmRequest(false));
+
+      expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+    });
+
+    it('fails the confirm (500, retryable) when the CONFIRMED row cannot be written', async () => {
+      orderWithHistory([]);
+      (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
+        ...mockOrder,
+        status: 'CONFIRMED',
+      });
+      (prisma.orderStatusHistory.create as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const response = await POST(confirmRequest(true));
+
+      expect(response.status).toBe(500);
+      expect(notifyOrderCreated).not.toHaveBeenCalled();
+    });
 
     it('should handle database update errors', async () => {
       (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockOrder);

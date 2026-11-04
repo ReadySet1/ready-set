@@ -18,9 +18,10 @@ import {
 import {
   authenticatePartnerRequest,
   isOrderEditable,
-  wasDispatched,
-  DISPATCH_HISTORY_PROBE,
-  DISPATCHED_ORDER_MESSAGE,
+  wasConfirmed,
+  CONFIRMED_HISTORY_PROBE,
+  CONFIRMED_HISTORY_STATUS,
+  CONFIRMED_ORDER_MESSAGE,
   isPartnerOrder,
 } from '@/app/api/cater-valley/_lib';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
         user: true,
         pickupAddress: true,
         deliveryAddress: true,
-        statusHistory: DISPATCH_HISTORY_PROBE,
+        statusHistory: CONFIRMED_HISTORY_PROBE,
       },
     });
 
@@ -144,9 +145,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (wasDispatched(existingOrder)) {
+    if (wasConfirmed(existingOrder)) {
       return NextResponse.json(
-        { status: 'ERROR', message: DISPATCHED_ORDER_MESSAGE },
+        { status: 'ERROR', message: CONFIRMED_ORDER_MESSAGE },
         { status: 422 }
       );
     }
@@ -185,16 +186,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const confirmedOrder = await prisma.cateringRequest.update({
-      where: { id: validatedData.id },
-      data: {
-        status: 'CONFIRMED',
-        updatedAt: new Date(),
-      },
-      include: {
-        pickupAddress: true,
-        deliveryAddress: true,
-      },
+    // The CONFIRMED history row is what keeps the order locked for the
+    // partner once it is confirmed (return-to-dispatch resets the status to
+    // ACTIVE), so it is written in the same transaction as the status: a
+    // failed write fails the confirm (retryable) instead of leaving a
+    // confirmed order unlocked. It is an internal event — no webhook.
+    const confirmedOrder = await prisma.$transaction(async (tx) => {
+      const updated = await tx.cateringRequest.update({
+        where: { id: validatedData.id },
+        data: {
+          status: 'CONFIRMED',
+          updatedAt: new Date(),
+        },
+        include: {
+          pickupAddress: true,
+          deliveryAddress: true,
+        },
+      });
+      await tx.orderStatusHistory.create({
+        data: {
+          cateringRequestId: updated.id,
+          partnerStatus: CONFIRMED_HISTORY_STATUS,
+          driverStatus: null,
+          changedBy: null,
+        },
+      });
+      return updated;
     });
 
     await triggerOrderDispatch(confirmedOrder.id);

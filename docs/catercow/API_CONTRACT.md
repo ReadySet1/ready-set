@@ -210,7 +210,7 @@ On error, returns one of the codes in the [Error Codes](#error-codes) section wi
 
 ### Request
 
-Only an order that has not been dispatched yet can be updated. Once a driver has been assigned, the order stays locked for `/orders/update` and `/orders/confirm` (`422`) even if Ready Set later puts it back in the dispatch pool.
+Only an order you have not confirmed yet can be updated. Once confirmed, the order stays locked for `/orders/update` and `/orders/confirm` (`422`) even if Ready Set later puts it back in the dispatch pool. A driver assigned before you confirm does not lock the draft.
 
 Update is a **full-body replace**, not a partial update. Send every field exactly as you would for `/orders/draft`, plus the `id` returned from the original draft. Fields you don't intend to change should be sent with their current value. Sending a partial body will return `400 Bad Request`.
 
@@ -247,7 +247,7 @@ Same shape as `/orders/draft` response, but returned with HTTP **200 OK** instea
 
 ## Endpoint 3 — Confirm Order
 
-**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft; Ready Set then sends a `CANCELLED` status webhook (after responding — the confirm response does not wait for your webhook endpoint). An order that was already dispatched can no longer be confirmed or cancelled here (`422`).
+**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft; Ready Set then sends a `CANCELLED` status webhook (after responding — the confirm response does not wait for your webhook endpoint). An order that was already confirmed can no longer be confirmed or cancelled here (`422`).
 
 **`POST /orders/confirm`**
 
@@ -309,13 +309,14 @@ No body. Same `partner` + `x-api-key` headers as every other endpoint; `{id}` is
     orderNumber: string;            // Ready Set's order number, e.g. "CC-12345"
     orderStatus: string;            // Ready Set order state: "ACTIVE" / "PENDING" (draft), "CONFIRMED",
                                     // "ASSIGNED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "CANCELLED"
-    lifecycleStatus:                // Latest status event (same values as the webhook `status`);
+    lifecycleStatus:                // Latest lifecycle event (same values as the webhook `status`);
       | "ASSIGNED" | "PICKED_UP" | "ON_THE_WAY"
       | "ARRIVED" | "DELIVERED" | "CANCELLED"
-      | null;                       // null until the first event
+      | null;                       // null until the first lifecycle event (CONFIRMED doesn't count)
     deliveryDate: string | null;    // ISO 8601 UTC delivery date-time
     events: Array<{                 // Up to the 10 most recent events, newest first
-      status: string;               // Same values as lifecycleStatus
+      status: string;               // A lifecycleStatus value, or "CONFIRMED" (your confirm;
+                                    // never sent as a webhook)
       driverStatus: string | null;  // Ready Set's internal driver step behind the event (informational)
       timestamp: string;            // ISO 8601 UTC
       location?: { lat: number; lng: number };
@@ -474,7 +475,7 @@ Delivery fee is typically calculated as the **lesser** of headcount tier or food
 | 409 | `ERROR` | Draft: duplicate `orderCode` for this partner — an active order with the same code already exists. The conflicting order's `id` is included in `details.existingOrderId` (see below). Treat this as a successful idempotent retry: use the existing `id` for subsequent update / confirm calls. `details` is absent when the code belonged to an order that was since deleted; codes are not reusable. Update: renaming to an `orderCode` another active order already uses (no `details`). |
 | 413 | `ERROR` | Request body exceeds the 256 KB size limit |
 | 415 | `ERROR` | Wrong `Content-Type` (must be `application/json`) |
-| 422 | `ERROR` | Pricing calculation failed — typically a malformed pickup / drop-off address. Retry with corrected values. Also returned when the order can no longer be updated or confirmed (its status, or it was already dispatched) and when the delivery time is not available. |
+| 422 | `ERROR` | Pricing calculation failed — typically a malformed pickup / drop-off address. Retry with corrected values. Also returned when the order can no longer be updated or confirmed (its status, or it was already confirmed) and when the delivery time is not available. |
 | 429 | `ERROR` | Rate limit exceeded — see [Rate Limiting](#rate-limiting). Response includes a `Retry-After` header (seconds) indicating when to retry. |
 | 500 | `ERROR` | Internal error — please retry (idempotent via `Idempotency-Key`) or contact support |
 
@@ -557,7 +558,8 @@ Ready Set will provide:
 - The `CANCELLED` webhook after `/orders/confirm` with `isAccepted: false` is sent after the response, so the confirm call no longer waits on your webhook endpoint.
 - Status webhooks are sent once per real status change; a re-sent driver status no longer produces a duplicate event.
 - `ON_THE_WAY` webhooks now carry `location` when the driver's position is known; documented that it can be absent and is never sent on other statuses (was "Present for ON_THE_WAY pings").
-- An order that was already dispatched stays locked for `/orders/update` and `/orders/confirm` (`422`) even after Ready Set returns it to the dispatch pool.
+- A confirmed order stays locked for `/orders/update` and `/orders/confirm` (`422`) even after Ready Set returns it to the dispatch pool. A driver assigned before you confirm does not lock the draft.
+- A successful confirm is recorded as a `CONFIRMED` event: it appears in `GET /orders/{id}` `events` (not in `lifecycleStatus`) and is never sent as a webhook.
 - 409 from `/orders/draft` now includes `details.existingOrderId`, as documented in v0.2 (it was missing). Absent when the code belonged to a deleted order.
 - Body limit enforced at **256 KB** on the bytes received, chunked bodies included (previously only `Content-Length` was checked, against 1 MB). Non-`application/json` `Content-Type` on a `POST` is now rejected with `415`, as documented.
 - Rate limit: corrected to **per route** (each endpoint has its own bucket; previously documented as "across all endpoints combined"); your account's configured ceiling now applies (was a fixed 100/min). Documented the real 429 message and `X-RateLimit-*` headers.

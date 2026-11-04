@@ -15,7 +15,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
-import { authenticatePartnerRequest, isPartnerOrder } from '@/app/api/cater-valley/_lib';
+import {
+  authenticatePartnerRequest,
+  isPartnerOrder,
+  CONFIRMED_HISTORY_STATUS,
+} from '@/app/api/cater-valley/_lib';
 
 const HISTORY_LIMIT = 10;
 
@@ -72,9 +76,13 @@ export async function GET(
       ? order.orderNumber.slice(partner.orderPrefix.length)
       : order.orderNumber;
 
-    // The partner-facing lifecycle status is the latest recorded event
-    // (history is ordered newest-first). Null until the order is dispatched.
-    const lifecycleStatus = order.statusHistory[0]?.partnerStatus ?? null;
+    // The partner-facing lifecycle status is the latest recorded lifecycle
+    // event (history is ordered newest-first). The CONFIRMED row marks the
+    // partner's own confirm: it is listed in `events` but is not a lifecycle
+    // status, so lifecycleStatus stays null until the order is dispatched.
+    const lifecycleStatus =
+      order.statusHistory.find((e) => e.partnerStatus !== CONFIRMED_HISTORY_STATUS)
+        ?.partnerStatus ?? null;
 
     return NextResponse.json({
       status: 'SUCCESS',
