@@ -427,6 +427,32 @@ describe('POST /api/cater-valley/orders/confirm - Confirm/Cancel Order', () => {
       await expectErrorResponse(response, 422, /cannot be confirmed in current status/i);
     });
 
+    it.each([true, false])(
+      'rejects an ACTIVE order that was already dispatched (isAccepted=%s)',
+      async (isAccepted) => {
+        // Confirmed -> assigned -> returned to dispatch leaves the order
+        // ACTIVE again; it must not be re-confirmed or cancelled as a draft.
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+          ...mockOrder,
+          statusHistory: [{ id: 'hist-1' }],
+        });
+
+        const request = new Request('http://localhost:3000/api/cater-valley/orders/confirm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'test-api-key',
+            'partner': 'catervalley',
+          },
+          body: JSON.stringify({ id: mockOrder.id, isAccepted }),
+        });
+
+        const response = await POST(request);
+        await expectErrorResponse(response, 422, /already been dispatched/i);
+        expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
+      },
+    );
+
     it('should handle database update errors', async () => {
       (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockOrder);
       (prisma.cateringRequest.update as jest.Mock).mockRejectedValue(

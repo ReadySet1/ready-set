@@ -126,6 +126,28 @@ export function isOrderEditable(status: string): boolean {
   return editableStatuses.includes(status);
 }
 
+/**
+ * Include for the order lookup that tells whether the order already left
+ * the draft stage. Return-to-dispatch puts a confirmed, assigned order back
+ * to ACTIVE, so status alone reads it as a fresh draft again; any
+ * `order_status_history` row (lifecycle events start at ASSIGNED) shows it
+ * was dispatched.
+ */
+export const DISPATCH_HISTORY_PROBE = { select: { id: true }, take: 1 } as const;
+
+/**
+ * True when the order was already dispatched (see DISPATCH_HISTORY_PROBE).
+ * Partner API only: such an order stays locked for partner update / confirm
+ * even when its status is back to ACTIVE. Internal admin flows don't use it.
+ */
+export function wasDispatched(order: { statusHistory?: ReadonlyArray<unknown> | null }): boolean {
+  return (order.statusHistory?.length ?? 0) > 0;
+}
+
+/** Partner-facing 422 message for an order that wasDispatched(). */
+export const DISPATCHED_ORDER_MESSAGE =
+  'Order can no longer be modified: it has already been dispatched';
+
 // ---------------------------------------------------------------------
 // Backward-compat wrappers — pinned to CaterValley.
 // Kept so legacy tests and call sites that haven't moved to the

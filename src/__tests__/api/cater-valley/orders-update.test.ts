@@ -286,6 +286,55 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
       await expectErrorResponse(response, 422, /cannot be updated in current status/i);
     });
 
+    it('rejects an ACTIVE order that was already dispatched (returned to dispatch after confirm)', async () => {
+      // Return-to-dispatch puts a confirmed order back to ACTIVE; its
+      // lifecycle history is what shows it already left the draft stage.
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
+        id: validUpdateData.id,
+        orderNumber: 'CV-TEST-001',
+        status: 'ACTIVE',
+        user: { email: 'system@catervalley.com' },
+        pickupAddress: {},
+        deliveryAddress: {},
+        statusHistory: [{ id: 'hist-1' }],
+      });
+
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify(validUpdateData),
+      });
+
+      const response = await POST(request);
+      await expectErrorResponse(response, 422, /already been dispatched/i);
+      expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('reads the lifecycle history with the order lookup', async () => {
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify(validUpdateData),
+      });
+
+      await POST(request);
+      expect(prisma.cateringRequest.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            statusHistory: { select: { id: true }, take: 1 },
+          }),
+        }),
+      );
+    });
+
     it('should reject unavailable delivery time', async () => {
       (pricingService.isDeliveryTimeAvailable as jest.Mock).mockReturnValue(false);
 
