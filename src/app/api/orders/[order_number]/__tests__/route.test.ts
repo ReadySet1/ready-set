@@ -335,6 +335,59 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
       expect(mockedRecordLifecycle).not.toHaveBeenCalled();
     });
 
+    it('dispatches CANCELLED when an admin cancels a catering order', async () => {
+      setupMocks({ orderNumber: 'CC-12345', status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      const { PATCH } = await importRoute();
+
+      const response = await PATCH(createPatchRequest({ status: 'CANCELLED' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(response.status).toBe(200);
+      expect(mockedRecordLifecycle).toHaveBeenCalledTimes(1);
+      expect(mockedRecordLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderId: 'order-123',
+          orderNumber: 'CC-12345',
+          partnerStatus: 'CANCELLED',
+          driverStatus: null,
+          changedBy: 'test-user-id',
+        }),
+      );
+    });
+
+    it('does NOT dispatch CANCELLED again for an order that is already cancelled', async () => {
+      setupMocks({ orderNumber: 'CC-12345', status: 'CANCELLED', driverStatus: 'ASSIGNED' });
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ status: 'CANCELLED' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).not.toHaveBeenCalled();
+    });
+
+    it('does NOT dispatch CANCELLED for an on-demand order (partner orders are catering)', async () => {
+      setupMocks({ orderNumber: 'CC-12345', status: 'ASSIGNED', driverStatus: 'ASSIGNED' });
+      (mockedPrisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.onDemand.findFirst as jest.Mock).mockResolvedValue(
+        createMockOrder({ orderNumber: 'CC-12345', status: 'ASSIGNED' }),
+      );
+      (mockedPrisma.onDemand.update as jest.Mock).mockResolvedValue(
+        createMockOrder({ orderNumber: 'CC-12345', status: 'CANCELLED' }),
+      );
+      const { PATCH } = await importRoute();
+
+      await PATCH(createPatchRequest({ status: 'CANCELLED' }, 'CC-12345'), {
+        params: Promise.resolve({ order_number: 'CC-12345' }),
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockedRecordLifecycle).not.toHaveBeenCalled();
+    });
+
     it('does not fail the driver request if the partner dispatch rejects', async () => {
       // Fire-and-forget: even a thrown dispatch must not break the PATCH.
       setupMocks({

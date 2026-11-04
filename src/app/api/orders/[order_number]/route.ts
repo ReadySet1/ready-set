@@ -1051,6 +1051,28 @@ export async function PATCH(
         );
       }
 
+      // Tell the owning partner (e.g. CaterCow) the order is cancelled. Only on
+      // the actual transition, so re-sending CANCELLED never emits twice.
+      // Partner orders are catering rows; the helper no-ops for anything that
+      // isn't a registry partner order and never throws.
+      if (
+        updateData.status === 'CANCELLED' &&
+        currentStatus !== 'CANCELLED' &&
+        orderType === 'catering'
+      ) {
+        const cancelledOrderId: string = (updatedOrder as any).id;
+        const cancelledOrderNumber: string = (updatedOrder as any).orderNumber ?? order_number;
+        runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+          recordAndDispatchLifecycleEvent({
+            orderId: cancelledOrderId,
+            orderNumber: cancelledOrderNumber,
+            partnerStatus: 'CANCELLED',
+            driverStatus: null,
+            changedBy: user.id,
+          }),
+        );
+      }
+
       // Send notifications for driver status updates (non-blocking)
       if (driverStatus) {
         const dispatchStatus = DRIVER_STATUS_TO_DISPATCH_STATUS[driverStatus];
