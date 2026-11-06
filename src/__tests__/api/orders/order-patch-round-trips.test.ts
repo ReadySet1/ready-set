@@ -68,7 +68,10 @@ const order = {
   pickupAddress: {},
   deliveryAddress: { street1: '1 Main St' },
   dispatches: [{ driver: { id: DRIVER_USER, name: 'D' } }],
-  fileUploads: [],
+  // PICKED_UP needs the vendor-stage photo on file (read from the loaded
+  // order, no extra round trip); the pickup confirmation itself is satisfied
+  // by the fileUpload.findFirst mock below.
+  fileUploads: [{ category: 'pickup_photo' }],
 };
 
 function deferred<T>() {

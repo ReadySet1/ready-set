@@ -170,6 +170,24 @@ describe("SignatureCapture", () => {
     expect(init.headers ?? {}).not.toHaveProperty("Authorization");
   });
 
+  // C4 (2026-08-17 mobile round): the pen ink is dark, so in dark mode a
+  // theme-flipping pad background (bg-driver-surface-alt -> #16202f) made the
+  // strokes invisible while signing. The pad is a fixed light "paper" surface in
+  // both themes; the ink stays dark so the exported PNG reads on light pages.
+  it("draws dark ink on a light pad that does not flip with the theme (dark mode)", () => {
+    const SignaturePad = jest.requireMock("signature_pad").default as jest.Mock;
+    render(
+      <SignatureCapture orderNumber="CAT-001" onUploadComplete={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(SignaturePad).toHaveBeenCalledWith(
+      expect.any(HTMLCanvasElement),
+      expect.objectContaining({ penColor: "#15202e" }),
+    );
+    const well = screen.getByLabelText(/signature pad/i).parentElement!;
+    expect(well).toHaveClass("bg-white");
+    expect(well).not.toHaveClass("bg-driver-surface-alt");
+  });
+
   describe("resize ink preservation", () => {
     const setCanvasSize = (canvas: HTMLElement, w: number, h: number) => {
       Object.defineProperty(canvas, "offsetWidth", { value: w, configurable: true });
@@ -608,6 +626,76 @@ describe("SignatureCapture", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: /sign in full screen/i }));
       expect(screen.getByLabelText(/signature pad/i).parentElement).toHaveClass("flex-1", "min-h-0");
+    });
+  });
+
+  describe("delivery stage (completion: signature, or name if the recipient refuses)", () => {
+    const renderDelivery = (onComplete = jest.fn()) =>
+      render(
+        <SignatureCapture
+          stage="delivery"
+          orderNumber="CAT-001"
+          onUploadComplete={onComplete}
+          onCancel={jest.fn()}
+        />,
+      );
+    const recipientInput = () => screen.getByLabelText(/recipient name/i);
+    const confirmButton = () => screen.getByRole("button", { name: /confirm delivery/i });
+
+    it("states the requirement on screen", () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      renderDelivery();
+      expect(screen.getByText(/required/i)).toHaveTextContent(/signature/i);
+      expect(screen.getByText(/required/i)).toHaveTextContent(/refuse/i);
+    });
+
+    it("keeps Confirm disabled until there is a signature or a recipient name", () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      renderDelivery();
+      expect(confirmButton()).toBeDisabled();
+
+      fireEvent.change(recipientInput(), { target: { value: "Sam Carter" } });
+      expect(confirmButton()).toBeEnabled();
+    });
+
+    it("enables Confirm with a signature alone", () => {
+      renderDelivery();
+      expect(confirmButton()).toBeDisabled();
+      act(() => mockPad._handlers["endStroke"]?.());
+      expect(confirmButton()).toBeEnabled();
+    });
+
+    it("posts a signature-only confirmation to the recipient endpoint", async () => {
+      const onComplete = jest.fn();
+      renderDelivery(onComplete);
+      act(() => mockPad._handlers["endStroke"]?.());
+      fireEvent.click(confirmButton());
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledWith(SIG_URL));
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/orders/CAT-001/recipient",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const fd = lastFormData();
+      expect(fd.get("file")).not.toBeNull();
+      expect(fd.get("receivedBy")).toBeNull();
+    });
+
+    it("posts a name-only confirmation when the recipient refused to sign", async () => {
+      mockPad.isEmpty.mockReturnValue(true);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, url: null, receivedBy: "Sam Carter" }),
+      });
+      const onComplete = jest.fn();
+      renderDelivery(onComplete);
+      fireEvent.change(recipientInput(), { target: { value: " Sam Carter " } });
+      fireEvent.click(confirmButton());
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledWith(null));
+      const fd = lastFormData();
+      expect(fd.get("receivedBy")).toBe("Sam Carter");
+      expect(fd.get("file")).toBeNull();
     });
   });
 });

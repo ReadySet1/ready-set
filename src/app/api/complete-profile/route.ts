@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { UserType, UserStatus } from "@/types/prisma";
 import { randomUUID } from 'crypto';
+import { normalizeStateCode } from '@/lib/utils/state-code';
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
           street1: formData.street1,
           street2: formData.street2 || null,
           city: formData.city,
-          state: formData.state,
+          state: normalizeStateCode(formData.state),
           zip: formData.zip,
           county: Array.isArray(formData.countiesServed) ? formData.countiesServed[0] : null,
           parkingLoading: formData.parking || null,

@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import CateringStats from "@/components/FoodDelivery/CateringStats";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 // Mock the FormManager hook
 const mockOpenForm = jest.fn();
@@ -110,7 +111,7 @@ describe("CateringStats Component", () => {
       const bookCallButton = screen.getByTestId("schedule-dialog-button");
       expect(bookCallButton).toHaveAttribute(
         "data-calendar-url",
-        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+        BOOKING_CALENDAR_URL
       );
     });
   });

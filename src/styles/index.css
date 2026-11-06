@@ -284,6 +284,24 @@
   .font-display { font-family: var(--font-display); }
 }
 
+@layer components {
+  /* iOS/WebKit date & time inputs ignore width/padding while they use the
+     native appearance, which lets the overlay icon cover the value.
+     Opting out restores the normal box model. */
+  .native-picker-input {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 2.5rem;   /* keeps height when the field is empty on iOS */
+  }
+  .native-picker-input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+  .native-picker-input::-webkit-datetime-edit {
+    padding: 0;
+  }
+}
+
 /* Custom utility classes */
 @layer utilities {
   .scrollbar-hide {

@@ -171,6 +171,27 @@ describe('useDriverDeliveries', () => {
       expect(delivery.pendingReturn).toBe(false);
     });
 
+    it('carries each stop address so Navigate can fall back to it when ungeocoded', async () => {
+      setDeliveries([
+        makeOrder({
+          address: { street1: '1 Vendor St', city: 'SF', state: 'CA', zip: '94103' },
+          delivery_address: { street1: '9 Client Ave', city: 'SF', state: 'CA', zip: '94107' },
+        }),
+      ]);
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+      const delivery = result.current.activeDeliveries[0];
+      expect(delivery.pickupLocation).toEqual({
+        coordinates: [0, 0],
+        address: '1 Vendor St, SF, CA, 94103',
+      });
+      expect(delivery.deliveryLocation.address).toBe('9 Client Ave, SF, CA, 94107');
+    });
+
     it('maps the feed pendingReturn flag onto the delivery (end-shift mirror)', async () => {
       setDeliveries([makeOrder({ pendingReturn: true })]);
 
@@ -397,6 +418,80 @@ describe('useDriverDeliveries', () => {
 
       expect(success!).toBe(false);
       expect(result.current.error).toBe('Network error');
+    });
+  });
+
+  describe('advanceDeliveryStatus (structured outcome for the stage gates)', () => {
+    it('returns ok on success', async () => {
+      setDeliveries([mockOrder]);
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(
+          mockDeliveryId,
+          DriverStatus.EN_ROUTE_TO_VENDOR,
+        );
+      });
+
+      expect(outcome).toEqual({ ok: true });
+    });
+
+    it('returns the 422 gate code and message instead of a bare false', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () =>
+        okJson(
+          {
+            error: 'PICKUP_PHOTO_REQUIRED',
+            code: 'PICKUP_PHOTO_REQUIRED',
+            message: 'Take a photo of the order at the vendor before marking it picked up.',
+          },
+          422,
+        );
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome).toEqual({
+        ok: false,
+        status: 422,
+        code: 'PICKUP_PHOTO_REQUIRED',
+        message: 'Take a photo of the order at the vendor before marking it picked up.',
+      });
+    });
+
+    it('reads a code-only body (PICKUP_CONFIRMATION_REQUIRED shape)', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () =>
+        okJson({ code: 'PICKUP_CONFIRMATION_REQUIRED', message: 'Record who handed over the order' }, 422);
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: any;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome.code).toBe('PICKUP_CONFIRMATION_REQUIRED');
+    });
+
+    it('returns ok:false without a code on a network error', async () => {
+      setDeliveries([mockOrder]);
+      orderPatchHandler = () => Promise.reject(new Error('Network error'));
+      const { result } = renderHook(() => useDriverDeliveries());
+      await waitFor(() => expect(result.current.activeDeliveries).toHaveLength(1));
+
+      let outcome: any;
+      await act(async () => {
+        outcome = await result.current.advanceDeliveryStatus(mockDeliveryId, DriverStatus.PICKED_UP);
+      });
+
+      expect(outcome).toEqual({ ok: false, message: 'Network error' });
     });
   });
 
@@ -723,6 +818,75 @@ describe('useDriverDeliveries', () => {
         );
       });
       expect(lastPatchBody()).toEqual({ driverStatus: DriverStatus.DELIVERED });
+    });
+  });
+
+  // The provider in the /driver layout runs this poller for every driver surface,
+  // so a request still in flight must die with the hook, and a slow background
+  // poll must never beat a fresher refresh (e.g. the reload after a status PATCH).
+  describe('request lifecycle', () => {
+    const deferred = <T,>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const feedCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes('/api/driver-deliveries'),
+      );
+
+    it('aborts the feed request in flight on unmount', async () => {
+      const first = deferred<any[]>();
+      deliveriesHandler = () => first.promise;
+
+      const { unmount } = renderHook(() => useDriverDeliveries());
+
+      expect(feedCalls()).toHaveLength(1);
+      const init = feedCalls()[0]![1] as RequestInit;
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      expect(init.signal!.aborted).toBe(false);
+
+      unmount();
+
+      expect(init.signal!.aborted).toBe(true);
+
+      // Let the late response land: it must not throw or be reported.
+      await act(async () => {
+        first.resolve([mockOrder]);
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    it('a superseded poll response cannot overwrite a fresher refresh', async () => {
+      const slowPoll = deferred<any[]>();
+      let calls = 0;
+      deliveriesHandler = () =>
+        ++calls === 1
+          ? slowPoll.promise
+          : [makeOrder({ driverStatus: DriverStatus.EN_ROUTE_TO_CLIENT })];
+
+      const { result } = renderHook(() => useDriverDeliveries());
+      expect(feedCalls()).toHaveLength(1);
+
+      // A refresh starts while the mount poll is still pending and wins the race.
+      await act(async () => {
+        await result.current.refreshDeliveries();
+      });
+      await waitFor(() => {
+        expect(result.current.activeDeliveries[0]?.status).toBe(DriverStatus.EN_ROUTE_TO_CLIENT);
+      });
+      expect(result.current.loading).toBe(false);
+
+      // The stale mount poll finally resolves with the older status.
+      await act(async () => {
+        slowPoll.resolve([makeOrder({ driverStatus: DriverStatus.ASSIGNED })]);
+      });
+
+      expect(result.current.activeDeliveries[0]?.status).toBe(DriverStatus.EN_ROUTE_TO_CLIENT);
+      expect(result.current.error).toBeNull();
+      expect((feedCalls()[0]![1] as RequestInit).signal!.aborted).toBe(true);
+      expect(captureException).not.toHaveBeenCalled();
     });
   });
 });

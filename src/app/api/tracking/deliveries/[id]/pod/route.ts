@@ -40,6 +40,7 @@ export async function POST(
       SELECT d.id, d.driver_id
       FROM deliveries d
       WHERE d.id = $1
+        AND d.deleted_at IS NULL
     `;
 
     const verifyResult = await prisma.$queryRawUnsafe<
@@ -120,7 +121,7 @@ export async function POST(
     // are appended to `delivery_notes`, mirroring uploadProofOfDelivery in
     // src/app/actions/tracking/delivery-actions.ts. The storage path is kept in
     // the note so DELETE can recover it without a metadata column.
-    await prisma.$executeRawUnsafe(
+    const updated = await prisma.$executeRawUnsafe(
       `
       UPDATE deliveries
       SET
@@ -128,11 +129,31 @@ export async function POST(
         delivery_notes = COALESCE(delivery_notes, '') || $3,
         updated_at = NOW()
       WHERE id = $1::uuid
+        AND deleted_at IS NULL
     `,
       deliveryId,
       uploadResult.url,
       ` [POD photo uploaded ${new Date().toISOString()} by ${authResult.context.user.id} | path:${uploadResult.path}]`
     );
+
+    // The delivery was deleted between the existence check and the UPDATE:
+    // nothing references the uploaded object, so remove it (best effort).
+    if (updated === 0) {
+      if (uploadResult.path) {
+        const cleanup = await deletePODImage(uploadResult.path);
+        if (cleanup.error) {
+          Sentry.captureMessage('Failed to remove orphaned POD upload', {
+            level: 'warning',
+            tags: { operation: 'pod_upload_cleanup', route: 'tracking_deliveries' },
+            extra: { error: cleanup.error, path: uploadResult.path },
+          });
+        }
+      }
+      return NextResponse.json(
+        { success: false, error: 'Delivery not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -183,6 +204,7 @@ export async function GET(
         d.driver_id
       FROM deliveries d
       WHERE d.id = $1
+        AND d.deleted_at IS NULL
     `;
 
     const result = await prisma.$queryRawUnsafe<
@@ -266,6 +288,7 @@ export async function DELETE(
       SELECT delivery_photo_url
       FROM deliveries
       WHERE id = $1
+        AND deleted_at IS NULL
     `;
 
     const result = await prisma.$queryRawUnsafe<
@@ -306,7 +329,7 @@ export async function DELETE(
     }
 
     // Clear the POD reference in the database
-    await prisma.$executeRawUnsafe(
+    const updated = await prisma.$executeRawUnsafe(
       `
       UPDATE deliveries
       SET
@@ -314,10 +337,18 @@ export async function DELETE(
         delivery_notes = COALESCE(delivery_notes, '') || $2,
         updated_at = NOW()
       WHERE id = $1::uuid
+        AND deleted_at IS NULL
     `,
       deliveryId,
       ` [POD deleted ${new Date().toISOString()} by ${authResult.context.user.id}]`
     );
+
+    if (updated === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Delivery not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

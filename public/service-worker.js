@@ -1,32 +1,35 @@
 // ReadySet Driver Portal Service Worker
-// Provides offline capabilities and background sync for location tracking
+//
+// The offline GPS queue lives in the PAGE now (src/lib/tracking/location-outbox.ts),
+// not here. This worker used to answer a failed location POST with a synthetic
+// 202 and keep the fix in its own store, replaying it only on a Background Sync
+// `sync` event — which Android WebView (the native wrapper) and iOS Safari never
+// fire. Every fix of a multi-minute outage was lost that way (2026-10-17), and
+// the page took the 202 as "saved" so it never queued them itself.
+// What is left: cache cleanup, and draining fixes an older version queued
+// (Chrome on Android only, where `sync` exists).
 
-const CACHE_NAME = 'readyset-driver-v1';
-const STATIC_CACHE_URLS = [
-  '/driver/tracking',
-  '/manifest.json',
-  // Add other essential assets here
-];
+// Bumped from v1: activate deletes every other cache, which clears the stale
+// /driver/tracking HTML and authenticated API responses v1 stored on phones.
+// Nothing is cached any more; the name only exists so activate can clean up.
+const CACHE_NAME = 'readyset-driver-v2';
 
 const LOCATION_QUEUE_STORE = 'location-queue';
 const DB_NAME = 'readyset-driver-db';
 const DB_VERSION = 1;
 
-// Flush pacing (mirrors useLocationTracking): trickle queued posts instead of
-// bursting them into the server rate limiter, and back off entirely on a 429.
+// Flush pacing for the legacy queue: trickle queued posts instead of bursting
+// them into the server rate limiter, and back off entirely on a 429.
 const LOCATION_FLUSH_SPACING_MS = 250;
+// Older fixes can't be filed by the server (it would stamp them NOW() and show
+// them as the driver's current position), so they are discarded unsent.
+const LOCATION_REPLAY_MAX_AGE_MS = 23 * 60 * 60 * 1000;
 const LOCATION_FLUSH_429_BACKOFF_MS = 30000;
 let locationFlushBackoffUntil = 0;
 
-// Install event - cache essential resources
+// Install event - nothing to precache; take over as soon as possible.
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_CACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate event - clean up old caches
@@ -47,115 +50,10 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - serve from cache when offline
-self.addEventListener('fetch', (event) => {
-  // Handle location update requests specially
-  if (event.request.url.includes('/api/tracking/locations')) {
-    event.respondWith(handleLocationRequest(event.request));
-    return;
-  }
-
-  // Handle other requests with cache-first strategy for navigation
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          return response || fetch(event.request);
-        })
-        .catch(() => {
-          // Return offline page if available
-          return caches.match('/driver/tracking');
-        })
-    );
-    return;
-  }
-
-  // Default network-first strategy for API calls
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, responseClone));
-        }
-        return response;
-      })
-      .catch(() => {
-        // Fallback to cache
-        return caches.match(event.request);
-      })
-  );
-});
-
-// Handle location update requests with offline queue
-async function handleLocationRequest(request) {
-  try {
-    // Try to send immediately
-    const response = await fetch(request);
-    if (response.ok) {
-      return response;
-    }
-    // Never queue a rate-limited post: replaying it later just repeats the
-    // same burst. Hand the 429 back so the client's own throttle handles it.
-    if (response.status === 429) {
-      return response;
-    }
-    throw new Error('Network request failed');
-  } catch (error) {
-    console.log('Location request failed, queuing for later sync:', error);
-    
-    // Store request in IndexedDB for later sync
-    const requestData = {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries()),
-      body: await request.text(),
-      timestamp: Date.now()
-    };
-    
-    await storeOfflineRequest(requestData);
-    
-    // Return a synthetic response
-    return new Response(
-      JSON.stringify({ success: false, queued: true }),
-      { 
-        status: 202,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  }
-}
-
-// Store failed requests in IndexedDB
-async function storeOfflineRequest(requestData) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction([LOCATION_QUEUE_STORE], 'readwrite');
-      const store = transaction.objectStore(LOCATION_QUEUE_STORE);
-      
-      store.add({
-        ...requestData,
-        id: Date.now() + Math.random()
-      });
-      
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    };
-    
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(LOCATION_QUEUE_STORE)) {
-        db.createObjectStore(LOCATION_QUEUE_STORE, { keyPath: 'id' });
-      }
-    };
-  });
-}
+// No fetch handler: every request, location POSTs included, goes straight to
+// the network, so a failed location POST rejects in the page and lands in the
+// page's own outbox. (Without a fetch listener the browser also skips the
+// worker on every request — no respondWith pitfalls on Safari.)
 
 // Background sync event - retry failed requests
 self.addEventListener('sync', (event) => {
@@ -177,6 +75,10 @@ async function syncQueuedLocations() {
 
     for (let i = 0; i < queuedRequests.length; i++) {
       const requestData = queuedRequests[i];
+      if (!(Date.now() - requestData.timestamp < LOCATION_REPLAY_MAX_AGE_MS)) {
+        await removeQueuedRequest(requestData.id);
+        continue;
+      }
       try {
         const response = await fetch(requestData.url, {
           method: requestData.method,

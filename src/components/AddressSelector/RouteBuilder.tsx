@@ -16,6 +16,20 @@ import { cn } from '@/lib/utils';
 
 const ADDRESSES_PER_PAGE = 20;
 
+type RouteSlotRole = 'pickup' | 'delivery';
+
+interface AddressEditTarget {
+  slot: RouteSlotRole;
+  address: Address;
+  /** The user created this address, so the saved record itself is corrected. */
+  ownedByUser: boolean;
+}
+
+const OWNED_EDIT_NOTICE =
+  'This updates your saved address everywhere it is used.';
+const COPY_EDIT_NOTICE =
+  'This address belongs to someone else, so your corrections will be saved as a new private address for this order. The original stays unchanged.';
+
 export function RouteBuilder({
   pickup,
   delivery,
@@ -27,6 +41,7 @@ export function RouteBuilder({
 }: RouteBuilderProps) {
   const { user } = useUser();
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AddressEditTarget | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeScope, setActiveScope] = useState<ScopeFilter>('all');
@@ -122,6 +137,34 @@ export function RouteBuilder({
     [assignAddress],
   );
 
+  // In-place correction of the address already in a slot. Only the creator may
+  // change the saved record (same rule as the address book); anything else is
+  // edited as a private copy so shared/other users' addresses are never mutated.
+  const handleEditAddress = useCallback(
+    (slot: RouteSlotRole) => {
+      const address = slot === 'pickup' ? pickup : delivery;
+      if (!address) return;
+      const ownedByUser = Boolean(user?.id) && address.createdBy === user?.id;
+      setEditTarget({ slot, address, ownedByUser });
+    },
+    [pickup, delivery, user?.id],
+  );
+
+  const handleAddressEdited = useCallback(
+    (savedAddress?: Address) => {
+      const target = editTarget;
+      setEditTarget(null);
+      if (target && savedAddress) {
+        onChange({
+          pickup: target.slot === 'pickup' ? savedAddress : pickup,
+          delivery: target.slot === 'delivery' ? savedAddress : delivery,
+        });
+      }
+      refetchAddresses();
+    },
+    [editTarget, onChange, pickup, delivery, refetchAddresses],
+  );
+
   const handleCreateNew = useCallback(() => {
     if (onCreateNew) {
       onCreateNew();
@@ -141,6 +184,7 @@ export function RouteBuilder({
         activeSlot={activeSlot}
         onEditSlot={editSlot}
         onClearSlot={clearSlot}
+        onEditAddress={handleEditAddress}
       />
 
       {/* Address Library */}
@@ -170,6 +214,18 @@ export function RouteBuilder({
             refetchAddresses();
             setIsAddressModalOpen(false);
           }}
+        />
+      )}
+
+      {/* In-place editor for the address already selected in a slot */}
+      {editTarget && (
+        <AddressModal
+          isOpen
+          onClose={() => setEditTarget(null)}
+          addressToEdit={editTarget.ownedByUser ? editTarget.address : null}
+          initialValues={editTarget.ownedByUser ? undefined : editTarget.address}
+          notice={editTarget.ownedByUser ? OWNED_EDIT_NOTICE : COPY_EDIT_NOTICE}
+          onAddressUpdated={handleAddressEdited}
         />
       )}
     </div>

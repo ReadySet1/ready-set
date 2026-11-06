@@ -206,6 +206,8 @@ jest.mock('lucide-react', () => ({
   ActivityIcon: () => <span data-testid="activity-icon">Activity</span>,
   SearchIcon: () => <span data-testid="search-icon">Search</span>,
   FilterIcon: () => <span data-testid="filter-icon">Filter</span>,
+  PowerOffIcon: () => <span data-testid="power-off-icon">PowerOff</span>,
+  Loader2Icon: () => <span data-testid="loader-icon">Loading</span>,
 }));
 
 // Mock cn utility
@@ -645,6 +647,68 @@ describe('DriverStatusList', () => {
 
       expect(screen.getByText('No drivers match your criteria')).toBeInTheDocument();
     });
+
+    // rs-dev has drivers whose employee_id (and phone/vehicle) columns are
+    // NULL; the live SSE feed passes those nulls straight through.
+    const mockDriverNullIds: TrackedDriver = {
+      ...mockDriver2,
+      id: 'driver-null',
+      employeeId: null,
+      name: 'Test Driver',
+      vehicleNumber: null,
+      phoneNumber: null,
+    };
+
+    it('does not crash when a driver has no employee ID, vehicle or phone', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-input');
+      expect(() =>
+        fireEvent.change(searchInput, { target: { value: 'EMP001' } })
+      ).not.toThrow();
+
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Test Driver')).not.toBeInTheDocument();
+    });
+
+    it('matches drivers by name, case-insensitively', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-input');
+      fireEvent.change(searchInput, { target: { value: 'tEsT' } });
+
+      expect(screen.getByText('Test Driver')).toBeInTheDocument();
+      expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+    });
+
+    it('does not crash sorting by name when a driver has no employee ID', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriver2, mockDriverNullIds]}
+          recentLocations={[]}
+          compact={false}
+        />
+      );
+
+      const sortSelect = screen.getByDisplayValue('Sort by Status');
+      expect(() =>
+        fireEvent.change(sortSelect, { target: { value: 'name' } })
+      ).not.toThrow();
+
+      expect(screen.getAllByTestId('card')).toHaveLength(3);
+    });
   });
 
   describe('Status Filter', () => {
@@ -814,6 +878,28 @@ describe('DriverStatusList', () => {
       );
 
       expect(screen.getByText('🚶 Walking')).toBeInTheDocument();
+    });
+  });
+  describe('Admin End shift action', () => {
+    const shiftDriver = { ...mockDriver1, currentShiftId: 'shift-uuid-1' } as TrackedDriver;
+
+    it('shows End shift for a driver with an open shift when allowed', () => {
+      render(
+        <DriverStatusList drivers={[shiftDriver]} recentLocations={[]} canEndShift />
+      );
+      expect(screen.getByRole('button', { name: /end shift/i })).toBeInTheDocument();
+    });
+
+    it('hides End shift without the admin permission', () => {
+      render(<DriverStatusList drivers={[shiftDriver]} recentLocations={[]} />);
+      expect(screen.queryByRole('button', { name: /end shift/i })).not.toBeInTheDocument();
+    });
+
+    it('hides End shift when the driver has no open shift', () => {
+      render(
+        <DriverStatusList drivers={[mockOffDutyDriver]} recentLocations={[]} canEndShift />
+      );
+      expect(screen.queryByRole('button', { name: /end shift/i })).not.toBeInTheDocument();
     });
   });
 });

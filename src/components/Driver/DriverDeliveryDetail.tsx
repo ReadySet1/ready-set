@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   Hourglass,
   MapPin,
@@ -36,10 +37,19 @@ import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { ReturnDeclinedNotice } from "@/components/Driver/ui/ReturnDeclinedNotice";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import { addressQuery } from "@/lib/driver-navigation";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
 import { requiresActiveShift } from "@/lib/state-machine/driver-state";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import {
+  DELIVERY_PHOTO_CATEGORY,
+  PICKUP_PHOTO_CATEGORY,
+  POD_MAX_PHOTOS,
+  RECIPIENT_REQUIRED_CODE,
+  hasRecipientConfirmation,
+  hasUploadInCategory,
+} from "@/lib/driver/stage-photos";
 
 /**
  * Driver-specific Delivery Detail.
@@ -54,9 +64,13 @@ import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
  *   - advance: PATCH /api/orders/{orderNumber}  { driverStatus }
  *              (on COMPLETED, also PATCH the order status to COMPLETED)
  *   - POD:    POST /api/orders/{orderNumber}/pod  (via DriverPodSheet)
+ *   - pickup photo: POST /api/orders/{orderNumber}/pickup-photo (same sheet)
  *
- * POD is required at ARRIVED_TO_CLIENT before advancing to COMPLETED — mirroring
- * the Live Tracking screen.
+ * Mandatory captures (server-enforced with 422 codes, mirrored here):
+ *   ARRIVED_AT_VENDOR → PICKED_UP: photo of the order, then pickup confirmation
+ *   ARRIVED_TO_CLIENT → COMPLETED: photo of the setup (POD), then the
+ *     recipient's signature or — if they refuse to sign — their name
+ *     (POST /api/orders/{orderNumber}/recipient via DriverSignatureSheet)
  */
 
 interface AddressLike {
@@ -121,6 +135,11 @@ interface DriverOrder {
   itemDelivered?: string | null;
   vehicleType?: string | null;
   deliveryTimestamps?: DeliveryTimestampMap | null;
+  /** file_uploads rows on the order — the stage-photo categories decide
+   *  whether a capture sheet still has to open. */
+  fileUploads?: Array<{ category?: string | null } | null> | null;
+  /** Recipient name recorded at completion (deliveries.delivery_received_by). */
+  deliveryReceivedBy?: string | null;
 }
 
 /** Map each lifecycle stage to the deliveryTimestamps field that records it. */
@@ -141,14 +160,6 @@ function formatAddressLines(addr?: AddressLike | null): string[] {
   const line1 = [addr.street1, addr.street2].filter(Boolean).join(", ");
   const line2 = [addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
   return [line1, line2].filter((l) => l.length > 0);
-}
-
-function addressQuery(addr?: AddressLike | null): string | null {
-  if (!addr) return null;
-  const q = [addr.street1, addr.street2, addr.city, addr.state, addr.zip]
-    .filter(Boolean)
-    .join(", ");
-  return q || null;
 }
 
 /** Shift gate toast: a delivery worked off-shift leaves no GPS trail, so send
@@ -189,7 +200,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const [notFound, setNotFound] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [podOpen, setPodOpen] = useState(false);
+  const [pickupPhotoOpen, setPickupPhotoOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  /** Stage photos stored in this session. Seeded from the order's file
+   *  uploads on load (below); the server gate (422) stays authoritative. */
+  const [pickupPhotoDone, setPickupPhotoDone] = useState(false);
+  const [podDone, setPodDone] = useState(false);
+  /** Recipient sign-off at completion (signature, or name if they refuse). */
+  const [recipientOpen, setRecipientOpen] = useState(false);
+  const [recipientDone, setRecipientDone] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   /** True while this order has a PENDING return request awaiting dispatch. */
   const [pendingReturn, setPendingReturn] = useState(false);
@@ -311,6 +330,60 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     void fetchPendingReturn();
   }, [fetchOrder, fetchPendingReturn]);
 
+  // Proof-of-delivery photos (up to POD_MAX_PHOTOS) for a completed delivery.
+  // The fileUrl stored on the order is a public URL into the private
+  // delivery-proofs bucket (it 404s), so read the signed URLs from the files
+  // route, which signs POD paths against the right bucket (#506). Non-fatal:
+  // no photo, no card.
+  const isCompleted =
+    !!order &&
+    resolveDriverStatus(order.driverStatus).status === DriverStatus.COMPLETED;
+  const [podPhotoUrls, setPodPhotoUrls] = useState<string[]>([]);
+  useEffect(() => {
+    if (!isCompleted || !orderNumber) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = await getValidSession();
+        const res = await fetch(
+          `/api/orders/${encodeURIComponent(orderNumber)}/files`,
+          {
+            credentials: "include",
+            headers: session
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+          },
+        );
+        if (!res.ok) return;
+        const files = (await res.json()) as unknown;
+        if (!Array.isArray(files)) return;
+        const pods = (
+          files as Array<{ category?: unknown; fileUrl?: unknown; uploadedAt?: unknown }>
+        )
+          .filter(
+            (f) =>
+              typeof f?.category === "string" &&
+              f.category.toLowerCase() === DELIVERY_PHOTO_CATEGORY &&
+              typeof f.fileUrl === "string" &&
+              f.fileUrl.length > 0,
+          )
+          // The files route lists newest first; show photos in capture order.
+          .sort((a, b) => {
+            const at = typeof a.uploadedAt === "string" ? Date.parse(a.uploadedAt) : NaN;
+            const bt = typeof b.uploadedAt === "string" ? Date.parse(b.uploadedAt) : NaN;
+            return Number.isNaN(at) || Number.isNaN(bt) ? 0 : at - bt;
+          })
+          .map((f) => f.fileUrl as string);
+        if (!cancelled && pods.length > 0) setPodPhotoUrls(pods);
+      } catch {
+        /* best-effort — the card simply stays hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCompleted, orderNumber, getValidSession]);
+
   /** PATCH driverStatus (and order status on COMPLETED), then refresh. */
   const advanceStatus = useCallback(
     async (newStatus: DriverStatus) => {
@@ -338,10 +411,17 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         if (!res.ok) {
           let detail = "";
           let code = "";
+          let message = "";
           try {
             const body = await res.json();
-            code = typeof body.error === "string" ? body.error : "";
-            detail = body.error || body.message || "";
+            code =
+              typeof body.error === "string"
+                ? body.error
+                : typeof body.code === "string"
+                  ? body.code
+                  : "";
+            message = typeof body.message === "string" ? body.message : "";
+            detail = message || body.error || "";
           } catch {
             /* ignore */
           }
@@ -349,6 +429,37 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           // can be stale, e.g. the shift ended in another tab.
           if (code === "SHIFT_REQUIRED") {
             showShiftRequiredToast();
+            return;
+          }
+          // Mandatory stage captures (authoritative): reopen whichever sheet
+          // the server says is missing — e.g. the photo was queued offline
+          // and has not landed yet, or the order was loaded before it.
+          if (code === "PICKUP_PHOTO_REQUIRED") {
+            setPickupPhotoDone(false);
+            toast.error(
+              message || "Take a photo of the order before marking it picked up.",
+            );
+            setPickupPhotoOpen(true);
+            return;
+          }
+          if (code === "POD_REQUIRED") {
+            setPodDone(false);
+            toast.error(message || "Take a photo of the setup before completing.");
+            setPodOpen(true);
+            return;
+          }
+          if (code === RECIPIENT_REQUIRED_CODE) {
+            setRecipientDone(false);
+            toast.error(
+              message ||
+                "Get the recipient's signature, or their name if they refuse to sign.",
+            );
+            setRecipientOpen(true);
+            return;
+          }
+          if (code === "PICKUP_CONFIRMATION_REQUIRED") {
+            toast.error(message || "Confirm the pickup before continuing.");
+            setSignatureOpen(true);
             return;
           }
           throw new Error(detail || res.statusText);
@@ -413,8 +524,20 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     [order, getValidSession, router, refreshDeliveries],
   );
 
-  /** Next-Action handler: gate the signature (pickup) + POD (delivery) steps,
-   *  otherwise advance. */
+  // Stage photos already on file: captured in this session, or present on
+  // the order when it loaded (e.g. the PATCH failed after the upload).
+  const hasPickupPhoto =
+    pickupPhotoDone || hasUploadInCategory(order?.fileUploads, PICKUP_PHOTO_CATEGORY);
+  const hasPod = podDone || hasUploadInCategory(order?.fileUploads, DELIVERY_PHOTO_CATEGORY);
+  const hasRecipient =
+    recipientDone ||
+    hasRecipientConfirmation({
+      files: order?.fileUploads,
+      deliveryReceivedBy: order?.deliveryReceivedBy,
+    });
+
+  /** Next-Action handler: gate the pickup photo + confirmation (pickup) and
+   *  the POD photo (delivery) steps, otherwise advance. */
   const handleNextAction = useCallback(() => {
     if (!order) return;
     const current = order.driverStatus as DriverStatus | undefined;
@@ -446,15 +569,27 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         return;
       }
     }
-    // Require a vendor-staff signature before marking the pickup done.
+    // Pickup: a photo of the order at the vendor (mandatory), then the pickup
+    // confirmation (receiver name / signature). The server enforces both.
     if (current === DriverStatus.ARRIVED_AT_VENDOR && next === DriverStatus.PICKED_UP) {
+      if (!hasPickupPhoto) {
+        setPickupPhotoOpen(true);
+        return;
+      }
       setSignatureOpen(true);
       return;
     }
-    // Require proof of delivery before completing.
+    // Completion: a photo of the setup, then the recipient's signature or
+    // name (both mandatory; the server enforces them).
     if (current === DriverStatus.ARRIVED_TO_CLIENT && next === DriverStatus.COMPLETED) {
-      setPodOpen(true);
-      return;
+      if (!hasPod) {
+        setPodOpen(true);
+        return;
+      }
+      if (!hasRecipient) {
+        setRecipientOpen(true);
+        return;
+      }
     }
     void advanceStatus(next);
   }, [
@@ -464,15 +599,37 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     geofenceRadiusM,
     isShiftActive,
     shiftLoading,
+    hasPickupPhoto,
+    hasPod,
+    hasRecipient,
   ]);
+
+  /** Photo of the order stored → straight on to the pickup confirmation. */
+  const onPickupPhotoComplete = useCallback(() => {
+    setPickupPhotoDone(true);
+    setPickupPhotoOpen(false);
+    setSignatureOpen(true);
+  }, []);
 
   const onSignatureComplete = useCallback(async () => {
     setSignatureOpen(false);
     await advanceStatus(DriverStatus.PICKED_UP);
   }, [advanceStatus]);
 
+  /** Setup photo stored → on to the recipient sign-off (unless on file). */
   const onPodComplete = useCallback(async () => {
+    setPodDone(true);
     setPodOpen(false);
+    if (!hasRecipient) {
+      setRecipientOpen(true);
+      return;
+    }
+    await advanceStatus(DriverStatus.COMPLETED);
+  }, [advanceStatus, hasRecipient]);
+
+  const onRecipientComplete = useCallback(async () => {
+    setRecipientDone(true);
+    setRecipientOpen(false);
     await advanceStatus(DriverStatus.COMPLETED);
   }, [advanceStatus]);
 
@@ -521,6 +678,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
     ? getNextStatus(order.driverStatus as DriverStatus)
     : DriverStatus.ASSIGNED;
   const completing = nextStatus === DriverStatus.COMPLETED;
+  const pickingUp = nextStatus === DriverStatus.PICKED_UP;
 
   // Build formatted timestamps keyed by DriverStatus for the timeline.
   const timestamps: Partial<Record<DriverStatus, string>> = {};
@@ -733,6 +891,63 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         ) : null}
       </DriverCard>
 
+      {isCompleted && podPhotoUrls.length > 0 ? (
+        <DriverCard className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Camera className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
+              Proof of delivery
+            </span>
+            {podPhotoUrls.length > 1 ? (
+              <span className="ml-auto text-[11px] font-semibold text-driver-subtle">
+                {podPhotoUrls.length} photos
+              </span>
+            ) : null}
+          </div>
+          {podPhotoUrls.length === 1 ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL; next/image would need a remote pattern per signed host */
+            <img
+              src={podPhotoUrls[0]}
+              alt="Proof of delivery photo"
+              className="max-h-80 w-full rounded-xl object-contain"
+            />
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {podPhotoUrls.map((url, index) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block aspect-square overflow-hidden rounded-xl bg-driver-surface-alt"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Supabase URL */}
+                  <img
+                    src={url}
+                    alt={`Proof of delivery photo ${index + 1} of ${podPhotoUrls.length}`}
+                    className="h-full w-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+        </DriverCard>
+      ) : null}
+
+      {isCompleted && order.deliveryReceivedBy?.trim() ? (
+        <DriverCard className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <UserIcon className="h-4 w-4 text-driver-subtle" strokeWidth={2.4} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-driver-subtle">
+              Received by
+            </span>
+          </div>
+          <div className="text-[14px] font-semibold text-driver-text">
+            {order.deliveryReceivedBy.trim()}
+          </div>
+        </DriverCard>
+      ) : null}
+
       {/* Sticky action bar */}
       <div
         className="fixed inset-x-0 bottom-0 z-30 border-t border-driver-border bg-driver-glass px-4 pt-3 backdrop-blur-xl backdrop-saturate-150"
@@ -753,8 +968,10 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
                 geofenceBlocked
                   ? geofenceHint(arrivalCheck!.distanceM!)
                   : completing
-                    ? "Photo required to complete"
-                    : "Tap to update your status"
+                    ? "Photo + recipient signature or name required"
+                    : pickingUp
+                      ? "Photo of the order required"
+                      : "Tap to update your status"
               }
               loading={isAdvancing}
               disabled={geofenceBlocked}
@@ -778,6 +995,19 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         </div>
       </div>
 
+      {pickupPhotoOpen ? (
+        <DriverPodSheet
+          open={pickupPhotoOpen}
+          onOpenChange={setPickupPhotoOpen}
+          deliveryId={order.id}
+          orderNumber={order.orderNumber}
+          title="Photo of the order"
+          requirementHint="Take a photo of the order at the vendor before confirming pickup"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pickup-photo`}
+          onComplete={onPickupPhotoComplete}
+        />
+      ) : null}
+
       {signatureOpen ? (
         <DriverSignatureSheet
           open={signatureOpen}
@@ -794,7 +1024,19 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
           deliveryId={order.id}
           orderNumber={order.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
+          maxPhotos={POD_MAX_PHOTOS}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {recipientOpen ? (
+        <DriverSignatureSheet
+          open={recipientOpen}
+          onOpenChange={setRecipientOpen}
+          orderNumber={order.orderNumber}
+          stage="delivery"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/recipient`}
+          onComplete={onRecipientComplete}
         />
       ) : null}
 

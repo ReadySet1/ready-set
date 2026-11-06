@@ -133,6 +133,48 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         });
       });
 
+      it('exposes the completion recipient name from the deliveries row', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+        });
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
+          id: 'order-1',
+          orderNumber: 'CATER-001',
+          status: 'COMPLETED',
+          driverStatus: 'COMPLETED',
+          user: { name: 'John Doe', email: 'john@example.com' },
+          pickupAddress: {},
+          deliveryAddress: {},
+          dispatches: [],
+          fileUploads: [],
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          updatedAt: new Date('2024-01-10T00:00:00Z'),
+        });
+        (prisma.delivery.findFirst as jest.Mock).mockResolvedValue({
+          assignedAt: null,
+          enRouteToVendorAt: null,
+          arrivedAtVendorAt: null,
+          pickedUpAt: null,
+          enRouteAt: null,
+          arrivedAtClientAt: null,
+          deliveredAt: new Date('2024-01-15T12:00:00Z'),
+          deliveryReceivedBy: 'Sam Carter',
+        });
+
+        const request = createGetRequest('http://localhost:3000/api/orders/CATER-001');
+        const response = await GET(request, {
+          params: Promise.resolve({ order_number: 'CATER-001' }),
+        });
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.deliveryReceivedBy).toBe('Sam Carter');
+        expect(prisma.delivery.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            select: expect.objectContaining({ deliveryReceivedBy: true }),
+          }),
+        );
+      });
+
       it('should fetch on-demand order when catering not found', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123' } },

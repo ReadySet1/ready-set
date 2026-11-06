@@ -7,7 +7,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { SignatureCapture } from "@/components/Driver/SignatureCapture";
+import { SignatureCapture, type SignatureStage } from "@/components/Driver/SignatureCapture";
 import { useVisualViewportInset } from "@/hooks/useVisualViewportInset";
 import { useDriverTheme } from "./DriverThemeProvider";
 
@@ -15,19 +15,26 @@ interface DriverSignatureSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderNumber: string;
-  /** Endpoint override (defaults to /api/orders/[order_number]/signature). */
+  /** Pickup (vendor staff, default) or delivery (recipient at completion). */
+  stage?: SignatureStage;
+  /** Sheet title override (defaults per stage). */
+  title?: string;
+  /** Endpoint override (defaults to the stage's route). */
   uploadEndpoint?: string;
   /** Called once the confirmation is stored. `url` is the signature image URL
    *  when one was drawn, or null for a name-only confirmation. */
   onComplete: (url: string | null) => void;
 }
 
-/** Bottom-sheet wrapper around the pickup SignatureCapture flow. Mirrors
- *  DriverPodSheet (driver-theme scoped bottom sheet). */
+/** Bottom-sheet wrapper around the SignatureCapture flow (pickup confirmation
+ *  or the recipient at completion). Mirrors DriverPodSheet (driver-theme
+ *  scoped bottom sheet). */
 export function DriverSignatureSheet({
   open,
   onOpenChange,
   orderNumber,
+  stage = "pickup",
+  title,
   uploadEndpoint,
   onComplete,
 }: DriverSignatureSheetProps) {
@@ -65,12 +72,13 @@ export function DriverSignatureSheet({
         <div className="mx-auto w-full max-w-2xl">
           <SheetHeader className="items-start">
             <SheetTitle className="text-[18px] font-semibold text-driver-text">
-              Confirm pickup
+              {title ?? (stage === "delivery" ? "Recipient signature" : "Confirm pickup")}
             </SheetTitle>
           </SheetHeader>
           <div className="mt-4">
             <SignatureCapture
               orderNumber={orderNumber}
+              stage={stage}
               uploadEndpoint={uploadEndpoint}
               onUploadComplete={(url) => onComplete(url)}
               onCancel={() => onOpenChange(false)}

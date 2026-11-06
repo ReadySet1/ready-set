@@ -25,6 +25,7 @@ jest.mock('@/lib/db/prisma', () => {
     },
     cateringRequest: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   };
@@ -520,7 +521,10 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
       });
 
       const response = await POST(request);
-      await expectErrorResponse(response, 409, /Order.*already exists/i);
+      const data = await expectErrorResponse(response, 409, /Order.*already exists/i);
+      // Contract: the conflicting order's id, so the partner can treat the
+      // 409 as an idempotent retry.
+      expect(data.details).toEqual({ existingOrderId: 'existing-order' });
     });
 
     it('should handle database errors gracefully', async () => {
@@ -733,10 +737,17 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
         body: JSON.stringify(validOrderData),
       });
 
+      (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValueOnce({ id: 'race-winner' });
+
       const response = await POST(request);
       expect(response.status).toBe(409);
       const data = await response.json();
       expect(data.message).toMatch(/already exists/i);
+      expect(data.details).toEqual({ existingOrderId: 'race-winner' });
+      expect(prisma.cateringRequest.findFirst).toHaveBeenCalledWith({
+        where: { orderNumber: 'CV-TEST-001', deletedAt: null },
+        select: { id: true },
+      });
     });
 
     it('replays a cached response on retry with the same Idempotency-Key', async () => {

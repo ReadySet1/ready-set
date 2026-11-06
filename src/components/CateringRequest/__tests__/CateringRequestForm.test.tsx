@@ -598,6 +598,39 @@ describe("CateringRequestForm", () => {
   });
 });
 
+describe("CateringRequestForm — native-picker-input class", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
+    });
+  });
+
+  it("applies native-picker-input to date and time fields but not text fields", async () => {
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+
+    // Date and time fields should have the class
+    expect(screen.getByLabelText(/^date/i)).toHaveClass("native-picker-input");
+    expect(screen.getByLabelText(/pick up time/i)).toHaveClass("native-picker-input");
+    expect(screen.getByLabelText(/arrival time/i)).toHaveClass("native-picker-input");
+    expect(screen.getByLabelText(/complete time/i)).toHaveClass("native-picker-input");
+
+    // Text fields should NOT have the class
+    expect(screen.getByLabelText(/order number/i)).not.toHaveClass("native-picker-input");
+  });
+});
+
 describe("CateringRequestForm — headcount / orderTotal at-least-one rule", () => {
   beforeEach(() => {
     jest.clearAllMocks();

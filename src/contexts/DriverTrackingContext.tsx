@@ -10,7 +10,11 @@ import React, {
 } from 'react';
 import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
-import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
+import {
+  useDriverDeliveries,
+  type DriverDeliveriesFeedSource,
+  type StatusAdvanceOutcome,
+} from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { DriverStatus } from '@/types/user';
 import type { LocationUpdate, DriverShift, DeliveryTracking } from '@/types/tracking';
@@ -39,11 +43,16 @@ interface DriverTrackingContextValue {
 
   // Shift management
   currentShift: DriverShift | null;
+  /** Server clock minus device clock (ms); feed to shiftElapsedSeconds()
+   *  so shift timers survive a wrong phone clock. */
+  clockOffsetMs: number;
   isShiftActive: boolean;
   shiftLoading: boolean;
   shiftError: string | null;
   startShift: (location: LocationUpdate) => Promise<boolean>;
   endShift: (shiftId: string, location: LocationUpdate, finalMileage?: number) => Promise<boolean>;
+  /** Miles driven on the last shift ended this session (null until one ends). */
+  lastShiftMiles: number | null;
 
   // Deliveries
   activeDeliveries: DeliveryTracking[];
@@ -54,9 +63,20 @@ interface DriverTrackingContextValue {
     status: DriverStatus,
     location?: LocationUpdate
   ) => Promise<boolean>;
+  /** Same advance, returning the server's gate code (422 PICKUP_PHOTO_REQUIRED,
+   *  POD_REQUIRED, RECIPIENT_REQUIRED, …) so the caller can reopen a sheet. */
+  advanceDeliveryStatus: (
+    deliveryId: string,
+    status: DriverStatus,
+    location?: LocationUpdate
+  ) => Promise<StatusAdvanceOutcome>;
   /** Re-fetch the active deliveries feed on demand (e.g. after a status change
    *  made outside this context, so guards don't wait on the 60s poll). */
   refreshDeliveries: () => Promise<void>;
+  /** The raw deliveries poll behind `activeDeliveries`. The Home page's
+   *  `useDriverDeliveriesFeed` reads it so the endpoint is polled ONCE for
+   *  every driver surface instead of once per consumer. */
+  deliveriesFeed: DriverDeliveriesFeedSource;
 
   // Offline support
   isOnline: boolean;
@@ -71,6 +91,14 @@ export function useDriverTracking(): DriverTrackingContextValue {
     throw new Error('useDriverTracking must be used within a DriverTrackingProvider');
   }
   return context;
+}
+
+/**
+ * The provider's shared deliveries poll, or null when rendered outside a
+ * DriverTrackingProvider (the hook then falls back to polling on its own).
+ */
+export function useDriverDeliveriesFeedSource(): DriverDeliveriesFeedSource | null {
+  return useContext(DriverTrackingContext)?.deliveriesFeed ?? null;
 }
 
 interface DriverTrackingProviderProps {
@@ -103,9 +131,11 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   // Shift management
   const {
     currentShift,
+    clockOffsetMs,
     isShiftActive,
     startShift,
     endShift: endShiftBase,
+    lastShiftMiles,
     loading: shiftLoading,
     error: shiftError,
   } = useDriverShift();
@@ -189,7 +219,9 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
   const {
     activeDeliveries,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
+    feedSource: deliveriesFeed,
     loading: deliveriesLoading,
     error: deliveriesError,
   } = useDriverDeliveries();
@@ -213,18 +245,22 @@ export function DriverTrackingProvider({ children }: DriverTrackingProviderProps
 
     // Shift
     currentShift,
+    clockOffsetMs,
     isShiftActive,
     shiftLoading,
     shiftError,
     startShift,
     endShift,
+    lastShiftMiles,
 
     // Deliveries
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
+    deliveriesFeed,
 
     // Offline
     isOnline: offlineStatus.isOnline,

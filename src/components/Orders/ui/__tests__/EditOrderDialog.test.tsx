@@ -10,23 +10,57 @@ import { act } from '@testing-library/react';
 
 // Mock dependencies BEFORE imports
 jest.mock('react-hot-toast', () => ({
+  __esModule: true,
   default: {
     success: jest.fn(),
     error: jest.fn(),
   },
 }));
 
-// Mock date-fns - use requireActual to get all exports and override format
-jest.mock('date-fns', () => {
-  const actual = jest.requireActual('date-fns');
+// date-fns v4 has ESM interop issues with SWC/Jest — SWC transpiles
+// `import { format } from 'date-fns'` to `_format.default(...)` which breaks.
+// Mock date-display (the only module that calls date-fns format during render)
+// with an implementation that uses date-fns-tz format (which works fine).
+jest.mock('@/lib/utils/date-display', () => {
+  const { utcToLocalTime } = jest.requireActual('@/lib/utils/timezone');
+  const { format: tzFormat } = jest.requireActual('date-fns-tz');
+
   return {
-    ...actual,
-    format: jest.fn((date: Date | string, formatStr: string) => {
-      const d = date instanceof Date ? date : new Date(date);
-      return d.toLocaleString();
-    }),
+    __esModule: true,
+    formatDateTimeForDisplay: (
+      utcDate: string | Date | null | undefined,
+      formatStr: string = 'MMM d, yyyy h:mm a',
+    ) => {
+      if (!utcDate) return 'N/A';
+      try {
+        const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+        const { date: localDate, time: localTime } = utcToLocalTime(date);
+        const localDateTime = new Date(`${localDate}T${localTime}`);
+        return tzFormat(localDateTime, formatStr);
+      } catch {
+        return 'Invalid Date';
+      }
+    },
+    formatDateForDisplay: (utcDate: string | Date | null | undefined) => 'N/A',
+    formatTimeForDisplay: (utcDate: string | Date | null | undefined) => 'N/A',
+    getRelativeTime: (utcDate: string | Date | null | undefined) => 'N/A',
   };
 });
+
+// Make Popover content always visible so the time <input> is in the DOM
+// without clicking the trigger. This also avoids the react-day-picker
+// Calendar pulling in date-fns (which has ESM interop issues in Jest/SWC).
+jest.mock('@/components/ui/popover', () => ({
+  __esModule: true,
+  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+jest.mock('@/components/ui/calendar', () => ({
+  __esModule: true,
+  Calendar: () => <div data-testid="mock-calendar" />,
+}));
 
 const mockSupabase = {
   auth: {
@@ -804,5 +838,126 @@ describe.skip('EditOrderDialog', () => {
         expect(pickupStreetInput).toBeInTheDocument();
       });
     });
+  });
+});
+
+/**
+ * Schedule timezone consistency — NOT skipped.
+ *
+ * These tests verify that the button label and the time <input> agree, and
+ * that changing the time produces the correct UTC instant. They fail on the
+ * pre-fix code whenever the machine's timezone differs from Pacific.
+ */
+describe('Schedule timezone consistency', () => {
+  const mockOnOpenChange = jest.fn();
+  const mockOnSaveSuccess = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFetch.mockReset();
+  });
+
+  it('button label and time input show the same Pacific time', () => {
+    // 2026-10-07T20:00:00Z = 1:00 PM PDT
+    const order = createMockCateringOrder({
+      pickupDateTime: '2026-10-07T20:00:00Z',
+    });
+
+    render(
+      <EditOrderDialog
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        order={order}
+        onSaveSuccess={mockOnSaveSuccess}
+      />
+    );
+
+    // The button label should contain 1:00 PM (formatDateTimeForDisplay uses Pacific)
+    const pickupButton = screen.getAllByRole('button').find(
+      (b) => b.textContent?.includes('1:00 PM'),
+    );
+    expect(pickupButton).toBeDefined();
+
+    // Popover is mocked to always render content, so the time input is in the DOM
+    const timeInput = screen.getByDisplayValue('13:00');
+    expect(timeInput).toBeInTheDocument();
+  });
+
+  it('changing the time input updates both input and button consistently', async () => {
+    const order = createMockCateringOrder({
+      pickupDateTime: '2026-10-07T20:00:00Z',
+    });
+
+    render(
+      <EditOrderDialog
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        order={order}
+        onSaveSuccess={mockOnSaveSuccess}
+      />
+    );
+
+    // Change time to 14:00 (2:00 PM PT)
+    const timeInput = screen.getByDisplayValue('13:00');
+    fireEvent.change(timeInput, { target: { value: '14:00' } });
+
+    // After change the input should reflect the new time
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('14:00')).toBeInTheDocument();
+    });
+
+    // The button should now say 2:00 PM
+    const updatedButton = screen.getAllByRole('button').find(
+      (b) => b.textContent?.includes('2:00 PM'),
+    );
+    expect(updatedButton).toBeDefined();
+  });
+
+  it('saving after a time change sends the correct UTC instant', async () => {
+    const order = createMockCateringOrder({
+      pickupDateTime: '2026-10-07T20:00:00Z',
+    });
+
+    mockSupabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'mock-token' } },
+      error: null,
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    render(
+      <EditOrderDialog
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        order={order}
+        onSaveSuccess={mockOnSaveSuccess}
+      />
+    );
+
+    // Change pickup time to 14:00 (2:00 PM PDT)
+    const timeInput = screen.getByDisplayValue('13:00');
+    fireEvent.change(timeInput, { target: { value: '14:00' } });
+
+    // Click Save
+    await waitFor(() => {
+      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      expect(saveButton).not.toBeDisabled();
+    });
+
+    const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+    await userEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    // Extract the PATCH body
+    const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(fetchOptions.body as string);
+
+    // 2:00 PM PDT = 21:00 UTC
+    expect(body.pickupDateTime).toBe('2026-10-07T21:00:00.000Z');
   });
 });

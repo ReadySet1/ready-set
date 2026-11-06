@@ -36,12 +36,17 @@ import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import { deliveryNavTarget } from "@/lib/driver/next-stop-guide";
 import {
   checkArrivalGeofence,
   geofenceHint,
   type GeofenceCheck,
 } from "@/lib/driver/geofence";
+import { formatMiles } from "@/lib/units";
+import { RECIPIENT_REQUIRED_CODE, stageGateMessage } from "@/lib/driver/stage-photos";
+import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
+import { POD_MAX_PHOTOS } from "@/lib/driver/stage-photos";
 import {
   useDeliveryStatusRealtime,
   type DeliveryStatusUpdatedPayload,
@@ -115,6 +120,10 @@ export default function DriverTrackingPortal() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [podTarget, setPodTarget] = useState<PodTarget | null>(null);
   const [sigTarget, setSigTarget] = useState<PodTarget | null>(null);
+  /** Pickup: photo of the order at the vendor, before the confirmation. */
+  const [pickupPhotoTarget, setPickupPhotoTarget] = useState<PodTarget | null>(null);
+  /** Completion: recipient's signature, or name if they refuse (after POD). */
+  const [recipientTarget, setRecipientTarget] = useState<PodTarget | null>(null);
   /** Order number of the delivery being handed back to dispatch (issue #508). */
   const [returnTarget, setReturnTarget] = useState<string | null>(null);
   // Jul-3 walk feedback: multiple staged/real orders made "Active deliveries"
@@ -135,15 +144,17 @@ export default function DriverTrackingPortal() {
     stopTracking,
     requestLocationPermission,
     currentShift,
+    clockOffsetMs = 0,
     isShiftActive,
     shiftLoading,
     shiftError,
     startShift,
     endShift,
+    lastShiftMiles,
     activeDeliveries,
     deliveriesLoading,
     deliveriesError,
-    updateDeliveryStatus,
+    advanceDeliveryStatus,
     refreshDeliveries,
     isOnline,
     queuedItems,
@@ -192,28 +203,29 @@ export default function DriverTrackingPortal() {
     }
   }, []);
 
-  // Live shift timer.
+  // Live shift timer. Measured on the server's clock: a phone clock running
+  // behind the server kept this at 0:00 for whole shifts (2026-10-14).
+  const shiftStartTime = currentShift?.startTime;
   useEffect(() => {
-    if (!isShiftActive || !currentShift?.startTime) return;
-    const startedAt = new Date(currentShift.startTime).getTime();
-    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    if (!isShiftActive || !shiftStartTime) return;
+    const tick = () =>
+      setElapsed(shiftElapsedSeconds(shiftStartTime, Date.now(), clockOffsetMs));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [isShiftActive, currentShift?.startTime]);
+  }, [isShiftActive, shiftStartTime, clockOffsetMs]);
 
   // GPS auto-resume for an active shift lives in DriverTrackingProvider (the
   // /driver layout), so it fires on every driver page, not only this portal.
 
+  // Start shift only renders once a location exists (the permission CTA shows
+  // before that), so this render's currentLocation is the position the driver
+  // just granted. The old fallback re-requested permission and then re-read
+  // currentLocation from this same stale closure — always null — so it could
+  // never start a shift.
   const handleStartShift = async () => {
-    let location = currentLocation;
-    if (!location) {
-      const granted = await requestLocationPermission();
-      if (!granted) return;
-      location = currentLocation;
-    }
-    if (!location) return;
-    const ok = await startShift(location);
+    if (!currentLocation) return;
+    const ok = await startShift(currentLocation);
     if (ok) startTracking();
   };
 
@@ -276,20 +288,32 @@ export default function DriverTrackingPortal() {
     if (shiftError) toast.error(shiftError);
   }, [shiftError]);
 
-  const advanceStatus = async (deliveryId: string, status: DriverStatus) => {
-    setUpdatingId(deliveryId);
+  const advanceStatus = async (target: PodTarget, status: DriverStatus) => {
+    setUpdatingId(target.deliveryId);
     try {
-      const ok = await updateDeliveryStatus(
-        deliveryId,
+      const outcome = await advanceDeliveryStatus(
+        target.deliveryId,
         status,
         currentLocation || undefined,
       );
-      if (!ok) {
-        // The update failed server-side (auth, network, validation). Without
-        // this the button just does nothing and the driver assumes a freeze.
-        toast.error("Couldn't update the delivery status. Please try again.");
+      if (!outcome.ok) {
+        // Server-side stage gates (authoritative, same as the detail screen):
+        // say what is missing in plain words and reopen the matching sheet —
+        // e.g. an upload queued offline that has not landed yet.
+        const gateMessage = stageGateMessage(outcome.code, outcome.message);
+        if (gateMessage) {
+          toast.error(gateMessage);
+          if (outcome.code === "PICKUP_PHOTO_REQUIRED") setPickupPhotoTarget(target);
+          else if (outcome.code === "PICKUP_CONFIRMATION_REQUIRED") setSigTarget(target);
+          else if (outcome.code === "POD_REQUIRED") setPodTarget(target);
+          else if (outcome.code === RECIPIENT_REQUIRED_CODE) setRecipientTarget(target);
+        } else {
+          // Anything else (auth, network, validation). Without this the
+          // button just does nothing and the driver assumes a freeze.
+          toast.error("Couldn't update the delivery status. Please try again.");
+        }
       }
-      return ok;
+      return outcome.ok;
     } finally {
       setUpdatingId(null);
     }
@@ -311,38 +335,58 @@ export default function DriverTrackingPortal() {
     }
     const orderNumber =
       delivery.cateringRequestId || delivery.onDemandId || delivery.id;
-    // The pickup step routes through vendor-signature capture (mandatory per
-    // the 2026-06-22 decision — mirrors the gate in DriverDeliveryDetail; the
-    // server also rejects an unsigned PICKED_UP).
+    const target = { deliveryId: delivery.id, orderNumber };
+    // Pickup: photo of the order, then the vendor confirmation (both
+    // mandatory; mirrors DriverDeliveryDetail, the server enforces both). The
+    // feed carries no pickup-photo flag, so the photo is always asked here; a
+    // retake replaces the earlier one.
     if (next === DriverStatus.PICKED_UP) {
-      setSigTarget({ deliveryId: delivery.id, orderNumber });
+      setPickupPhotoTarget(target);
       return;
     }
-    // The final step routes through proof-of-delivery capture.
+    // Completion: setup photo (skipped when the feed shows one on file), then
+    // the recipient's signature or name.
     if (next === DriverStatus.COMPLETED) {
-      setPodTarget({ deliveryId: delivery.id, orderNumber });
+      if (delivery.proofOfDelivery) setRecipientTarget(target);
+      else setPodTarget(target);
       return;
     }
-    advanceStatus(delivery.id, next);
+    advanceStatus(target, next);
+  };
+
+  /** Pickup photo stored → on to the pickup confirmation. */
+  const onPickupPhotoComplete = () => {
+    if (!pickupPhotoTarget) return;
+    setSigTarget(pickupPhotoTarget);
+    setPickupPhotoTarget(null);
   };
 
   const onPodComplete = async () => {
     if (!podTarget) return;
-    const { deliveryId } = podTarget;
+    // Setup photo stored → the recipient sign-off is the second mandatory
+    // completion capture (server: 422 RECIPIENT_REQUIRED). Mirrors
+    // DriverDeliveryDetail.
+    setRecipientTarget(podTarget);
+    setPodTarget(null);
+  };
+
+  const onRecipientComplete = async () => {
+    if (!recipientTarget) return;
+    const target = recipientTarget;
     // The upload already succeeded (and toasted) — close the sheet NOW instead
     // of holding it open across the status PATCH + deliveries refetch (2-5s on
     // LTE reads as a hang). A failed advance is surfaced by advanceStatus's
-    // toast and retried from the delivery card. Mirrors DriverDeliveryDetail.
-    setPodTarget(null);
-    await advanceStatus(deliveryId, DriverStatus.COMPLETED);
+    // toast and retried from the delivery card.
+    setRecipientTarget(null);
+    await advanceStatus(target, DriverStatus.COMPLETED);
   };
 
   const onSignatureComplete = async () => {
     if (!sigTarget) return;
-    const { deliveryId } = sigTarget;
-    // Same close-first semantics as POD.
+    const target = sigTarget;
+    // Same close-first semantics as the recipient sheet.
     setSigTarget(null);
-    await advanceStatus(deliveryId, DriverStatus.PICKED_UP);
+    await advanceStatus(target, DriverStatus.PICKED_UP);
   };
 
   const isPickupToday = (d?: Date) =>
@@ -440,6 +484,7 @@ export default function DriverTrackingPortal() {
                     activeDeliveries={activeDeliveries}
                     driverId={currentShift?.driverId}
                     shiftStartedAt={currentShift?.startTime}
+                    clockOffsetMs={clockOffsetMs}
                   />
                 </div>
               ) : (
@@ -466,8 +511,8 @@ export default function DriverTrackingPortal() {
 
             {/* Shift control bar */}
             <DriverCard className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-semibold text-driver-text">
                     On shift
                   </div>
@@ -481,7 +526,7 @@ export default function DriverTrackingPortal() {
                       : ""}
                   </div>
                   {endShiftBlockers > 0 ? (
-                    <div className="mt-0.5 text-[11px] font-semibold text-driver-subtle">
+                    <div className="mt-0.5 break-words text-[11px] font-semibold text-driver-subtle">
                       {endShiftBlockers === 1
                         ? `Order ${firstBlockerOrderNumber} to finish or return first`
                         : `${endShiftBlockers} deliveries to finish or return first`}
@@ -497,11 +542,10 @@ export default function DriverTrackingPortal() {
                   onClick={handleEndShift}
                   loading={shiftLoading}
                   aria-disabled={endShiftBlockers > 0}
-                  className={
-                    endShiftBlockers > 0
-                      ? "cursor-not-allowed opacity-50"
-                      : undefined
-                  }
+                  className={cn(
+                    "shrink-0 whitespace-nowrap",
+                    endShiftBlockers > 0 && "cursor-not-allowed opacity-50",
+                  )}
                 >
                   <Square className="h-4 w-4" />
                   End shift
@@ -578,9 +622,7 @@ export default function DriverTrackingPortal() {
                     : "on_demand";
                   const next = getNextStatus(delivery.status);
                   const progress = getStatusProgress(delivery.status);
-                  const coords = delivery.deliveryLocation?.coordinates;
-                  const lng = coords?.[0];
-                  const lat = coords?.[1];
+                  const navTarget = deliveryNavTarget(delivery);
                   const lead = idx === 0;
                   const atClient =
                     delivery.status === DriverStatus.ARRIVED_TO_CLIENT;
@@ -660,8 +702,8 @@ export default function DriverTrackingPortal() {
                         </div>
                       )}
 
-                      {typeof lat === "number" && typeof lng === "number" ? (
-                        <NavigateButton target={{ lat, lng }} label="Navigate" />
+                      {navTarget ? (
+                        <NavigateButton target={navTarget} label="Navigate" />
                       ) : null}
                     </DriverCard>
                   );
@@ -686,6 +728,11 @@ export default function DriverTrackingPortal() {
                   ? "Enable location in your browser settings, then try again."
                   : "We use your location to track your shift and deliveries."}
               </p>
+              {lastShiftMiles != null ? (
+                <p className="mt-3 rounded-full bg-driver-surface-alt px-3 py-1.5 text-[13px] font-semibold text-driver-text">
+                  {`Last shift · ${formatMiles(lastShiftMiles)}`}
+                </p>
+              ) : null}
             </div>
 
             {permissionState === "denied" ? (
@@ -726,6 +773,19 @@ export default function DriverTrackingPortal() {
         )}
       </div>
 
+      {pickupPhotoTarget ? (
+        <DriverPodSheet
+          open={!!pickupPhotoTarget}
+          onOpenChange={(o) => !o && setPickupPhotoTarget(null)}
+          deliveryId={pickupPhotoTarget.deliveryId}
+          orderNumber={pickupPhotoTarget.orderNumber}
+          title="Photo of the order"
+          requirementHint="Take a photo of the order at the vendor before confirming pickup"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(pickupPhotoTarget.orderNumber)}/pickup-photo`}
+          onComplete={onPickupPhotoComplete}
+        />
+      ) : null}
+
       {sigTarget ? (
         <DriverSignatureSheet
           open={!!sigTarget}
@@ -742,7 +802,19 @@ export default function DriverTrackingPortal() {
           deliveryId={podTarget.deliveryId}
           orderNumber={podTarget.orderNumber}
           uploadEndpoint={`/api/orders/${encodeURIComponent(podTarget.orderNumber)}/pod`}
+          maxPhotos={POD_MAX_PHOTOS}
           onComplete={onPodComplete}
+        />
+      ) : null}
+
+      {recipientTarget ? (
+        <DriverSignatureSheet
+          open={!!recipientTarget}
+          onOpenChange={(o) => !o && setRecipientTarget(null)}
+          orderNumber={recipientTarget.orderNumber}
+          stage="delivery"
+          uploadEndpoint={`/api/orders/${encodeURIComponent(recipientTarget.orderNumber)}/recipient`}
+          onComplete={() => void onRecipientComplete()}
         />
       ) : null}
 

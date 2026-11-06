@@ -5,6 +5,7 @@ import Image from "next/image";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import ScheduleDialog from "../Logistics/Schedule";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface FlowerHeroProps {
   imagePath?: string;
@@ -66,7 +67,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
                 </button>
                 <ScheduleDialog
                   buttonText="Book a Call"
-                  calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                  calendarUrl={BOOKING_CALENDAR_URL}
                   customButton={
                     <button className="rounded-lg bg-yellow-400 px-7 py-3 text-base font-bold text-gray-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg sm:px-10">
                       Book a Call

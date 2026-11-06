@@ -7,6 +7,7 @@ import FeatureCarousel from "./FeatureCarousel";
 import { MaskBackground } from "./MaskBackground";
 import AppointmentDialog from "./Appointment";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { VA_CONSULTATION_CALENDAR_URL } from "@/config/scheduling-config";
 
 const HeroHeader: React.FC = () => {
   const animations: Record<string, Variants> = {
@@ -86,7 +87,7 @@ const HeroHeader: React.FC = () => {
                   variants: animations.scaleIn,
                 } as HTMLMotionProps<"div">)}
               >
-                <AppointmentDialog calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true" />
+                <AppointmentDialog calendarUrl={VA_CONSULTATION_CALENDAR_URL} />
               </motion.div>
             </motion.div>
 

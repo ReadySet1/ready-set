@@ -2,6 +2,7 @@
 
 import React from "react";
 import AppointmentDialog from "../VirtualAssistant/Appointment";
+import { HOW_IT_WORKS_CALENDAR_URL } from "@/config/scheduling-config";
 
 
 
@@ -84,7 +85,7 @@ const HowItWorks = () => {
         <div className="mt-8 flex justify-center items-center md:mt-12 lg:mt-16 xl:mt-20">
           <AppointmentDialog
             buttonVariant="amber"
-            calendarUrl="https://calendar.google.com/calendar/appointments/AcZssZ1jHb5jHQLYMdGkYHDE1Joqi0ADTQ_QVVx1HcA=?gv=true&embedded=true"
+            calendarUrl={HOW_IT_WORKS_CALENDAR_URL}
           />
         </div>
         </div>

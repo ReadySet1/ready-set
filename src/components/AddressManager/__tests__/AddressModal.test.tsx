@@ -329,6 +329,58 @@ describe("AddressModal", () => {
     });
   });
 
+  describe("Saved address hand-off", () => {
+    it("passes the updated address to onAddressUpdated", async () => {
+      const updated = { ...mockAddress, street1: "125 Main St" };
+      mockUpdateMutateAsync.mockResolvedValue(updated);
+
+      customRender(<AddressModal {...defaultProps} addressToEdit={mockAddress} />);
+
+      await userEvent.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        expect(mockOnAddressUpdated).toHaveBeenCalledWith(updated);
+      });
+    });
+  });
+
+  describe("Prefilled copy (initialValues)", () => {
+    it("prefills the form and creates a new address instead of updating", async () => {
+      const created = { ...mockAddress, id: "copy-id", street1: "125 Main St" };
+      mockCreateMutateAsync.mockResolvedValue(created);
+
+      customRender(
+        <AddressModal
+          {...defaultProps}
+          initialValues={{ ...mockAddress, isShared: true }}
+          notice="Saved as a new address"
+        />,
+      );
+
+      const street = screen.getByRole("textbox", { name: /Street Address \*/i });
+      expect(street).toHaveValue("123 Main St");
+      expect(screen.getByRole("textbox", { name: /City/i })).toHaveValue("San Francisco");
+      expect(screen.getByText("Saved as a new address")).toBeInTheDocument();
+
+      await userEvent.clear(street);
+      await userEvent.type(street, "125 Main St");
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            street1: "125 Main St",
+            city: "San Francisco",
+            zip: "94103",
+            isShared: false,
+          }),
+        );
+      });
+      expect(mockUpdateMutateAsync).not.toHaveBeenCalled();
+      expect(mockOnAddressUpdated).toHaveBeenCalledWith(created);
+    });
+  });
+
   describe("Form Reset", () => {
     it("resets form after successful submission", async () => {
       customRender(<AddressModal {...defaultProps} />);

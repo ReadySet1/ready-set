@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
-import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforcePartnerBodyPolicy, readJsonBody } from '@/lib/security/body-size-limit';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import {
   readIdempotencyContext,
@@ -87,7 +87,8 @@ interface DraftOrderResponse {
 export async function POST(request: NextRequest) {
   try {
     // 0. Reject oversized bodies before doing any work.
-    const sizeReject = enforceBodySizeLimit(request);
+    // Content-Type (415 on /api/partners) + declared size, before auth.
+    const sizeReject = enforcePartnerBodyPolicy(request);
     if (sizeReject) return sizeReject;
 
     // 1. Authentication — resolve partner from headers via registry.
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // 1a. Per-partner rate limit (after auth so we can attribute the count
     //     to a specific partner).
-    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.draft');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.draft', partner.rateLimitPerMin);
     if (rateLimitReject) return rateLimitReject;
 
     // 1b. Idempotency-Key replay — namespaced by partner slug.
@@ -106,18 +107,11 @@ export async function POST(request: NextRequest) {
     if (replay) return replay;
 
     // 2. Parse and validate request body
-    let requestBody: DraftOrderRequest;
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      return NextResponse.json(
-        {
-          status: 'ERROR',
-          message: 'Invalid JSON in request body',
-        },
-        { status: 400 }
-      );
-    }
+    // Read with the size limit enforced on the bytes actually received
+    // (a chunked body has no Content-Length to check up front).
+    const read = await readJsonBody(request);
+    if (!read.ok) return read.response;
+    const requestBody = read.body as DraftOrderRequest;
 
     const validationResult = DraftOrderSchema.safeParse(requestBody);
     if (!validationResult.success) {
@@ -160,6 +154,7 @@ export async function POST(request: NextRequest) {
       return storeAndReturnResponse(idempotency, 409, {
         status: 'ERROR',
         message: `Order with code ${validatedData.orderCode} already exists`,
+        details: { existingOrderId: existingOrder.id },
       });
     }
 
@@ -249,9 +244,16 @@ export async function POST(request: NextRequest) {
       // P2002 (unique constraint). Convert to a deterministic 409 instead
       // of a 500.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Name the live order that won, so the partner can treat this as an
+        // idempotent retry. A code held only by a deleted order has none.
+        const conflicting = await prisma.cateringRequest.findFirst({
+          where: { orderNumber: normalizedOrderNumber, deletedAt: null },
+          select: { id: true },
+        });
         return storeAndReturnResponse(idempotency, 409, {
           status: 'ERROR',
           message: `Order with code ${validatedData.orderCode} already exists`,
+          ...(conflicting ? { details: { existingOrderId: conflicting.id } } : {}),
         });
       }
       throw error;

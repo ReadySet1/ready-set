@@ -5,9 +5,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { getCloudinaryUrl, ASSET_CACHE_VERSION } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
-
-const LOGISTICS_CALENDAR_URL =
-  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 export interface PartnerLogo {
   name: string;
@@ -109,6 +107,12 @@ const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
       alt: "Componere Culinary and Events logo",
       url: "https://www.componere.co/",
     },
+    {
+      name: "Taqueria Los Altos",
+      image: getCloudinaryUrl("food/partners/taquerialosaltos"),
+      alt: "Taqueria Los Altos logo",
+      url: "https://taquerialosaltossf.com/",
+    },
   ];
 
 const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
@@ -116,7 +120,7 @@ const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
   subtitle = "We're proud to collaborate with some of the top names in the industry:",
   partners = DEFAULT_FOOD_PARTNERS,
   ctaLabel = "Partner With Us",
-  calendarUrl = LOGISTICS_CALENDAR_URL,
+  calendarUrl = BOOKING_CALENDAR_URL,
 }) => {
   return (
     <div className="w-full bg-white py-16 md:py-20 lg:py-24">
@@ -176,7 +180,7 @@ const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
               {partners.slice(8).map((partner, index) => (
                 <motion.div
                   key={partner.name}
-                  className="flex w-[calc(50%-12px)] items-center justify-center md:w-[calc(25%-24px)]"
+                  className="flex w-[calc(50%-12px)] items-center justify-center md:w-[calc(25%-24px)] lg:w-[calc(25%-30px)]"
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}

@@ -62,6 +62,7 @@ import {
 } from '@/lib/web-pricing/pricing-calculator';
 
 import ScheduleDialog from '@/components/Logistics/Schedule';
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 // ============================================================================
 // CONSTANTS
@@ -624,7 +625,7 @@ function PricingBreakdown({ breakdown }: PricingBreakdownProps) {
             buttonText="Schedule a Call"
             dialogTitle="Schedule a Consultation"
             dialogDescription="Choose a convenient time to discuss your web development project."
-            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+            calendarUrl={BOOKING_CALENDAR_URL}
             customButton={
               <Button
                 variant="outline"

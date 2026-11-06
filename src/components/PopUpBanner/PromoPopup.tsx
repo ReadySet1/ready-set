@@ -8,6 +8,7 @@ import { motion, AnimatePresence, type Variants } from "framer-motion";
 import AppointmentDialog from "../VirtualAssistant/Appointment";
 import dynamic from "next/dynamic";
 import { getPromotionDates } from "@/utils/dates";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 const overlayVariants: Variants = {
   hidden: { opacity: 0 },
@@ -59,8 +60,7 @@ const textVariants = {
 
 const ClientSidePromoPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const calendarUrl =
-    "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+  const calendarUrl = BOOKING_CALENDAR_URL;
   const { formattedDisplay } = getPromotionDates();
 
   useEffect(() => {

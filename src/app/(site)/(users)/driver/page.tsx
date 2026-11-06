@@ -13,6 +13,7 @@ import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { useUser } from "@/contexts/UserContext";
 import { performSignOut } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
+import { shiftElapsedSeconds } from "@/lib/driver/shift-clock";
 import {
   DriverCard,
   DriverScreen,
@@ -24,7 +25,7 @@ import { useDriverDeliveriesFeed } from "@/hooks/driver/useDriverDeliveriesFeed"
 
 export default function DriverHomePage() {
   const { logout } = useUser();
-  const { isShiftActive, currentShift } = useDriverTracking();
+  const { isShiftActive, currentShift, clockOffsetMs = 0 } = useDriverTracking();
 
   // Single source for the deliveries list AND the "N active" count below, so
   // they can never disagree (the prior bug). Polls + refreshes on focus.
@@ -82,9 +83,12 @@ export default function DriverHomePage() {
     hour12: true,
   });
 
-  const shiftSeconds = currentShift?.startTime
-    ? Math.floor((now.getTime() - new Date(currentShift.startTime).getTime()) / 1000)
-    : 0;
+  // Server clock, not the phone's: a phone running behind read 0 (2026-10-14).
+  const shiftSeconds = shiftElapsedSeconds(
+    currentShift?.startTime,
+    now.getTime(),
+    clockOffsetMs,
+  );
 
   // Server cookie clear + a never-redirecting destination inside the native
   // shell (a 307 on a top-level WKWebView load bounces the driver to Safari).

@@ -1,5 +1,10 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useDriverShift } from '../useDriverShift';
+import {
+  useDriverShift,
+  SHIFT_REQUEST_TIMEOUT_MS,
+  START_SHIFT_TIMEOUT_MESSAGE,
+  LOAD_SHIFT_TIMEOUT_MESSAGE,
+} from '../useDriverShift';
 
 // Mock the server actions that are STILL used by the hook (break ops).
 // The shift start/end/active operations moved to fetch() API routes and are
@@ -80,6 +85,8 @@ describe('useDriverShift', () => {
   // Active-shift route: a queue of values mirroring mockResolvedValueOnce(...).
   // Each call dequeues the next; once empty it sticks on the last value.
   let activeShiftQueue: Array<any>;
+  // Server clock the active-shift route reports (undefined = old server).
+  let activeServerNow: (() => number) | undefined;
   let startShiftResult: () => FetchResult | Promise<FetchResult>;
   let endShiftResult: () => FetchResult | Promise<FetchResult>;
 
@@ -107,6 +114,7 @@ describe('useDriverShift', () => {
     // Defaults — equivalent to the old action defaults.
     sessionResponse = () => okJson(mockSessionResponse);
     setActiveShift(null); // getActiveShift -> null by default
+    activeServerNow = undefined;
     startShiftResult = () => okJson({ success: true, shiftId: mockShiftId });
     endShiftResult = () => okJson({ success: true });
 
@@ -123,7 +131,13 @@ describe('useDriverShift', () => {
         if (value instanceof Error) {
           return Promise.reject(value);
         }
-        return Promise.resolve(okJson({ success: true, shift: value }));
+        return Promise.resolve(
+          okJson({
+            success: true,
+            shift: value,
+            ...(activeServerNow ? { serverNow: activeServerNow() } : {}),
+          }),
+        );
       }
       if (url.includes('/api/tracking/shifts/start')) {
         return Promise.resolve(startShiftResult());
@@ -193,6 +207,35 @@ describe('useDriverShift', () => {
       await waitFor(() => {
         expect(captureException).toHaveBeenCalled();
       });
+    });
+  });
+
+  // 2026-10-14: an Android tester's phone clock ran ~3,648 s behind the
+  // server, so every shift timer read 0:00. The active-shift route reports the
+  // server clock; the hook turns it into a server-minus-device offset.
+  describe('server clock offset', () => {
+    it('defaults to 0 before any shift is loaded', () => {
+      const { result } = renderHook(() => useDriverShift());
+      expect(result.current.clockOffsetMs).toBe(0);
+    });
+
+    it('measures the device clock running an hour behind the server', async () => {
+      setActiveShift(mockShift);
+      activeServerNow = () => Date.now() + 3_648_000;
+
+      const { result } = renderHook(() => useDriverShift());
+
+      await waitFor(() => expect(result.current.currentShift).toEqual(mockShift));
+      expect(Math.abs(result.current.clockOffsetMs - 3_648_000)).toBeLessThan(1_000);
+    });
+
+    it('stays at 0 when the server does not report its clock (old server)', async () => {
+      setActiveShift(mockShift);
+
+      const { result } = renderHook(() => useDriverShift());
+
+      await waitFor(() => expect(result.current.currentShift).toEqual(mockShift));
+      expect(result.current.clockOffsetMs).toBe(0);
     });
   });
 
@@ -311,6 +354,25 @@ describe('useDriverShift', () => {
   });
 
   describe('endShift', () => {
+    // C11: the end-shift response carries the shift miles; the hook keeps
+    // them so the tracking screen can show the distance after the shift.
+    it('exposes the ended shift miles from the server response', async () => {
+      setActiveShift(mockShift);
+      endShiftResult = () => okJson({ success: true, totalMiles: 0.62 });
+
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.currentShift).toEqual(mockShift);
+      });
+      expect(result.current.lastShiftMiles).toBeNull();
+
+      await act(async () => {
+        await result.current.endShift(mockShiftId, mockLocation);
+      });
+
+      expect(result.current.lastShiftMiles).toBe(0.62);
+    });
+
     it('should end shift successfully', async () => {
       setActiveShift(mockShift);
 
@@ -734,6 +796,110 @@ describe('useDriverShift', () => {
         expect.stringContaining('/api/tracking/shifts/active'),
         expect.anything(),
       );
+    });
+  });
+  describe('bounded shift requests (2026-10 stuck Start-shift spinner)', () => {
+    const never = <T,>() => new Promise<T>(() => undefined);
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('gives up on a hung start request, clears loading and explains why', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      startShiftResult = () => never<FetchResult>();
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+      expect(result.current.loading).toBe(true);
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+      const startCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([u]) => String(u) === '/api/tracking/shifts/start',
+      );
+      expect(startCall![1].signal.aborted).toBe(true);
+    });
+
+    it('gives up when the Supabase session read hangs', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      (createClient as jest.Mock).mockReturnValue({
+        auth: { getSession: jest.fn(() => never()) },
+      });
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+    });
+
+    it('gives up when the driver-id session lookup hangs', async () => {
+      const { result } = renderHook(() => useDriverShift());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      jest.useFakeTimers();
+      sessionResponse = () => never<FetchResult>() as unknown as FetchResult;
+
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = result.current.startShift(mockLocation);
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+        ok = await pending;
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(START_SHIFT_TIMEOUT_MESSAGE);
+    });
+
+    it('does not leave the initial shift load spinning when the session hangs', async () => {
+      jest.useFakeTimers();
+      sessionResponse = () => never<FetchResult>() as unknown as FetchResult;
+
+      const { result } = renderHook(() => useDriverShift());
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SHIFT_REQUEST_TIMEOUT_MS);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(LOAD_SHIFT_TIMEOUT_MESSAGE);
     });
   });
 });

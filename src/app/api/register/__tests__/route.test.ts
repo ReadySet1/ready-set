@@ -559,6 +559,19 @@ describe("/api/register", () => {
       });
     });
 
+    it("should store the USPS code when sign-up sends a full state name", async () => {
+      const request = createPostRequest("http://localhost:3000/api/register", {
+        ...validVendorData,
+        state: "California",
+      });
+
+      await POST(request);
+
+      expect(mockPrisma.address.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ state: "CA" }),
+      });
+    });
+
     it("should link user to address", async () => {
       const request = createPostRequest(
         "http://localhost:3000/api/register",

@@ -3,6 +3,7 @@
 import React from "react";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 /**
  * CateringStats Component
@@ -46,7 +47,7 @@ const CateringStats: React.FC = () => {
             <ScheduleDialog
               buttonText="Book a Call"
               className="w-full rounded-lg bg-yellow-500 px-8 py-3 text-base font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:w-auto sm:px-10 sm:py-4 sm:text-lg"
-              calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+              calendarUrl={BOOKING_CALENDAR_URL}
             />
           </div>
         </div>

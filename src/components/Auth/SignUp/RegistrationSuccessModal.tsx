@@ -3,6 +3,7 @@
 import React from "react";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -10,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Mail } from "lucide-react";
+import { CheckCircle2, Mail, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface RegistrationSuccessModalProps {
@@ -41,7 +42,17 @@ const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      {/* On a phone the content used to fill the whole viewport: no close
+          control, no backdrop left to tap, and no scroll to reach the footer
+          button (mobile QA round 1, F1). Keep a gutter, cap the height to the
+          dynamic viewport and let the body scroll. */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-lg sm:max-w-md">
+        <DialogClose
+          aria-label="Close"
+          className="absolute right-3 top-3 rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </DialogClose>
         <DialogHeader>
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand">
             <CheckCircle2 className="h-10 w-10 text-text-primary" />

@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface VendorOnboardingProps {
   /**
@@ -87,7 +88,7 @@ const VendorOnboarding = ({
                 buttonText="Get Started"
                 dialogTitle="Schedule Your Consultation"
                 dialogDescription="Choose a convenient time to discuss your catering delivery needs."
-                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                calendarUrl={BOOKING_CALENDAR_URL}
                 customButton={
                   <button className="rounded-lg bg-yellow-400 px-6 py-2.5 text-center text-sm font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:px-8 sm:text-base">
                     Get Started

@@ -1,0 +1,219 @@
+/**
+ * Next-stop guide for the driver live map (2026-10-06 field report: a driver
+ * read the breadcrumb trail as a route to follow and stopped at the vendor
+ * thinking a further step was pending — "no guide like Google Maps/Waze").
+ *
+ * Pure helpers only — the map component owns rendering and fetching:
+ * - which stop the driver should head to next,
+ * - when to refetch the Directions route (throttled to limit API usage),
+ * - the imperial distance / ETA label (product rule: feet/miles only).
+ */
+
+import { distanceToTargetM, isValidTarget, type LngLatTuple } from '@/lib/driver/geofence';
+import { FEET_PER_MILE, METERS_TO_FEET } from '@/lib/units';
+import type { NavTarget } from '@/lib/driver-navigation';
+
+/** Refetch the route only after the driver moved this far (meters). */
+export const ROUTE_REFETCH_DISTANCE_M = 100;
+
+export type NextStopKind = 'pickup' | 'dropoff';
+
+export interface NextStop {
+  deliveryId: string;
+  kind: NextStopKind;
+  coordinates: LngLatTuple;
+}
+
+/** The subset of DeliveryTracking the guide needs (keeps tests light). */
+export interface GuideDelivery {
+  id: string;
+  status: string;
+  pendingReturn?: boolean;
+  scheduledPickupAt?: Date | string;
+  pickupLocation?: { coordinates?: unknown; address?: string | null } | null;
+  deliveryLocation?: { coordinates?: unknown; address?: string | null } | null;
+}
+
+/** Progress rank per status: higher = further along. Pickup phase < 10. */
+const STATUS_RANK: Record<string, number> = {
+  ASSIGNED: 0,
+  EN_ROUTE_TO_VENDOR: 1,
+  ARRIVED_AT_VENDOR: 2,
+  PICKED_UP: 10,
+  EN_ROUTE_TO_CLIENT: 11,
+  ARRIVED_TO_CLIENT: 12,
+};
+const DROPOFF_PHASE_MIN_RANK = 10;
+const TERMINAL_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'DELIVERED']);
+
+const scheduledMs = (value: Date | string | undefined): number => {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+};
+
+/**
+ * The stop one order needs next: the pickup until the food is on board, then
+ * the drop-off. Null for terminal orders, orders handed back to dispatch, and
+ * ungeocoded targets. Shared by the map guide and the per-card Navigate button
+ * (2026-10-23 drives: Navigate sent the driver to the client while still en
+ * route to the vendor because the card always used the drop-off).
+ */
+export function deliveryStop(d: GuideDelivery): NextStop | null {
+  const kind = stopKind(d);
+  if (!kind) return null;
+  const coordinates = stopLocation(d, kind)?.coordinates;
+  if (!isValidTarget(coordinates)) return null;
+  return { deliveryId: d.id, kind, coordinates };
+}
+
+/** Which stop is current (null for terminal orders and pending returns). */
+function stopKind(d: GuideDelivery): NextStopKind | null {
+  const status = String(d.status ?? '').toUpperCase();
+  if (TERMINAL_STATUSES.has(status) || d.pendingReturn) return null;
+  const rank = STATUS_RANK[status] ?? 0;
+  return rank >= DROPOFF_PHASE_MIN_RANK ? 'dropoff' : 'pickup';
+}
+
+const stopLocation = (d: GuideDelivery, kind: NextStopKind) =>
+  kind === 'pickup' ? d.pickupLocation : d.deliveryLocation;
+
+/**
+ * Navigate target for one order's card: the current stop's coordinates, or —
+ * when that stop is ungeocoded — its address, like the delivery detail screen.
+ * Null only when the stop has neither (or the order is terminal / returned).
+ */
+export function deliveryNavTarget(d: GuideDelivery): NavTarget | null {
+  const stop = deliveryStop(d);
+  if (stop) return { lat: stop.coordinates[1], lng: stop.coordinates[0] };
+  const kind = stopKind(d);
+  const address = kind ? stopLocation(d, kind)?.address : null;
+  return address ? { address } : null;
+}
+
+/**
+ * Pick the one stop the driver should head to now. With several open orders,
+ * the one furthest along wins (food already on board beats a fresh pickup),
+ * then the earliest scheduled pickup.
+ */
+export function selectNextStop(deliveries: readonly GuideDelivery[]): NextStop | null {
+  const candidates = deliveries
+    .map((d, index) => {
+      const stop = deliveryStop(d);
+      if (!stop) return null;
+      const rank = STATUS_RANK[String(d.status ?? '').toUpperCase()] ?? 0;
+      return { ...stop, rank, scheduled: scheduledMs(d.scheduledPickupAt), index };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+    .sort((a, b) => b.rank - a.rank || a.scheduled - b.scheduled || a.index - b.index);
+
+  const best = candidates[0];
+  return best ? { deliveryId: best.deliveryId, kind: best.kind, coordinates: best.coordinates } : null;
+}
+
+export interface RouteRequestKey {
+  origin: { lat: number; lng: number };
+  /** Identifies the target stop, e.g. `${deliveryId}:${kind}:${lng},${lat}`. */
+  targetKey: string;
+}
+
+/**
+ * Throttle for Directions requests: fetch on the first fix, whenever the next
+ * stop changes, or once the driver has moved past `thresholdM` from where the
+ * last route was requested. GPS jitter alone never triggers a refetch.
+ */
+export function shouldRefetchRoute(
+  last: RouteRequestKey | null,
+  next: RouteRequestKey,
+  thresholdM: number = ROUTE_REFETCH_DISTANCE_M,
+): boolean {
+  if (!last) return true;
+  if (last.targetKey !== next.targetKey) return true;
+  const moved = distanceToTargetM(next.origin, [last.origin.lng, last.origin.lat]);
+  // Unknown distance (bad coords) → refetch rather than freeze a stale route.
+  return moved === null || moved > thresholdM;
+}
+
+/** Imperial distance: feet (rounded to 10) under 1000 ft, else miles (1 dp). */
+export function formatGuideDistance(meters: number): string {
+  const feet = meters * METERS_TO_FEET;
+  return feet >= 1000
+    ? `${(feet / FEET_PER_MILE).toFixed(1)} mi`
+    : `${Math.round(feet / 10) * 10} ft`;
+}
+
+export function formatGuideDuration(seconds: number): string {
+  if (seconds < 60) return '<1 min';
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+const STOP_LABEL: Record<NextStopKind, string> = {
+  pickup: 'Pickup',
+  dropoff: 'Drop-off',
+};
+
+export interface NextStopMetrics {
+  distanceM: number | null;
+  durationS?: number | null;
+  /** Straight-line fallback (Directions unavailable) — prefixed with "~", no ETA. */
+  approximate?: boolean;
+}
+
+/** e.g. "Next: Pickup · 1.2 mi · 6 min" or "Next: Drop-off · ~0.4 mi". */
+export function formatNextStopLabel(kind: NextStopKind, metrics: NextStopMetrics | null): string {
+  const parts = [`Next: ${STOP_LABEL[kind]}`];
+  if (metrics && metrics.distanceM !== null && Number.isFinite(metrics.distanceM)) {
+    const distance = formatGuideDistance(metrics.distanceM);
+    parts.push(metrics.approximate ? `~${distance}` : distance);
+    if (!metrics.approximate && metrics.durationS != null && Number.isFinite(metrics.durationS)) {
+      parts.push(formatGuideDuration(metrics.durationS));
+    }
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * Same Mapbox Directions request shape the admin LiveDriverMap uses (public
+ * NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN, client-side, no proxy).
+ */
+export function buildDirectionsUrl(
+  origin: { lat: number; lng: number },
+  target: LngLatTuple,
+  token: string,
+): string {
+  const coords = `${origin.lng},${origin.lat};${target[0]},${target[1]}`;
+  return `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${encodeURIComponent(token)}`;
+}
+
+export interface ParsedRoute {
+  coordinates: [number, number][];
+  distanceM: number | null;
+  durationS: number | null;
+}
+
+/** Defensive parse of a Directions response; null when there is no usable line. */
+export function parseDirectionsRoute(body: unknown): ParsedRoute | null {
+  const route = (body as { routes?: unknown[] } | null)?.routes?.[0] as
+    | { geometry?: { type?: string; coordinates?: unknown }; distance?: unknown; duration?: unknown }
+    | undefined;
+  const geometry = route?.geometry;
+  if (
+    !geometry ||
+    geometry.type !== 'LineString' ||
+    !Array.isArray(geometry.coordinates) ||
+    geometry.coordinates.length < 2
+  ) {
+    return null;
+  }
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return {
+    coordinates: geometry.coordinates as [number, number][],
+    distanceM: num(route?.distance),
+    durationS: num(route?.duration),
+  };
+}

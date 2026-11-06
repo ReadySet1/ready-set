@@ -7,10 +7,7 @@ import ScheduleDialog from "@/components/Logistics/Schedule";
 import sendEmail from "@/app/actions/email";
 import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
-
-// Logistics calendar URL for scheduling appointments
-const LOGISTICS_CALENDAR_URL =
-  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface MessageState {
   type: "success" | "error";
@@ -472,7 +469,7 @@ const CateringContact: React.FC = () => {
               </p>
               <ScheduleDialog
                 buttonText="Partner With Us"
-                calendarUrl={LOGISTICS_CALENDAR_URL}
+                calendarUrl={BOOKING_CALENDAR_URL}
                 className="rounded-lg bg-yellow-400 px-8 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
               />
             </motion.div>

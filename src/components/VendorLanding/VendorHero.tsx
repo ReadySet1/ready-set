@@ -5,9 +5,9 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
-const DEFAULT_PARTNER_URL =
-  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+const DEFAULT_PARTNER_URL = BOOKING_CALENDAR_URL;
 
 export interface VendorHeroProps {
   id?: string;

@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import VendorOnboarding from "../VendorOnboarding";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 // Mock Next.js Image component
 jest.mock("next/image", () => ({
@@ -187,7 +188,7 @@ describe("VendorOnboarding", () => {
     it("should pass correct calendarUrl prop", () => {
       render(<VendorOnboarding />);
       expect(screen.getByTestId("dialog-calendar-url")).toHaveTextContent(
-        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+        BOOKING_CALENDAR_URL
       );
     });
 

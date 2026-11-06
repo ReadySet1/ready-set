@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "./DriverStatus";
+import { DeliveryRecipient } from "./DeliveryRecipient";
 import OrderHeader from "./ui/OrderHeader";
 import OrderDetails from "./ui/OrderDetails";
 import AddressInfo from "./ui/AddressInfo";
@@ -38,6 +39,7 @@ import { getCustomerEditBlockReason } from "@/lib/orders/customer-order-edit";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
+import { ProofOfDeliveryPanel } from "./ui/ProofOfDeliveryPanel";
 import {
   Driver,
   Order,
@@ -54,6 +56,7 @@ import { UserType } from "@/types/user";
 import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
@@ -158,6 +161,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   canViewDeliveryTime = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  // Order times are entered and shown in the pickup address zone (PT/CT), never the browser zone.
+  const orderZone = orderTimezone(order);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
   const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
@@ -1004,6 +1009,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
+                                timeZone: orderZone,
                               },
                             )}
                           </span>
@@ -1020,8 +1026,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 hour12: true,
+                                timeZone: orderZone,
                               },
                             )}
+                          </span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {timezoneAbbreviation(orderZone)}
                           </span>
                         </div>
                       )}
@@ -1114,6 +1124,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                     canUpdateStatus={canUserUpdateTimeline}
                     onStatusUpdate={updateDriverStatus}
                   />
+                  <div className="mt-3">
+                    <DeliveryRecipient receivedBy={(order as any).deliveryReceivedBy} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1198,6 +1211,13 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               </div>
             )}
 
+            {/* Proof of Delivery (all POD photos, up to 3) */}
+            <ProofOfDeliveryPanel
+              orderId={order.id.toString()}
+              orderNumber={order.orderNumber}
+              files={files}
+            />
+
             {/* Order Files */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
@@ -1245,10 +1265,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                         Email
                       </div>
                       <div className="flex items-center gap-2 text-slate-800">
-                        <Mail className="h-4 w-4 text-slate-400" />
+                        <Mail className="h-4 w-4 shrink-0 text-slate-400" />
                         <a
                           href={`mailto:${order.user.email}`}
-                          className="transition-colors hover:text-blue-600"
+                          className="min-w-0 break-all transition-colors hover:text-blue-600"
                         >
                           {order.user.email}
                         </a>

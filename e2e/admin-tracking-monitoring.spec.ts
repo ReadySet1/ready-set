@@ -8,21 +8,25 @@
  * 2. Monitor Driver Status - Driver details, location updates, real-time status
  * 3. Assign Delivery - Delivery assignment panel, driver selection, confirmation
  * 4. View Delivery Progress - Status tracking, ETA updates, completion flow
+ *
+ * Every test runs as the E2E admin (storage state from e2e/auth/setup.ts). The
+ * suite skips only when no admin credentials were configured; a redirect to
+ * sign-in with credentials present fails the test.
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { adminTest } from './fixtures/auth.fixture';
-import * as path from 'path';
-import * as fs from 'fs';
+import { authStatePath, hasAuthState, missingAuthReason } from './fixtures/auth-state';
 
-// Check if admin auth is available
-const authDir = path.join(__dirname, '.auth');
-let adminAuthExists = false;
-try {
-  adminAuthExists = fs.existsSync(path.join(authDir, 'admin.json'));
-} catch {
-  adminAuthExists = false;
-}
+test.use({ storageState: authStatePath('admin') });
+
+test.beforeEach(async ({ page }) => {
+  test.skip(!hasAuthState('admin'), missingAuthReason('admin'));
+  // The Overview tab mounts a Mapbox map. On CI it renders WebGL in software
+  // across 4 parallel workers, starving the renderer until clicks time out.
+  // No test here asserts map pixels, so keep Mapbox from loading at all.
+  await page.route(/^https:\/\/[a-z]+\.mapbox\.com\//, (route) => route.abort());
+  await openDashboard(page);
+});
 
 // =============================================================================
 // Test Helpers
@@ -39,41 +43,54 @@ function connectionStatus(page: Page) {
 }
 
 /**
- * Helper to wait for dashboard to fully load
+ * Open /admin/tracking and wait until the first data load has finished.
+ *
+ * The dashboard streams and polls continuously, so 'networkidle' never settles.
+ * The stat cards render skeletons while loading and their labels only after, so
+ * the "GPS Updates" label is the "data loaded" signal.
  */
-async function waitForDashboardLoad(page: Page): Promise<boolean> {
-  // The dashboard streams and polls continuously, so 'networkidle' never
-  // settles. Wait for the connection indicator, which renders once it mounts.
-  return connectionStatus(page)
-    .waitFor({ state: 'visible', timeout: 15000 })
-    .then(() => true)
-    .catch(() => false);
+async function openDashboard(page: Page) {
+  await page.goto('/admin/tracking');
+  await expect(page, 'admin session was rejected (redirected away)').toHaveURL(/\/admin\/tracking/);
+  await expect(connectionStatus(page)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('GPS Updates', { exact: true })).toBeVisible({ timeout: 15000 });
 }
 
-/**
- * Helper to check if we're on the tracking page
- */
-async function isOnTrackingPage(page: Page): Promise<boolean> {
-  const url = page.url();
-  return url.includes('/admin/tracking');
+const TAB_LABELS = {
+  overview: 'Overview',
+  map: 'Live Map',
+  drivers: 'Drivers',
+  deliveries: 'Deliveries',
+} as const;
+
+/** Switch tabs and wait for the switch to take effect (no fixed sleep). */
+async function navigateToTab(page: Page, tabName: keyof typeof TAB_LABELS) {
+  const tab = page.getByRole('tab', { name: TAB_LABELS[tabName], exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
-/**
- * Helper to navigate to a specific tab
- */
-async function navigateToTab(page: Page, tabName: 'overview' | 'map' | 'drivers' | 'deliveries') {
-  const tabMap = {
-    overview: 'Overview',
-    map: 'Live Map',
-    drivers: 'Drivers',
-    deliveries: 'Deliveries',
-  };
+function activePanel(page: Page) {
+  // Radix unmounts inactive tab content, so the first tabpanel is the active one.
+  return page.getByRole('tabpanel').first();
+}
 
-  const tabTrigger = page.locator(`[role="tab"]:has-text("${tabMap[tabName]}")`);
-  if (await tabTrigger.count() > 0) {
-    await tabTrigger.click();
-    await page.waitForTimeout(500); // Wait for tab content to render
-  }
+/** "Active Drivers (N)" heading on the Drivers tab → N. */
+async function activeDriverCount(page: Page): Promise<number> {
+  const heading = page.getByText(/^Active Drivers \(\d+\)$/);
+  await expect(heading).toBeVisible();
+  const text = (await heading.textContent()) ?? '';
+  return Number(text.match(/\((\d+)\)/)?.[1] ?? 0);
+}
+
+/** The Deliveries tab finishes loading when the drivers summary title renders. */
+async function waitForDeliveriesPanel(page: Page) {
+  await expect(page.getByText(/^Available Drivers \(\d+\)$/)).toBeVisible({ timeout: 15000 });
+}
+
+/** A label div inside the Deliveries tab summary cards (exact text, not <option>s). */
+function deliveryStatLabel(page: Page, label: string) {
+  return activePanel(page).locator('div').filter({ hasText: new RegExp(`^${label}$`) });
 }
 
 // =============================================================================
@@ -81,100 +98,37 @@ async function navigateToTab(page: Page, tabName: 'overview' | 'map' | 'drivers'
 // =============================================================================
 
 test.describe('View Active Drivers', () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to admin tracking page
-    await page.goto('/admin/tracking');
-  });
-
   test('should navigate to /admin/tracking successfully', async ({ page }) => {
-    // Check if redirected to sign-in (unauthenticated case)
-    if (await page.locator('text=Sign In').count() > 0) {
-      console.log('Admin tracking requires authentication - testing basic navigation only');
-      return;
-    }
-
-    // Verify we're on the tracking page
     await expect(page).toHaveURL(/.*admin\/tracking/);
 
-    // Check for breadcrumb navigation
-    await expect(page.locator('text=Dashboard')).toBeVisible();
-    await expect(page.locator('text=Driver Tracking')).toBeVisible();
+    const breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb', exact: true });
+    await expect(breadcrumb.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    await expect(breadcrumb.getByText('Driver Tracking', { exact: true })).toBeVisible();
   });
 
   test('should display driver tracking dashboard components', async ({ page }) => {
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Connection status indicator should be visible
     await expect(connectionStatus(page)).toBeVisible();
-
-    // Control buttons should be present
-    const refreshButton = page.locator('button:has-text("Refresh")');
-    await expect(refreshButton).toBeVisible();
-
-    const exportButton = page.locator('button:has-text("Export")');
-    await expect(exportButton).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
   });
 
   test('should display statistics cards', async ({ page }) => {
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Check for statistics cards
-    const statsCards = [
-      'On Duty',
-      'Active Deliveries',
-      'Avg Speed',
-      'Total KM',
-      'GPS Updates',
-    ];
-
-    for (const stat of statsCards) {
-      const card = page.locator(`text=${stat}`).first();
-      await expect(card).toBeVisible();
+    for (const stat of ['On Duty', 'Active Deliveries', 'Avg Speed (mph)', 'Total Miles', 'GPS Updates']) {
+      await expect(page.getByText(stat, { exact: true }).first()).toBeVisible();
     }
   });
 
   test('should display dashboard tabs', async ({ page }) => {
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Verify all tabs are present
-    const tabs = ['Overview', 'Live Map', 'Drivers', 'Deliveries'];
-    for (const tab of tabs) {
-      const tabElement = page.locator(`[role="tab"]:has-text("${tab}")`);
-      await expect(tabElement).toBeVisible();
+    for (const tab of Object.values(TAB_LABELS)) {
+      await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
     }
   });
 
   test('should show driver list in Drivers tab', async ({ page }) => {
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Navigate to Drivers tab
     await navigateToTab(page, 'drivers');
 
-    // Check for Active Drivers heading
-    const driversHeading = page.locator('text=Active Drivers');
-    await expect(driversHeading).toBeVisible();
-
-    // Check for driver search/filter controls
-    const searchInput = page.locator('input[placeholder*="Search drivers"]');
-    if (await searchInput.count() > 0) {
-      await expect(searchInput).toBeVisible();
-    }
+    await activeDriverCount(page);
+    await expect(page.getByPlaceholder('Search drivers...')).toBeVisible();
   });
 });
 
@@ -184,96 +138,63 @@ test.describe('View Active Drivers', () => {
 
 test.describe('Monitor Driver Status', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/admin/tracking');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
+    await navigateToTab(page, 'drivers');
   });
 
   test('should display driver status indicators', async ({ page }) => {
-    await navigateToTab(page, 'drivers');
+    const count = await activeDriverCount(page);
+    const emptyState = activePanel(page).getByText('No drivers match your criteria');
 
-    // Look for driver status elements
-    const statusBadges = page.locator('text=On Duty, text=Off Duty');
-
-    // If there are drivers, at least some status badges should be visible
-    // If no drivers, the empty state should be shown
-    const hasDrivers = await statusBadges.count() > 0;
-    const emptyState = page.locator('text=No drivers match your criteria');
-    const hasEmptyState = await emptyState.count() > 0;
-
-    expect(hasDrivers || hasEmptyState).toBeTruthy();
+    if (count === 0) {
+      await expect(emptyState).toBeVisible();
+    } else {
+      // Every driver card carries an On Duty / Off Duty badge.
+      await expect(
+        activePanel(page).locator('div, span').filter({ hasText: /^(On|Off) Duty$/ }).first()
+      ).toBeVisible();
+      await expect(emptyState).toHaveCount(0);
+    }
   });
 
   test('should show driver activity types', async ({ page }) => {
-    await navigateToTab(page, 'drivers');
-
-    // Activity type badges (when drivers are active)
-    const activityBadges = page.locator('text=Driving, text=Walking, text=Stopped');
-
-    // These may or may not be present depending on driver data
-    // Just verify the tab loaded successfully
-    const driversSection = page.locator('text=Active Drivers');
-    await expect(driversSection).toBeVisible();
+    // Activity badges depend on live GPS data; the list itself must render.
+    const count = await activeDriverCount(page);
+    expect(count).toBeGreaterThanOrEqual(0);
   });
 
   test('should filter drivers by status', async ({ page }) => {
-    await navigateToTab(page, 'drivers');
+    const statusFilter = activePanel(page).locator('select').filter({ hasText: 'All Drivers' });
 
-    // Find status filter dropdown
-    const statusFilter = page.locator('select').filter({ hasText: /All Drivers|On Duty|Off Duty/ });
+    await statusFilter.selectOption('on_duty');
+    await expect(statusFilter).toHaveValue('on_duty');
 
-    if (await statusFilter.count() > 0) {
-      // Select "On Duty" filter
-      await statusFilter.selectOption({ label: 'On Duty' });
-      await page.waitForTimeout(500);
-
-      // Verify filter is applied
-      await expect(statusFilter).toHaveValue('on_duty');
-    }
+    await statusFilter.selectOption('all');
+    await expect(statusFilter).toHaveValue('all');
   });
 
   test('should sort drivers list', async ({ page }) => {
-    await navigateToTab(page, 'drivers');
+    const sortDropdown = activePanel(page).locator('select').filter({ hasText: 'Sort by Status' });
 
-    // Find sort dropdown
-    const sortDropdown = page.locator('select').filter({ hasText: /Sort by/ });
+    await sortDropdown.selectOption({ label: 'Sort by Distance' });
+    await expect(sortDropdown).toHaveValue('distance');
 
-    if (await sortDropdown.count() > 0) {
-      // Test sorting by different fields
-      await sortDropdown.selectOption({ label: 'Sort by Distance' });
-      await page.waitForTimeout(300);
-      await expect(sortDropdown).toHaveValue('distance');
-
-      await sortDropdown.selectOption({ label: 'Sort by Deliveries' });
-      await page.waitForTimeout(300);
-      await expect(sortDropdown).toHaveValue('deliveries');
-    }
+    await sortDropdown.selectOption({ label: 'Sort by Deliveries' });
+    await expect(sortDropdown).toHaveValue('deliveries');
   });
 
   test('should search for drivers', async ({ page }) => {
-    await navigateToTab(page, 'drivers');
+    const searchInput = page.getByPlaceholder('Search drivers...');
+    const emptyState = activePanel(page).getByText('No drivers match your criteria');
 
-    const searchInput = page.locator('input[placeholder*="Search drivers"]');
+    await searchInput.fill('zz-no-such-driver-zz');
+    await expect(emptyState).toBeVisible();
 
-    if (await searchInput.count() > 0) {
-      // Type a search term
-      await searchInput.fill('test');
-      await page.waitForTimeout(500);
-
-      // Clear search
-      await searchInput.clear();
-      await page.waitForTimeout(300);
-    }
+    await searchInput.clear();
+    await expect(searchInput).toHaveValue('');
   });
 
   test('should display last update time', async ({ page }) => {
-    // Look for last update indicator
-    const lastUpdate = page.locator('text=Last update');
-    await expect(lastUpdate).toBeVisible();
+    await expect(page.getByText(/^Last update:/)).toBeVisible();
   });
 });
 
@@ -283,88 +204,59 @@ test.describe('Monitor Driver Status', () => {
 
 test.describe('Assign Delivery', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/admin/tracking');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
     await navigateToTab(page, 'deliveries');
+    await waitForDeliveriesPanel(page);
   });
 
   test('should display delivery management panel', async ({ page }) => {
-    // Check for Delivery Management heading
-    const deliveriesHeading = page.locator('text=Delivery Management');
-    await expect(deliveriesHeading).toBeVisible();
+    await expect(page.getByText('Delivery Management', { exact: true })).toBeVisible();
   });
 
   test('should show delivery statistics', async ({ page }) => {
-    // Look for delivery stat cards
-    const statsCards = ['Total', 'Unassigned', 'Assigned', 'In Progress'];
-
-    for (const stat of statsCards) {
-      const statCard = page.locator(`text=${stat}`).first();
-      if (await statCard.count() > 0) {
-        await expect(statCard).toBeVisible();
-      }
+    for (const stat of ['Total', 'Unassigned', 'Assigned', 'In Progress']) {
+      await expect(deliveryStatLabel(page, stat).first()).toBeVisible();
     }
   });
 
   test('should filter deliveries by status', async ({ page }) => {
-    // Find delivery filter dropdown
-    const filterDropdown = page.locator('select').filter({ hasText: /All Deliveries|Unassigned/ });
+    const filterDropdown = activePanel(page).locator('select').filter({ hasText: 'All Deliveries' });
 
-    if (await filterDropdown.count() > 0) {
-      // Filter to show only unassigned
-      await filterDropdown.selectOption({ label: 'Unassigned' });
-      await page.waitForTimeout(500);
-    }
+    await filterDropdown.selectOption({ label: 'Unassigned' });
+    await expect(filterDropdown).toHaveValue('unassigned');
   });
 
   test('should search deliveries', async ({ page }) => {
-    const searchInput = page.locator('input[placeholder*="Search deliveries"]');
+    const searchInput = page.getByPlaceholder('Search deliveries...');
 
-    if (await searchInput.count() > 0) {
-      await expect(searchInput).toBeVisible();
-      await searchInput.fill('test');
-      await page.waitForTimeout(500);
-    }
+    await searchInput.fill('zz-no-such-delivery-zz');
+    await expect(activePanel(page).getByText('No deliveries match your criteria')).toBeVisible();
   });
 
   test('should display available drivers section', async ({ page }) => {
-    // Check for Available Drivers section
-    const availableDrivers = page.locator('text=Available Drivers');
-    await expect(availableDrivers).toBeVisible();
+    await expect(page.getByText(/^Available Drivers \(\d+\)$/)).toBeVisible();
   });
 
   test('should show delivery priority badges', async ({ page }) => {
-    // If there are deliveries, check for priority badges
-    const priorityBadges = page.locator('text=high priority, text=medium priority, text=low priority');
+    // Each delivery card has a priority badge; with no deliveries the panel
+    // shows its empty state instead.
+    const priorityBadge = activePanel(page).getByText(/^(high|medium|low) priority$/);
+    const emptyState = activePanel(page).getByText('No deliveries match your criteria');
 
-    // Either we have priority badges (has deliveries) or an empty state
-    const hasDeliveries = await priorityBadges.count() > 0;
-    const emptyState = page.locator('text=No deliveries match your criteria');
-    const hasEmptyState = await emptyState.count() > 0;
-
-    // One of these should be true
-    expect(hasDeliveries || hasEmptyState).toBeTruthy();
+    await expect(priorityBadge.or(emptyState).first()).toBeVisible();
   });
 
   test('should handle delivery card click interaction', async ({ page }) => {
-    // Try to find and click a delivery card
-    const deliveryCard = page.locator('[class*="cursor-pointer"]').filter({ hasText: /priority/ }).first();
+    const deliveryCard = activePanel(page)
+      .locator('.cursor-pointer')
+      .filter({ hasText: /(high|medium|low) priority/ })
+      .first();
 
-    if (await deliveryCard.count() > 0) {
-      await deliveryCard.click();
-      await page.waitForTimeout(500);
+    test.skip((await deliveryCard.count()) === 0, 'No active deliveries in the test database');
 
-      // After clicking, assignment panel should appear
-      const assignmentPanel = page.locator('text=Assign to Driver, text=Current Assignment');
-      if (await assignmentPanel.count() > 0) {
-        await expect(assignmentPanel.first()).toBeVisible();
-      }
-    }
+    await deliveryCard.click();
+    await expect(
+      deliveryCard.getByText(/^(Assign to Driver|Current Assignment)$/)
+    ).toBeVisible();
   });
 });
 
@@ -373,57 +265,29 @@ test.describe('Assign Delivery', () => {
 // =============================================================================
 
 test.describe('View Delivery Progress', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/admin/tracking');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-  });
-
   test('should display delivery status in overview', async ({ page }) => {
-    // Overview tab should show delivery-related info
-    const activeDeliveries = page.locator('text=Active Deliveries');
-    await expect(activeDeliveries).toBeVisible();
+    await expect(page.getByText('Active Deliveries', { exact: true }).first()).toBeVisible();
   });
 
   test('should show delivery locations on map', async ({ page }) => {
     await navigateToTab(page, 'map');
 
-    // Check for Live Driver Tracking Map heading
-    const mapHeading = page.locator('text=Live Driver Tracking Map');
-    await expect(mapHeading).toBeVisible();
-
-    // Map container should be visible (or loading)
-    const mapContainer = page.locator('[class*="h-96"]');
-    if (await mapContainer.count() > 0) {
-      await expect(mapContainer).toBeVisible();
-    }
+    await expect(page.getByText('Live Driver Tracking Map', { exact: true })).toBeVisible();
+    await expect(activePanel(page).locator('.h-96').first()).toBeVisible();
   });
 
   test('should display ETA information in deliveries tab', async ({ page }) => {
     await navigateToTab(page, 'deliveries');
+    await waitForDeliveriesPanel(page);
 
-    // Look for ETA indicators (if deliveries exist)
-    const etaIndicator = page.locator('text=ETA');
-
-    // ETA is only shown when there are scheduled deliveries
-    // Just verify the deliveries tab is functional
-    const deliveriesHeading = page.locator('text=Delivery Management');
-    await expect(deliveriesHeading).toBeVisible();
+    await expect(page.getByText('Delivery Management', { exact: true })).toBeVisible();
   });
 
   test('should show delivery status badges', async ({ page }) => {
     await navigateToTab(page, 'deliveries');
+    await waitForDeliveriesPanel(page);
 
-    // Look for delivery status badges
-    const statusBadges = page.locator('text=ASSIGNED, text=EN_ROUTE_TO_CLIENT, text=ARRIVED_TO_CLIENT');
-
-    // Status is only shown when there are deliveries
-    const deliveriesHeading = page.locator('text=Delivery Management');
-    await expect(deliveriesHeading).toBeVisible();
+    await expect(deliveryStatLabel(page, 'In Progress').first()).toBeVisible();
   });
 });
 
@@ -432,68 +296,48 @@ test.describe('View Delivery Progress', () => {
 // =============================================================================
 
 test.describe('Dashboard Controls', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/admin/tracking');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-  });
-
   test('should toggle auto refresh', async ({ page }) => {
-    const autoRefreshButton = page.locator('button:has-text("Auto Refresh")');
+    const autoRefresh = page.getByRole('button', { name: /^Auto Refresh (On|Off)$/ });
+    const initial = (await autoRefresh.textContent())?.trim();
+    const flipped = initial === 'Auto Refresh On' ? 'Auto Refresh Off' : 'Auto Refresh On';
 
-    if (await autoRefreshButton.count() > 0) {
-      // Click to toggle
-      await autoRefreshButton.click();
-      await page.waitForTimeout(300);
+    await autoRefresh.click();
+    await expect(autoRefresh).toHaveText(flipped);
 
-      // Click again to toggle back
-      await autoRefreshButton.click();
-      await page.waitForTimeout(300);
-    }
+    await autoRefresh.click();
+    await expect(autoRefresh).toHaveText(initial ?? '');
   });
 
   test('should trigger manual refresh', async ({ page }) => {
-    const refreshButton = page.locator('button:has-text("Refresh")');
+    const refreshButton = page.getByRole('button', { name: 'Refresh', exact: true });
 
-    if (await refreshButton.count() > 0) {
-      await expect(refreshButton).toBeVisible();
-      await refreshButton.click();
-      await page.waitForTimeout(500);
+    // Refresh is disabled exactly while the dashboard is disconnected.
+    if ((await connectionStatus(page).textContent()) === 'Disconnected') {
+      await expect(refreshButton).toBeDisabled();
+      return;
     }
+
+    await refreshButton.click();
+    // A manual refresh always stamps "Last update" with a time.
+    await expect(page.getByText(/^Last update: \d/)).toBeVisible();
   });
 
   test('should export tracking data', async ({ page }) => {
-    const exportButton = page.locator('button:has-text("Export")');
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
 
-    if (await exportButton.count() > 0) {
-      await expect(exportButton).toBeVisible();
-
-      // Set up download promise before clicking
-      const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
-
-      await exportButton.click();
-
-      const download = await downloadPromise;
-      if (download) {
-        // Verify the download is a JSON file
-        expect(download.suggestedFilename()).toContain('driver-tracking');
-        expect(download.suggestedFilename()).toContain('.json');
-      }
-    }
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^driver-tracking-.*\.json$/);
   });
 
   test('should toggle connection mode if available', async ({ page }) => {
-    // Look for WebSocket/SSE mode toggle
-    const modeToggle = page.locator('button:has-text("WebSocket Mode"), button:has-text("SSE Mode")');
+    // The mode toggle only exists when the realtime admin-dashboard flag is on.
+    const modeToggle = page.getByRole('button', { name: /^(WebSocket|SSE) Mode$/ });
+    test.skip((await modeToggle.count()) === 0, 'Realtime admin dashboard flag is off in this build');
 
-    if (await modeToggle.count() > 0) {
-      await modeToggle.click();
-      await page.waitForTimeout(500);
-    }
+    const initial = (await modeToggle.textContent())?.trim();
+    await modeToggle.click();
+    await expect(modeToggle).not.toHaveText(initial ?? '');
   });
 });
 
@@ -503,81 +347,38 @@ test.describe('Dashboard Controls', () => {
 
 test.describe('Error Handling', () => {
   test('should handle connection errors gracefully', async ({ page }) => {
-    await page.goto('/admin/tracking');
+    // Whatever the connection state, the dashboard stays usable and an error
+    // banner always offers a reconnect.
+    await expect(page.getByRole('tab').first()).toBeVisible();
 
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
+    if ((await page.getByText('Connection Error', { exact: true }).count()) > 0) {
+      await expect(page.getByRole('button', { name: 'Reconnect' })).toBeVisible();
     }
-
-    await waitForDashboardLoad(page);
-
-    // If there's a connection error, reconnect button should be available
-    const reconnectButton = page.locator('button:has-text("Reconnect")');
-
-    // Error state might show these elements
-    const errorAlert = page.locator('text=Connection Error');
-
-    // Dashboard should still be functional even with connection issues
-    const dashboardTabs = page.locator('[role="tab"]');
-    await expect(dashboardTabs.first()).toBeVisible();
   });
 
   test('should display empty states appropriately', async ({ page }) => {
-    await page.goto('/admin/tracking');
-
-    if (await page.locator('text=Sign In').count() > 0) {
-      test.skip(true, 'Admin tracking requires authentication');
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Navigate to drivers tab
     await navigateToTab(page, 'drivers');
 
-    // Either show driver list or empty state
-    const driversList = page.locator('text=Driver #');
-    const emptyState = page.locator('text=No drivers match your criteria');
-
-    const hasDrivers = await driversList.count() > 0;
-    const hasEmptyState = await emptyState.count() > 0;
-
-    // Page should show one or the other
-    expect(hasDrivers || hasEmptyState || true).toBeTruthy(); // Allow for loading state
+    const count = await activeDriverCount(page);
+    const emptyState = activePanel(page).getByText('No drivers match your criteria');
+    await expect(emptyState).toHaveCount(count === 0 ? 1 : 0);
   });
 });
 
 // =============================================================================
-// Test Suite: Authenticated Admin Tests (using admin fixture)
+// Test Suite: Authenticated Admin Tests
 // =============================================================================
 
-// Only run these tests if admin auth is available
-adminTest.describe('Authenticated Admin Monitoring', () => {
-  adminTest.beforeEach(async () => {
-    // Skip if admin auth doesn't exist
-    if (!adminAuthExists) {
-      adminTest.skip(true, 'Admin authentication not available');
-    }
+test.describe('Authenticated Admin Monitoring', () => {
+  test('should load tracking dashboard with live data', async ({ page }) => {
+    await expect(connectionStatus(page)).toBeVisible();
+    await expect(page.getByRole('tab').first()).toBeVisible();
   });
 
-  adminTest('should load tracking dashboard with live data', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/admin/tracking');
-    await waitForDashboardLoad(authenticatedPage);
+  test('should interact with driver list as admin', async ({ page }) => {
+    await navigateToTab(page, 'drivers');
 
-    // Verify connection status
-    await expect(connectionStatus(authenticatedPage)).toBeVisible();
-
-    // Verify dashboard components loaded
-    const tabs = authenticatedPage.locator('[role="tab"]');
-    await expect(tabs.first()).toBeVisible();
-  });
-
-  adminTest('should interact with driver list as admin', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/admin/tracking');
-    await waitForDashboardLoad(authenticatedPage);
-    await navigateToTab(authenticatedPage, 'drivers');
-
-    // Admin should see driver search and filter controls
-    const searchInput = authenticatedPage.getByPlaceholder('Search drivers...');
+    const searchInput = page.getByPlaceholder('Search drivers...');
     await expect(searchInput).toBeVisible();
     await searchInput.fill('test');
     await expect(searchInput).toHaveValue('test');
@@ -585,29 +386,18 @@ adminTest.describe('Authenticated Admin Monitoring', () => {
     await expect(searchInput).toHaveValue('');
   });
 
-  adminTest('should manage deliveries as admin', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/admin/tracking');
-    await waitForDashboardLoad(authenticatedPage);
-    await navigateToTab(authenticatedPage, 'deliveries');
+  test('should manage deliveries as admin', async ({ page }) => {
+    await navigateToTab(page, 'deliveries');
 
-    // Admin should see delivery management panel
-    const deliveryPanel = authenticatedPage.locator('text=Delivery Management');
-    await expect(deliveryPanel).toBeVisible();
-
-    // Check for available drivers section. Its title is a skeleton until the
-    // drivers query resolves, so allow for the data load.
-    const availableDrivers = authenticatedPage.getByText(/^Available Drivers \(\d+\)$/);
-    await expect(availableDrivers).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Delivery Management', { exact: true })).toBeVisible();
+    // The drivers summary title is a skeleton until the drivers query resolves.
+    await waitForDeliveriesPanel(page);
   });
 
-  adminTest('should view live map as admin', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/admin/tracking');
-    await waitForDashboardLoad(authenticatedPage);
-    await navigateToTab(authenticatedPage, 'map');
+  test('should view live map as admin', async ({ page }) => {
+    await navigateToTab(page, 'map');
 
-    // Check for map heading
-    const mapHeading = authenticatedPage.locator('text=Live Driver Tracking Map');
-    await expect(mapHeading).toBeVisible();
+    await expect(page.getByText('Live Driver Tracking Map', { exact: true })).toBeVisible();
   });
 });
 
@@ -617,40 +407,25 @@ adminTest.describe('Authenticated Admin Monitoring', () => {
 
 test.describe('Full Admin Monitoring Workflow', () => {
   test('complete admin monitoring flow', async ({ page }) => {
-    // Step 1: Navigate to tracking
-    await page.goto('/admin/tracking');
+    // Step 1: overview statistics
+    await expect(page.getByText('On Duty', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Active Deliveries', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Driver Locations', { exact: true }).first()).toBeVisible();
 
-    if (await page.locator('text=Sign In').count() > 0) {
-      console.log('Admin monitoring flow requires authentication - testing navigation only');
-      return;
-    }
-
-    await waitForDashboardLoad(page);
-
-    // Step 2: Check overview statistics
-    const statsCards = page.locator('text=On Duty, text=Active Deliveries, text=Avg Speed');
-    await expect(statsCards.first()).toBeVisible();
-
-    // Step 3: View drivers
+    // Step 2: drivers
     await navigateToTab(page, 'drivers');
-    const driversSection = page.locator('text=Active Drivers');
-    await expect(driversSection).toBeVisible();
+    await activeDriverCount(page);
 
-    // Step 4: View live map
+    // Step 3: live map
     await navigateToTab(page, 'map');
-    const mapHeading = page.locator('text=Live Driver Tracking Map');
-    await expect(mapHeading).toBeVisible();
+    await expect(page.getByText('Live Driver Tracking Map', { exact: true })).toBeVisible();
 
-    // Step 5: View deliveries
+    // Step 4: deliveries
     await navigateToTab(page, 'deliveries');
-    const deliveryPanel = page.locator('text=Delivery Management');
-    await expect(deliveryPanel).toBeVisible();
+    await expect(page.getByText('Delivery Management', { exact: true })).toBeVisible();
 
-    // Step 6: Return to overview
+    // Step 5: back to overview
     await navigateToTab(page, 'overview');
-    const driverLocations = page.locator('text=Driver Locations');
-    await expect(driverLocations).toBeVisible();
-
-    console.log('Admin monitoring workflow completed successfully');
+    await expect(page.getByText('Driver Locations', { exact: true }).first()).toBeVisible();
   });
 });

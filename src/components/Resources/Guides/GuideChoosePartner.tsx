@@ -7,11 +7,11 @@ import { Card } from "@/components/ui/card";
 import AppointmentDialog from "../../VirtualAssistant/Appointment";
 import { DownloadPopup } from "../ui/DownloadPopup";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 const GuideChoosePartner = () => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
-  const calendarUrl =
-    "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
+  const calendarUrl = BOOKING_CALENDAR_URL;
 
   const guideTitle =
     "The Complete Guide to Choosing the Right Delivery Partner";

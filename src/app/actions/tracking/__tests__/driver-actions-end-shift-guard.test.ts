@@ -258,3 +258,30 @@ describe("endDriverShift guard ignores stale not-started work (2026-08-26 deadlo
     expect(sql).toContain("EN_ROUTE_TO_VENDOR");
   });
 });
+
+// C11 (2026-08-17 mobile round): the shift mileage was computed at end-shift
+// but never returned, so the driver saw no distance after the walk.
+describe("endDriverShift reports the shift distance", () => {
+  it("returns the computed shift miles on success", async () => {
+    mockEndShiftQueries([]);
+    (calculateShiftMileage as jest.Mock).mockResolvedValue({
+      totalMiles: 0.62,
+      gpsDistanceMiles: 0.62,
+      mileageSource: "gps",
+      warnings: [],
+    });
+
+    const result = await endDriverShift(SHIFT_ID, endLocation);
+
+    expect(result).toEqual({ success: true, totalMiles: 0.62 });
+  });
+
+  it("omits the distance when the mileage calculation fails", async () => {
+    mockEndShiftQueries([]);
+    (calculateShiftMileage as jest.Mock).mockRejectedValue(new Error("boom"));
+
+    const result = await endDriverShift(SHIFT_ID, endLocation);
+
+    expect(result).toEqual({ success: true });
+  });
+});

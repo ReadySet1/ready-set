@@ -65,9 +65,13 @@ export interface DeliveryTracking {
   status: DriverStatus;        // Use existing enum
   pickupLocation: {
     coordinates: [number, number]; // [lng, lat]
+    /** Maps search string — Navigate falls back to it when ungeocoded ([0,0]). */
+    address?: string;
   };
   deliveryLocation: {
     coordinates: [number, number]; // [lng, lat]
+    /** Maps search string — Navigate falls back to it when ungeocoded ([0,0]). */
+    address?: string;
   };
   estimatedArrival?: Date;
   actualArrival?: Date;
@@ -103,11 +107,11 @@ export interface Geofence {
 export interface TrackedDriver {
   id: string;
   userId?: string;
-  employeeId: string;
+  employeeId: string | null;
   name?: string;
-  vehicleNumber?: string;
+  vehicleNumber?: string | null;
   licenseNumber?: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
   isActive: boolean;
   isOnDuty: boolean;
   lastKnownLocation?: {

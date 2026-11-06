@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { BOOKING_CALENDAR_URL } from "@/config/scheduling-config";
 
 interface BakeryHeroProps {
   onRequestQuote?: () => void;
@@ -123,7 +124,7 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
               </button>
               <ScheduleDialog
                 buttonText="Book a Call"
-                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                calendarUrl={BOOKING_CALENDAR_URL}
                 className="mt-3 w-full rounded-full bg-yellow-300 px-8 py-3 font-[Montserrat] font-bold text-gray-800 transition-colors hover:bg-yellow-400 sm:mt-0 sm:w-auto"
               />
             </div>

@@ -11,7 +11,7 @@ describe("renderDeliveryTemplate", () => {
     driverName: "Alex Driver",
     estimatedArrival: "10:30 AM",
     deliveryAddress: "123 Main St, City, ST 12345",
-    trackingLink: "https://test.readysetllc.com/orders/ORD-999",
+    trackingLink: "https://test.readysetllc.com/order-status/ORD-999",
     supportLink: "https://test.readysetllc.com/contact",
     unsubscribeLink: "https://test.readysetllc.com/account/preferences?tab=notifications",
     currentYear: "2025",
@@ -23,7 +23,7 @@ describe("renderDeliveryTemplate", () => {
 
       expect(html).toContain("ORD-999");
       expect(html).toContain("Jane Doe");
-      expect(html).toContain("https://test.readysetllc.com/orders/ORD-999");
+      expect(html).toContain("https://test.readysetllc.com/order-status/ORD-999");
       expect(html).toContain("2025");
 
       expect(text).toContain("ORD-999");

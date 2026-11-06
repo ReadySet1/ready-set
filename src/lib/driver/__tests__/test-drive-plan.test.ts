@@ -6,6 +6,8 @@ import {
   isDisposableTestOrder,
   offsetCoords,
   pickRouteLeg,
+  shouldUnassignDispatchedOrder,
+  type DispatchedOrder,
 } from '@/lib/driver/test-drive-plan';
 import { ARRIVAL_GEOFENCE_RADIUS_M, distanceToTargetM } from '@/lib/driver/geofence';
 
@@ -224,5 +226,64 @@ describe('buildRouteTestDrivePlan', () => {
     const plan = buildRouteTestDrivePlan({ route, runId: 'x', now: morning });
     expect(plan.pickupAt.getTime()).toBe(morning.getTime() + 30 * 60_000);
     expect(plan.arriveBy.getTime()).toBe(plan.pickupAt.getTime() + 30 * 60_000);
+  });
+});
+
+describe('shouldUnassignDispatchedOrder', () => {
+  const now = new Date('2026-09-03T15:00:00Z');
+  const past = new Date('2026-09-03T14:00:00Z');
+  const future = new Date('2026-09-03T18:30:00Z');
+  const order = (overrides: Partial<DispatchedOrder> = {}): DispatchedOrder => ({
+    orderNumber: 'CV-1001',
+    status: 'ASSIGNED',
+    driverStatus: 'ASSIGNED',
+    pickupDateTime: future,
+    deletedAt: null,
+    ...overrides,
+  });
+
+  it('unassigns an in-flight order', () => {
+    expect(shouldUnassignDispatchedOrder(order({ driverStatus: 'PICKED_UP' }), now)).toBe(true);
+  });
+
+  it('unassigns an ASSIGNED order whose pickup is already due', () => {
+    expect(shouldUnassignDispatchedOrder(order({ pickupDateTime: past }), now)).toBe(true);
+  });
+
+  it('leaves a real future-dated assignment alone', () => {
+    expect(shouldUnassignDispatchedOrder(order(), now)).toBe(false);
+  });
+
+  // 2026-09-03: seeded for 18:00, re-seeded for 18:30 the same morning. The
+  // superseded seed was future-dated, survived the reset, came due mid-walk
+  // and deadlocked End Shift alongside the new one.
+  it('retires a superseded future-dated test seed', () => {
+    expect(shouldUnassignDispatchedOrder(order({ orderNumber: 'RSQA-20260903-1500' }), now)).toBe(true);
+  });
+
+  it('retires a test seed with no pickup time', () => {
+    expect(
+      shouldUnassignDispatchedOrder(order({ orderNumber: 'RSQA-x', pickupDateTime: null }), now),
+    ).toBe(true);
+  });
+
+  it('keeps finished test orders (their dispatch is history, not a blocker)', () => {
+    for (const finished of [
+      { driverStatus: 'COMPLETED' },
+      { status: 'COMPLETED' },
+      { status: 'DELIVERED' },
+      { status: 'CANCELLED' },
+    ]) {
+      expect(
+        shouldUnassignDispatchedOrder(order({ orderNumber: 'RSQA-x', ...finished }), now),
+      ).toBe(false);
+    }
+  });
+
+  it('ignores soft-deleted and missing orders', () => {
+    expect(
+      shouldUnassignDispatchedOrder(order({ orderNumber: 'RSQA-x', deletedAt: past }), now),
+    ).toBe(false);
+    expect(shouldUnassignDispatchedOrder(null, now)).toBe(false);
   });
 });
