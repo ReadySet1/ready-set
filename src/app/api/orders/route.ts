@@ -8,7 +8,7 @@ import { CateringStatus, OnDemandStatus } from "@/types/order-status";
 import { localTimeToUtc } from "@/lib/utils/timezone";
 import { cookies } from 'next/headers';
 import { validateApiAuth } from '@/utils/api-auth';
-import { validateRequiredFields } from '@/utils/field-validation';
+import { ORDER_CREATE_ALLOWED_ROLES, parseCreateOrderBody } from './create-order-schema';
 import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
@@ -293,67 +293,68 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const authValidation = await validateApiAuth(req);
     
-          if (!authValidation.isValid || !authValidation.user) {
+    if (!authValidation.isValid || !authValidation.user) {
       return NextResponse.json(
         { error: 'Authentication required' }, 
         { status: 401 }
       );
     }
 
-    // Validate required fields
-    const requiredFields = [
-      'type', 'pickupAddressId', 'deliveryAddressId'
-    ];
-    
-    const fieldValidation = validateRequiredFields(body, requiredFields);
-    if (!fieldValidation.isValid) {
+    const callerRole = String(
+      authValidation.userType ?? authValidation.user.type ?? '',
+    ).toUpperCase();
+    if (!(ORDER_CREATE_ALLOWED_ROLES as readonly string[]).includes(callerRole)) {
       return NextResponse.json(
-        { error: `Missing required fields: ${fieldValidation.missingFields.join(', ')}` },
+        { error: 'Forbidden - this account type cannot create orders' },
+        { status: 403 }
+      );
+    }
+
+    // Build the order only from the per-type allowlist. Anything else in the
+    // body (status, userId, pricing columns, nested relation writes, ...) is
+    // rejected here instead of being spread into the create.
+    const parsed = parseCreateOrderBody(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error, issues: parsed.issues },
         { status: 400 }
       );
     }
 
-    const { type, ...orderData } = body;
-    
     // Generate order number
     const orderNumber = generateOrderNumber();
     
     // Use transaction with proper typing
     const result = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
-      const baseOrderData = {
-        ...orderData,
+      // Server-owned fields are always set here, never taken from the body.
+      const serverOwned = {
         orderNumber,
-        userId: authValidation.user!.id,
+        userId: authValidation.user!.id as string,
         status: 'PENDING' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      const include = {
+        pickupAddress: true,
+        deliveryAddress: true,
+        user: true,
+      } as const;
 
-      if (type === 'catering') {
+      if (parsed.type === 'catering') {
         const cateringOrder = await tx.cateringRequest.create({
-          data: baseOrderData,
-          include: {
-            pickupAddress: true,
-            deliveryAddress: true,
-            user: true,
-          },
+          data: { ...parsed.data, ...serverOwned },
+          include,
         });
 
         return { order: cateringOrder, type: 'catering' };
-      } else if (type === 'ondemand') {
-        const onDemandOrder = await tx.onDemand.create({
-          data: baseOrderData,
-          include: {
-            pickupAddress: true,
-            deliveryAddress: true,
-            user: true,
-          },
-        });
-
-        return { order: onDemandOrder, type: 'ondemand' };
-      } else {
-        throw new Error('Invalid order type');
       }
+
+      const onDemandOrder = await tx.onDemand.create({
+        data: { ...parsed.data, ...serverOwned },
+        include,
+      });
+
+      return { order: onDemandOrder, type: 'ondemand' };
     });
 
     // Notifications moved outside transaction — an email failure must never
