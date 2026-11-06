@@ -65,9 +65,13 @@ export interface DeliveryTracking {
   status: DriverStatus;        // Use existing enum
   pickupLocation: {
     coordinates: [number, number]; // [lng, lat]
+    /** Maps search string — Navigate falls back to it when ungeocoded ([0,0]). */
+    address?: string;
   };
   deliveryLocation: {
     coordinates: [number, number]; // [lng, lat]
+    /** Maps search string — Navigate falls back to it when ungeocoded ([0,0]). */
+    address?: string;
   };
   estimatedArrival?: Date;
   actualArrival?: Date;

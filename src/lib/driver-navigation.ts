@@ -26,6 +26,24 @@ export const NAV_APPS: readonly NavAppMeta[] = [
 /** A navigation destination — either a geocoded coordinate or a free-text address. */
 export type NavTarget = { lat: number; lng: number } | { address: string };
 
+/** Address row fields a maps search string is built from. */
+export interface NavAddressLike {
+  street1?: string | null;
+  street2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+}
+
+/** "street1, street2, city, state, zip" for a maps search; null when empty. */
+export function addressQuery(addr?: NavAddressLike | null): string | null {
+  if (!addr) return null;
+  const q = [addr.street1, addr.street2, addr.city, addr.state, addr.zip]
+    .filter(Boolean)
+    .join(", ");
+  return q || null;
+}
+
 const STORAGE_KEY = "rs:driverNavApp";
 export const DEFAULT_NAV_APP: NavApp = "google";
 

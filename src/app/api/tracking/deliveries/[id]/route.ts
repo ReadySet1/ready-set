@@ -46,7 +46,7 @@ export async function GET(
         dr.employee_id,
         dr.vehicle_number
       FROM deliveries d
-      LEFT JOIN drivers dr ON d.driver_id = dr.id
+      LEFT JOIN drivers dr ON d.driver_id = dr.id AND dr.deleted_at IS NULL
       WHERE d.id = $1
     `;
 
@@ -236,6 +236,7 @@ export async function PUT(
           last_location_update = NOW(),
           updated_at = NOW()
         WHERE id = $1::uuid
+        AND deleted_at IS NULL
       `,
         delivery.driver_id,
         `POINT(${location.coordinates.lng} ${location.coordinates.lat})`

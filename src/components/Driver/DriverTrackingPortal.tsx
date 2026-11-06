@@ -36,6 +36,7 @@ import { DriverPodSheet } from "@/components/Driver/ui/DriverPodSheet";
 import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import { deliveryNavTarget } from "@/lib/driver/next-stop-guide";
 import {
   checkArrivalGeofence,
   geofenceHint,
@@ -483,6 +484,7 @@ export default function DriverTrackingPortal() {
                     activeDeliveries={activeDeliveries}
                     driverId={currentShift?.driverId}
                     shiftStartedAt={currentShift?.startTime}
+                    clockOffsetMs={clockOffsetMs}
                   />
                 </div>
               ) : (
@@ -620,9 +622,7 @@ export default function DriverTrackingPortal() {
                     : "on_demand";
                   const next = getNextStatus(delivery.status);
                   const progress = getStatusProgress(delivery.status);
-                  const coords = delivery.deliveryLocation?.coordinates;
-                  const lng = coords?.[0];
-                  const lat = coords?.[1];
+                  const navTarget = deliveryNavTarget(delivery);
                   const lead = idx === 0;
                   const atClient =
                     delivery.status === DriverStatus.ARRIVED_TO_CLIENT;
@@ -702,8 +702,8 @@ export default function DriverTrackingPortal() {
                         </div>
                       )}
 
-                      {typeof lat === "number" && typeof lng === "number" ? (
-                        <NavigateButton target={{ lat, lng }} label="Navigate" />
+                      {navTarget ? (
+                        <NavigateButton target={navTarget} label="Navigate" />
                       ) : null}
                     </DriverCard>
                   );

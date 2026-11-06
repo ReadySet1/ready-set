@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforcePartnerBodyPolicy, readJsonBody } from '@/lib/security/body-size-limit';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import {
   readIdempotencyContext,
@@ -18,6 +18,10 @@ import {
 import {
   authenticatePartnerRequest,
   isOrderEditable,
+  wasConfirmed,
+  CONFIRMED_HISTORY_PROBE,
+  CONFIRMED_HISTORY_STATUS,
+  CONFIRMED_ORDER_MESSAGE,
   isPartnerOrder,
 } from '@/app/api/cater-valley/_lib';
 import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
@@ -66,32 +70,26 @@ function calculateEstimatedDeliveryTime(pickupDateTime: Date): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const sizeReject = enforceBodySizeLimit(request);
+    // Content-Type (415 on /api/partners) + declared size, before auth.
+    const sizeReject = enforcePartnerBodyPolicy(request);
     if (sizeReject) return sizeReject;
 
     const auth = await authenticatePartnerRequest(request);
     if (!auth.ok) return auth.response;
     const { partner } = auth;
 
-    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.confirm');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.confirm', partner.rateLimitPerMin);
     if (rateLimitReject) return rateLimitReject;
 
     const idempotency = readIdempotencyContext(request, partner.slug);
     const replay = await replayCachedResponse(idempotency);
     if (replay) return replay;
 
-    let requestBody: ConfirmOrderRequest;
-    try {
-      requestBody = await request.json();
-    } catch (error) {
-      return NextResponse.json(
-        {
-          status: 'ERROR',
-          message: 'Invalid JSON in request body',
-        },
-        { status: 400 }
-      );
-    }
+    // Read with the size limit enforced on the bytes actually received
+    // (a chunked body has no Content-Length to check up front).
+    const read = await readJsonBody(request);
+    if (!read.ok) return read.response;
+    const requestBody = read.body as ConfirmOrderRequest;
 
     const validationResult = ConfirmOrderSchema.safeParse(requestBody);
     if (!validationResult.success) {
@@ -113,6 +111,7 @@ export async function POST(request: NextRequest) {
         user: true,
         pickupAddress: true,
         deliveryAddress: true,
+        statusHistory: CONFIRMED_HISTORY_PROBE,
       },
     });
 
@@ -146,6 +145,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (wasConfirmed(existingOrder)) {
+      return NextResponse.json(
+        { status: 'ERROR', message: CONFIRMED_ORDER_MESSAGE },
+        { status: 422 }
+      );
+    }
+
     if (!validatedData.isAccepted) {
       const cancelledOrder = await prisma.cateringRequest.update({
         where: { id: validatedData.id },
@@ -159,14 +165,18 @@ export async function POST(request: NextRequest) {
       });
 
       // Notify the partner of the cancellation (records to
-      // order_status_history + POSTs a signed CANCELLED webhook). The
-      // helper self-guards against legacy carriers and never throws.
-      await recordAndDispatchLifecycleEvent({
-        orderId: cancelledOrder.id,
-        orderNumber: cancelledOrder.orderNumber,
-        partnerStatus: 'CANCELLED',
-        notes: validatedData.reason,
-      });
+      // order_status_history + POSTs a signed CANCELLED webhook). Deferred
+      // past the response so it never waits on the partner's server; a
+      // failed send is retried from the durable queue. The helper
+      // self-guards against legacy carriers and never throws.
+      runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+        recordAndDispatchLifecycleEvent({
+          orderId: cancelledOrder.id,
+          orderNumber: cancelledOrder.orderNumber,
+          partnerStatus: 'CANCELLED',
+          notes: validatedData.reason,
+        }),
+      );
 
       return storeAndReturnResponse(idempotency, 200, {
         id: cancelledOrder.id,
@@ -176,16 +186,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const confirmedOrder = await prisma.cateringRequest.update({
-      where: { id: validatedData.id },
-      data: {
-        status: 'CONFIRMED',
-        updatedAt: new Date(),
-      },
-      include: {
-        pickupAddress: true,
-        deliveryAddress: true,
-      },
+    // The CONFIRMED history row is what keeps the order locked for the
+    // partner once it is confirmed (return-to-dispatch resets the status to
+    // ACTIVE), so it is written in the same transaction as the status: a
+    // failed write fails the confirm (retryable) instead of leaving a
+    // confirmed order unlocked. It is an internal event — no webhook.
+    const confirmedOrder = await prisma.$transaction(async (tx) => {
+      const updated = await tx.cateringRequest.update({
+        where: { id: validatedData.id },
+        data: {
+          status: 'CONFIRMED',
+          updatedAt: new Date(),
+        },
+        include: {
+          pickupAddress: true,
+          deliveryAddress: true,
+        },
+      });
+      await tx.orderStatusHistory.create({
+        data: {
+          cateringRequestId: updated.id,
+          partnerStatus: CONFIRMED_HISTORY_STATUS,
+          driverStatus: null,
+          changedBy: null,
+        },
+      });
+      return updated;
     });
 
     await triggerOrderDispatch(confirmedOrder.id);

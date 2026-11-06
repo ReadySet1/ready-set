@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
 import { localTimeToUtc } from "@/lib/utils/timezone";
+import { resolveAddressTimezone } from "@/lib/utils/address-timezone";
 import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
 import { randomUUID } from "crypto";
 import { Resend } from "resend";
@@ -276,11 +277,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse date and time fields with proper timezone conversion
-    const pickupDateTime = new Date(localTimeToUtc(data.date, data.pickupTime));
-    const arrivalDateTime = new Date(localTimeToUtc(data.date, data.arrivalTime));
+    // The customer types wall-clock times for the pickup location, so read
+    // them in the pickup address zone (an Austin 11:00 is 11:00 Central).
+    const orderZone = resolveAddressTimezone(pickupAddr);
+    const pickupDateTime = new Date(localTimeToUtc(data.date, data.pickupTime, orderZone));
+    const arrivalDateTime = new Date(localTimeToUtc(data.date, data.arrivalTime, orderZone));
     const completeDateTime = data.completeTime
-      ? new Date(localTimeToUtc(data.date, data.completeTime))
+      ? new Date(localTimeToUtc(data.date, data.completeTime, orderZone))
       : null;
 
     // Convert numeric values — guard blank/null to produce explicit null (not NaN or throw)

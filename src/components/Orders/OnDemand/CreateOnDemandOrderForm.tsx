@@ -56,6 +56,8 @@ import {
   Package,
 } from "lucide-react";
 import { format } from "date-fns";
+import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
+import { OrderTimezoneHint } from "@/components/Orders/ui/OrderTimezoneHint";
 import { cn } from "@/lib/utils";
 import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
@@ -259,7 +261,8 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         ? { ...data, tempEntityId } as CreateOnDemandOrderInput
         : data as CreateOnDemandOrderInput;
 
-      const result = await createOnDemandOrder(submitData);
+      // The pickers hold browser-local wall-clock; save it in the pickup address zone (PT/CT).
+      const result = await createOnDemandOrder(orderTimesInPickupZone(submitData));
 
       if (result.error) {
         // Map server-side field errors to react-hook-form for inline display
@@ -381,7 +384,9 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         formData.tempEntityId = tempEntityId;
       }
 
-      const result = await createOnDemandOrder(formData as CreateOnDemandOrderInput);
+      const result = await createOnDemandOrder(
+        orderTimesInPickupZone(formData as CreateOnDemandOrderInput),
+      );
 
       if (result.success) {
         if (uploadedFiles.length > 0 && result.orderId) {
@@ -552,7 +557,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Pickup Date & Time */}
           <div className="space-y-2">
-            <Label htmlFor="pickupDateTime">Pickup Date & Time *</Label>
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="pickupDateTime">Pickup Date & Time *</Label>
+              <OrderTimezoneHint pickupAddress={watch("pickupAddress")} />
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <Button

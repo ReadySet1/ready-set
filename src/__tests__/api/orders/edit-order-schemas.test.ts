@@ -67,11 +67,11 @@ describe('Order Edit Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject address with invalid state length', () => {
+    it('should reject a state that is neither a 2-letter code nor a US state name', () => {
       const invalidAddress = {
         street1: '123 Main St',
         city: 'San Francisco',
-        state: 'California', // Should be 2 characters
+        state: 'Guanajuato', // no USPS code — must not be guessed
         zip: '94102',
       };
 

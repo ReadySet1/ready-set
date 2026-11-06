@@ -6,6 +6,7 @@ import { DriverStatus } from '@/types/user';
 import { OrderStatus } from '@/types/order';
 import { createClient } from '@/utils/supabase/client';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { addressQuery } from '@/lib/driver-navigation';
 
 /**
  * The raw `/api/driver-deliveries` payload behind `activeDeliveries`, shared so
@@ -162,8 +163,14 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             pendingReturn: Boolean(o.pendingReturn),
             driverId: '',
             status: (o.driverStatus as DriverStatus) || DriverStatus.ASSIGNED,
-            pickupLocation: { coordinates: toCoords(pickup) },
-            deliveryLocation: { coordinates: toCoords(dropoff) },
+            pickupLocation: {
+              coordinates: toCoords(pickup),
+              address: addressQuery(pickup) ?? undefined,
+            },
+            deliveryLocation: {
+              coordinates: toCoords(dropoff),
+              address: addressQuery(dropoff) ?? undefined,
+            },
             estimatedArrival: o.arrivalDateTime ? new Date(o.arrivalDateTime) : undefined,
             scheduledPickupAt: o.pickupDateTime ? new Date(o.pickupDateTime) : undefined,
             route: [],

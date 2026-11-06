@@ -61,6 +61,22 @@ jest.mock('@/lib/services/partner-registry', () => ({
         },
       };
     }
+    if (slug === 'tinycow' && apiKey === 'tiny-key') {
+      // A partner whose api_partners row sets a 2 requests/minute ceiling.
+      return {
+        ok: true,
+        partner: {
+          id: 'partner-tiny-id',
+          slug: 'tinycow',
+          displayName: 'TinyCow',
+          orderPrefix: 'TC-',
+          webhookUrl: null,
+          webhookSecret: null,
+          rateLimitPerMin: 2,
+          isActive: true,
+        },
+      };
+    }
     if (slug === 'catervalley' && apiKey === 'cv-test-key') {
       return {
         ok: true,
@@ -202,5 +218,50 @@ describe('POST /api/partners/orders/draft (CaterCow)', () => {
     const createCall = (prisma.cateringRequest.create as jest.Mock).mock.calls[0][0];
     expect(createCall.data.orderNumber).toBe('CV-99999');
     expect(createCall.data.brokerage).toBe('CaterValley');
+  });
+
+  describe('contract body rules on /api/partners', () => {
+    const CC_HEADERS = { partner: 'catercow', 'x-api-key': 'cc-test-key' };
+    const oversized = { ...validOrderData, specialNotes: 'x'.repeat(300 * 1024) };
+
+    it('answers 415 for a non-JSON Content-Type', async () => {
+      const response = await draftPOST(
+        buildPartnerDraftRequest({ ...CC_HEADERS, 'Content-Type': 'text/plain' }) as any
+      );
+      await expectErrorResponse(response, 415, /application\/json/);
+      expect(prisma.cateringRequest.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 413 for a body over 256 KB even without a Content-Length header', async () => {
+      const request = buildPartnerDraftRequest(CC_HEADERS, oversized);
+      expect(request.headers.get('content-length')).toBeNull();
+
+      const response = await draftPOST(request as any);
+      await expectErrorResponse(response, 413, /too large/i);
+      expect(prisma.cateringRequest.create).not.toHaveBeenCalled();
+    });
+
+    it('keeps the legacy CaterValley URL on its own limit and no Content-Type check', async () => {
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain', ...CC_HEADERS },
+        body: JSON.stringify(oversized),
+      });
+
+      const response = await draftPOST(request as any);
+      expect(response.status).not.toBe(413);
+      expect(response.status).not.toBe(415);
+    });
+  });
+
+  it("applies the partner's own rateLimitPerMin, per route", async () => {
+    const headers = { partner: 'tinycow', 'x-api-key': 'tiny-key' };
+    const send = () => draftPOST(buildPartnerDraftRequest(headers, { orderCode: 'TC-1' }) as any);
+
+    expect((await send()).status).not.toBe(429);
+    expect((await send()).status).not.toBe(429);
+    const limited = await send();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('X-RateLimit-Limit')).toBe('2');
   });
 });

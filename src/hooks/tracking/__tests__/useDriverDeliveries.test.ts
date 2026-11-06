@@ -171,6 +171,27 @@ describe('useDriverDeliveries', () => {
       expect(delivery.pendingReturn).toBe(false);
     });
 
+    it('carries each stop address so Navigate can fall back to it when ungeocoded', async () => {
+      setDeliveries([
+        makeOrder({
+          address: { street1: '1 Vendor St', city: 'SF', state: 'CA', zip: '94103' },
+          delivery_address: { street1: '9 Client Ave', city: 'SF', state: 'CA', zip: '94107' },
+        }),
+      ]);
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(1);
+      });
+      const delivery = result.current.activeDeliveries[0];
+      expect(delivery.pickupLocation).toEqual({
+        coordinates: [0, 0],
+        address: '1 Vendor St, SF, CA, 94103',
+      });
+      expect(delivery.deliveryLocation.address).toBe('9 Client Ave, SF, CA, 94107');
+    });
+
     it('maps the feed pendingReturn flag onto the delivery (end-shift mirror)', async () => {
       setDeliveries([makeOrder({ pendingReturn: true })]);
 

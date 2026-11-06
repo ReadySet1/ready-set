@@ -12,6 +12,7 @@ import {
   formatDateTimeForDisplay,
   formatDateForDisplay,
   formatTimeForDisplay,
+  formatDateTimeWithZone,
 } from '../date-display';
 
 const PACIFIC_DATETIME = 'Oct 7, 2026 11:30 PM';
@@ -62,5 +63,32 @@ describe('formatDateForDisplay / formatTimeForDisplay', () => {
     expect(formatDateForDisplay('2026-10-08T06:30:00+00:00')).toBe(PACIFIC_DATE);
     expect(formatTimeForDisplay('2026-10-08T06:30:00Z')).toBe(PACIFIC_TIME);
     expect(formatTimeForDisplay('2026-10-08T06:30:00+00:00')).toBe(PACIFIC_TIME);
+  });
+});
+
+describe('per-location timezone', () => {
+  const CENTRAL = 'America/Chicago';
+
+  it('formats in the given zone instead of the app default', () => {
+    // 2026-10-08T16:00Z = 11:00 AM CDT = 9:00 AM PDT
+    expect(formatDateTimeForDisplay('2026-10-08T16:00:00Z', 'MMM d, yyyy h:mm a', CENTRAL)).toBe(
+      'Oct 8, 2026 11:00 AM',
+    );
+    expect(formatDateTimeForDisplay('2026-10-08T16:00:00Z')).toBe('Oct 8, 2026 9:00 AM');
+  });
+
+  it('keeps the calendar day of the given zone in the date-only and time-only forms', () => {
+    // 06:30Z is still Oct 8, 1:30 AM in Central but Oct 7 in Pacific.
+    expect(formatDateForDisplay('2026-10-08T06:30:00Z', CENTRAL)).toBe('Oct 8, 2026');
+    expect(formatDateForDisplay('2026-10-08T06:30:00Z')).toBe(PACIFIC_DATE);
+    expect(formatTimeForDisplay('2026-10-08T06:30:00Z', CENTRAL)).toBe('1:30 AM');
+  });
+
+  it('appends the zone label with formatDateTimeWithZone', () => {
+    expect(formatDateTimeWithZone('2026-10-08T16:00:00Z', CENTRAL)).toBe('Oct 8, 2026 11:00 AM CT');
+    expect(formatDateTimeWithZone('2026-10-08T16:00:00Z', 'America/Los_Angeles', 'h:mm a')).toBe(
+      '9:00 AM PT',
+    );
+    expect(formatDateTimeWithZone(null, CENTRAL)).toBe('N/A');
   });
 });

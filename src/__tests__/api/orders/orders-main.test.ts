@@ -616,6 +616,9 @@ describe('/api/orders API - Main Endpoint', () => {
 
   describe('POST /api/orders - Create Order', () => {
     const CATERING_ORDER_ID = 'catering-new-1';
+    // The route validates address IDs as UUIDs (the columns are @db.Uuid).
+    const PICKUP_ADDRESS_ID = '11111111-1111-4111-8111-111111111111';
+    const DELIVERY_ADDRESS_ID = '22222222-2222-4222-8222-222222222222';
 
     const mockCreatedOrder = {
       id: CATERING_ORDER_ID,
@@ -640,8 +643,8 @@ describe('/api/orders API - Main Endpoint', () => {
 
       const request = createPostRequest('http://localhost:3000/api/orders', {
         type: 'catering',
-        pickupAddressId: 'addr-1',
-        deliveryAddressId: 'addr-2',
+        pickupAddressId: PICKUP_ADDRESS_ID,
+        deliveryAddressId: DELIVERY_ADDRESS_ID,
       });
 
       const response = await POST(request);
@@ -672,8 +675,11 @@ describe('/api/orders API - Main Endpoint', () => {
 
       const request = createPostRequest('http://localhost:3000/api/orders', {
         type: 'ondemand',
-        pickupAddressId: 'addr-1',
-        deliveryAddressId: 'addr-2',
+        pickupAddressId: PICKUP_ADDRESS_ID,
+        deliveryAddressId: DELIVERY_ADDRESS_ID,
+        pickupDateTime: '2026-11-10T17:00:00.000Z',
+        arrivalDateTime: '2026-11-10T18:00:00.000Z',
+        clientAttention: 'Front desk',
       });
 
       const response = await POST(request);

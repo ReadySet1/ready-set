@@ -119,4 +119,44 @@ describe('GET /api/cater-valley/orders/{id}', () => {
     expect(body.order.events).toHaveLength(2);
     expect(body.order.events[0]).toMatchObject({ status: 'PICKED_UP', driverStatus: 'PICKED_UP' });
   });
+
+  it('lists the CONFIRMED event but keeps lifecycleStatus null until dispatch', async () => {
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: ORDER_ID,
+      orderNumber: 'CC-12345',
+      deletedAt: null,
+      status: 'CONFIRMED',
+      arrivalDateTime: null,
+      user: { email: 'system@catercow.com' },
+      statusHistory: [
+        { partnerStatus: 'CONFIRMED', driverStatus: null, createdAt: new Date('2026-06-14T09:00:00Z'), location: null, notes: null },
+      ],
+    });
+
+    const body = await (await GET(makeRequest(authHeaders), ctx(ORDER_ID))).json();
+    expect(body.order.lifecycleStatus).toBeNull();
+    expect(body.order.events).toEqual([
+      { status: 'CONFIRMED', driverStatus: null, timestamp: '2026-06-14T09:00:00.000Z' },
+    ]);
+  });
+
+  it('reports the newest lifecycle event even when a later CONFIRMED row sits on top', async () => {
+    // Ops assigned the draft first, then the partner confirmed it.
+    (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: ORDER_ID,
+      orderNumber: 'CC-12345',
+      deletedAt: null,
+      status: 'CONFIRMED',
+      arrivalDateTime: null,
+      user: { email: 'system@catercow.com' },
+      statusHistory: [
+        { partnerStatus: 'CONFIRMED', driverStatus: null, createdAt: new Date('2026-06-14T10:00:00Z'), location: null, notes: null },
+        { partnerStatus: 'ASSIGNED', driverStatus: 'ASSIGNED', createdAt: new Date('2026-06-14T09:00:00Z'), location: null, notes: null },
+      ],
+    });
+
+    const body = await (await GET(makeRequest(authHeaders), ctx(ORDER_ID))).json();
+    expect(body.order.lifecycleStatus).toBe('ASSIGNED');
+    expect(body.order.events.map((e: { status: string }) => e.status)).toEqual(['CONFIRMED', 'ASSIGNED']);
+  });
 });

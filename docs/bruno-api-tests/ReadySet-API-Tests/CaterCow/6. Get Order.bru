@@ -1,0 +1,42 @@
+meta {
+  name: 6. Get Order
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{PARTNERS_URL}}/orders/{{cc_orderId}}
+  body: none
+  auth: none
+}
+
+headers {
+  partner: {{CATERCOW_PARTNER}}
+  x-api-key: {{CATERCOW_API_KEY}}
+}
+
+docs {
+  # CaterCow — Get Order
+
+  Reads the order created by Step 1 (run Step 1 first so `cc_orderId` is
+  set). Returns the internal `orderStatus`, the latest partner-facing
+  `lifecycleStatus` (null until the first status event) and up to the 10
+  most recent `events`, newest first. Partners use it to resync after a
+  missed webhook. See `docs/catercow/API_CONTRACT.md` — Endpoint 4.
+}
+
+tests {
+  test("Read succeeded (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns the requested order", function() {
+    expect(res.getBody().status).to.equal("SUCCESS");
+    expect(res.getBody().order.id).to.equal(bru.getVar("cc_orderId"));
+  });
+  test("orderNumber has CC- prefix", function() {
+    expect(res.getBody().order.orderNumber).to.match(/^CC-/);
+  });
+  test("events is an array", function() {
+    expect(res.getBody().order.events).to.be.an("array");
+  });
+}

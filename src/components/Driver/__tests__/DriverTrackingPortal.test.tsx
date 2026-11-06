@@ -38,8 +38,10 @@ jest.mock("@/hooks/tracking/useTrackingSettings", () => ({
 // Light map mock (real one needs Mapbox + a token).
 jest.mock("@/components/Driver/DriverLiveMap", () => ({
   __esModule: true,
-  default: ({ activeDeliveries }: any) => (
-    <div data-testid="driver-live-map">map ({activeDeliveries?.length ?? 0})</div>
+  default: ({ activeDeliveries, clockOffsetMs }: any) => (
+    <div data-testid="driver-live-map" data-clock-offset-ms={clockOffsetMs}>
+      map ({activeDeliveries?.length ?? 0})
+    </div>
   ),
 }));
 
@@ -579,6 +581,94 @@ describe("DriverTrackingPortal (redesigned)", () => {
         sampleLocation,
       ),
     );
+  });
+
+  describe("Navigate target (2026-10-23 drives: Navigate sent the driver to the client while en route to the vendor)", () => {
+    const PICKUP: [number, number] = [-101.6731, 21.1172];
+    const DROPOFF: [number, number] = [-101.6861, 21.1236];
+    const withStatus = (status: DriverStatus) =>
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-1",
+            cateringRequestId: "cr-1",
+            driverId: "driver-1",
+            status,
+            pickupLocation: { coordinates: PICKUP },
+            deliveryLocation: { coordinates: DROPOFF },
+          },
+        ],
+      });
+    const destinationOf = (url: string) =>
+      decodeURIComponent(new URL(url).searchParams.get("destination") ?? "");
+
+    let openSpy: jest.SpyInstance;
+    beforeEach(() => {
+      openSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+    });
+    afterEach(() => openSpy.mockRestore());
+
+    it("navigates to the pickup while en route to the vendor", () => {
+      mockUseDriverTracking.mockReturnValue(withStatus(DriverStatus.EN_ROUTE_TO_VENDOR));
+      renderPortal();
+      fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+      expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe(`${PICKUP[1]},${PICKUP[0]}`);
+    });
+
+    it("navigates to the drop-off once the food is on board", () => {
+      mockUseDriverTracking.mockReturnValue(withStatus(DriverStatus.EN_ROUTE_TO_CLIENT));
+      renderPortal();
+      fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+      expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe(`${DROPOFF[1]},${DROPOFF[0]}`);
+    });
+
+    describe("ungeocoded stops fall back to the address (same as the detail screen)", () => {
+      const ungeocoded = (status: DriverStatus, withAddress = true) =>
+        baseCtx({
+          isShiftActive: true,
+          currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+          currentLocation: sampleLocation,
+          activeDeliveries: [
+            {
+              id: "del-1",
+              cateringRequestId: "cr-1",
+              driverId: "driver-1",
+              status,
+              pickupLocation: {
+                coordinates: [0, 0],
+                ...(withAddress ? { address: "1 Vendor St, SF, CA" } : {}),
+              },
+              deliveryLocation: {
+                coordinates: [0, 0],
+                ...(withAddress ? { address: "9 Client Ave, SF, CA" } : {}),
+              },
+            },
+          ],
+        });
+
+      it("navigates to the pickup address before pickup", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_VENDOR));
+        renderPortal();
+        fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+        expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe("1 Vendor St, SF, CA");
+      });
+
+      it("navigates to the drop-off address after pickup", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_CLIENT));
+        renderPortal();
+        fireEvent.click(screen.getByRole("button", { name: /^navigate$/i }));
+        expect(destinationOf(openSpy.mock.calls[0]![0] as string)).toBe("9 Client Ave, SF, CA");
+      });
+
+      it("hides Navigate when the stop has neither coordinates nor an address", () => {
+        mockUseDriverTracking.mockReturnValue(ungeocoded(DriverStatus.EN_ROUTE_TO_VENDOR, false));
+        renderPortal();
+        expect(screen.queryByRole("button", { name: /^navigate$/i })).toBeNull();
+      });
+    });
   });
 
   describe("stage gates (same rules as the delivery detail screen)", () => {
@@ -1172,6 +1262,15 @@ describe("DriverTrackingPortal (redesigned)", () => {
         jest.advanceTimersByTime(3_000);
       });
       expect(screen.getByText("2:03")).toBeInTheDocument();
+    });
+
+    it("hands the clock offset to the live map so its trail window uses the server clock", () => {
+      mockUseDriverTracking.mockReturnValue(activeShiftCtx({ clockOffsetMs: 3_648_000 }));
+      renderPortal();
+      expect(screen.getByTestId("driver-live-map")).toHaveAttribute(
+        "data-clock-offset-ms",
+        "3648000",
+      );
     });
   });
 
