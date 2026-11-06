@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { stateCodeSchema } from '@/lib/utils/state-code';
 
 // Define a simple type for the client list
 export interface ClientListItem {
@@ -19,7 +20,7 @@ export const addressSchema = z.object({
   street1: z.string().min(1, "Street address is required"),
   street2: z.string().optional().nullable(),
   city: z.string().min(1, "City is required"),
-  state: z.string().min(2, "State is required").max(2, "State must be 2 characters"),
+  state: stateCodeSchema,
   zip: z.string().min(5, "Zip code is required").regex(/^\d{5}(-\d{4})?$/, "Invalid zip code format"),
   county: z.string().optional().nullable(),
 });

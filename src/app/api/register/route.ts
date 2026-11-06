@@ -6,6 +6,7 @@ import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitia
 import { randomUUID } from 'crypto';
 import { sendUserWelcomeEmail } from "@/services/email-notification";
 import { siteUrl } from "@/lib/site-url";
+import { normalizeStateCode } from "@/lib/utils/state-code";
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -310,7 +311,7 @@ export async function POST(request: Request) {
         street1: body.street1,
         street2: body.street2,
         city: body.city,
-        state: body.state,
+        state: normalizeStateCode(body.state),
         zip: body.zip,
         county:
           userType === UserType.VENDOR || userType === UserType.CLIENT

@@ -501,6 +501,35 @@ describe("/api/addresses", () => {
       });
     });
 
+    it("should store the USPS code when given a full state name", async () => {
+      const request = createPostRequest("http://localhost:3000/api/addresses", {
+        ...validAddressData,
+        state: "California",
+      });
+      await POST(request);
+
+      expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          state: expect.objectContaining({ equals: "CA" }),
+        }),
+      });
+      expect(mockPrisma.address.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ state: "CA" }),
+      });
+    });
+
+    it("should keep a non-US region as typed instead of inventing a code", async () => {
+      const request = createPostRequest("http://localhost:3000/api/addresses", {
+        ...validAddressData,
+        state: "Guanajuato",
+      });
+      await POST(request);
+
+      expect(mockPrisma.address.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ state: "Guanajuato" }),
+      });
+    });
+
     it("should trim whitespace from fields", async () => {
       const dataWithWhitespace = {
         ...validAddressData,
@@ -796,6 +825,21 @@ describe("/api/addresses", () => {
         expect.objectContaining({
           where: { id: mockAddress.id },
           data: { city: "Oakland" },
+        })
+      );
+    });
+
+    it("should store the USPS code when an update sends a full state name", async () => {
+      const request = createPutRequest(
+        `http://localhost:3000/api/addresses?id=${mockAddress.id}`,
+        { state: "california" }
+      );
+
+      await PUT(request);
+
+      expect(mockPrisma.address.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ state: "CA" }),
         })
       );
     });
