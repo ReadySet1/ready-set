@@ -7,6 +7,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError } from '@/types/prisma';
 import { sendUserWelcomeEmail } from "@/services/email-notification";
+import { normalizeStateCode } from "@/lib/utils/state-code";
 
 interface AdminRegistrationRequest {
   name: string;
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
         street1: body.street1,
         street2: body.street2,
         city: body.city,
-        state: body.state,
+        state: normalizeStateCode(body.state),
         zip: body.zip,
         isRestaurant: false,
         isShared: false,

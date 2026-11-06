@@ -8,6 +8,7 @@ import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeAddress } from "@/utils/address-normalization";
 import { deriveAddressTimezone } from "@/lib/utils/address-timezone";
+import { normalizeStateCode } from "@/lib/utils/state-code";
 
 // Simple in-memory rate limiting (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -370,7 +371,7 @@ export async function POST(request: NextRequest) {
     const normalized = normalizeAddress({
       street1: formData.street1,
       city: formData.city,
-      state: formData.state,
+      state: normalizeStateCode(formData.state),
       zip: formData.zip,
     });
 
@@ -401,8 +402,8 @@ export async function POST(request: NextRequest) {
         // Ensure boolean fields are properly set
         isRestaurant: Boolean(formData.isRestaurant),
         isShared: Boolean(formData.isShared),
-        // Normalize state to uppercase
-        state: formData.state.trim().toUpperCase(),
+        // USPS code; full US state names are mapped, non-US regions kept as typed
+        state: normalizeStateCode(formData.state),
         // Normalize ZIP code
         zip: formData.zip.trim(),
         // IANA zone derived from the ZIP (addresses.state is unreliable)
@@ -523,7 +524,7 @@ export async function PUT(request: NextRequest) {
         if (formData.street1 !== undefined) updateData.street1 = formData.street1;
         if (formData.street2 !== undefined) updateData.street2 = formData.street2;
         if (formData.city !== undefined) updateData.city = formData.city;
-        if (formData.state !== undefined) updateData.state = formData.state;
+        if (formData.state !== undefined) updateData.state = normalizeStateCode(formData.state);
         if (formData.zip !== undefined) {
           updateData.zip = formData.zip;
           updateData.timezone = deriveAddressTimezone({ zip: formData.zip });

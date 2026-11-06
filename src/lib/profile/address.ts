@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma as defaultPrisma } from '@/lib/prisma';
+import { normalizeStateCode } from '@/lib/utils/state-code';
 
 type Db = Prisma.TransactionClient | typeof defaultPrisma;
 
@@ -131,7 +132,7 @@ export async function setProfileAddress(
         street1: addr.street1,
         street2: addr.street2,
         city: addr.city,
-        state: addr.state,
+        state: normalizeStateCode(addr.state),
         zip: addr.zip,
         locationNumber: addr.locationNumber,
         parkingLoading: addr.parkingLoading,
@@ -155,7 +156,7 @@ async function createDefaultUserAddress(
       street1: addr.street1!,
       street2: addr.street2,
       city: addr.city!,
-      state: addr.state!,
+      state: normalizeStateCode(addr.state!),
       zip: addr.zip!,
       locationNumber: addr.locationNumber,
       parkingLoading: addr.parkingLoading,
