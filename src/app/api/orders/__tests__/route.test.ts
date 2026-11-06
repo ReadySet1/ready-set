@@ -304,10 +304,13 @@ describe("/api/orders", () => {
   });
 
   describe("POST /api/orders", () => {
+    const PICKUP_ADDRESS_ID = "11111111-1111-4111-8111-111111111111";
+    const DELIVERY_ADDRESS_ID = "22222222-2222-4222-8222-222222222222";
+
     const validCateringOrderData = {
       type: "catering",
-      pickupAddressId: "pickup-addr-id",
-      deliveryAddressId: "delivery-addr-id",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
       headcount: 50,
       hoursNeeded: 2,
       specialNotes: "Test notes",
@@ -315,10 +318,13 @@ describe("/api/orders", () => {
 
     const validOnDemandOrderData = {
       type: "ondemand",
-      pickupAddressId: "pickup-addr-id",
-      deliveryAddressId: "delivery-addr-id",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
+      pickupDateTime: "2026-11-10T17:00:00.000Z",
+      arrivalDateTime: "2026-11-10T18:00:00.000Z",
+      clientAttention: "Front desk",
       itemDelivered: "Documents",
-      vehicleType: "Car",
+      vehicleType: "CAR",
     };
 
     it("should return 401 when not authenticated", async () => {
@@ -548,15 +554,11 @@ describe("/api/orders", () => {
       expect(data.success).toBe(true);
     });
 
-    it("should reject invalid order type", async () => {
+    it("should reject invalid order type with 400 before touching the DB", async () => {
       const invalidData = {
         ...validCateringOrderData,
         type: "invalid",
       };
-
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        return callback({});
-      });
 
       const request = createPostRequest(
         "http://localhost:3000/api/orders",
@@ -564,7 +566,8 @@ describe("/api/orders", () => {
       );
 
       const response = await POST(request);
-      await expectServerError(response);
+      await expectValidationError(response);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("should handle database transaction errors", async () => {
@@ -594,6 +597,251 @@ describe("/api/orders", () => {
 
       const response = await POST(request);
       await expectServerError(response);
+    });
+  });
+  describe("POST /api/orders — mass assignment allowlist", () => {
+    const PICKUP_ADDRESS_ID = "11111111-1111-4111-8111-111111111111";
+    const DELIVERY_ADDRESS_ID = "22222222-2222-4222-8222-222222222222";
+
+    const minimalCatering = {
+      type: "catering",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
+    };
+
+    const minimalOnDemand = {
+      type: "ondemand",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
+      pickupDateTime: "2026-11-10T17:00:00.000Z",
+      arrivalDateTime: "2026-11-10T18:00:00.000Z",
+      clientAttention: "Front desk",
+    };
+
+    function captureCreate(model: "cateringRequest" | "onDemand", order: any) {
+      const create = jest.fn().mockResolvedValue(order);
+      mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+        callback({ [model]: { create } }),
+      );
+      return create;
+    }
+
+    function asRole(type: string) {
+      mockValidateApiAuth.mockResolvedValue({
+        isValid: true,
+        user: { ...mockUser, type },
+        userType: type as any,
+      });
+    }
+
+    const post = (body: unknown) =>
+      POST(createPostRequest("http://localhost:3000/api/orders", body));
+
+    // Every column/relation the caller must never control on create.
+    const serverOwnedFields: Array<[string, unknown]> = [
+      ["id", "33333333-3333-4333-8333-333333333333"],
+      ["guid", "forged-guid"],
+      ["userId", "44444444-4444-4444-8444-444444444444"],
+      ["orderNumber", "FORGED-001"],
+      ["status", "COMPLETED"],
+      ["driverStatus", "COMPLETED"],
+      ["deliveryCost", 0.01],
+      ["appliedDiscount", 999],
+      ["pricingTierId", "55555555-5555-4555-8555-555555555555"],
+      ["deliveryDistance", 0],
+      ["ezCaterDeliveryId", "ezc-forged"],
+      ["image", "https://evil.test/x.png"],
+      ["createdAt", "2020-01-01T00:00:00.000Z"],
+      ["updatedAt", "2020-01-01T00:00:00.000Z"],
+      ["deletedAt", "2020-01-01T00:00:00.000Z"],
+      ["deletedBy", "44444444-4444-4444-8444-444444444444"],
+      ["deletionReason", "forged"],
+      ["archivedAt", "2020-01-01T00:00:00.000Z"],
+      ["archiveBatchId", "55555555-5555-4555-8555-555555555555"],
+      ["dispatches", { create: { driverId: "66666666-6666-4666-8666-666666666666" } }],
+      ["fileUploads", { create: { fileName: "x", fileUrl: "x" } }],
+      ["statusHistory", { create: { status: "COMPLETED" } }],
+      ["user", { connect: { id: "44444444-4444-4444-8444-444444444444" } }],
+      ["pickupAddress", { create: { street1: "x" } }],
+    ];
+
+    it.each(serverOwnedFields)(
+      "rejects server-owned field %s on a catering order (400, nothing created)",
+      async (field, value) => {
+        const create = captureCreate("cateringRequest", mockCateringOrder);
+
+        const response = await post({ ...minimalCatering, [field]: value });
+
+        const data = await expectValidationError(response);
+        expect(JSON.stringify(data)).toContain(field);
+        expect(create).not.toHaveBeenCalled();
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(serverOwnedFields)(
+      "rejects server-owned field %s on an on-demand order (400, nothing created)",
+      async (field, value) => {
+        const create = captureCreate("onDemand", mockOnDemandOrder);
+
+        const response = await post({ ...minimalOnDemand, [field]: value });
+
+        await expectValidationError(response);
+        expect(create).not.toHaveBeenCalled();
+      },
+    );
+
+    it("rejects catering-only fields on an on-demand order", async () => {
+      captureCreate("onDemand", mockOnDemandOrder);
+
+      const response = await post({ ...minimalOnDemand, headcount: 10 });
+
+      await expectValidationError(response);
+    });
+
+    it("creates a catering order from a minimal body with only server-owned extras", async () => {
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post(minimalCatering);
+      await expectSuccessResponse(response, 200);
+
+      const data = create.mock.calls[0][0].data;
+      expect(Object.keys(data).sort()).toEqual(
+        [
+          "createdAt",
+          "deliveryAddressId",
+          "orderNumber",
+          "pickupAddressId",
+          "status",
+          "updatedAt",
+          "userId",
+        ].sort(),
+      );
+      expect(data.userId).toBe(mockUser.id);
+      expect(data.status).toBe("PENDING");
+    });
+
+    it("creates an on-demand order from a minimal body, parsing ISO datetimes", async () => {
+      const create = captureCreate("onDemand", mockOnDemandOrder);
+
+      const response = await post(minimalOnDemand);
+      await expectSuccessResponse(response, 200);
+
+      const data = create.mock.calls[0][0].data;
+      expect(data.pickupDateTime).toEqual(new Date("2026-11-10T17:00:00.000Z"));
+      expect(data.arrivalDateTime).toEqual(new Date("2026-11-10T18:00:00.000Z"));
+      expect(data.clientAttention).toBe("Front desk");
+      expect(data.userId).toBe(mockUser.id);
+      expect(data).not.toHaveProperty("type");
+    });
+
+    it("passes through client-entered catering fields, including orderTotal and tip", async () => {
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post({
+        ...minimalCatering,
+        brokerage: "Direct",
+        headcount: 25,
+        needHost: "YES",
+        hoursNeeded: 3,
+        numberOfHosts: 2,
+        clientAttention: "Jane",
+        pickupNotes: "Back door",
+        specialNotes: "Nut-free",
+        orderTotal: 450.5,
+        tip: 20,
+        pickupDateTime: "2026-11-10T17:00:00.000Z",
+      });
+      await expectSuccessResponse(response, 200);
+
+      expect(create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          brokerage: "Direct",
+          headcount: 25,
+          needHost: "YES",
+          orderTotal: 450.5,
+          tip: 20,
+          pickupDateTime: new Date("2026-11-10T17:00:00.000Z"),
+        }),
+      );
+    });
+
+    it.each<[string, Record<string, unknown>]>([
+      ["negative orderTotal", { orderTotal: -10 }],
+      ["zero orderTotal", { orderTotal: 0 }],
+      ["orderTotal over Decimal(10,2)", { orderTotal: 100000000 }],
+      ["negative tip", { tip: -1 }],
+      ["string orderTotal", { orderTotal: "450" }],
+      ["non-integer headcount", { headcount: 2.5 }],
+      ["non-uuid pickupAddressId", { pickupAddressId: "not-a-uuid" }],
+      ["object pickupAddressId", { pickupAddressId: { connect: { id: "x" } } }],
+      ["unparseable date", { pickupDateTime: "tomorrow" }],
+      ["unknown needHost", { needHost: "MAYBE" }],
+    ])("rejects %s", async (_label, patch) => {
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post({ ...minimalCatering, ...patch });
+
+      await expectValidationError(response);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("requires the on-demand NOT NULL columns", async () => {
+      const { clientAttention, ...withoutAttention } = minimalOnDemand;
+      captureCreate("onDemand", mockOnDemandOrder);
+
+      const response = await post(withoutAttention);
+
+      await expectValidationError(response);
+    });
+
+    it("rejects a non-object body", async () => {
+      const response = await post(["type", "catering"]);
+      await expectValidationError(response);
+    });
+
+    it("forbids DRIVER accounts from creating orders", async () => {
+      asRole("DRIVER");
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post(minimalCatering);
+
+      expect(response.status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it.each(["CLIENT", "VENDOR", "ADMIN", "SUPER_ADMIN", "HELPDESK"])(
+      "lets %s create an order",
+      async (role) => {
+        asRole(role);
+        captureCreate("cateringRequest", mockCateringOrder);
+
+        const response = await post(minimalCatering);
+
+        await expectSuccessResponse(response, 200);
+      },
+    );
+
+    it("applies the same allowlist to admins: pricing columns are not settable here", async () => {
+      asRole("ADMIN");
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post({ ...minimalCatering, deliveryCost: 5, appliedDiscount: 10 });
+
+      await expectValidationError(response);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("never lets an admin create an order on behalf of another user", async () => {
+      asRole("SUPER_ADMIN");
+      captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post({
+        ...minimalCatering,
+        userId: "44444444-4444-4444-8444-444444444444",
+      });
+
+      await expectValidationError(response);
     });
   });
 });
