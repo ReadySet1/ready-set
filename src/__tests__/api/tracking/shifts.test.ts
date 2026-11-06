@@ -583,7 +583,7 @@ describe('/api/tracking/shifts API', () => {
         await expectErrorResponse(response, 404, /Driver profile not found or inactive/i);
       });
 
-      it('should return 409 if driver already has active shift', async () => {
+      it('should not 409 on a stale currentShiftId pointer and delegate to startDriverShift', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -591,21 +591,29 @@ describe('/api/tracking/shifts API', () => {
           },
         });
 
+        // Pointer left behind by a hand-closed shift: drivers.current_shift_id
+        // is set, but startDriverShift is the one that knows whether a shift is
+        // really open (it checks driver_shifts and repairs the driver row).
         (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([
-          { id: 'driver-1', is_active: true, current_shift_id: 'existing-shift' },
+          { id: 'driver-1', is_active: true, current_shift_id: 'stale-shift' },
         ]);
+        (startDriverShift as jest.Mock).mockResolvedValue({
+          success: true,
+          shiftId: 'shift-new-3',
+          resumed: false,
+        });
 
+        const location = { coordinates: { lat: 30.2672, lng: -97.7431 } };
         const request = createPostRequest(
           'http://localhost:3000/api/tracking/shifts',
-          {
-            location: {
-              coordinates: { lat: 30.2672, lng: -97.7431 },
-            },
-          }
+          { location }
         );
 
         const response = await POST(request);
-        await expectErrorResponse(response, 409, /already has an active shift/i);
+        const data = await expectSuccessResponse(response, 201);
+
+        expect(data.data.shiftId).toBe('shift-new-3');
+        expect(startDriverShift).toHaveBeenCalledWith('driver-1', location, { vehicleCheck: false });
       });
     });
 

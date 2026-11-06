@@ -83,6 +83,138 @@ function haversineMeters(
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
+function distanceMeters(a: OdometerPoint, b: OdometerPoint): number {
+  return haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude);
+}
+
+function secondsBetween(from: OdometerPoint, to: OdometerPoint): number {
+  return (to.recorded_at.getTime() - from.recorded_at.getTime()) / 1000;
+}
+
+/**
+ * Could a vehicle physically get from `from` to `to` in the time between the
+ * two fixes? Mirrors the original per-segment SQL gates:
+ * - non-positive time deltas are not a valid hop
+ * - hops longer than MAX_SEGMENT_DISTANCE_MILES over a short time are not
+ * - the effective speed must not exceed the admin max speed (sub-second
+ *   deltas are floored to 1s so near-duplicate fixes never look "fast")
+ */
+function isPlausibleHop(
+  from: OdometerPoint,
+  to: OdometerPoint,
+  maxSpeedMs: number,
+  maxSegmentMeters: number
+): boolean {
+  const dtSeconds = secondsBetween(from, to);
+  if (dtSeconds <= 0) {
+    return false;
+  }
+  const meters = distanceMeters(from, to);
+  if (
+    meters > maxSegmentMeters &&
+    dtSeconds < MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS
+  ) {
+    return false;
+  }
+  return meters / Math.max(dtSeconds, 1) <= maxSpeedMs;
+}
+
+interface FilteredPoint {
+  point: OdometerPoint;
+  /**
+   * True when the hop INTO this point was physically impossible and could not
+   * be explained as a spike. The odometer re-anchors here without billing it.
+   */
+  discontinuity: boolean;
+}
+
+/**
+ * Remove teleport-and-return outliers from an ordered GPS trail.
+ *
+ * Plausibility is judged against the previous KEPT fix — normally the previous
+ * raw fix — never against the odometer anchor. (Judging against the anchor was
+ * the 2026-10-14 bug: after a long stationary stretch the anchor is minutes
+ * old, so a 465m phantom jump looked like a slow 4 m/s hop and was billed, and
+ * so was the jump back.)
+ *
+ * When the hop from the last kept fix L to the next fix p is impossible:
+ * 1. Look ahead: if within MAX_SPIKE_POINTS fixes the trail comes back near L
+ *    (a plausible hop from L that lands within SPIKE_RETURN_RATIO of the
+ *    excursion), p and the fixes before that return are a spike — drop them.
+ * 2. Look back: if p is plausible from a fix Q up to MAX_SPIKE_POINTS kept
+ *    fixes earlier and lands back near Q, the fixes after Q were the spike (it
+ *    went out slowly, after a gap, and came back impossibly fast) — drop them.
+ * 3. Otherwise keep p as a discontinuity: either side may be wrong, but an
+ *    impossible hop is never billed. Real travel after a locked-screen gap is
+ *    unaffected: a long gap makes the hop slow enough to be plausible.
+ */
+function rejectTeleportSpikes(
+  points: OdometerPoint[],
+  maxSpeedMs: number,
+  maxSegmentMeters: number
+): FilteredPoint[] {
+  const maxSpikePoints = MILEAGE_CONFIG.MAX_SPIKE_POINTS;
+  const returnRatio = MILEAGE_CONFIG.SPIKE_RETURN_RATIO;
+  const plausible = (from: OdometerPoint, to: OdometerPoint) =>
+    isPlausibleHop(from, to, maxSpeedMs, maxSegmentMeters);
+
+  const kept: FilteredPoint[] = [];
+  let i = 0;
+  nextPoint: while (i < points.length) {
+    const p = points[i]!;
+    const last = kept[kept.length - 1]?.point;
+
+    if (!last) {
+      kept.push({ point: p, discontinuity: false });
+      i++;
+      continue;
+    }
+    // Duplicate / out-of-order timestamps carry no distance information.
+    if (secondsBetween(last, p) <= 0) {
+      i++;
+      continue;
+    }
+    if (plausible(last, p)) {
+      kept.push({ point: p, discontinuity: false });
+      i++;
+      continue;
+    }
+
+    // 1. p starts a spike the trail returns from.
+    const excursion = distanceMeters(last, p);
+    const lookaheadEnd = Math.min(points.length, i + 1 + maxSpikePoints);
+    for (let j = i + 1; j < lookaheadEnd; j++) {
+      const r = points[j]!;
+      if (plausible(last, r) && distanceMeters(last, r) <= returnRatio * excursion) {
+        i = j;
+        continue nextPoint;
+      }
+    }
+
+    // 2. The tail of the kept trail was a spike p returns from.
+    const lookbackEnd = Math.max(0, kept.length - 1 - maxSpikePoints);
+    for (let k = kept.length - 2; k >= lookbackEnd; k--) {
+      const q = kept[k]!.point;
+      const spikeStart = kept[k + 1]!.point;
+      if (
+        plausible(q, p) &&
+        distanceMeters(q, p) <= returnRatio * distanceMeters(q, spikeStart)
+      ) {
+        kept.length = k + 1;
+        kept.push({ point: p, discontinuity: false });
+        i++;
+        continue nextPoint;
+      }
+    }
+
+    // 3. Unexplained impossible hop: keep the fix, never bill the hop.
+    kept.push({ point: p, discontinuity: true });
+    i++;
+  }
+
+  return kept;
+}
+
 /**
  * Anchor-based odometer over an ordered GPS trail.
  *
@@ -94,50 +226,31 @@ function haversineMeters(
  * therefore sums to ~zero, while genuine movement accumulates in
  * >= threshold steps (undercount bounded by one threshold per anchor hop).
  *
- * Glitch gates mirror the previous per-segment SQL filters, applied per
- * candidate anchor hop:
- * - Non-positive time deltas are skipped
- * - Hops longer than MAX_SEGMENT_DISTANCE_MILES over a short time are dropped
- * - Hops whose effective speed exceeds the admin max speed are dropped
+ * Glitches are removed first, hop by hop, by rejectTeleportSpikes (speed and
+ * segment-length gates against the previous fix, plus out-and-back spike
+ * detection). Every hop that survives is physically plausible, so any
+ * anchor-to-point displacement is too; impossible hops that could not be
+ * explained re-anchor the odometer without being billed.
  */
 export function computeAnchorDistanceMeters(
   points: OdometerPoint[],
   maxSpeedMs: number,
   maxSegmentMeters: number
 ): number {
-  let anchor = points[0];
+  const trail = rejectTeleportSpikes(points, maxSpeedMs, maxSegmentMeters);
+  let anchor = trail[0]?.point;
   if (!anchor) {
     return 0;
   }
 
   let totalMeters = 0;
-  for (let i = 1; i < points.length; i++) {
-    const current = points[i]!;
-    const displacementM = haversineMeters(
-      anchor.latitude,
-      anchor.longitude,
-      current.latitude,
-      current.longitude
-    );
-    const dtSeconds =
-      (current.recorded_at.getTime() - anchor.recorded_at.getTime()) / 1000;
-
-    // Ensure positive time delta (duplicate / out-of-order timestamps)
-    if (dtSeconds <= 0) {
+  for (let i = 1; i < trail.length; i++) {
+    const { point: current, discontinuity } = trail[i]!;
+    if (discontinuity) {
+      anchor = current;
       continue;
     }
-    // Drop obvious outliers: large jumps within short time
-    if (
-      displacementM > maxSegmentMeters &&
-      dtSeconds < MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS
-    ) {
-      continue;
-    }
-    // Cap effective speed to filter GPS glitches
-    if (displacementM / Math.max(dtSeconds, 1) > maxSpeedMs) {
-      continue;
-    }
-
+    const displacementM = distanceMeters(anchor, current);
     if (displacementM >= MILEAGE_CONFIG.MIN_DISPLACEMENT_M) {
       totalMeters += displacementM;
       anchor = current;

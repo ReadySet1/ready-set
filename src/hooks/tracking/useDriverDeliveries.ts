@@ -1,16 +1,57 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryTracking, LocationUpdate } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
 import { OrderStatus } from '@/types/order';
 import { createClient } from '@/utils/supabase/client';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+import { addressQuery } from '@/lib/driver-navigation';
+
+/**
+ * The raw `/api/driver-deliveries` payload behind `activeDeliveries`, shared so
+ * the Home page's `useDriverDeliveriesFeed` can read the SAME poll instead of
+ * running a second one (the driver home used to fire every request twice).
+ */
+export interface DriverDeliveriesFeedSource {
+  /** Rows exactly as the API returned them on the last successful load. */
+  rows: unknown[];
+  /** False until the first load settles (success or failure). */
+  settled: boolean;
+  /** True once any load succeeded; later failures keep `rows` as they were. */
+  hasData: boolean;
+  /** Message of the last failed load (cleared when the next load starts). */
+  error: string | null;
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Result of a driver status advance. On failure `code` carries the orders
+ * PATCH gate code when the server sent one (e.g. 422 PICKUP_PHOTO_REQUIRED,
+ * POD_REQUIRED, RECIPIENT_REQUIRED, PICKUP_CONFIRMATION_REQUIRED,
+ * SHIFT_REQUIRED) so the caller can reopen the right capture sheet.
+ */
+export type StatusAdvanceOutcome =
+  | { ok: true }
+  | { ok: false; status?: number; code?: string; message?: string };
+
+/** Thrown inside the advance so the catch keeps the server's gate details. */
+class StatusAdvanceError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly serverMessage?: string,
+  ) {
+    super(message);
+  }
+}
 
 interface UseDriverDeliveriesReturn {
   activeDeliveries: DeliveryTracking[];
   loading: boolean;
   error: string | null;
+  feedSource: DriverDeliveriesFeedSource;
   refreshDeliveries: () => Promise<void>;
   updateDeliveryStatus: (
     orderNumber: string,
@@ -19,6 +60,12 @@ interface UseDriverDeliveriesReturn {
     proofOfDelivery?: string,
     notes?: string
   ) => Promise<boolean>;
+  /** Same advance as `updateDeliveryStatus`, returning the failure details. */
+  advanceDeliveryStatus: (
+    orderNumber: string,
+    status: DriverStatus,
+    location?: LocationUpdate,
+  ) => Promise<StatusAdvanceOutcome>;
 }
 
 const TERMINAL_STATUSES = new Set<string>(['COMPLETED', 'CANCELLED', 'DELIVERED']);
@@ -49,6 +96,10 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
   const [activeDeliveries, setActiveDeliveries] = useState<DeliveryTracking[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Unmapped rows + first-load status, shared with the Home page's feed hook.
+  const [rawRows, setRawRows] = useState<unknown[]>([]);
+  const [settled, setSettled] = useState(false);
+  const [hasData, setHasData] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
@@ -58,16 +109,31 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     return session?.access_token ?? null;
   }, [supabase]);
 
+  /** Controller of the feed request in flight; aborted when superseded or on unmount. */
+  const controllerRef = useRef<AbortController | null>(null);
+
+  // Latest request wins. A refresh after a status PATCH must never lose to a
+  // slower background poll that started earlier (the list would revert to the
+  // pre-PATCH status until the next tick), so a new load supersedes whatever
+  // is in flight and a superseded response is dropped without touching state.
+  // Skipping while busy — what the Home feed's standalone poller does — would
+  // make that post-PATCH refresh a no-op and hand the guards stale data.
   const loadActiveDeliveries = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
       setLoading(true);
       setError(null);
 
       const res = await fetch('/api/driver-deliveries?page=1&limit=999', {
         credentials: 'include',
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (!res.ok) throw new Error(`Failed to load deliveries (${res.status})`);
       const data = await res.json();
+      if (controller.signal.aborted) return;
       const list: any[] = Array.isArray(data?.deliveries) ? data.deliveries : [];
 
       const mapped: DeliveryTracking[] = list
@@ -97,8 +163,14 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             pendingReturn: Boolean(o.pendingReturn),
             driverId: '',
             status: (o.driverStatus as DriverStatus) || DriverStatus.ASSIGNED,
-            pickupLocation: { coordinates: toCoords(pickup) },
-            deliveryLocation: { coordinates: toCoords(dropoff) },
+            pickupLocation: {
+              coordinates: toCoords(pickup),
+              address: addressQuery(pickup) ?? undefined,
+            },
+            deliveryLocation: {
+              coordinates: toCoords(dropoff),
+              address: addressQuery(dropoff) ?? undefined,
+            },
             estimatedArrival: o.arrivalDateTime ? new Date(o.arrivalDateTime) : undefined,
             scheduledPickupAt: o.pickupDateTime ? new Date(o.pickupDateTime) : undefined,
             route: [],
@@ -117,7 +189,11 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         );
 
       setActiveDeliveries(mapped);
+      setRawRows(list);
+      setHasData(true);
     } catch (err) {
+      // An aborted request was superseded or the hook unmounted: not an error.
+      if (controller.signal.aborted) return;
       console.error('Error loading active deliveries:', err);
       setError(err instanceof Error ? err.message : 'Failed to load deliveries');
       captureException(err, {
@@ -127,20 +203,23 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         handled: true,
       });
     } finally {
-      setLoading(false);
+      if (controllerRef.current === controller) controllerRef.current = null;
+      // A superseded load leaves `loading`/`settled` to the request that replaced it.
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setSettled(true);
+      }
     }
   }, []);
 
   // Advance an order via the orders API — the single source of truth shared with
   // the Home + Detail screens. `orderNumber` is DeliveryTracking.id from the portal.
-  const updateDeliveryStatus = useCallback(
+  const advanceDeliveryStatus = useCallback(
     async (
       orderNumber: string,
       status: DriverStatus,
       _location?: LocationUpdate,
-      _proofOfDelivery?: string,
-      _notes?: string,
-    ): Promise<boolean> => {
+    ): Promise<StatusAdvanceOutcome> => {
       try {
         setError(null);
         const token = await getToken();
@@ -155,13 +234,23 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
         });
         if (!res.ok) {
           let detail = '';
+          let code: string | undefined;
+          let serverMessage: string | undefined;
           try {
             const body = await res.json();
             detail = body.error || body.message || '';
+            if (typeof body.code === 'string') code = body.code;
+            else if (typeof body.error === 'string' && /^[A-Z_]+$/.test(body.error)) code = body.error;
+            if (typeof body.message === 'string') serverMessage = body.message;
           } catch {
             /* non-JSON error body */
           }
-          throw new Error(detail || `Failed to update status (${res.status})`);
+          throw new StatusAdvanceError(
+            detail || `Failed to update status (${res.status})`,
+            res.status,
+            code,
+            serverMessage,
+          );
         }
 
         // Mirror the Detail screen: a completed delivery also completes the order.
@@ -181,7 +270,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
 
         await loadActiveDeliveries();
         addSentryBreadcrumb('Driver updated delivery status', { orderNumber, status });
-        return true;
+        return { ok: true };
       } catch (err) {
         console.error('Error updating delivery status:', err);
         setError(err instanceof Error ? err.message : 'Failed to update delivery');
@@ -192,19 +281,46 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
           handled: true,
           metadata: { orderNumber, status },
         });
-        return false;
+        if (err instanceof StatusAdvanceError) {
+          return {
+            ok: false,
+            status: err.status,
+            ...(err.code ? { code: err.code } : {}),
+            ...(err.serverMessage ? { message: err.serverMessage } : {}),
+          };
+        }
+        return { ok: false, message: err instanceof Error ? err.message : undefined };
       }
     },
     [getToken, loadActiveDeliveries],
+  );
+
+  // Boolean form kept for existing callers. The trailing legacy arguments
+  // (proof URL, notes) were never sent; the POD/recipient have their own routes.
+  const updateDeliveryStatus = useCallback(
+    async (
+      orderNumber: string,
+      status: DriverStatus,
+      location?: LocationUpdate,
+      _proofOfDelivery?: string,
+      _notes?: string,
+    ): Promise<boolean> =>
+      (await advanceDeliveryStatus(orderNumber, status, location)).ok,
+    [advanceDeliveryStatus],
   );
 
   const refreshDeliveries = useCallback(async () => {
     await loadActiveDeliveries();
   }, [loadActiveDeliveries]);
 
-  // Load on mount.
+  // Load on mount; abort the request in flight on unmount so a late response
+  // never touches state.
   useEffect(() => {
     loadActiveDeliveries();
+    return () => {
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    };
   }, [loadActiveDeliveries]);
 
   // Periodic refresh (1 min).
@@ -222,11 +338,18 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [loadActiveDeliveries]);
 
+  const feedSource = useMemo<DriverDeliveriesFeedSource>(
+    () => ({ rows: rawRows, settled, hasData, error, refresh: refreshDeliveries }),
+    [rawRows, settled, hasData, error, refreshDeliveries],
+  );
+
   return {
     activeDeliveries,
     loading,
     error,
+    feedSource,
     refreshDeliveries,
     updateDeliveryStatus,
+    advanceDeliveryStatus,
   };
 }

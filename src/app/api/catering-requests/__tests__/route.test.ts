@@ -1051,5 +1051,85 @@ describe("/api/catering-requests", () => {
       const data = await expectValidationError(response);
       expect(data.message).toContain("Order total is too large");
     });
+
+    describe("times are read in the pickup address time zone", () => {
+      // November dates: PST (UTC-8), CST (UTC-6), EST (UTC-5)
+      const novemberOrder = {
+        ...validCateringData,
+        date: "2026-11-17",
+        pickupTime: "11:00",
+        arrivalTime: "12:00",
+        completeTime: "13:00",
+      };
+
+      const withPickupAddress = (overrides: Record<string, unknown>) => {
+        mockPrisma.address.findUnique.mockImplementation((params: any) => {
+          if (params.where.id === mockPickupAddress.id) {
+            return Promise.resolve({ ...mockPickupAddress, ...overrides });
+          }
+          if (params.where.id === mockDeliveryAddress.id) {
+            return Promise.resolve(mockDeliveryAddress);
+          }
+          return Promise.resolve(null);
+        });
+      };
+
+      const storedTimes = async () => {
+        const request = createPostRequest(
+          "http://localhost:3000/api/catering-requests",
+          novemberOrder
+        );
+        await POST(request);
+        const { data } = mockPrisma.cateringRequest.create.mock.calls[0][0];
+        return {
+          pickup: data.pickupDateTime.toISOString(),
+          arrival: data.arrivalDateTime.toISOString(),
+          complete: data.completeDateTime.toISOString(),
+        };
+      };
+
+      it("stores an Austin (78701) order's 11:00 as 11:00 Central", async () => {
+        withPickupAddress({ city: "Austin", state: "TX", zip: "78701", timezone: null });
+
+        await expect(storedTimes()).resolves.toEqual({
+          pickup: "2026-11-17T17:00:00.000Z",
+          arrival: "2026-11-17T18:00:00.000Z",
+          complete: "2026-11-17T19:00:00.000Z",
+        });
+      });
+
+      it("keeps a California (94103) order's 11:00 as 11:00 Pacific", async () => {
+        withPickupAddress({ zip: "94103", timezone: null });
+
+        await expect(storedTimes()).resolves.toEqual({
+          pickup: "2026-11-17T19:00:00.000Z",
+          arrival: "2026-11-17T20:00:00.000Z",
+          complete: "2026-11-17T21:00:00.000Z",
+        });
+      });
+
+      it("lets a stored address timezone override the ZIP", async () => {
+        withPickupAddress({ zip: "94103", timezone: "America/New_York" });
+
+        await expect(storedTimes()).resolves.toEqual({
+          pickup: "2026-11-17T16:00:00.000Z",
+          arrival: "2026-11-17T17:00:00.000Z",
+          complete: "2026-11-17T18:00:00.000Z",
+        });
+      });
+
+      it.each([
+        ["missing", null],
+        ["unknown", "ABCDE"],
+      ])("falls back to Pacific when the ZIP is %s", async (_label, zip) => {
+        withPickupAddress({ zip, timezone: null });
+
+        await expect(storedTimes()).resolves.toEqual({
+          pickup: "2026-11-17T19:00:00.000Z",
+          arrival: "2026-11-17T20:00:00.000Z",
+          complete: "2026-11-17T21:00:00.000Z",
+        });
+      });
+    });
   });
 });

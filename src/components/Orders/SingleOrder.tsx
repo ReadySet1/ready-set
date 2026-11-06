@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "./DriverStatus";
+import { DeliveryRecipient } from "./DeliveryRecipient";
 import OrderHeader from "./ui/OrderHeader";
 import OrderDetails from "./ui/OrderDetails";
 import AddressInfo from "./ui/AddressInfo";
@@ -36,6 +37,7 @@ import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
+import { ProofOfDeliveryPanel } from "./ui/ProofOfDeliveryPanel";
 import {
   Driver,
   Order,
@@ -52,7 +54,7 @@ import { UserType } from "@/types/user";
 import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
-import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
@@ -157,6 +159,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   canViewDeliveryTime = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  // Order times are entered and shown in the pickup address zone (PT/CT), never the browser zone.
+  const orderZone = orderTimezone(order);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
   const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
@@ -970,7 +974,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
-                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                                timeZone: orderZone,
                               },
                             )}
                           </span>
@@ -987,9 +991,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 hour12: true,
-                                timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                                timeZone: orderZone,
                               },
                             )}
+                          </span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {timezoneAbbreviation(orderZone)}
                           </span>
                         </div>
                       )}
@@ -1082,6 +1089,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                     canUpdateStatus={canUserUpdateTimeline}
                     onStatusUpdate={updateDriverStatus}
                   />
+                  <div className="mt-3">
+                    <DeliveryRecipient receivedBy={(order as any).deliveryReceivedBy} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1165,6 +1175,13 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Proof of Delivery (all POD photos, up to 3) */}
+            <ProofOfDeliveryPanel
+              orderId={order.id.toString()}
+              orderNumber={order.orderNumber}
+              files={files}
+            />
 
             {/* Order Files */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

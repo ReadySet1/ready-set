@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import DriverLiveMap, { mergeTrailSeed, type TrailEntry } from '../DriverLiveMap';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
@@ -15,6 +15,8 @@ const mockRemoveSource = jest.fn();
 const mockGetSource = jest.fn();
 const mockGetLayer = jest.fn();
 const mockEaseTo = jest.fn();
+const mockFlyTo = jest.fn();
+const mockIsMoving = jest.fn(() => false);
 const mockFitBounds = jest.fn();
 const mockSetLngLat = jest.fn().mockReturnThis();
 const mockMarkerAddTo = jest.fn().mockReturnThis();
@@ -27,13 +29,19 @@ const mockBoundsExtend = jest.fn();
 let mockMapInstance: any;
 let mockMarkerInstance: any;
 let loadCallback: (() => void) | null = null;
+/** Every map.on(event, handler) registration, so tests can fire map events. */
+let mapHandlers: Record<string, Array<(e?: any) => void>> = {};
+const fireMapEvent = (event: string, payload: any = {}) => {
+  for (const handler of mapHandlers[event] ?? []) handler(payload);
+};
 
 const createMockMapInstance = () => ({
   addControl: mockAddControl,
-  on: jest.fn((event: string, callback: () => void) => {
+  on: jest.fn((event: string, callback: (e?: any) => void) => {
     if (event === 'load') {
-      loadCallback = callback;
+      loadCallback = callback as () => void;
     }
+    (mapHandlers[event] ??= []).push(callback);
   }),
   remove: mockRemove,
   addSource: mockAddSource,
@@ -43,6 +51,8 @@ const createMockMapInstance = () => ({
   getSource: mockGetSource,
   getLayer: mockGetLayer,
   easeTo: mockEaseTo,
+  flyTo: mockFlyTo,
+  isMoving: mockIsMoving,
   fitBounds: mockFitBounds,
 });
 
@@ -116,6 +126,7 @@ jest.mock('@/components/ui/card', () => ({
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   AlertTriangleIcon: () => <span data-testid="alert-triangle-icon">Alert</span>,
+  LocateFixed: () => <span data-testid="locate-fixed-icon" />,
 }));
 
 // Mock cn utility
@@ -130,6 +141,8 @@ describe('DriverLiveMap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     loadCallback = null;
+    mapHandlers = {};
+    mockIsMoving.mockReturnValue(false);
     mockMapInstance = null;
     mockMarkerInstance = null;
 
@@ -824,6 +837,372 @@ describe('DriverLiveMap', () => {
       await renderLoaded([]);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(screen.queryByText(/^Next:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Follow mode (Waze-style camera follow)', () => {
+    // ~1 m of latitude in degrees.
+    const M_LAT = 1 / 111_320;
+    const fixAt = (northMeters: number): LocationUpdate => ({
+      ...mockCurrentLocation,
+      coordinates: { lat: 37.7749 + northMeters * M_LAT, lng: -122.4194 },
+      timestamp: new Date().toISOString(),
+    });
+
+    const renderLoaded = async () => {
+      const utils = render(
+        <DriverLiveMap currentLocation={fixAt(0)} activeDeliveries={[]} />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      return utils;
+    };
+
+    const moveTo = async (rerender: (ui: React.ReactElement) => void, northMeters: number) => {
+      await act(async () => {
+        rerender(<DriverLiveMap currentLocation={fixAt(northMeters)} activeDeliveries={[]} />);
+      });
+    };
+
+    /** A real drag on the map canvas: Mapbox attaches the DOM event. */
+    const userDrag = () => {
+      const canvas = document.createElement('canvas');
+      const originalEvent = new Event('touchstart');
+      Object.defineProperty(originalEvent, 'target', { value: canvas });
+      act(() => {
+        fireMapEvent('dragstart', { originalEvent });
+      });
+    };
+
+    it('eases the camera to each new fix, keeping the current zoom', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+      const opts = mockEaseTo.mock.calls[0][0];
+      expect(opts.center[0]).toBeCloseTo(-122.4194, 6);
+      expect(opts.center[1]).toBeCloseTo(37.7749 + 100 * M_LAT, 6);
+      expect(opts).not.toHaveProperty('zoom');
+      expect(opts.duration).toBeLessThanOrEqual(1000);
+    });
+
+    it('does not move the camera for GPS jitter of a couple of meters', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      await moveTo(rerender, 2);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+    });
+
+    it('keeps following over a long drive without re-zooming or clearing the trail', async () => {
+      const setData = jest.fn();
+      mockGetSource.mockReturnValue({ setData });
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+
+      // 12 km in 1 km steps — past the old 10 km "jump" anchor.
+      for (let km = 1; km <= 12; km++) {
+        await moveTo(rerender, km * 1000);
+      }
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(12);
+      for (const [opts] of mockEaseTo.mock.calls) {
+        expect(opts).not.toHaveProperty('zoom');
+      }
+      const lastTrail = setData.mock.calls[setData.mock.calls.length - 1][0];
+      expect(lastTrail.geometry.coordinates.length).toBe(13);
+    });
+
+    it('pauses follow when the driver pans the map by hand and shows Recenter', async () => {
+      const { rerender } = await renderLoaded();
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+
+      userDrag();
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /recenter/i })).toBeInTheDocument();
+    });
+
+    it('does not pause follow on programmatic camera moves (no originalEvent)', async () => {
+      const { rerender } = await renderLoaded();
+
+      act(() => {
+        fireMapEvent('dragstart', {});
+        fireMapEvent('zoomstart', {});
+        fireMapEvent('rotatestart', {});
+        fireMapEvent('pitchstart', {});
+      });
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+    });
+
+    it('pauses follow on pinch-zoom and rotate gestures too', async () => {
+      const { rerender } = await renderLoaded();
+      const canvas = document.createElement('canvas');
+      const originalEvent = new Event('touchmove');
+      Object.defineProperty(originalEvent, 'target', { value: canvas });
+
+      act(() => {
+        fireMapEvent('rotatestart', { originalEvent });
+      });
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 100);
+
+      expect(mockEaseTo).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /recenter/i })).toBeInTheDocument();
+    });
+
+    it('Recenter flies to the current position and resumes follow', async () => {
+      const { rerender } = await renderLoaded();
+      userDrag();
+      await moveTo(rerender, 100);
+
+      fireEvent.click(screen.getByRole('button', { name: /recenter/i }));
+
+      expect(mockFlyTo).toHaveBeenCalledTimes(1);
+      const opts = mockFlyTo.mock.calls[0][0];
+      expect(opts.center[1]).toBeCloseTo(37.7749 + 100 * M_LAT, 6);
+      expect(screen.queryByRole('button', { name: /recenter/i })).not.toBeInTheDocument();
+
+      mockEaseTo.mockClear();
+      await moveTo(rerender, 200);
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+    });
+
+    it('Recenter is a comfortable touch target with an accessible label', async () => {
+      await renderLoaded();
+      userDrag();
+
+      const button = screen.getByRole('button', { name: /recenter/i });
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveAttribute('aria-label', 'Recenter map on your location');
+      expect(button.className).toMatch(/min-h-11/);
+    });
+
+    it('does not fight an in-progress programmatic animation (e.g. fit to stops)', async () => {
+      const { rerender } = await renderLoaded();
+      mockEaseTo.mockClear();
+      mockIsMoving.mockReturnValue(true);
+
+      await moveTo(rerender, 100);
+      expect(mockEaseTo).not.toHaveBeenCalled();
+
+      mockIsMoving.mockReturnValue(false);
+      await moveTo(rerender, 110);
+      expect(mockEaseTo).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Trail seed on a skewed device clock', () => {
+    // The server says the shift started 3 h ago, but the phone runs 1 h
+    // behind the server (same class as the 10/14 shift-timer bug, #687).
+    const HOUR = 3_600_000;
+    const shiftStartMs = Date.parse('2026-11-03T15:00:00.000Z');
+    const serverNowMs = shiftStartMs + 3 * HOUR;
+    const clockOffsetMs = 1 * HOUR; // server minus device
+    const deviceNowMs = serverNowMs - clockOffsetMs;
+    const fetchMock = global.fetch as jest.Mock;
+
+    const seedPoint = (lng: number, lat: number, recordedAtMs: number) => ({
+      location: { coordinates: [lng, lat] },
+      recorded_at: new Date(recordedAtMs).toISOString(),
+    });
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(deviceNowMs);
+    });
+
+    afterEach(() => {
+      (Date.now as jest.Mock).mockRestore();
+      fetchMock.mockReset();
+    });
+
+    const renderSeeded = async (
+      seed: unknown[],
+      liveFixDeviceMs: number,
+      offsetMs: number = clockOffsetMs,
+    ) => {
+      let resolveSeed: (value: unknown) => void = () => {};
+      fetchMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveSeed = resolve;
+          }),
+      );
+      render(
+        <DriverLiveMap
+          currentLocation={{
+            ...mockCurrentLocation,
+            coordinates: { lat: 37.79, lng: -122.39 },
+            timestamp: new Date(liveFixDeviceMs).toISOString(),
+          }}
+          activeDeliveries={[]}
+          driverId="driver-1"
+          shiftStartedAt={new Date(shiftStartMs).toISOString()}
+          clockOffsetMs={offsetMs}
+        />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      await act(async () => {
+        resolveSeed({ ok: true, json: async () => ({ data: seed }) });
+      });
+    };
+
+    it('sizes the history window on the server clock, not the phone clock', async () => {
+      await renderSeeded([], deviceNowMs);
+
+      const url = String(fetchMock.mock.calls[0]?.[0]);
+      expect(url).toContain('/api/tracking/locations?');
+      // 3 h on the server clock; the phone clock alone would ask for 2 h and
+      // drop the first hour of the route.
+      expect(url).toContain('hours=3&');
+    });
+
+    it('orders a live fix after the seeded history when the phone clock is behind', async () => {
+      await renderSeeded(
+        [
+          seedPoint(-122.43, 37.75, shiftStartMs + 1 * HOUR),
+          seedPoint(-122.41, 37.77, shiftStartMs + 2.9 * HOUR),
+        ],
+        deviceNowMs, // the newest fix, stamped on the phone clock
+      );
+
+      const setData = mockGetSource.mock.results[0]?.value.setData as jest.Mock;
+      const lastCall = setData.mock.calls[setData.mock.calls.length - 1]?.[0];
+      expect(lastCall.geometry.coordinates).toEqual([
+        [-122.43, 37.75],
+        [-122.41, 37.77],
+        [-122.39, 37.79],
+      ]);
+    });
+  });
+
+  describe('Trail on a phone clock ahead, behind slightly, or exact', () => {
+    // Same seeded-trail harness, but the device clock is pinned per case so the
+    // server clock stays fixed at serverNowMs.
+    const HOUR = 3_600_000;
+    const shiftStartMs = Date.parse('2026-11-03T15:00:00.000Z');
+    const serverNowMs = shiftStartMs + 3 * HOUR;
+    const fetchMock = global.fetch as jest.Mock;
+    const A: [number, number] = [-122.43, 37.75];
+    const X: [number, number] = [-122.39, 37.79]; // the live fix
+    const B: [number, number] = [-122.41, 37.77];
+
+    const seedPoint = ([lng, lat]: [number, number], recordedAtMs: number) => ({
+      location: { coordinates: [lng, lat] },
+      recorded_at: new Date(recordedAtMs).toISOString(),
+    });
+
+    afterEach(() => {
+      (Date.now as jest.Mock).mockRestore();
+      fetchMock.mockReset();
+    });
+
+    const renderSeeded = async (seed: unknown[], clockOffsetMs: number) => {
+      const deviceNowMs = serverNowMs - clockOffsetMs;
+      jest.spyOn(Date, 'now').mockReturnValue(deviceNowMs);
+      let resolveSeed: (value: unknown) => void = () => {};
+      fetchMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveSeed = resolve;
+          }),
+      );
+      render(
+        <DriverLiveMap
+          currentLocation={{
+            ...mockCurrentLocation,
+            coordinates: { lat: X[1], lng: X[0] },
+            // the fix was taken just now, stamped on the phone clock
+            timestamp: new Date(deviceNowMs).toISOString(),
+          }}
+          activeDeliveries={[]}
+          driverId="driver-1"
+          shiftStartedAt={new Date(shiftStartMs).toISOString()}
+          clockOffsetMs={clockOffsetMs}
+        />,
+      );
+      await act(async () => {
+        loadCallback?.();
+      });
+      await act(async () => {
+        resolveSeed({ ok: true, json: async () => ({ data: seed }) });
+      });
+      return deviceNowMs;
+    };
+
+    const lastTrail = () => {
+      const setData = mockGetSource.mock.results[0]?.value.setData as jest.Mock;
+      return setData.mock.calls[setData.mock.calls.length - 1]?.[0].geometry.coordinates;
+    };
+
+    it.each([
+      ['ahead of the server by 1 h', -HOUR],
+      ['on the server clock', 0],
+    ])('sizes the history window on the server clock when the phone is %s', async (_label, offset) => {
+      await renderSeeded([], offset);
+
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain('hours=3&');
+    });
+
+    it('keeps the raw fix time when the phone is behind by less than the server tolerance', async () => {
+      // 10 s behind: the server stores this fix uncorrected (recorded-at.ts),
+      // and a later fix B landed in the history before the seed was fetched.
+      const offset = 10_000;
+      const fixMs = serverNowMs - offset;
+      await renderSeeded(
+        [seedPoint(A, fixMs - 20_000), seedPoint(X, fixMs), seedPoint(B, fixMs + 5_000)],
+        offset,
+      );
+
+      // Shifting the live copy by the offset would sort it after B and draw
+      // A -> X -> B -> X.
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('lines the live fix up with its stored copy when the phone is ahead by less than the tolerance', async () => {
+      // 10 s ahead: the server clamps the future fix time to its receive time.
+      const offset = -10_000;
+      await renderSeeded(
+        [
+          seedPoint(A, serverNowMs - 25_000),
+          seedPoint(X, serverNowMs + 200), // stored at receive time (+latency)
+          seedPoint(B, serverNowMs + 4_000), // a later fix, also clamped
+        ],
+        offset,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('stamps the live fix as-is when the phone is on the server clock', async () => {
+      await renderSeeded(
+        [seedPoint(A, serverNowMs - 20_000), seedPoint(X, serverNowMs), seedPoint(B, serverNowMs + 5_000)],
+        0,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
+    });
+
+    it('moves the live fix onto the server clock when the phone is ahead by more than the tolerance', async () => {
+      // 1 h ahead: the server shifts the fix back by the measured offset.
+      await renderSeeded(
+        [seedPoint(A, serverNowMs - 20_000), seedPoint(X, serverNowMs), seedPoint(B, serverNowMs + 5_000)],
+        -HOUR,
+      );
+
+      expect(lastTrail()).toEqual([A, X, B]);
     });
   });
 

@@ -169,8 +169,11 @@ export interface RouteSlotProps {
   role: 'pickup' | 'delivery';
   address: Address | null;
   isActive: boolean;
+  /** Re-open the slot so a different saved address can be picked. */
   onEdit: () => void;
   onClear: () => void;
+  /** Correct the selected address's details in place (opens the edit form). */
+  onEditDetails?: () => void;
 }
 
 /**

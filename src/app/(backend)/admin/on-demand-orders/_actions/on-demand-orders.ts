@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db/prisma';
+import { deriveAddressTimezone } from '@/lib/utils/address-timezone';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 
@@ -137,6 +138,7 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
           state: data.pickupAddress.state,
           zip: data.pickupAddress.zip,
           county: data.pickupAddress.county ?? null,
+          timezone: deriveAddressTimezone({ zip: data.pickupAddress.zip }),
         },
       });
 
@@ -149,6 +151,7 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
           state: data.deliveryAddress.state,
           zip: data.deliveryAddress.zip,
           county: data.deliveryAddress.county ?? null,
+          timezone: deriveAddressTimezone({ zip: data.deliveryAddress.zip }),
         },
       });
 

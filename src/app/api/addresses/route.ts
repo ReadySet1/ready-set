@@ -7,6 +7,8 @@ import { withDatabaseRetry } from "@/utils/prismaDB";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeAddress } from "@/utils/address-normalization";
+import { deriveAddressTimezone } from "@/lib/utils/address-timezone";
+import { normalizeStateCode } from "@/lib/utils/state-code";
 
 // Simple in-memory rate limiting (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -369,7 +371,7 @@ export async function POST(request: NextRequest) {
     const normalized = normalizeAddress({
       street1: formData.street1,
       city: formData.city,
-      state: formData.state,
+      state: normalizeStateCode(formData.state),
       zip: formData.zip,
     });
 
@@ -400,10 +402,12 @@ export async function POST(request: NextRequest) {
         // Ensure boolean fields are properly set
         isRestaurant: Boolean(formData.isRestaurant),
         isShared: Boolean(formData.isShared),
-        // Normalize state to uppercase
-        state: formData.state.trim().toUpperCase(),
+        // USPS code; full US state names are mapped, non-US regions kept as typed
+        state: normalizeStateCode(formData.state),
         // Normalize ZIP code
         zip: formData.zip.trim(),
+        // IANA zone derived from the ZIP (addresses.state is unreliable)
+        timezone: deriveAddressTimezone({ zip: formData.zip.trim() }),
         // Normalize city and street
         city: formData.city.trim(),
         street1: formData.street1.trim(),
@@ -489,9 +493,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Fetch the address to check ownership
+    // Fetch the address to check ownership (soft-deleted rows count as missing)
     const existingAddress = await prisma.address.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
     });
 
     if (!existingAddress) {
@@ -500,14 +504,11 @@ export async function PUT(request: NextRequest) {
 
     // Only allow creator or admin to update
     if (existingAddress.createdBy !== currentUser.id) {
-      // Check if user is admin (you need to implement this check)
       const isAdmin = await checkIfUserIsAdmin(currentUser.id);
 
+      // Answer like a missing row so non-owners can't probe for existence
       if (!isAdmin) {
-        return NextResponse.json(
-          { error: "Unauthorized to update this address" },
-          { status: 403 },
-        );
+        return NextResponse.json({ error: "Address not found" }, { status: 404 });
       }
     }
 
@@ -523,8 +524,11 @@ export async function PUT(request: NextRequest) {
         if (formData.street1 !== undefined) updateData.street1 = formData.street1;
         if (formData.street2 !== undefined) updateData.street2 = formData.street2;
         if (formData.city !== undefined) updateData.city = formData.city;
-        if (formData.state !== undefined) updateData.state = formData.state;
-        if (formData.zip !== undefined) updateData.zip = formData.zip;
+        if (formData.state !== undefined) updateData.state = normalizeStateCode(formData.state);
+        if (formData.zip !== undefined) {
+          updateData.zip = formData.zip;
+          updateData.timezone = deriveAddressTimezone({ zip: formData.zip });
+        }
         if (formData.county !== undefined) updateData.county = formData.county;
         if (formData.locationNumber !== undefined) updateData.locationNumber = formData.locationNumber;
         if (formData.parkingLoading !== undefined) updateData.parkingLoading = formData.parkingLoading;
@@ -605,9 +609,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Fetch the address to check ownership
+    // Fetch the address to check ownership (soft-deleted rows count as missing)
     const existingAddress = await prisma.address.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
     });
 
     if (!existingAddress) {
@@ -619,11 +623,9 @@ export async function DELETE(request: NextRequest) {
       // Check if user is admin
       const isAdmin = await checkIfUserIsAdmin(currentUser.id);
 
+      // Answer like a missing row so non-owners can't probe for existence
       if (!isAdmin) {
-        return NextResponse.json(
-          { error: "Unauthorized to delete this address" },
-          { status: 403 },
-        );
+        return NextResponse.json({ error: "Address not found" }, { status: 404 });
       }
     }
 

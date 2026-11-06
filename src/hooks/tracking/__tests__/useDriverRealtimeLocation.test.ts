@@ -156,6 +156,73 @@ describe('useDriverRealtimeLocation', () => {
     });
   });
 
+  describe('out-of-order points (late offline-queue replay)', () => {
+    const NOW = Date.parse('2026-10-16T00:04:00Z');
+
+    it('ignores a database insert older than the position already shown', async () => {
+      const onLocationUpdate = jest.fn();
+      const { result } = renderHook(() =>
+        useDriverRealtimeLocation({ driverProfileId: 'driver-1', onLocationUpdate })
+      );
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      act(() => {
+        channelCallbacks.onDatabaseInsert?.({
+          driver_id: 'driver-1',
+          latitude: 37.785,
+          longitude: -122.4094,
+          recorded_at: new Date(NOW).toISOString(),
+        });
+      });
+      act(() => {
+        channelCallbacks.onDatabaseInsert?.({
+          driver_id: 'driver-1',
+          latitude: 37.1,
+          longitude: -122.9,
+          recorded_at: '2026-10-15T21:04:00Z',
+        });
+      });
+
+      expect(result.current.location?.lat).toBe(37.785);
+      expect(onLocationUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a broadcast older than the position already shown', async () => {
+      const { result } = renderHook(() =>
+        useDriverRealtimeLocation({ driverProfileId: 'driver-1' })
+      );
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      act(() => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-1', lat: 37.785, lng: -122.4094, isMoving: true,
+          timestamp: new Date(NOW).toISOString(),
+        });
+      });
+      act(() => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-1', lat: 37.1, lng: -122.9, isMoving: true,
+          timestamp: new Date(NOW - 60_000).toISOString(),
+        });
+      });
+      expect(result.current.location?.lat).toBe(37.785);
+
+      // A newer point still moves the marker.
+      act(() => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-1', lat: 37.79, lng: -122.41, isMoving: true,
+          timestamp: new Date(NOW + 10_000).toISOString(),
+        });
+      });
+
+      expect(result.current.location?.lat).toBe(37.79);
+    });
+  });
+
   describe('overlapping connect() calls', () => {
     it('creates exactly one new channel when a reconnect overlaps a slow unsubscribe', async () => {
       const { result } = renderHook(() =>

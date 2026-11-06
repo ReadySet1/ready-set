@@ -27,6 +27,9 @@ jest.mock('@/services/notifications/driver-cancellation', () => ({
 jest.mock('@/lib/realtime/server-broadcast', () => ({
   broadcastDeliveryStatus: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('@/lib/services/partnerWebhookService', () => ({
+  recordAndDispatchLifecycleEvent: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('@/lib/api/after-response', () => ({
   runAfterResponse: jest.fn((_label: string, work: () => Promise<unknown>) => {
     void work();
@@ -37,6 +40,7 @@ import { prisma } from '@/utils/prismaDB';
 import { createAdminClient } from '@/utils/supabase/server';
 import { notifyDriverOrderCancelled } from '@/services/notifications/driver-cancellation';
 import { broadcastDeliveryStatus } from '@/lib/realtime/server-broadcast';
+import { recordAndDispatchLifecycleEvent } from '@/lib/services/partnerWebhookService';
 import {
   softDeleteOrder,
   softDeleteOrders,
@@ -47,6 +51,7 @@ const mockedPrisma = prisma as any;
 const mockedCreateAdminClient = createAdminClient as jest.Mock;
 const mockedNotify = notifyDriverOrderCancelled as jest.Mock;
 const mockedBroadcast = broadcastDeliveryStatus as jest.Mock;
+const mockedLifecycle = recordAndDispatchLifecycleEvent as jest.Mock;
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111';
 const ADMIN_ID = '22222222-2222-4222-8222-222222222222';
@@ -237,6 +242,70 @@ describe('softDeleteOrder', () => {
 
     expect(mockedNotify).not.toHaveBeenCalled();
     expect(mockedBroadcast).not.toHaveBeenCalled();
+  });
+
+  describe('partner cancellation webhook', () => {
+    it('emits CANCELLED for a live catering order, with a fixed partner-facing note', async () => {
+      primeLiveCatering();
+
+      await softDeleteOrder(
+        { orderType: 'catering', orderId: ORDER_ID },
+        { deletedBy: ADMIN_ID, reason: 'internal: duplicate of CC-9' },
+      );
+
+      expect(mockedLifecycle).toHaveBeenCalledTimes(1);
+      expect(mockedLifecycle).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        orderNumber: 'CAT-001',
+        partnerStatus: 'CANCELLED',
+        driverStatus: null,
+        changedBy: ADMIN_ID,
+        notes: 'Order cancelled by Ready Set',
+      });
+    });
+
+    it.each(['CANCELLED', 'COMPLETED', 'DELIVERED'])(
+      'does not emit for an order that was already %s (no second CANCELLED)',
+      async (status) => {
+        tx.cateringRequest.findFirst.mockResolvedValueOnce({ ...liveOrder, status });
+        tx.cateringRequest.updateMany.mockResolvedValue({ count: 1 });
+        tx.dispatch.findMany.mockResolvedValue([]);
+
+        await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
+
+        expect(mockedLifecycle).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not emit for an on-demand order', async () => {
+      tx.onDemand.findFirst.mockResolvedValueOnce({ ...liveOrder, orderNumber: 'OD-001' });
+      tx.onDemand.updateMany.mockResolvedValue({ count: 1 });
+      tx.dispatch.findMany.mockResolvedValue([]);
+
+      await softDeleteOrder({ orderType: 'on_demand', orderId: ORDER_ID }, ACTOR);
+
+      expect(mockedLifecycle).not.toHaveBeenCalled();
+    });
+
+    it('does not emit when the order was already deleted', async () => {
+      tx.cateringRequest.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(liveOrder);
+
+      const result = await softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR);
+
+      expect(result.outcome).toBe('ALREADY_DELETED');
+      expect(mockedLifecycle).not.toHaveBeenCalled();
+    });
+
+    it('does not emit when the transaction fails', async () => {
+      primeLiveCatering();
+      tx.dispatch.deleteMany.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        softDeleteOrder({ orderType: 'catering', orderId: ORDER_ID }, ACTOR),
+      ).rejects.toThrow('db down');
+
+      expect(mockedLifecycle).not.toHaveBeenCalled();
+    });
   });
 
   it('returns NOT_FOUND for an order that does not exist and writes nothing', async () => {

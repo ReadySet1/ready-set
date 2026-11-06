@@ -1,31 +1,41 @@
-import { format } from 'date-fns';
-import { utcToLocalTime } from './timezone';
+import { format, toZonedTime } from 'date-fns-tz';
+import { TIMEZONE_CONFIG } from '@/lib/config/timezone';
+import { timezoneAbbreviation } from '@/lib/utils/address-timezone';
 
 /**
- * Format a UTC date/time for display in local timezone
- * @param utcDate - UTC date string or Date object
+ * ISO-8601 zone designator at the tail of a string: `Z`, `±HH:MM` or `±HHMM`.
+ * A string without one is "naive" wall-clock time and is formatted as-is.
+ */
+const ZONE_DESIGNATOR_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * Format an absolute instant for display in a given IANA timezone (default:
+ * the app timezone, TIMEZONE_CONFIG.LOCAL_TIMEZONE), never the viewer's
+ * browser timezone. Order surfaces pass `orderTimezone(order)`.
+ * @param utcDate - Date, or ISO string (`Z` / explicit offset = absolute; no designator = naive)
  * @param formatStr - Format string for date-fns (default: 'MMM d, yyyy h:mm a')
- * @returns Formatted date string in local timezone
+ * @param timeZone - IANA zone to render in (default: app timezone)
+ * @returns Formatted date string in `timeZone`
  */
 export function formatDateTimeForDisplay(
   utcDate: string | Date | null | undefined,
-  formatStr: string = 'MMM d, yyyy h:mm a'
+  formatStr: string = 'MMM d, yyyy h:mm a',
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
 ): string {
   if (!utcDate) return 'N/A';
-  
+
   try {
     const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
-    
-    // If the date is already in local timezone (no 'Z' suffix), format directly
-    if (typeof utcDate === 'string' && !utcDate.endsWith('Z')) {
+    if (Number.isNaN(date.getTime())) {
+      throw new RangeError(`Invalid date value: ${String(utcDate)}`);
+    }
+
+    // A naive string carries no zone designator: it is already wall-clock time.
+    if (typeof utcDate === 'string' && !ZONE_DESIGNATOR_RE.test(utcDate.trim())) {
       return format(date, formatStr);
     }
-    
-    // Convert UTC to local time for display
-    const { date: localDate, time: localTime } = utcToLocalTime(date);
-    const localDateTime = new Date(`${localDate}T${localTime}`);
-    
-    return format(localDateTime, formatStr);
+
+    return format(toZonedTime(date, timeZone), formatStr, { timeZone });
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Invalid Date';
@@ -35,15 +45,35 @@ export function formatDateTimeForDisplay(
 /**
  * Format just the date part for display
  */
-export function formatDateForDisplay(utcDate: string | Date | null | undefined): string {
-  return formatDateTimeForDisplay(utcDate, 'MMM d, yyyy');
+export function formatDateForDisplay(
+  utcDate: string | Date | null | undefined,
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+): string {
+  return formatDateTimeForDisplay(utcDate, 'MMM d, yyyy', timeZone);
 }
 
 /**
  * Format just the time part for display
  */
-export function formatTimeForDisplay(utcDate: string | Date | null | undefined): string {
-  return formatDateTimeForDisplay(utcDate, 'h:mm a');
+export function formatTimeForDisplay(
+  utcDate: string | Date | null | undefined,
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+): string {
+  return formatDateTimeForDisplay(utcDate, 'h:mm a', timeZone);
+}
+
+/**
+ * Format in `timeZone` and append its short label ("Oct 8, 2026 11:00 AM CT"),
+ * so a viewer in another market can tell which clock the time is on.
+ */
+export function formatDateTimeWithZone(
+  utcDate: string | Date | null | undefined,
+  timeZone: string,
+  formatStr: string = 'MMM d, yyyy h:mm a',
+): string {
+  const formatted = formatDateTimeForDisplay(utcDate, formatStr, timeZone);
+  if (formatted === 'N/A' || formatted === 'Invalid Date') return formatted;
+  return `${formatted} ${timezoneAbbreviation(timeZone)}`;
 }
 
 /**

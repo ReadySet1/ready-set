@@ -1,3 +1,5 @@
+import type { ProfileCounties } from "./user";
+
 import { Prisma } from '@prisma/client';
 import { Decimal } from 'decimal.js';
 
@@ -219,7 +221,7 @@ export type ProfileGetPayload<T = {}> = {
   zip?: string | null;
   locationNumber?: string | null;
   parkingLoading?: string | null;
-  counties?: any | null;
+  counties?: ProfileCounties | null;
   timeNeeded?: string | null;
   cateringBrokerage?: string | null;
   frequency?: string | null;
@@ -340,7 +342,7 @@ export type ProfileCreateInput = {
   zip?: string | null;
   locationNumber?: string | null;
   parkingLoading?: string | null;
-  counties?: any | null;
+  counties?: ProfileCounties | null;
   timeNeeded?: string | null;
   cateringBrokerage?: string | null;
   frequency?: string | null;
@@ -370,7 +372,7 @@ export type ProfileUpdateInput = {
   zip?: string | null;
   locationNumber?: string | null;
   parkingLoading?: string | null;
-  counties?: any | null;
+  counties?: ProfileCounties | null;
   timeNeeded?: string | null;
   cateringBrokerage?: string | null;
   frequency?: string | null;

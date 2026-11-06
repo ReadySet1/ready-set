@@ -226,6 +226,8 @@ model Address {
   name                     String?
   latitude                 Float?
   longitude                Float?
+  /// IANA zone (e.g. America/Chicago). Derived from ZIP at write time; null falls back to derivation at read time.
+  timezone                 String?
   deletedAt                DateTime?         @db.Timestamptz(6)
   creator                  Profile?          @relation("AddressCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cateringDeliveryRequests CateringRequest[] @relation("CateringDelivery")
@@ -304,6 +306,7 @@ model CateringRequest {
   dispatches        Dispatch[]
   fileUploads       FileUpload[]
   statusHistory     OrderStatusHistory[]
+  webhookDeliveries PartnerWebhookDelivery[]
 
   @@index([userId])
   @@index([status])
@@ -337,10 +340,47 @@ model OrderStatusHistory {
   notes             String?
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   cateringRequest   CateringRequest @relation(fields: [cateringRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  webhookDelivery   PartnerWebhookDelivery?
 
   @@index([cateringRequestId, createdAt])
   @@schema("public")
   @@map("order_status_history")
+}
+
+/// Durable outbound partner webhook queue: one row per partner lifecycle
+/// event. The dispatcher enqueues and makes the first attempt in-request;
+/// failures are retried by the partner-webhook-retry cron worker with
+/// backoff up to 5 attempts (src/lib/services/partner-webhook-queue.ts).
+/// `statusHistoryId` is unique, so enqueueing the same event twice is a
+/// no-op. `nextAttemptAt` doubles as the claim lease: a worker pushes it
+/// forward when it claims a row, so an attempt lost to a crash comes due
+/// again on its own.
+model PartnerWebhookDelivery {
+  id                String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partnerId         String                      @map("partner_id") @db.Uuid
+  cateringRequestId String                      @map("catering_request_id") @db.Uuid
+  orderNumber       String                      @map("order_number")
+  statusHistoryId   String?                     @unique @map("status_history_id") @db.Uuid
+  eventStatus       String                      @map("event_status")
+  payload           Json
+  state             PartnerWebhookDeliveryState @default(PENDING)
+  attempts          Int                         @default(0)
+  nextAttemptAt     DateTime?                   @map("next_attempt_at") @db.Timestamptz(6)
+  lastAttemptAt     DateTime?                   @map("last_attempt_at") @db.Timestamptz(6)
+  lastStatusCode    Int?                        @map("last_status_code")
+  lastError         String?                     @map("last_error")
+  deliveredAt       DateTime?                   @map("delivered_at") @db.Timestamptz(6)
+  createdAt         DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  partner           ApiPartner                  @relation(fields: [partnerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cateringRequest   CateringRequest             @relation(fields: [cateringRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  statusHistory     OrderStatusHistory?         @relation(fields: [statusHistoryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([state, nextAttemptAt])
+  @@index([cateringRequestId])
+  @@index([partnerId])
+  @@schema("public")
+  @@map("partner_webhook_deliveries")
 }
 
 model Dispatch {
@@ -646,6 +686,13 @@ enum FormType {
   FLOWER
   BAKERY
   SPECIALTY
+  @@schema("public")
+}
+
+enum PartnerWebhookDeliveryState {
+  PENDING
+  SUCCEEDED
+  FAILED
   @@schema("public")
 }
 
@@ -993,6 +1040,7 @@ model Delivery {
   signatureRequired      Boolean?  @default(false) @map("signature_required")
   photoRequired          Boolean?  @default(false) @map("photo_required")
   deliverySignatureUrl   String?   @map("delivery_signature_url")
+  deliveryReceivedBy     String?   @map("delivery_received_by") @db.VarChar(255)
   pickupSignatureUrl     String?   @map("pickup_signature_url")
   pickupReceivedBy       String?   @map("pickup_received_by") @db.VarChar(255)
   deliveryPhotoUrl       String?   @map("delivery_photo_url")
@@ -1173,6 +1221,7 @@ model ApiPartner {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy       String?   @map("deleted_by") @db.Uuid
+  webhookDeliveries PartnerWebhookDelivery[]
 
   @@index([apiKeyHash])
   @@index([slug, deletedAt])

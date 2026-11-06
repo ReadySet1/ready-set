@@ -27,6 +27,14 @@ jest.mock('@capacitor/core', () => ({
   }),
 }));
 
+// The durable outbox (location-outbox.ts) writes to the page's IndexedDB;
+// back it with an in-memory store that a test can inspect.
+import { MemoryLocationStore } from '@/__tests__/helpers/memory-location-store';
+let mockOutboxStore = new MemoryLocationStore();
+jest.mock('@/utils/indexedDB/locationStore', () => ({
+  getLocationStore: () => mockOutboxStore,
+}));
+
 type Bridge = typeof import('../capacitor-tracking');
 type IssueStore = typeof import('../native-location-issue');
 type WatcherCallback = (
@@ -77,6 +85,7 @@ describe('capacitor-tracking', () => {
     mockCheckPermissions.mockResolvedValue({ location: 'granted' });
     mockRequestPermissions.mockResolvedValue({ location: 'granted' });
     window.localStorage.clear();
+    mockOutboxStore = new MemoryLocationStore();
     nowMs = 1_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => nowMs);
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -121,6 +130,111 @@ describe('capacitor-tracking', () => {
     await emitFix();
 
     expect(postedBody().client_sent_at).toBe(nowMs);
+  });
+
+  describe('GPS fix time', () => {
+    // A leaked watcher replaying an old fix must not look fresh: the server
+    // stamps NOW() only when no fix time arrives, so the plugin's `time`
+    // (epoch ms of the fix) has to travel as `timestamp`.
+    it('sends the plugin fix time as an ISO timestamp', async () => {
+      const fixTimeMs = nowMs - 10 * 60_000; // a 10-minute-old fix
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ time: fixTimeMs });
+
+      expect(postedBody().timestamp).toBe(new Date(fixTimeMs).toISOString());
+    });
+
+    it('omits timestamp when the plugin reports no fix time', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix({ time: null });
+
+      expect(postedBody()).not.toHaveProperty('timestamp');
+    });
+
+    it('omits timestamp when the fix time is absent or not a usable epoch', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix(); // no `time` key at all
+      await emitFix({ time: Number.NaN });
+      await emitFix({ time: 0 });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(postedBody(0)).not.toHaveProperty('timestamp');
+      expect(postedBody(1)).not.toHaveProperty('timestamp');
+      expect(postedBody(2)).not.toHaveProperty('timestamp');
+    });
+  });
+
+  describe('offline outbox (gps-points-lost-during-data-outage)', () => {
+    // 2026-10-17: a failed native POST was swallowed ("next fix retries"), so
+    // every fix of a ~5 min data outage was lost.
+    const batchCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/tracking/locations/batch');
+
+    it('queues every fix of an outage with its GPS fix time', async () => {
+      await bridge.startNativeShiftTracking(session());
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const fixTimes: number[] = [];
+      for (let i = 0; i < 36; i++) {
+        // 3 minutes, one fix every 5 s
+        fixTimes.push(nowMs + 5_001);
+        await emitFix({ time: nowMs + 5_001, speed: 8 });
+      }
+
+      expect(mockOutboxStore.pendingTimestamps()).toEqual(
+        fixTimes.map((t) => new Date(t).toISOString()),
+      );
+      expect([...mockOutboxStore.rows.values()][0]!.driverId).toBe('driver-1');
+    });
+
+    it('queues on a server error but not on a 429 (cadence throttle, the next fix follows)', async () => {
+      await bridge.startNativeShiftTracking(session());
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 503 });
+      await emitFix({ time: nowMs });
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 429 });
+      await emitFix({ time: nowMs });
+
+      expect(mockOutboxStore.pendingTimestamps()).toHaveLength(1);
+    });
+
+    it('uses the callback time for a queued fix the plugin gave no time for', async () => {
+      await bridge.startNativeShiftTracking(session());
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+      await emitFix({ time: null });
+
+      expect(mockOutboxStore.pendingTimestamps()).toEqual([new Date(nowMs).toISOString()]);
+    });
+
+    it('replays the backlog oldest-first through the batch route once a live post succeeds', async () => {
+      await bridge.startNativeShiftTracking(session());
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+      const first = nowMs + 5_001;
+      await emitFix({ time: first });
+      await emitFix({ time: first + 5_001 });
+
+      fetchMock.mockReset().mockResolvedValue({ ok: true, status: 201 });
+      await emitFix({ time: first + 10_002 });
+
+      const batches = batchCalls();
+      expect(batches).toHaveLength(1);
+      const [, init] = batches[0]!;
+      expect(init.headers).toMatchObject({ Authorization: 'Bearer token-1' });
+      const body = JSON.parse(init.body);
+      expect(body.driver_id).toBe('driver-1');
+      expect(body.points.map((p: { timestamp: string }) => p.timestamp)).toEqual([
+        new Date(first).toISOString(),
+        new Date(first + 5_001).toISOString(),
+      ]);
+      expect(mockOutboxStore.pendingTimestamps()).toHaveLength(0);
+    });
+
+    it('does not call the batch route when nothing is queued', async () => {
+      await bridge.startNativeShiftTracking(session());
+      await emitFix();
+      await emitFix();
+
+      expect(batchCalls()).toHaveLength(0);
+    });
   });
 
   it('retries the driver-id lookup on later fixes until it succeeds, then caches it', async () => {

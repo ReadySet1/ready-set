@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import UserOrdersTable from "../UserOrdersTable";
+import { simulateBrowserTimezone } from "@/__tests__/utils/browser-timezone";
 
 // Mock fetch used by the component
 global.fetch = jest.fn();
@@ -77,5 +78,43 @@ describe("UserOrdersTable - Address rendering", () => {
       expect(naCells.length).toBeGreaterThanOrEqual(1);
       expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("UserOrdersTable - order date timezone", () => {
+  // 06:30Z = Oct 7, 11:30 PM in Pacific, but Oct 8 in Tokyo (and in UTC).
+  const ORDER_DATE = "2026-10-08T06:30:00.000Z";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    simulateBrowserTimezone("Asia/Tokyo");
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("shows the order date in the app timezone (Pacific), not the browser timezone", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: "tz-1",
+          order_number: "A-TZ-1",
+          order_type: "catering" as const,
+          status: "active",
+          date: ORDER_DATE,
+          order_total: "10.00",
+          client_attention: "Tz Tester",
+          address: { street1: "10 Market St", city: "San Jose", state: "CA" },
+          delivery_address: { street1: "20 Main St", city: "San Jose", state: "CA" },
+        },
+      ],
+    } as Response);
+
+    render(<UserOrdersTable />);
+
+    expect(await screen.findByText("Oct 7, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("10/8/2026")).not.toBeInTheDocument();
   });
 });

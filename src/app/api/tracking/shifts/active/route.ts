@@ -9,7 +9,10 @@ import { getActiveShift } from '@/app/actions/tracking/driver-actions';
  * making the live-tracking screen flap between active and "Start a shift to begin").
  * The underlying function authorizes the caller (`callerMayActOnDriver`).
  *
- * Returns: { success: true, shift: DriverShift | null }
+ * Returns: { success: true, shift: DriverShift | null, serverNow: number }
+ *
+ * `serverNow` (epoch ms) lets the driver app correct a wrong phone clock for
+ * the shift timer (see @/lib/driver/shift-clock).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const shift = await getActiveShift(driverId);
-    return NextResponse.json({ success: true, shift });
+    return NextResponse.json({ success: true, shift, serverNow: Date.now() });
   } catch (error) {
     return NextResponse.json(
       {

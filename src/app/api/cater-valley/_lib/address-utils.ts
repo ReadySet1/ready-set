@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/db/prisma';
 import type { PrismaExecutor } from './order-utils';
+import { normalizeStateCode } from '@/lib/utils/state-code';
 
 /**
  * Location data structure for address operations
@@ -50,12 +51,13 @@ export async function ensureAddress(
   executor: PrismaExecutor = prisma
 ): Promise<{ id: string }> {
   const zipCode = location.zip || extractZipFromAddress(location.address);
+  const state = normalizeStateCode(location.state);
 
   const existingAddress = await executor.address.findFirst({
     where: {
       street1: location.address,
       city: location.city,
-      state: location.state,
+      state,
       zip: zipCode,
     },
     select: { id: true },
@@ -69,7 +71,7 @@ export async function ensureAddress(
     data: {
       street1: location.address,
       city: location.city,
-      state: location.state,
+      state,
       zip: zipCode,
       name: location.name,
       isRestaurant: false, // We'll determine this based on context later

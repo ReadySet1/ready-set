@@ -306,7 +306,7 @@ export function TasksBoard({
         </div>
       </header>
 
-      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-4 pb-3 pt-5 md:px-7 md:snap-x md:scroll-px-7">
+      <div data-testid="tasks-board-columns" className="flex flex-1 items-start gap-4 overflow-x-auto px-4 pb-3 pt-5 md:px-7 md:snap-x md:scroll-px-7">
         {data.columns.map((col) => {
           const tasks = visibleByStatus.get(col.key) ?? [];
           return (
@@ -354,7 +354,7 @@ export function TasksBoard({
             </section>
           );
         })}
-      </main>
+      </div>
 
       <footer className="px-4 pb-[18px] pt-2.5 text-[11.5px] text-slate-400 md:px-7">
         Source: meetings/shared/tasks-board.json · Generated {data.generated}
@@ -423,6 +423,10 @@ function TaskCard({
             {TAG_META[tag]?.label ?? tag}
           </span>
         ))}
+        {task.created && <DatePill label="added" date={task.created} />}
+        {task.status === "done" && task.closed && (
+          <DatePill label="closed" date={task.closed} />
+        )}
         <span className="ml-auto whitespace-nowrap text-[11px] font-semibold text-slate-400">
           {metaText(task, sourceLabels)}
         </span>
@@ -437,6 +441,15 @@ function TaskCard({
         </span>
       </span>
     </button>
+  );
+}
+
+/** Muted "added 2026-09-23" / "closed 2026-10-12" pill; dates are YYYY-MM-DD strings. */
+function DatePill({ label, date }: { label: string; date: string }) {
+  return (
+    <span className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-medium tabular-nums text-slate-400">
+      {label} {date}
+    </span>
   );
 }
 

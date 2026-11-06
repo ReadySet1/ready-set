@@ -31,6 +31,7 @@ import {
   type LngLat,
   type TrailFeature,
 } from '@/lib/tracking/trail-geojson';
+import { isOutOfOrderPoint } from '@/lib/tracking/late-point';
 
 // Ensure Mapbox token is available
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -70,6 +71,8 @@ const TERMINAL_DELIVERY_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'delivered
 interface TrailState {
   shiftId: string;
   feature: TrailFeature;
+  /** recordedAt of the newest ping drawn at the trail's end, if any. */
+  tipAt?: string;
 }
 
 interface LineStyle {
@@ -713,12 +716,15 @@ export default function LiveDriverMap({
           if (!feature || feature.geometry?.type !== 'LineString') return;
           const liveMap = mapRef.current;
           if (!liveMap) return;
-          trailsRef.current.set(driver.id, { shiftId, feature });
-          lineColorsRef.current.set(driver.id, color);
           // Pings already on screen are already persisted in the trail.
-          recentLocationsRef.current
-            .filter(loc => loc.driverId === driver.id)
-            .forEach(loc => seenPingsRef.current.add(`${loc.driverId}:${loc.recordedAt}`));
+          const onScreen = recentLocationsRef.current.filter(loc => loc.driverId === driver.id);
+          onScreen.forEach(loc => seenPingsRef.current.add(`${loc.driverId}:${loc.recordedAt}`));
+          const tipAt = onScreen.reduce<string | undefined>(
+            (newest, loc) => (newest && !isOutOfOrderPoint(newest, loc.recordedAt) ? newest : loc.recordedAt),
+            undefined,
+          );
+          trailsRef.current.set(driver.id, { shiftId, feature, tipAt });
+          lineColorsRef.current.set(driver.id, color);
           upsertLineLayer(liveMap, sourceId, feature, { color }, showTrailsRef.current);
         })
         .catch((error) => {
@@ -746,6 +752,10 @@ export default function LiveDriverMap({
       const trail = trailsRef.current.get(loc.driverId);
       if (!trail) return; // trail not loaded yet — the fetch marks pings as seen
       seenPingsRef.current.add(`${loc.driverId}:${loc.recordedAt}`);
+      // A ping older than the trail tip (offline-queue replay) is already in
+      // the DB trail; appending it would draw a line back to the old spot.
+      if (isOutOfOrderPoint(loc.recordedAt, trail.tipAt)) return;
+      trail.tipAt = loc.recordedAt;
       const next = appendTrailPoint(trail.feature, loc.location.coordinates as LngLat);
       if (next === trail.feature) return;
       trail.feature = next;

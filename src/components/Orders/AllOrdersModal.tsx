@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Package } from "lucide-react";
 import Link from "next/link";
 import { OrderData } from "@/lib/services/vendor";
+import { formatDateTimeForDisplay } from "@/lib/utils/date-display";
 
 interface AllOrdersModalProps {
   isOpen: boolean;
@@ -179,26 +180,10 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
                       </TableCell>
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
                       <TableCell>
-                        {new Date(order.pickupDateTime).toLocaleString(
-                          undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
+                        {formatDateTimeForDisplay(order.pickupDateTime)}
                       </TableCell>
                       <TableCell>
-                        {new Date(order.arrivalDateTime).toLocaleString(
-                          undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
+                        {formatDateTimeForDisplay(order.arrivalDateTime)}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(order.orderTotal)}

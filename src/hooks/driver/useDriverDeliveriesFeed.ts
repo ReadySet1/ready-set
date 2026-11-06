@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDriverDeliveriesFeedSource } from "@/contexts/DriverTrackingContext";
 
 /** Minimal shape consumed from /api/driver-deliveries. Kept permissive to
  *  tolerate API drift. */
@@ -40,22 +41,61 @@ function parseDeliveries(data: unknown): ApiDelivery[] {
   return Array.isArray(data) ? (data as ApiDelivery[]) : [];
 }
 
-/**
- * Single source of truth for the driver's delivery list on Home.
- *
- * Both the "My deliveries — N active" card and the DriverDeliveryList read from
- * this one fetch, so the count and the rendered list are always consistent. It
- * also polls (60s) and refreshes on tab focus, fixing the prior bug where the
- * list fetched once on mount and went stale (showing an empty list while the
- * count, from a different polling source, claimed deliveries existed).
- */
 /** Terminal driver/order statuses that should never count as an active delivery. */
 const TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "DELIVERED"]);
 
 const FEED_URL = "/api/driver-deliveries?page=1&limit=999";
 const POLL_INTERVAL_MS = 60_000;
 
+/** "Active" = still to be done. Guard on terminal status as well as
+ *  completeDateTime, so a completed order whose completion timestamp is missing
+ *  (historical-data bug) can't resurrect itself as active. The orders PATCH
+ *  route now stamps completeDateTime on completion; this is belt-and-suspenders. */
+function countActive(deliveries: ApiDelivery[]): number {
+  return deliveries.filter(
+    (d) =>
+      !d.completeDateTime &&
+      !TERMINAL_STATUSES.has((d.status ?? "").toUpperCase()) &&
+      !TERMINAL_STATUSES.has((d.driverStatus ?? "").toUpperCase()),
+  ).length;
+}
+
+/**
+ * Single source of truth for the driver's delivery list on Home.
+ *
+ * Both the "My deliveries — N active" card and the DriverDeliveryList read from
+ * this one feed, so the count and the rendered list are always consistent.
+ *
+ * Under the /driver layout the DriverTrackingProvider already polls this same
+ * endpoint (mount, 60s, tab focus) for the Live-Tracking tab, the detail page
+ * and the shift pill, so this hook reads that poll instead of running a second
+ * one — the home used to fire every request twice on the driver's phone. The
+ * same "keep the last good list when a background poll fails" rule applies:
+ * the provider only replaces its rows on success, and the error only surfaces
+ * when there is nothing good to show yet.
+ *
+ * Rendered without a provider it polls on its own (same cadence and triggers),
+ * aborting the request in flight on unmount.
+ */
 export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
+  const shared = useDriverDeliveriesFeedSource();
+  const own = useOwnDeliveriesPoll(shared === null);
+
+  if (shared) {
+    const deliveries = shared.rows as ApiDelivery[];
+    return {
+      deliveries,
+      loading: !shared.settled,
+      error: shared.hasData ? null : shared.error,
+      refresh: shared.refresh,
+      activeCount: countActive(deliveries),
+    };
+  }
+  return own;
+}
+
+/** The standalone poller, only armed when no provider feed is available. */
+function useOwnDeliveriesPoll(enabled: boolean): DriverDeliveriesFeed {
   const [deliveries, setDeliveries] = useState<ApiDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +140,7 @@ export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
   // coming back to the app). Unmount stops all three and aborts the request in
   // flight so a late response never touches state.
   useEffect(() => {
+    if (!enabled) return;
     void load();
     const id = setInterval(() => void load(), POLL_INTERVAL_MS);
     const onVisible = () => {
@@ -113,18 +154,7 @@ export function useDriverDeliveriesFeed(): DriverDeliveriesFeed {
       controllerRef.current = null;
       inFlight.current = false;
     };
-  }, [load]);
+  }, [enabled, load]);
 
-  // "Active" = still to be done. Guard on terminal status as well as
-  // completeDateTime, so a completed order whose completion timestamp is missing
-  // (historical-data bug) can't resurrect itself as active. The orders PATCH
-  // route now stamps completeDateTime on completion; this is belt-and-suspenders.
-  const activeCount = deliveries.filter(
-    (d) =>
-      !d.completeDateTime &&
-      !TERMINAL_STATUSES.has((d.status ?? "").toUpperCase()) &&
-      !TERMINAL_STATUSES.has((d.driverStatus ?? "").toUpperCase()),
-  ).length;
-
-  return { deliveries, loading, error, refresh: load, activeCount };
+  return { deliveries, loading, error, refresh: load, activeCount: countActive(deliveries) };
 }

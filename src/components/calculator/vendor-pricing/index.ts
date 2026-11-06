@@ -3,3 +3,4 @@ export { DriverPaySettingsEditor } from './DriverPaySettingsEditor';
 export { BridgeTollEditor } from './BridgeTollEditor';
 export { ZeroOrderSettingsEditor } from './ZeroOrderSettingsEditor';
 export { AdvancedFlagsEditor } from './AdvancedFlagsEditor';
+export { NewClientDialog } from './NewClientDialog';

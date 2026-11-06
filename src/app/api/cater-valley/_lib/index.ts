@@ -25,6 +25,10 @@ export {
   isPartnerOrder,
   partnerSystemUserEmail,
   isOrderEditable,
+  wasConfirmed,
+  CONFIRMED_HISTORY_PROBE,
+  CONFIRMED_HISTORY_STATUS,
+  CONFIRMED_ORDER_MESSAGE,
   // Legacy wrappers (CaterValley-pinned) kept for backward compat:
   normalizeOrderNumber,
   ensureCaterValleySystemUser,

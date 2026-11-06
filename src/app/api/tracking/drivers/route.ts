@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
-import { driverOwnershipCondition } from '@/lib/auth/driver-ownership';
+import { driverOwnershipCondition, existingDriverOwnershipCondition } from '@/lib/auth/driver-ownership';
 import { rawQuery } from '@/lib/db/raw';
 
 interface Driver {
@@ -259,7 +259,7 @@ export async function PUT(request: NextRequest) {
     // A DRIVER may only update their own record.
     if (auth.context.user.type === 'DRIVER') {
       const owns = await rawQuery<{ id: string }>(
-        `SELECT id FROM drivers WHERE id = $1 AND ${driverOwnershipCondition(2)}`,
+        `SELECT id FROM drivers WHERE id = $1 AND ${existingDriverOwnershipCondition(2)}`,
         [driver_id, auth.context.user.id],
       );
       if (owns.length === 0) {

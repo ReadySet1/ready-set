@@ -227,6 +227,35 @@ describe('VendorPricingEditor', () => {
     });
   });
 
+  describe('New client draft (isNew)', () => {
+    it('enables Save for an untouched draft and labels it as a create', () => {
+      const config = createMockConfig();
+      render(
+        <VendorPricingEditor config={config} onSave={mockOnSave} isSaving={false} isNew />
+      );
+
+      const saveButton = screen.getByRole('button', { name: /create client/i });
+      expect(saveButton).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/new client/i)).toBeInTheDocument();
+
+      fireEvent.click(saveButton);
+      expect(mockOnSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'test-config' }));
+    });
+
+    it('still blocks Save on validation errors', () => {
+      mockValidateConfiguration.mockReturnValue({ valid: false, errors: ['Client name is required'] });
+      const config = createMockConfig();
+      render(
+        <VendorPricingEditor config={config} onSave={mockOnSave} isSaving={false} isNew />
+      );
+
+      fireEvent.change(screen.getByDisplayValue('Test Client'), { target: { value: '' } });
+
+      expect(screen.getByRole('button', { name: /create client/i })).toBeDisabled();
+    });
+  });
+
   describe('Save and Reset', () => {
     it('should disable Save button when no changes made', () => {
       const config = createMockConfig();

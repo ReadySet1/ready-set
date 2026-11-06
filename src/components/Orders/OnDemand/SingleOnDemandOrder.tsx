@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "../DriverStatus";
+import { DeliveryRecipient } from "../DeliveryRecipient";
 import OrderDetails from "../ui/OrderDetails";
 import AddressInfo from "../ui/AddressInfo";
 import AdditionalInfo from "../ui/AdditionalInfo";
@@ -31,6 +32,7 @@ import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "../OrderStatus";
 import { usePathname, useRouter } from "next/navigation";
 import { OrderFilesManager } from "../ui/OrderFiles";
+import { ProofOfDeliveryPanel } from "../ui/ProofOfDeliveryPanel";
 import {
   Driver,
   Order,
@@ -44,7 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
+import { orderTimezone, timezoneAbbreviation } from "@/lib/utils/address-timezone";
 import { UserType } from "@/types/client-enums";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 
@@ -158,6 +160,8 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   canEditOrder = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  // Order times are entered and shown in the pickup address zone (PT/CT), never the browser zone.
+  const orderZone = orderTimezone(order);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Why the order is missing: "not_found" only for a 404, "failed" otherwise.
   const [loadError, setLoadError] = useState<"not_found" | "failed" | null>(
@@ -904,6 +908,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   onStatusChange={handleOrderStatusChange}
                   canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
+                <DeliveryRecipient receivedBy={(order as any).deliveryReceivedBy} />
               </div>
             </div>
 
@@ -976,6 +981,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Proof of Delivery (all POD photos, up to 3) */}
+            <ProofOfDeliveryPanel
+              orderId={order.id.toString()}
+              orderNumber={order.orderNumber}
+              files={files}
+            />
 
             {/* Order Files */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1168,7 +1180,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                       <div className="text-xs text-slate-500">
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleString(undefined, {
-                              timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+                              timeZone: orderZone,
                             })
                           : "N/A"}
                       </div>
@@ -1183,8 +1195,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.pickupDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>
@@ -1198,8 +1211,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.arrivalDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>
@@ -1213,8 +1227,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {new Date(order.completeDateTime).toLocaleString(undefined, {
-                            timeZone: TIMEZONE_CONFIG.LOCAL_TIMEZONE,
-                          })}
+                            timeZone: orderZone,
+                          })}{" "}
+                          <span className="text-slate-400">{timezoneAbbreviation(orderZone)}</span>
                         </div>
                       </div>
                     </div>

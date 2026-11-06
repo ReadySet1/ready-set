@@ -45,9 +45,8 @@ test.describe("Internal boards — admin routes", () => {
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
 
     // Scroll the board row to the end so the NEW column is in view
-    await page.evaluate(() => {
-      const board = document.querySelector("main");
-      if (board) board.scrollLeft = board.scrollWidth;
+    await page.getByTestId("tasks-board-columns").evaluate((el) => {
+      el.scrollLeft = el.scrollWidth;
     });
     await expect(page.getByRole("heading", { name: /new/i }).first()).toBeInViewport();
   });

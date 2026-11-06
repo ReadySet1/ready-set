@@ -95,6 +95,23 @@ export const MILEAGE_CONFIG = {
    * Default: 15m
    */
   MIN_DISPLACEMENT_M: Number(process.env.MILEAGE_MIN_DISPLACEMENT_M) || 15,
+
+  /**
+   * Longest run of consecutive fixes the teleport filter will treat as one
+   * spike (a fix, or a short burst, that jumps away implausibly fast and then
+   * comes back). Field phantoms arrive as 1-2 fixes between real ones.
+   * Default: 5
+   */
+  MAX_SPIKE_POINTS: Number(process.env.MILEAGE_MAX_SPIKE_POINTS) || 5,
+
+  /**
+   * A trail "returns" from a spike when it lands within this fraction of the
+   * spike's excursion from the point it left. Relative, so it works for a
+   * parked driver (returns to ~0m of a 465m excursion) and a moving one
+   * (returns ~60m along the route from a 465m sideways excursion).
+   * Default: 0.5
+   */
+  SPIKE_RETURN_RATIO: Number(process.env.MILEAGE_SPIKE_RETURN_RATIO) || 0.5,
 } as const;
 
 /**

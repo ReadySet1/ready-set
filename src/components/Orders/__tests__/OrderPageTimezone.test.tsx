@@ -141,7 +141,17 @@ import SingleOrder from "@/components/Orders/SingleOrder";
 import SingleOnDemandOrder from "@/components/Orders/OnDemand/SingleOnDemandOrder";
 
 const PACIFIC = "America/Los_Angeles";
+const CENTRAL = "America/Chicago";
 const BROWSER_TZ = "Asia/Tokyo";
+
+// Austin, TX. `state` is deliberately dirty: the zone must come from the ZIP.
+const AUSTIN_PICKUP = {
+  id: "44444444-4444-4444-8444-444444444444",
+  street1: "1100 Congress Ave",
+  city: "Austin",
+  state: "TEXAS (78701)",
+  zip: "78701",
+};
 
 // 03:30Z = Oct 7, 8:30 PM PDT, but Oct 8, 12:30 PM in Tokyo: day and time differ.
 const PICKUP = "2026-10-08T03:30:00.000Z";
@@ -266,5 +276,89 @@ describe("SingleOnDemandOrder timeline times", () => {
         screen.queryByText(inZone(iso, "toLocaleString", BROWSER_TZ)),
       ).not.toBeInTheDocument();
     }
+  });
+});
+
+describe("per-location timezone (Austin pickup)", () => {
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
+  const timeOptions: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  };
+
+  it("SingleOrder header shows the pickup time in Central with a CT label", async () => {
+    serveOrder({
+      id: "33333333-3333-4333-8333-333333333333",
+      orderNumber: "CAT002",
+      order_type: "catering",
+      status: "ACTIVE",
+      pickupDateTime: PICKUP,
+      pickupAddress: AUSTIN_PICKUP,
+      dispatches: [],
+    });
+
+    render(<SingleOrder onDeleteSuccess={jest.fn()} showHeader={false} />);
+    await screen.findByTestId("driver-card");
+
+    expect(
+      screen.getByText(inZone(PICKUP, "toLocaleDateString", CENTRAL, dateOptions)),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(inZone(PICKUP, "toLocaleTimeString", CENTRAL, timeOptions)),
+    ).toBeInTheDocument();
+    expect(screen.getByText("CT")).toBeInTheDocument();
+    expect(
+      screen.queryByText(inZone(PICKUP, "toLocaleTimeString", PACIFIC, timeOptions)),
+    ).not.toBeInTheDocument();
+  });
+
+  it("SingleOrder header labels a Pacific order PT", async () => {
+    serveOrder({
+      id: "33333333-3333-4333-8333-333333333333",
+      orderNumber: "CAT003",
+      order_type: "catering",
+      status: "ACTIVE",
+      pickupDateTime: PICKUP,
+      pickupAddress: { ...AUSTIN_PICKUP, city: "San Francisco", state: "CA", zip: "94102" },
+      dispatches: [],
+    });
+
+    render(<SingleOrder onDeleteSuccess={jest.fn()} showHeader={false} />);
+    await screen.findByTestId("driver-card");
+
+    expect(screen.getByText("PT")).toBeInTheDocument();
+    expect(
+      screen.getByText(inZone(PICKUP, "toLocaleTimeString", PACIFIC, timeOptions)),
+    ).toBeInTheDocument();
+  });
+
+  it("SingleOnDemandOrder timeline shows pickup and arrival in Central with CT labels", async () => {
+    serveOrder({
+      id: "33333333-3333-4333-8333-333333333333",
+      orderNumber: "OND002",
+      order_type: "on_demand",
+      status: "ACTIVE",
+      vehicleType: "VAN",
+      itemDelivered: "Medical supplies",
+      pickupDateTime: PICKUP,
+      arrivalDateTime: ARRIVAL,
+      pickupAddress: AUSTIN_PICKUP,
+      dispatches: [],
+    });
+
+    render(<SingleOnDemandOrder onDeleteSuccess={jest.fn()} showHeader={false} />);
+    await screen.findByTestId("driver-card");
+
+    for (const iso of [PICKUP, ARRIVAL]) {
+      expect(screen.getByText(inZone(iso, "toLocaleString", CENTRAL))).toBeInTheDocument();
+      expect(screen.queryByText(inZone(iso, "toLocaleString", PACIFIC))).not.toBeInTheDocument();
+    }
+    expect(screen.getAllByText("CT").length).toBeGreaterThanOrEqual(2);
   });
 });

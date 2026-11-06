@@ -288,6 +288,31 @@ describe('setProfileAddress', () => {
     });
   });
 
+  it('stores the USPS code when the profile form sends a full state name', async () => {
+    const { db, addresses } = makeFakeDb({
+      addresses: [
+        { id: 'a1', street1: 'Old', street2: null, city: 'Old', state: 'NY', zip: '00000', locationNumber: null, parkingLoading: null, createdBy: 'p1' },
+      ],
+      userAddresses: [{ id: 'ua1', userId: 'p1', addressId: 'a1', isDefault: true }],
+    });
+    const fields = {
+      street1: '110 Linden Av',
+      street2: null,
+      city: 'South San Francisco',
+      state: 'California',
+      zip: '94080',
+      locationNumber: null,
+      parkingLoading: null,
+    };
+
+    await setProfileAddress('p1', fields, db as any);
+    expect(addresses[0]!.state).toBe('CA');
+
+    const fresh = makeFakeDb({});
+    await setProfileAddress('p2', fields, fresh.db as any);
+    expect(fresh.addresses[0]!.state).toBe('CA');
+  });
+
   it('throws when required fields are missing — Address NOT NULL constraint', async () => {
     const { db } = makeFakeDb({});
 
