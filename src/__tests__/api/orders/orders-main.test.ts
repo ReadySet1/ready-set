@@ -27,6 +27,12 @@ jest.mock('@/utils/prismaDB', () => {
       findMany: jest.fn(),
       create: jest.fn(),
     },
+    // Every requested address exists and is usable by the caller.
+    address: {
+      findMany: jest.fn(async (args: any) =>
+        (args?.where?.id?.in ?? []).map((id: string) => ({ id })),
+      ),
+    },
   };
   mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
   return { prisma: mockPrisma };
