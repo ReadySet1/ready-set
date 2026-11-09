@@ -153,6 +153,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!validatedData.isAccepted) {
+      // Only the admin cancel path alerts the assigned driver, so a partner
+      // reject of an assigned order would send the driver to a cancelled
+      // pickup. Dispatch cancels those.
+      if (existingOrder.status === 'ASSIGNED') {
+        return NextResponse.json(
+          {
+            status: 'ERROR',
+            message: 'Order already has a driver assigned; contact Ready Set dispatch to cancel',
+          },
+          { status: 422 }
+        );
+      }
+
       const cancelledOrder = await prisma.cateringRequest.update({
         where: { id: validatedData.id },
         data: {
@@ -191,11 +204,14 @@ export async function POST(request: NextRequest) {
     // ACTIVE), so it is written in the same transaction as the status: a
     // failed write fails the confirm (retryable) instead of leaving a
     // confirmed order unlocked. It is an internal event — no webhook.
+    // A draft ops already assigned a driver to stays ASSIGNED: CONFIRMED
+    // would move it backwards in the dispatch flow.
+    const confirmedStatus = existingOrder.status === 'ASSIGNED' ? 'ASSIGNED' : 'CONFIRMED';
     const confirmedOrder = await prisma.$transaction(async (tx) => {
       const updated = await tx.cateringRequest.update({
         where: { id: validatedData.id },
         data: {
-          status: 'CONFIRMED',
+          status: confirmedStatus,
           updatedAt: new Date(),
         },
         include: {

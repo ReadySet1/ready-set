@@ -247,7 +247,7 @@ Same shape as `/orders/draft` response, but returned with HTTP **200 OK** instea
 
 ## Endpoint 3 — Confirm Order
 
-**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft; Ready Set then sends a `CANCELLED` status webhook (after responding — the confirm response does not wait for your webhook endpoint). An order that was already confirmed can no longer be confirmed or cancelled here (`422`).
+**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft; Ready Set then sends a `CANCELLED` status webhook (after responding — the confirm response does not wait for your webhook endpoint). An order that was already confirmed can no longer be confirmed or cancelled here (`422`). Rejecting a draft that already has a driver assigned also returns `422`; contact Ready Set dispatch to cancel it.
 
 **`POST /orders/confirm`**
 
