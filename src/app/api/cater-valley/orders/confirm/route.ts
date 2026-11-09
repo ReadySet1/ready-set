@@ -153,6 +153,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!validatedData.isAccepted) {
+      // Only the admin cancel path alerts the assigned driver, so a partner
+      // reject of an assigned order would send the driver to a cancelled
+      // pickup. Dispatch cancels those.
+      if (existingOrder.status === 'ASSIGNED') {
+        return NextResponse.json(
+          {
+            status: 'ERROR',
+            message: 'Order already has a driver assigned; contact Ready Set dispatch to cancel',
+          },
+          { status: 422 }
+        );
+      }
+
       const cancelledOrder = await prisma.cateringRequest.update({
         where: { id: validatedData.id },
         data: {
