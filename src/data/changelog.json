@@ -5,27 +5,39 @@
     {
       "version": "2.12.0",
       "date": "2026-11-10",
-      "title": "Release 2.12.0",
-      "summary": "",
+      "title": "Reliable partner order updates and accurate order times",
+      "summary": "This release makes order updates to our partners more reliable and keeps order times correct for locations outside California.",
       "changes": [
         {
-          "text": "Cancelling an order that already has a driver assigned now has to go through Ready Set dispatch.",
+          "text": "Order forms now show the pickup location's time zone next to the time fields.",
+          "type": "new"
+        },
+        {
+          "text": "Order times now follow the pickup location's time zone (Pacific or Central), so orders outside California keep the time you entered.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order updates that fail to reach a partner are now retried automatically for about 30 minutes.",
           "type": "improved"
+        },
+        {
+          "text": "Partners now get a cancellation update whenever we cancel or remove one of their orders.",
+          "type": "fixed"
         },
         {
           "text": "Partners can now confirm or update an order after Ready Set has already assigned a driver to it.",
           "type": "fixed"
         },
         {
+          "text": "Cancelling a partner order that already has a driver assigned now goes through Ready Set dispatch, so the driver is never left without notice.",
+          "type": "improved"
+        },
+        {
           "text": "Orders no longer fail with \"State must be 2 characters\" when a saved address uses the full state name.",
           "type": "fixed"
         },
         {
-          "text": "Partners now get a cancellation update whenever we cancel one of their orders.",
-          "type": "fixed"
-        },
-        {
-          "text": "Orders placed for locations outside California now keep the time you entered.",
+          "text": "Navigate on the Track tab now sends drivers to the restaurant until pickup, then to the customer.",
           "type": "fixed"
         },
         {
@@ -33,19 +45,15 @@
           "type": "fixed"
         },
         {
-          "text": "Navigate on the Track tab now sends you to the restaurant until you've picked up, then to the customer.",
+          "text": "Date and time values on forms are no longer covered by an icon on iPhone.",
           "type": "fixed"
         },
         {
-          "text": "Order times now follow the delivery location's timezone (Pacific or Central).",
+          "text": "The admin sidebar and the Tasks Board now display correctly on desktop and mobile.",
           "type": "fixed"
         },
         {
-          "text": "Fixed the admin sidebar and its mobile sheet rendering without a background",
-          "type": "fixed"
-        },
-        {
-          "text": "Fixed the Tasks Board overlapping the admin sidebar and made every column reachable on desktop and mobile",
+          "text": "Security updates for several third-party libraries, plus tighter checks on who can change an order.",
           "type": "fixed"
         }
       ],
