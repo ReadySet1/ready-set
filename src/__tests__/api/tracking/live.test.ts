@@ -532,6 +532,17 @@ describe('/api/tracking/live SSE Endpoint', () => {
     });
   });
 
+  describe('Recent locations scope', () => {
+    it('excludes soft-deleted drivers from the on-duty location feed', async () => {
+      const { calls } = await readDriverUpdate([[], [], [], [], []]);
+      const locationsQuery = calls.find((call) => call[0]!.includes('FROM driver_locations dl'));
+      expect(locationsQuery).toBeDefined();
+      const sql = locationsQuery![0]!;
+
+      expect(sql).toMatch(/SELECT id FROM drivers WHERE is_active = true AND is_on_duty = true AND deleted_at IS NULL/);
+    });
+  });
+
   describe('Driver shift stats (finding #3)', () => {
     const baseRow = {
       id: 'driver-123',

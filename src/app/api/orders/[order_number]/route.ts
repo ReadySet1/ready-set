@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
+import { deriveAddressTimezone } from "@/lib/utils/address-timezone";
 import { Prisma } from "@prisma/client";
 import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
 import { notifyDriverOrderCancelled } from "@/services/notifications/driver-cancellation";
@@ -50,6 +51,12 @@ import {
   recordDriverStatusTransition,
   shouldRecordDriverHistory,
 } from '@/lib/services/order-status-history';
+import {
+  parseClientLocation,
+  resolveStatusHistoryLocation,
+  statusHistoryDriverProfileId,
+  type StatusHistoryPoint,
+} from '@/lib/services/status-history-location';
 import {
   POST_PICKUP_DRIVER_STATUSES,
   voidPendingReturnRequests,
@@ -327,19 +334,23 @@ async function upsertAddress(
   existingAddressId?: string
 ): Promise<string> {
   const { id, ...addressFields } = addressData;
+  // The zone follows the ZIP; recompute whenever the ZIP is part of the write.
+  const timezone =
+    addressFields.zip !== undefined ? deriveAddressTimezone({ zip: addressFields.zip }) : undefined;
+  const data = timezone === undefined ? addressFields : { ...addressFields, timezone };
 
   // If we have an existing address ID, update it
   if (existingAddressId) {
     await prisma.address.update({
       where: { id: existingAddressId },
-      data: addressFields,
+      data,
     });
     return existingAddressId;
   }
 
   // Otherwise, create a new address
   const newAddress = await prisma.address.create({
-    data: addressFields,
+    data,
   });
   return newAddress.id;
 }
@@ -376,7 +387,7 @@ export async function PATCH(
     const order_number = decodeURIComponent(encodedOrderNumber);
 
     const body = await request.json();
-    const { status, driverStatus, ...updateFields } = body;
+    const { status, driverStatus, location: rawClientLocation, ...updateFields } = body;
 
     // Check if any update data is provided
     const hasStatusUpdate = status || driverStatus;
@@ -855,6 +866,33 @@ export async function PATCH(
       driverStatus !== currentDriverStatus &&
       (await shouldRecordDriverHistory(orderType, dbOrderNumber));
 
+    // Where the driver was for this transition: their latest fresh
+    // driver_locations point, else the client-sent point, else null. Started
+    // now so the lookup overlaps the status transaction; it never rejects.
+    // Feeds the internal history row and the partner lifecycle row, so it is
+    // skipped when neither will be written. A non-privileged caller was
+    // verified as assigned above, so their own identity is used; staff get the
+    // newest dispatch (the include has no orderBy).
+    // Partner lifecycle events fire on a real change only: a re-sent status
+    // (client retry, double tap) must not emit the same event twice.
+    const writesPartnerLifecycle =
+      !!driverStatus &&
+      driverStatus !== currentDriverStatus &&
+      !!DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
+        driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
+      ];
+    const historyLocation: Promise<StatusHistoryPoint | null> =
+      recordHistory || writesPartnerLifecycle
+        ? resolveStatusHistoryLocation({
+            driverProfileId: statusHistoryDriverProfileId({
+              callerId: user.id,
+              callerIsStaff: callerIsPrivileged,
+              dispatches: (existingOrder as any).dispatches,
+            }),
+            clientLocation: parseClientLocation(rawClientLocation),
+          })
+        : Promise.resolve(null);
+
     // Perform the order update + deliveries-mirror upsert atomically. If the
     // mirror upsert throws, the whole transaction rolls back (a retryable 500 via
     // the outer catch) instead of silently stranding a terminal order.
@@ -955,14 +993,13 @@ export async function PATCH(
     // Written after commit with one INSERT on the global client, awaited but
     // never thrown: a failed audit write is logged and the transition stands
     // (the row can then be missing — accepted trade-off, see the helper).
-    // The PATCH carries no driver position, so location stays empty rather
-    // than costing an extra query.
     if (recordHistory) {
       await recordDriverStatusTransition({
         cateringRequestId: (updatedRaw as any).id,
         driverStatus: driverStatus as DriverStatus,
         partnerStatus: String((updatedRaw as any).status),
         changedBy: user.id,
+        location: await historyLocation,
       });
     }
 
@@ -1014,6 +1051,28 @@ export async function PATCH(
         };
         runAfterResponse('Failed to broadcast order cancellation to driver:', () =>
           broadcastDeliveryStatus(cancelPayload),
+        );
+      }
+
+      // Tell the owning partner (e.g. CaterCow) the order is cancelled. Only on
+      // the actual transition, so re-sending CANCELLED never emits twice.
+      // Partner orders are catering rows; the helper no-ops for anything that
+      // isn't a registry partner order and never throws.
+      if (
+        updateData.status === 'CANCELLED' &&
+        currentStatus !== 'CANCELLED' &&
+        orderType === 'catering'
+      ) {
+        const cancelledOrderId: string = (updatedOrder as any).id;
+        const cancelledOrderNumber: string = (updatedOrder as any).orderNumber ?? order_number;
+        runAfterResponse('Failed to dispatch partner cancellation webhook:', () =>
+          recordAndDispatchLifecycleEvent({
+            orderId: cancelledOrderId,
+            orderNumber: cancelledOrderNumber,
+            partnerStatus: 'CANCELLED',
+            driverStatus: null,
+            changedBy: user.id,
+          }),
         );
       }
 
@@ -1095,22 +1154,27 @@ export async function PATCH(
           DRIVER_STATUS_TO_PARTNER_LIFECYCLE[
             driverStatus as keyof typeof DRIVER_STATUS_TO_PARTNER_LIFECYCLE
           ];
-        if (partnerLifecycle) {
+        if (partnerLifecycle && writesPartnerLifecycle) {
           const driverProfile = (updatedOrder as any).dispatches?.[0]?.driver;
           const driver =
             driverProfile?.name && driverProfile?.contactNumber
               ? { name: driverProfile.name, phone: driverProfile.contactNumber }
               : undefined;
-          runAfterResponse('Failed to dispatch partner lifecycle webhook:', () =>
-            recordAndDispatchLifecycleEvent({
+          runAfterResponse('Failed to dispatch partner lifecycle webhook:', async () => {
+            const point = await historyLocation;
+            await recordAndDispatchLifecycleEvent({
               orderId: (updatedOrder as any).id,
               orderNumber: (updatedOrder as any).orderNumber,
               partnerStatus: partnerLifecycle,
               driverStatus,
               changedBy: user.id ?? driverProfile?.id ?? null,
               driver,
-            }),
-          );
+              // Contract: ON_THE_WAY carries the driver's position when we
+              // know it (fresh server GPS point, else the client-sent one).
+              location: partnerLifecycle === 'ON_THE_WAY' ? point ?? undefined : undefined,
+              historyLocation: point,
+            });
+          });
         }
       }
 

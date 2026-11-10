@@ -37,6 +37,19 @@ export function driverOwnershipCondition(paramIndex: number, alias = ''): string
   return `(${p}profile_id = $${paramIndex}::uuid OR ${p}user_id = $${paramIndex}::uuid)`;
 }
 
+/**
+ * `driverOwnershipCondition` plus the soft-delete filter: the row must link to
+ * the auth user AND still exist (`deleted_at IS NULL`). This is the fragment
+ * route-level ownership guards should embed — a soft-deleted driver keeps its
+ * `profile_id` / `user_id`, so the bare ownership match alone would still let
+ * them read or write through routes guarded by raw SQL. Same `alias` caveat
+ * as `driverOwnershipCondition`.
+ */
+export function existingDriverOwnershipCondition(paramIndex: number, alias = ''): string {
+  const p = alias ? `${alias}.` : '';
+  return `${driverOwnershipCondition(paramIndex, alias)} AND ${p}deleted_at IS NULL`;
+}
+
 export interface ActionCaller {
   userId: string;
   isPrivileged: boolean;

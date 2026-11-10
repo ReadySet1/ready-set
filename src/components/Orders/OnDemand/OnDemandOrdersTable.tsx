@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { OnDemandOrder, StatusFilter, UserRole } from "./types";
 import DeleteOnDemandOrder from "./DeleteOnDemandOrder";
 import { formatDateForDisplay } from "@/lib/utils/date-display";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 
 interface OnDemandOrdersTableProps {
   orders: OnDemandOrder[];
@@ -100,7 +101,7 @@ export const OnDemandOrdersTable: React.FC<OnDemandOrdersTableProps> = ({
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {formatDateForDisplay(order.date)}
+                  {formatDateForDisplay(order.date, orderTimezone(order))}
                 </TableCell>
                 <TableCell className="text-right">
                   $

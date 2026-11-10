@@ -1,4 +1,10 @@
-import { setZonedTime, setZonedDate, zonedCalendarDay, utcToLocalTime } from '../timezone';
+import {
+  setZonedTime,
+  setZonedDate,
+  zonedCalendarDay,
+  utcToLocalTime,
+  reinterpretWallClock,
+} from '../timezone';
 
 const LA = 'America/Los_Angeles';
 
@@ -57,5 +63,28 @@ describe('round trip', () => {
     const instant = new Date('2026-10-07T20:00:00Z');
     const updated = setZonedTime(instant, '09:05', LA);
     expect(utcToLocalTime(updated, LA).time).toBe('09:05');
+  });
+});
+
+describe('reinterpretWallClock', () => {
+  const CENTRAL = 'America/Chicago';
+
+  // The create forms build a Date from the browser clock, so its *local* fields
+  // (getHours, getDate...) are the wall-clock the admin typed. Re-read them in
+  // the order's zone: 11:00 typed for Austin means 11:00 CDT = 16:00Z.
+  it('re-reads the browser-local wall-clock in the target zone', () => {
+    const typed = new Date(2026, 9, 8, 11, 0, 0, 0); // Oct 8, 11:00 in the browser zone
+    expect(reinterpretWallClock(typed, CENTRAL).toISOString()).toBe('2026-10-08T16:00:00.000Z');
+    expect(reinterpretWallClock(typed, LA).toISOString()).toBe('2026-10-08T18:00:00.000Z');
+  });
+
+  it('handles standard time after the DST switch', () => {
+    const typed = new Date(2026, 11, 1, 11, 0, 0, 0); // Dec 1, 11:00
+    expect(reinterpretWallClock(typed, CENTRAL).toISOString()).toBe('2026-12-01T17:00:00.000Z');
+  });
+
+  it('keeps midnight on the typed calendar day', () => {
+    const typed = new Date(2026, 9, 8, 0, 0, 0, 0);
+    expect(reinterpretWallClock(typed, CENTRAL).toISOString()).toBe('2026-10-08T05:00:00.000Z');
   });
 });

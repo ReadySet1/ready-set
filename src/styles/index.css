@@ -247,6 +247,16 @@
     --input:             var(--neutral-200);
     --ring:              var(--brand-500);
 
+    /* Shadcn sidebar aliases (light) — consumed by components/ui/sidebar.tsx */
+    --sidebar-background:         var(--background);
+    --sidebar-foreground:         var(--foreground);
+    --sidebar-primary:            var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent:             var(--neutral-100);
+    --sidebar-accent-foreground:  var(--neutral-900);
+    --sidebar-border:             var(--border);
+    --sidebar-ring:               var(--ring);
+
     /* Type */
     --font-sans:    "Montserrat", ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-display: "Kabel", "Montserrat", sans-serif;
@@ -277,11 +287,38 @@
     --border:            var(--neutral-700);
     --input:             var(--neutral-700);
     --ring:              var(--brand-400);
+
+    --sidebar-background:         var(--neutral-900);
+    --sidebar-foreground:         var(--neutral-50);
+    --sidebar-primary:            var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent:             var(--neutral-800);
+    --sidebar-accent-foreground:  var(--neutral-50);
+    --sidebar-border:             var(--border);
+    --sidebar-ring:               var(--ring);
   }
 
   /* Opt-in display font (marketing/H1). Default headings stay Kabel
      via the existing `h1, h2` rule below until PR-B. */
   .font-display { font-family: var(--font-display); }
+}
+
+@layer components {
+  /* iOS/WebKit date & time inputs ignore width/padding while they use the
+     native appearance, which lets the overlay icon cover the value.
+     Opting out restores the normal box model. */
+  .native-picker-input {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 2.5rem;   /* keeps height when the field is empty on iOS */
+  }
+  .native-picker-input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+  .native-picker-input::-webkit-datetime-edit {
+    padding: 0;
+  }
 }
 
 /* Custom utility classes */

@@ -37,6 +37,7 @@ import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { ReturnDeclinedNotice } from "@/components/Driver/ui/ReturnDeclinedNotice";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
+import { addressQuery } from "@/lib/driver-navigation";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
 import { requiresActiveShift } from "@/lib/state-machine/driver-state";
@@ -159,14 +160,6 @@ function formatAddressLines(addr?: AddressLike | null): string[] {
   const line1 = [addr.street1, addr.street2].filter(Boolean).join(", ");
   const line2 = [addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
   return [line1, line2].filter((l) => l.length > 0);
-}
-
-function addressQuery(addr?: AddressLike | null): string | null {
-  if (!addr) return null;
-  const q = [addr.street1, addr.street2, addr.city, addr.state, addr.zip]
-    .filter(Boolean)
-    .join(", ");
-  return q || null;
 }
 
 /** Shift gate toast: a delivery worked off-shift leaves no GPS trail, so send

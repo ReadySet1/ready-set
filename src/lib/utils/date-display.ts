@@ -1,5 +1,6 @@
 import { format, toZonedTime } from 'date-fns-tz';
 import { TIMEZONE_CONFIG } from '@/lib/config/timezone';
+import { timezoneAbbreviation } from '@/lib/utils/address-timezone';
 
 /**
  * ISO-8601 zone designator at the tail of a string: `Z`, `±HH:MM` or `±HHMM`.
@@ -8,15 +9,18 @@ import { TIMEZONE_CONFIG } from '@/lib/config/timezone';
 const ZONE_DESIGNATOR_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
 /**
- * Format an absolute instant for display in the app timezone
- * (TIMEZONE_CONFIG.LOCAL_TIMEZONE), never the viewer's browser timezone.
+ * Format an absolute instant for display in a given IANA timezone (default:
+ * the app timezone, TIMEZONE_CONFIG.LOCAL_TIMEZONE), never the viewer's
+ * browser timezone. Order surfaces pass `orderTimezone(order)`.
  * @param utcDate - Date, or ISO string (`Z` / explicit offset = absolute; no designator = naive)
  * @param formatStr - Format string for date-fns (default: 'MMM d, yyyy h:mm a')
- * @returns Formatted date string in the app timezone
+ * @param timeZone - IANA zone to render in (default: app timezone)
+ * @returns Formatted date string in `timeZone`
  */
 export function formatDateTimeForDisplay(
   utcDate: string | Date | null | undefined,
-  formatStr: string = 'MMM d, yyyy h:mm a'
+  formatStr: string = 'MMM d, yyyy h:mm a',
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
 ): string {
   if (!utcDate) return 'N/A';
 
@@ -31,7 +35,6 @@ export function formatDateTimeForDisplay(
       return format(date, formatStr);
     }
 
-    const timeZone = TIMEZONE_CONFIG.LOCAL_TIMEZONE;
     return format(toZonedTime(date, timeZone), formatStr, { timeZone });
   } catch (error) {
     console.error('Error formatting date:', error);
@@ -42,15 +45,35 @@ export function formatDateTimeForDisplay(
 /**
  * Format just the date part for display
  */
-export function formatDateForDisplay(utcDate: string | Date | null | undefined): string {
-  return formatDateTimeForDisplay(utcDate, 'MMM d, yyyy');
+export function formatDateForDisplay(
+  utcDate: string | Date | null | undefined,
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+): string {
+  return formatDateTimeForDisplay(utcDate, 'MMM d, yyyy', timeZone);
 }
 
 /**
  * Format just the time part for display
  */
-export function formatTimeForDisplay(utcDate: string | Date | null | undefined): string {
-  return formatDateTimeForDisplay(utcDate, 'h:mm a');
+export function formatTimeForDisplay(
+  utcDate: string | Date | null | undefined,
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+): string {
+  return formatDateTimeForDisplay(utcDate, 'h:mm a', timeZone);
+}
+
+/**
+ * Format in `timeZone` and append its short label ("Oct 8, 2026 11:00 AM CT"),
+ * so a viewer in another market can tell which clock the time is on.
+ */
+export function formatDateTimeWithZone(
+  utcDate: string | Date | null | undefined,
+  timeZone: string,
+  formatStr: string = 'MMM d, yyyy h:mm a',
+): string {
+  const formatted = formatDateTimeForDisplay(utcDate, formatStr, timeZone);
+  if (formatted === 'N/A' || formatted === 'Invalid Date') return formatted;
+  return `${formatted} ${timezoneAbbreviation(timeZone)}`;
 }
 
 /**

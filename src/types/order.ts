@@ -88,6 +88,7 @@ export interface Address {
   createdBy?: string | null; // Prisma: String? @db.Uuid
   latitude?: number | null; // Prisma: Float? (Added from schema)
   longitude?: number | null; // Prisma: Float? (Added from schema)
+  timezone?: string | null; // Prisma: String? IANA zone, see lib/utils/address-timezone
   deletedAt?: Date | string | null; // Prisma: DateTime? (Added from schema)
 }
 

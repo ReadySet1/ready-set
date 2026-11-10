@@ -286,6 +286,89 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
       await expectErrorResponse(response, 422, /cannot be updated in current status/i);
     });
 
+    /**
+     * Serve the order with only the history rows the route's include asks
+     * for, the way the database would (where + take).
+     */
+    const orderWithHistory = (
+      rows: Array<{ id: string; partnerStatus: string }>,
+      status = 'ACTIVE',
+    ) => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockImplementation(async (args: any) => {
+        const probe = args?.include?.statusHistory;
+        const wanted = probe?.where?.partnerStatus;
+        const matching = rows.filter((r) => !wanted || r.partnerStatus === wanted);
+        return {
+          id: validUpdateData.id,
+          orderNumber: 'CV-TEST-001',
+          status,
+          user: { email: 'system@catervalley.com' },
+          pickupAddress: {},
+          deliveryAddress: {},
+          statusHistory: probe ? matching.slice(0, probe.take ?? matching.length) : undefined,
+        };
+      });
+    };
+    const updateRequest = () =>
+      new Request('http://localhost:3000/api/cater-valley/orders/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify(validUpdateData),
+      });
+
+    it('still updates a draft that ops assigned a driver to before the partner confirmed', async () => {
+      // assignDriver moves the draft to ASSIGNED and writes an ASSIGNED
+      // history row; the partner has not confirmed yet.
+      orderWithHistory([{ id: 'hist-a', partnerStatus: 'ASSIGNED' }], 'ASSIGNED');
+
+      const response = await POST(updateRequest());
+
+      expect(response.status).toBe(200);
+      expect(prisma.cateringRequest.update).toHaveBeenCalled();
+    });
+
+    it('rejects an assigned order the partner already confirmed', async () => {
+      orderWithHistory(
+        [
+          { id: 'hist-a', partnerStatus: 'ASSIGNED' },
+          { id: 'hist-c', partnerStatus: 'CONFIRMED' },
+        ],
+        'ASSIGNED',
+      );
+
+      const response = await POST(updateRequest());
+
+      await expectErrorResponse(response, 422, /already been confirmed/i);
+      expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a confirmed order that return-to-dispatch put back to ACTIVE', async () => {
+      orderWithHistory([
+        { id: 'hist-a', partnerStatus: 'ASSIGNED' },
+        { id: 'hist-c', partnerStatus: 'CONFIRMED' },
+      ]);
+
+      const response = await POST(updateRequest());
+
+      await expectErrorResponse(response, 422, /already been confirmed/i);
+      expect(prisma.cateringRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('probes the history for a CONFIRMED row only', async () => {
+      await POST(updateRequest());
+      expect(prisma.cateringRequest.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            statusHistory: { where: { partnerStatus: 'CONFIRMED' }, select: { id: true }, take: 1 },
+          }),
+        }),
+      );
+    });
+
     it('should reject unavailable delivery time', async () => {
       (pricingService.isDeliveryTimeAvailable as jest.Mock).mockReturnValue(false);
 
