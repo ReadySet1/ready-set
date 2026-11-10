@@ -3,6 +3,58 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.12.0",
+      "date": "2026-11-10",
+      "title": "Release 2.12.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Cancelling an order that already has a driver assigned now has to go through Ready Set dispatch.",
+          "type": "improved"
+        },
+        {
+          "text": "Partners can now confirm or update an order after Ready Set has already assigned a driver to it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Orders no longer fail with \"State must be 2 characters\" when a saved address uses the full state name.",
+          "type": "fixed"
+        },
+        {
+          "text": "Partners now get a cancellation update whenever we cancel one of their orders.",
+          "type": "fixed"
+        },
+        {
+          "text": "Orders placed for locations outside California now keep the time you entered.",
+          "type": "fixed"
+        },
+        {
+          "text": "The route trail on the driver map now shows the whole shift, even when the phone's clock is wrong.",
+          "type": "fixed"
+        },
+        {
+          "text": "Navigate on the Track tab now sends you to the restaurant until you've picked up, then to the customer.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order times now follow the delivery location's timezone (Pacific or Central).",
+          "type": "fixed"
+        },
+        {
+          "text": "Fixed the admin sidebar and its mobile sheet rendering without a background",
+          "type": "fixed"
+        },
+        {
+          "text": "Fixed the Tasks Board overlapping the admin sidebar and made every column reachable on desktop and mobile",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.12.0"
+      }
+    },
+    {
       "version": "2.11.1",
       "date": "2026-10-27",
       "title": "Proof of delivery and a critical security fix",
