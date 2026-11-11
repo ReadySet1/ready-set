@@ -3,6 +3,66 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.12.0",
+      "date": "2026-11-10",
+      "title": "Reliable partner order updates and accurate order times",
+      "summary": "This release makes order updates to our partners more reliable and keeps order times correct for locations outside California.",
+      "changes": [
+        {
+          "text": "Order forms now show the pickup location's time zone next to the time fields.",
+          "type": "new"
+        },
+        {
+          "text": "Order times now follow the pickup location's time zone (Pacific or Central), so orders outside California keep the time you entered.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order updates that fail to reach a partner are now retried automatically for about 30 minutes.",
+          "type": "improved"
+        },
+        {
+          "text": "Partners now get a cancellation update whenever we cancel or remove one of their orders.",
+          "type": "fixed"
+        },
+        {
+          "text": "Partners can now confirm or update an order after Ready Set has already assigned a driver to it.",
+          "type": "fixed"
+        },
+        {
+          "text": "Cancelling a partner order that already has a driver assigned now goes through Ready Set dispatch, so the driver is never left without notice.",
+          "type": "improved"
+        },
+        {
+          "text": "Orders no longer fail with \"State must be 2 characters\" when a saved address uses the full state name.",
+          "type": "fixed"
+        },
+        {
+          "text": "Navigate on the Track tab now sends drivers to the restaurant until pickup, then to the customer.",
+          "type": "fixed"
+        },
+        {
+          "text": "The route trail on the driver map now shows the whole shift, even when the phone's clock is wrong.",
+          "type": "fixed"
+        },
+        {
+          "text": "Date and time values on forms are no longer covered by an icon on iPhone.",
+          "type": "fixed"
+        },
+        {
+          "text": "The admin sidebar and the Tasks Board now display correctly on desktop and mobile.",
+          "type": "fixed"
+        },
+        {
+          "text": "Security updates for several third-party libraries, plus tighter checks on who can change an order.",
+          "type": "fixed"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.12.0"
+      }
+    },
+    {
       "version": "2.11.1",
       "date": "2026-10-27",
       "title": "Proof of delivery and a critical security fix",

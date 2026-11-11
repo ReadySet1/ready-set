@@ -119,10 +119,13 @@ export function buildOrderGuid(orderCode: string, partner: ResolvedPartner): str
 }
 
 /**
- * Checks if an order status allows modifications.
+ * Checks if an order status allows modifications. ASSIGNED is editable:
+ * ops may assign a driver to a partner draft before the partner confirms,
+ * and that must not close the draft. wasConfirmed() still locks it once the
+ * partner has confirmed.
  */
 export function isOrderEditable(status: string): boolean {
-  const editableStatuses = ['PENDING', 'ACTIVE'];
+  const editableStatuses = ['PENDING', 'ACTIVE', 'ASSIGNED'];
   return editableStatuses.includes(status);
 }
 
@@ -137,7 +140,7 @@ export const CONFIRMED_HISTORY_STATUS = 'CONFIRMED';
  * confirmed the order. Return-to-dispatch puts a confirmed order back to
  * ACTIVE, so status alone reads it as a fresh draft again. Only the CONFIRMED
  * row counts: ops may assign a driver to a draft before the partner confirms
- * (an ASSIGNED row on an ACTIVE draft), which must not lock it.
+ * (an ASSIGNED row on an ASSIGNED draft), which must not lock it.
  */
 export const CONFIRMED_HISTORY_PROBE = {
   where: { partnerStatus: CONFIRMED_HISTORY_STATUS },
