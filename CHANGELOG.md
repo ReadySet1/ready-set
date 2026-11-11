@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0](https://github.com/ReadySet1/ready-set/compare/v2.11.1...v2.12.0) (2026-11-10)
+
+
+### Added
+
+* **orders:** show pickup time zone next to create-form time pickers ([efeeda8](https://github.com/ReadySet1/ready-set/commit/efeeda8b71f8a8d75cd3954a39b06e64056021c5))
+* **partners:** durable partner webhook retry queue and cron worker ([8ead1b3](https://github.com/ReadySet1/ready-set/commit/8ead1b38697249f0be5b63e16645567eee98ed68))
+
+
+### Fixed
+
+* **admin:** make tasks board fit desktop and mobile ([419db1b](https://github.com/ReadySet1/ready-set/commit/419db1ba8221de3098536de3d1a9a93a4ce6e966))
+* **driver:** fall back to the stop address for the Track-card Navigate button ([7ca8cd7](https://github.com/ReadySet1/ready-set/commit/7ca8cd7af825293d4804cd6c7e614ecd2e31ad67))
+* **driver:** fall back to the stop address for the Track-card Navigate button ([ac5ab8c](https://github.com/ReadySet1/ready-set/commit/ac5ab8c5f9c41c403baff60dcd6bf1908b5fbc47))
+* **driver:** Navigate on the Track tab targets the pickup until picked up ([d81861b](https://github.com/ReadySet1/ready-set/commit/d81861b712f100c43e3a3799b6cdd25012a0e8bf))
+* **driver:** Navigate on the Track tab targets the pickup until picked up ([8dee90a](https://github.com/ReadySet1/ready-set/commit/8dee90ae471913d1e2a3dbd94b68dbe3e53ad42f))
+* **driver:** size and order the map trail on the server clock ([f55358a](https://github.com/ReadySet1/ready-set/commit/f55358a4e6c0ba6b5b780fc71a74c0038482e7a4))
+* **driver:** size and order the map trail on the server clock ([a548129](https://github.com/ReadySet1/ready-set/commit/a5481291b4a1641767d8cce17ed5a5bfa9f64816))
+* **driver:** stamp live trail fixes with the server's recorded_at rule ([25d407c](https://github.com/ReadySet1/ready-set/commit/25d407cc6973d8c3b468e54577829eb7fa916291))
+* **forms:** stop overlay icon covering date/time values on iOS ([a6cf586](https://github.com/ReadySet1/ready-set/commit/a6cf58609da373ad9bf67b7fb0ff9c12a34b3f17))
+* normalize address state to the USPS 2-letter code ([40cebd8](https://github.com/ReadySet1/ready-set/commit/40cebd8ded77cc68d3ba4343905c65830c5fbb98))
+* normalize address state to the USPS 2-letter code ([9e0febb](https://github.com/ReadySet1/ready-set/commit/9e0febbd1724302e4a2fbbc6720637ad1cb81f2d))
+* **orders:** derive order timezone from the pickup address ([18c5dca](https://github.com/ReadySet1/ready-set/commit/18c5dca7562e26a5a9b775002e0cc26cc766ba8d))
+* **orders:** read customer-entered order times in the pickup address zone ([92c4d56](https://github.com/ReadySet1/ready-set/commit/92c4d56679a21a5dd06055ef4b9c5a1d99f14797))
+* **orders:** read customer-entered order times in the pickup address zone ([49e5366](https://github.com/ReadySet1/ready-set/commit/49e536655fc8815de5afeaab3f6894ccf462f98f))
+* **partners:** allow confirm and update after a driver is assigned ([0ed84ce](https://github.com/ReadySet1/ready-set/commit/0ed84cedd4d21d95bd0fca742accd33ee0428c0f))
+* **partners:** allow confirm and update after a driver is assigned ([c57c250](https://github.com/ReadySet1/ready-set/commit/c57c25056c0795c34c9dad5942f2d6908944287e))
+* **partners:** CaterCow go-live hardening (cancel webhooks, confirm lock, contract v0.4) ([781311b](https://github.com/ReadySet1/ready-set/commit/781311b84ba9b7e8d8d212789497e9e06e7531ea))
+* **partners:** emit a lifecycle webhook only when the driver status changes ([cd3f6fd](https://github.com/ReadySet1/ready-set/commit/cd3f6fd0e7855bda10c8e30c0350b02f13dc2db1))
+* **partners:** enforce the 256 KB body limit on bytes read and answer 415 ([6e09e4f](https://github.com/ReadySet1/ready-set/commit/6e09e4ffdf4a70308f1f9bd2c58908286ffac9de))
+* **partners:** include details.existingOrderId on a duplicate draft 409 ([6d4f3ff](https://github.com/ReadySet1/ready-set/commit/6d4f3ff0617a8396f8eef8e6b42607bfec54c71b))
+* **partners:** include the driver's position in the ON_THE_WAY webhook ([c75afac](https://github.com/ReadySet1/ready-set/commit/c75afac14ec48301d895638dfe9d5b02c253094a))
+* **partners:** keep a dispatched order locked after return-to-dispatch ([f4a90a5](https://github.com/ReadySet1/ready-set/commit/f4a90a5382b778152b9c13264261183235ec8d68))
+* **partners:** keep partner cancel blocked once a driver is assigned ([b981aed](https://github.com/ReadySet1/ready-set/commit/b981aed42643a7efd8a4477e3f65e0f38710c4fa))
+* **partners:** lock partner edits on the partner's confirm, not on dispatch ([9037e1f](https://github.com/ReadySet1/ready-set/commit/9037e1fb49d5b49ceb9fd1b1129a8c1b667ab983))
+* **partners:** rate-limit each partner at its own rateLimitPerMin ([9f2cb79](https://github.com/ReadySet1/ready-set/commit/9f2cb7985d76ffba7e0f87d825a0c1dc15e21c38))
+* **partners:** send a CANCELLED webhook when a live partner order is deleted ([17e7f0e](https://github.com/ReadySet1/ready-set/commit/17e7f0e56b30b2afc1f74c3dde54862f332a8245))
+* **partners:** send a CANCELLED webhook when an admin cancels a partner order ([d972374](https://github.com/ReadySet1/ready-set/commit/d9723743ebd20eb51ed375ae321dc636e32b9daa))
+* **partners:** send partner webhooks after the response on confirm and status routes ([05bf078](https://github.com/ReadySet1/ready-set/commit/05bf078ac2773d805a3493c980ee0e63fd85b12f))
+* **tracking:** 404 when POD update matches no delivery row ([e0a1911](https://github.com/ReadySet1/ready-set/commit/e0a191137196c5262b9de3480b738bb055afacba))
+* **tracking:** 404 when POD update matches no delivery row ([d9b92df](https://github.com/ReadySet1/ready-set/commit/d9b92df2ed595011b3d8010fde770bcf2bd71946))
+* **tracking:** dedupe resent GPS fixes regardless of device clock skew ([eb9fbce](https://github.com/ReadySet1/ready-set/commit/eb9fbce4b8d7f225c550a6a3c0ba4e085846ca4a))
+* **tracking:** dedupe resent GPS fixes regardless of device clock skew ([f3effd4](https://github.com/ReadySet1/ready-set/commit/f3effd4e92ce51046e2722b82f91fb9eb95a84da))
+* **tracking:** exclude soft-deleted deliveries from the POD route ([2e97d4b](https://github.com/ReadySet1/ready-set/commit/2e97d4bf70594df6cd585c18fb699c67ce0343d9))
+* **tracking:** exclude soft-deleted deliveries from the POD route ([17ad1a9](https://github.com/ReadySet1/ready-set/commit/17ad1a91a1740fba661d6805cd0a6e11b8acb3c9))
+* **tracking:** exclude soft-deleted drivers from deliveries routes ([c6b791a](https://github.com/ReadySet1/ready-set/commit/c6b791a21605d1afe32dada68f812fd6520a6f37))
+* **tracking:** exclude soft-deleted drivers from deliveries routes ([ec7b90e](https://github.com/ReadySet1/ready-set/commit/ec7b90e78841d03cde80cc52896a63fa4593a1af))
+* **tracking:** exclude soft-deleted drivers from ownership guards ([c011d57](https://github.com/ReadySet1/ready-set/commit/c011d57fdee3c659f916e75c4d0c78d3318af3c7))
+* **tracking:** make single-point location writes idempotent ([7afb115](https://github.com/ReadySet1/ready-set/commit/7afb115eb59ac872b483aed973bb17b039719982))
+* **tracking:** make single-point location writes idempotent ([237408b](https://github.com/ReadySet1/ready-set/commit/237408b97cf1ad47310e460320239dfc23cf7082))
+* **tracking:** pick the status-history driver from the verified caller ([b79b6a8](https://github.com/ReadySet1/ready-set/commit/b79b6a86219e1c91455e36bca35730a257d147ef))
+* **tracking:** recompute every closed shift a late GPS backlog spans ([67ab5f6](https://github.com/ReadySet1/ready-set/commit/67ab5f67b7e40634921f6e03f432c46040327487))
+* **tracking:** recompute every closed shift a late GPS backlog spans ([4430e65](https://github.com/ReadySet1/ready-set/commit/4430e65d63db0fe0d6d997dd1ecb2a8661000643))
+* **tracking:** recompute only closed shifts that hold a late GPS point ([298de98](https://github.com/ReadySet1/ready-set/commit/298de9807aecd78911cd2a788b21ee4a8eb6fb66))
+* **tracking:** record the driver's position on status-history rows ([e35c023](https://github.com/ReadySet1/ready-set/commit/e35c023f7ca3ec00a4b71fae7a4236565bb8d4fe))
+* **tracking:** record the driver's position on status-history rows ([9d5d271](https://github.com/ReadySet1/ready-set/commit/9d5d271b3d5d275f80dc0260261afc4c08f177d9))
+* **tracking:** resolve driver deliveries through the drivers row ([c0ae879](https://github.com/ReadySet1/ready-set/commit/c0ae87904e391b8b5ab9a04a02823182219996d8))
+* **tracking:** resolve driver deliveries through the drivers row ([2bdb36e](https://github.com/ReadySet1/ready-set/commit/2bdb36e4c6610ec890d1a84a0c1d92fce71ad551))
+
+
+### Security
+
+* allowlist POST /api/orders body fields ([90354e8](https://github.com/ReadySet1/ready-set/commit/90354e887d5caea2d2622434236ca92f927b03d8))
+* patch high npm advisories (follow-redirects, vite, markdown-it, source-map-js, undici, node-forge, zod) ([30a9367](https://github.com/ReadySet1/ready-set/commit/30a9367a28ae1e7cd38cb4edfc1312f762bfb05a))
+* stop drivers spoofing changedBy or assigning via catering status route ([bf1eb05](https://github.com/ReadySet1/ready-set/commit/bf1eb05d64dac39ad5f9d25e72717171a5e1715d))
+
+
+### Documentation
+
+* **catercow:** bump the partner API contract to v0.4 ([58d1d9b](https://github.com/ReadySet1/ready-set/commit/58d1d9bb11c3a084b51868537c045e7567634520))
+* **specs:** record approved order timezone decisions ([4e93f2e](https://github.com/ReadySet1/ready-set/commit/4e93f2e7845a4584dd8246ab390882bd885c7ebc))
+
 ## [2.11.1](https://github.com/ReadySet1/ready-set/compare/v2.11.0...v2.11.1) (2026-10-27)
 
 
