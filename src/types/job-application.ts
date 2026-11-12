@@ -43,6 +43,9 @@ export interface JobApplication {
   driverPhotoFilePath?: string | null;
   carPhotoFilePath?: string | null;
   equipmentPhotoFilePath?: string | null;
+  secondIdFilePath?: string | null;
+  cateringBagsPhotoFilePath?: string | null;
+  cartDollyPhotoFilePath?: string | null;
   
   status: ApplicationStatus;
   createdAt: Date;
