@@ -125,6 +125,19 @@ async function findUnusableAddressFields(
   );
 }
 
+/**
+ * Client profile fields embedded in each GET /api/orders row. No UI in this
+ * repo reads the list today, so it carries only what identifies the client
+ * (the same name/email the `search` filter matches). Never add auth or
+ * account-state columns (isTemporaryPassword, confirmationCode, status, ...)
+ * or the client's address book here.
+ */
+const ORDER_LIST_CLIENT_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+} as const;
+
 interface OrderData {
   id: string;
   type: 'catering' | 'ondemand';
@@ -207,16 +220,7 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          user: {
-            include: {
-              userAddresses: {
-                where: { address: { deletedAt: null } },
-                include: {
-                  address: true,
-                },
-              },
-            },
-          },
+          user: { select: ORDER_LIST_CLIENT_SELECT },
           pickupAddress: true,
           deliveryAddress: true,
           fileUploads: true,
@@ -244,16 +248,7 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          user: {
-            include: {
-              userAddresses: {
-                where: { address: { deletedAt: null } },
-                include: {
-                  address: true,
-                },
-              },
-            },
-          },
+          user: { select: ORDER_LIST_CLIENT_SELECT },
           pickupAddress: true,
           deliveryAddress: true,
           fileUploads: true,

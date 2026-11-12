@@ -375,7 +375,7 @@ describe('/api/orders API - Main Endpoint', () => {
         );
       });
 
-      it('should include related data (dispatches, addresses, user, files)', async () => {
+      it('should include related data (dispatches, addresses, client identity, files)', async () => {
         signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
@@ -400,15 +400,7 @@ describe('/api/orders API - Main Endpoint', () => {
                   }),
                 }),
               }),
-              user: expect.objectContaining({
-                include: expect.objectContaining({
-                  userAddresses: expect.objectContaining({
-                    include: expect.objectContaining({
-                      address: true,
-                    }),
-                  }),
-                }),
-              }),
+              user: { select: { id: true, name: true, email: true } },
               pickupAddress: true,
               deliveryAddress: true,
               fileUploads: true,
