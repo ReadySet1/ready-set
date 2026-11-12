@@ -21,6 +21,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
@@ -36,6 +37,7 @@ interface Address {
   city?: string | null;
   state?: string | null;
   zip?: string | null;
+  timezone?: string | null;
 }
 
 interface Driver {
@@ -328,6 +330,7 @@ const UserOrderDetail: React.FC = () => {
             deliveredAt={order.deliveryTimestamps?.deliveredAt}
             estimatedPickupTime={order.pickup_time}
             estimatedDeliveryTime={order.arrival_time}
+            timeZone={orderTimezone({ pickupAddress: order.address })}
             currentStatus={order.driver_status}
           />
         </CardContent>

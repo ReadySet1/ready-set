@@ -1108,6 +1108,29 @@ describe("/api/catering-requests", () => {
         });
       });
 
+      it("emails an Austin order's times on the Central clock", async () => {
+        const originalKey = process.env.RESEND_API_KEY;
+        process.env.RESEND_API_KEY = "test-key";
+        const { Resend } = jest.requireMock("resend");
+        Resend.mockClear();
+        try {
+          withPickupAddress({ city: "Austin", state: "TX", zip: "78701", timezone: null });
+          await POST(
+            createPostRequest("http://localhost:3000/api/catering-requests", novemberOrder)
+          );
+
+          const sends = Resend.mock.results.flatMap(
+            (r: { value: { emails: { send: jest.Mock } } }) => r.value.emails.send.mock.calls
+          );
+          const html: string = sends[sends.length - 1]?.[0]?.html ?? "";
+          expect(html).toContain("Tuesday, November 17, 2026");
+          expect(html).toContain("Pickup Time: 11:00 AM CT");
+          expect(html).toContain("Arrival Time: 12:00 PM CT");
+        } finally {
+          process.env.RESEND_API_KEY = originalKey;
+        }
+      });
+
       it("lets a stored address timezone override the ZIP", async () => {
         withPickupAddress({ zip: "94103", timezone: "America/New_York" });
 

@@ -213,6 +213,33 @@ describe("Email Notification Service - Customer Confirmations", () => {
         expect(mockResendClient.emails.send).toHaveBeenCalled();
       });
 
+      it("shows an Austin order's times on the Central clock", async () => {
+        // 2026-11-20T17:00Z = 11:00 AM CST; 18:30Z = 12:30 PM CST
+        await sendOrderConfirmationToCustomer({
+          ...baseConfirmationData,
+          orderType: "catering" as const,
+          pickupTime: new Date("2026-11-20T17:00:00Z"),
+          arrivalTime: new Date("2026-11-20T18:30:00Z"),
+          pickupAddress: { street1: "1 Congress Ave", city: "Austin", state: "TX", zip: "78701" },
+        });
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).toContain("Friday, November 20, 2026 11:00 AM CT");
+        expect(lastCall.html).toContain("Friday, November 20, 2026 12:30 PM CT");
+      });
+
+      it("shows a California order's times on the Pacific clock", async () => {
+        await sendOrderConfirmationToCustomer({
+          ...baseConfirmationData,
+          orderType: "catering" as const,
+          pickupTime: new Date("2026-11-20T17:00:00Z"),
+          arrivalTime: new Date("2026-11-20T18:30:00Z"),
+        });
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).toContain("Friday, November 20, 2026 9:00 AM PT");
+      });
+
       it("should handle null times gracefully", async () => {
         const confirmationData = {
           ...baseConfirmationData,
