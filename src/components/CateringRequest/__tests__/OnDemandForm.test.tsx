@@ -6,7 +6,6 @@ import { Address } from "@/types/address";
 import { useUser } from "@/contexts/UserContext";
 import { UserType } from "@/types/user";
 import { parseCreateOrderBody } from "@/app/api/orders/create-order-schema";
-import { localTimeToUtc } from "@/lib/utils/timezone";
 
 // Mock Next.js router
 const mockPush = jest.fn();
@@ -147,18 +146,36 @@ const mockAddress = {
   id: "11111111-1111-4111-8111-111111111111",
   street1: "123 Test St",
   street2: null,
-  city: "Test City",
-  state: "TS",
-  zip: "12345",
+  city: "San Francisco",
+  state: "CA",
+  zip: "94103",
 };
 
 const mockDeliveryAddress = {
   id: "22222222-2222-4222-8222-222222222222",
   street1: "456 Dropoff Ave",
   street2: null,
-  city: "Test City",
-  state: "TS",
-  zip: "12345",
+  city: "San Francisco",
+  state: "CA",
+  zip: "94110",
+};
+
+const austinPickupAddress = {
+  id: "33333333-3333-4333-8333-333333333333",
+  street1: "100 Congress Ave",
+  street2: null,
+  city: "Austin",
+  state: "TX",
+  zip: "78701",
+};
+
+const austinDeliveryAddress = {
+  id: "44444444-4444-4444-8444-444444444444",
+  street1: "200 E 6th St",
+  street2: null,
+  city: "Austin",
+  state: "TX",
+  zip: "78701",
 };
 
 // Helper to wait for component initialization (Supabase client + user loading)
@@ -527,7 +544,12 @@ describe("OnDemandOrderForm", () => {
     });
   });
 
-  it("posts a body that POST /api/orders accepts as an on-demand order", async () => {
+  // Fills every field, picks the given addresses, submits, and returns the
+  // JSON body posted to /api/orders.
+  async function submitWithAddresses(
+    pickup: typeof mockAddress,
+    delivery: typeof mockAddress,
+  ): Promise<Record<string, unknown>> {
     const user = userEvent.setup();
     await act(async () => {
       render(<OnDemandOrderForm />);
@@ -538,8 +560,8 @@ describe("OnDemandOrderForm", () => {
 
     // Both AddressManagers share the same loaded address list
     await act(async () => {
-      addressLoadCallbacks.pickup?.([mockAddress, mockDeliveryAddress]);
-      addressLoadCallbacks.delivery?.([mockAddress, mockDeliveryAddress]);
+      addressLoadCallbacks.pickup?.([pickup, delivery]);
+      addressLoadCallbacks.delivery?.([pickup, delivery]);
     });
     await waitForInit();
 
@@ -558,8 +580,8 @@ describe("OnDemandOrderForm", () => {
     await user.type(screen.getByLabelText(/pickup notes/i), "Ring the bell");
 
     await act(async () => {
-      addressSelectCallbacks.pickup?.(mockAddress.id);
-      addressSelectCallbacks.delivery?.(mockDeliveryAddress.id);
+      addressSelectCallbacks.pickup?.(pickup.id);
+      addressSelectCallbacks.delivery?.(delivery.id);
     });
     await waitForInit();
 
@@ -579,18 +601,23 @@ describe("OnDemandOrderForm", () => {
     const [, options] = mockFetch.mock.calls.find(
       ([url, init]) => url === "/api/orders" && init?.method === "POST",
     )!;
-    const body = JSON.parse(options.body);
+    return JSON.parse(options.body);
+  }
+
+  it("posts a body that POST /api/orders accepts as an on-demand order", async () => {
+    const body = await submitWithAddresses(mockAddress, mockDeliveryAddress);
 
     // The route's strict allowlist must accept the body as-is.
     const parsed = parseCreateOrderBody(body);
     expect(parsed).toMatchObject({ success: true, type: "ondemand" });
 
+    // California pickup: 10:00 / 11:00 Pacific (PST, UTC-8) on 2024-12-31.
     expect(body).toEqual({
       type: "ondemand",
       pickupAddressId: mockAddress.id,
       deliveryAddressId: mockDeliveryAddress.id,
-      pickupDateTime: localTimeToUtc("2024-12-31", "10:00"),
-      arrivalDateTime: localTimeToUtc("2024-12-31", "11:00"),
+      pickupDateTime: "2024-12-31T18:00:00.000Z",
+      arrivalDateTime: "2024-12-31T19:00:00.000Z",
       clientAttention: "John Doe",
       itemDelivered: "Test Package",
       vehicleType: "VAN",
@@ -602,6 +629,18 @@ describe("OnDemandOrderForm", () => {
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
     }, { timeout: 5000 });
+  });
+
+  it("converts the times from Central when the pickup address is in Austin", async () => {
+    const body = await submitWithAddresses(austinPickupAddress, austinDeliveryAddress);
+
+    // Austin pickup: 10:00 / 11:00 Central (CST, UTC-6) on 2024-12-31.
+    expect(body).toMatchObject({
+      pickupAddressId: austinPickupAddress.id,
+      deliveryAddressId: austinDeliveryAddress.id,
+      pickupDateTime: "2024-12-31T16:00:00.000Z",
+      arrivalDateTime: "2024-12-31T17:00:00.000Z",
+    });
   });
 
   it("validates required fields before submission", async () => {

@@ -21,7 +21,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import { CostEstimatorCard } from "./CostEstimatorCard";
-import { localTimeToUtc } from "@/lib/utils/timezone";
+import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
 
 // Form field components
 const NATIVE_PICKER_TYPES = new Set(["date", "time", "datetime-local"]);
@@ -199,6 +199,10 @@ interface OnDemandFormData {
     city: string;
     state: string;
     zip: string;
+    // Used to resolve the zone the order times are entered in.
+    latitude?: number | null;
+    longitude?: number | null;
+    timezone?: string | null;
   };
   delivery_address: {
     id: string;
@@ -226,21 +230,31 @@ function optionalText(value: string | undefined): string | undefined {
 /**
  * Maps the form state to the POST /api/orders on-demand allowlist
  * (src/app/api/orders/create-order-schema.ts). The schema is strict, so only
- * allowlisted keys are sent: addresses go by ID, times are converted from the
- * local date + time to UTC ISO strings, and vehicle type uses the enum value.
+ * allowlisted keys are sent: addresses go by ID, times are read in the pickup
+ * address zone (PT/CT, same as the admin form) and sent as UTC ISO strings,
+ * and vehicle type uses the enum value.
  * Brokerage and the brokerage order number have no column on on-demand orders
  * (the order number is generated server-side), so they are not sent.
  */
 export function buildOnDemandOrderBody(data: OnDemandFormData) {
+  // The inputs hold wall-clock date + time; build browser-local Dates and let
+  // the shared helper re-read them in the pickup address zone.
+  const wallClock = (time: string | undefined) =>
+    time ? new Date(`${data.date}T${time}`) : undefined;
+  const times = orderTimesInPickupZone({
+    pickupAddress: data.address,
+    pickupDateTime: wallClock(data.pickup_time),
+    arrivalDateTime: wallClock(data.arrival_time),
+    completeDateTime: wallClock(data.complete_time),
+  });
+
   const body: Record<string, unknown> = {
     type: "ondemand",
     pickupAddressId: data.address.id,
     deliveryAddressId: data.delivery_address.id,
-    pickupDateTime: localTimeToUtc(data.date, data.pickup_time),
-    arrivalDateTime: localTimeToUtc(data.date, data.arrival_time),
-    completeDateTime: data.complete_time
-      ? localTimeToUtc(data.date, data.complete_time)
-      : undefined,
+    pickupDateTime: times.pickupDateTime?.toISOString(),
+    arrivalDateTime: times.arrivalDateTime?.toISOString(),
+    completeDateTime: times.completeDateTime?.toISOString(),
     clientAttention: data.client_attention.trim(),
     itemDelivered: optionalText(data.item_delivered),
     vehicleType: data.vehicle_type.toUpperCase(),
@@ -441,6 +455,9 @@ const OnDemandOrderForm: React.FC = () => {
                   city: selectedAddress.city,
                   state: selectedAddress.state,
                   zip: selectedAddress.zip,
+                  latitude: selectedAddress.latitude ?? null,
+                  longitude: selectedAddress.longitude ?? null,
+                  timezone: selectedAddress.timezone ?? null,
                 });
               }
             }}
