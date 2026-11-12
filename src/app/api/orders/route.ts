@@ -6,8 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { CateringNeedHost } from "@/types/order";
 import { CateringStatus, OnDemandStatus } from "@/types/order-status";
 import { localTimeToUtc } from "@/lib/utils/timezone";
-import { cookies } from 'next/headers';
-import { validateApiAuth } from '@/utils/api-auth';
+import { withAuth, type AuthResult } from '@/lib/auth-middleware';
 import { ORDER_CREATE_ALLOWED_ROLES, parseCreateOrderBody } from './create-order-schema';
 import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
@@ -69,9 +68,26 @@ type EmailOrder = EmailCateringOrder | EmailOnDemandOrder;
  */
 const ORDER_STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
 
-function isOrderStaff(authValidation: { userType?: unknown; user?: { type?: unknown } }): boolean {
-  const role = String(authValidation.userType ?? authValidation.user?.type ?? '').toUpperCase();
-  return ORDER_STAFF_ROLES.includes(role);
+/**
+ * Roles that may list orders: every known account type. Non-staff are scoped
+ * to their own orders below; a missing or unknown role is rejected by withAuth.
+ */
+const ORDER_LIST_ALLOWED_ROLES = ['CLIENT', 'VENDOR', 'DRIVER', ...ORDER_STAFF_ROLES];
+
+function isOrderStaff(role: unknown): boolean {
+  return ORDER_STAFF_ROLES.includes(String(role ?? '').toUpperCase());
+}
+
+/** Maps a failed withAuth result to this route's `{ error }` response shape. */
+function authFailureResponse(auth: AuthResult, forbiddenMessage: string): NextResponse {
+  const status = auth.response?.status ?? 401;
+  const error =
+    status === 401
+      ? 'Authentication required'
+      : status === 403
+        ? forbiddenMessage
+        : 'Authentication error';
+  return NextResponse.json({ error }, { status });
 }
 
 /**
@@ -137,22 +153,21 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const search = searchParams.get('search');
 
-    const cookieStore = await cookies();
-    const authValidation = await validateApiAuth(req);
-    
-    if (!authValidation.isValid || !authValidation.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' }, 
-        { status: 401 }
-      );
+    const auth = await withAuth(req, {
+      allowedRoles: ORDER_LIST_ALLOWED_ROLES,
+      requireAuth: true,
+    });
+    if (!auth.success) {
+      return authFailureResponse(auth, 'Forbidden - this account type cannot list orders');
     }
+    const caller = auth.context.user;
 
     // Build where clauses for both catering and on-demand orders.
     // Soft-deleted orders are never listed; non-staff only see their own.
     const baseWhere: any = { deletedAt: null };
 
-    if (!isOrderStaff(authValidation)) {
-      baseWhere.userId = authValidation.user.id;
+    if (!isOrderStaff(caller.type)) {
+      baseWhere.userId = caller.id;
     }
     
     if (status) {
@@ -324,27 +339,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    
-    const cookieStore = await cookies();
-    const authValidation = await validateApiAuth(req);
-    
-    if (!authValidation.isValid || !authValidation.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' }, 
-        { status: 401 }
-      );
+    const auth = await withAuth(req, {
+      allowedRoles: [...ORDER_CREATE_ALLOWED_ROLES],
+      requireAuth: true,
+    });
+    if (!auth.success) {
+      return authFailureResponse(auth, 'Forbidden - this account type cannot create orders');
     }
+    const caller = auth.context.user;
 
-    const callerRole = String(
-      authValidation.userType ?? authValidation.user.type ?? '',
-    ).toUpperCase();
-    if (!(ORDER_CREATE_ALLOWED_ROLES as readonly string[]).includes(callerRole)) {
-      return NextResponse.json(
-        { error: 'Forbidden - this account type cannot create orders' },
-        { status: 403 }
-      );
-    }
+    const body = await req.json();
 
     // Build the order only from the per-type allowlist. Anything else in the
     // body (status, userId, pricing columns, nested relation writes, ...) is
@@ -360,8 +364,8 @@ export async function POST(req: NextRequest) {
     // Address IDs are only format-checked by the schema; make sure the caller
     // may actually use them before anything is written.
     const unusableAddressFields = await findUnusableAddressFields(
-      authValidation.user.id as string,
-      isOrderStaff(authValidation),
+      caller.id,
+      isOrderStaff(caller.type),
       parsed.data,
     );
     if (unusableAddressFields.length > 0) {
@@ -379,7 +383,7 @@ export async function POST(req: NextRequest) {
       // Server-owned fields are always set here, never taken from the body.
       const serverOwned = {
         orderNumber,
-        userId: authValidation.user!.id as string,
+        userId: caller.id,
         status: 'PENDING' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -426,7 +430,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Invalidate vendor cache since new order affects metrics and order lists
-    invalidateVendorCacheOnOrderCreate(authValidation.user!.id, result.order.id);
+    invalidateVendorCacheOnOrderCreate(caller.id, result.order.id);
 
     return NextResponse.json({
       success: true,

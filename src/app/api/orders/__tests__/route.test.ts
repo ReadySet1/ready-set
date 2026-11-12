@@ -15,7 +15,8 @@
 
 import { NextRequest } from "next/server";
 import { GET, POST } from "../route";
-import { validateApiAuth } from "@/utils/api-auth";
+import { getUserRole } from "@/lib/auth";
+import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendDeliveryNotifications } from "@/services/notifications/delivery-notifications";
 import { invalidateVendorCacheOnOrderCreate } from "@/lib/cache/cache-invalidation";
@@ -31,9 +32,14 @@ import {
   createMockOnDemandOrder,
 } from "@/__tests__/helpers/api-test-helpers";
 
-// Mock dependencies
-jest.mock("@/utils/api-auth", () => ({
-  validateApiAuth: jest.fn(),
+// Mock dependencies. Auth runs through the real withAuth: the Supabase session
+// supplies the user and profiles.type (getUserRole) supplies the role.
+jest.mock("@/utils/supabase/server", () => ({
+  createClient: jest.fn(),
+}));
+
+jest.mock("@/lib/auth", () => ({
+  getUserRole: jest.fn(),
 }));
 
 jest.mock("@/utils/prismaDB", () => ({
@@ -65,7 +71,17 @@ jest.mock("next/headers", () => ({
   cookies: jest.fn().mockResolvedValue({}),
 }));
 
-const mockValidateApiAuth = validateApiAuth as jest.MockedFunction<typeof validateApiAuth>;
+const mockCreateClient = createClient as jest.Mock;
+const mockGetUserRole = getUserRole as jest.Mock;
+
+type SessionUser = { id: string; email: string };
+
+function signInAs(user: SessionUser | null, role: string | null = null) {
+  mockCreateClient.mockResolvedValue({
+    auth: { getUser: jest.fn().mockResolvedValue({ data: { user }, error: null }) },
+  });
+  mockGetUserRole.mockResolvedValue(role);
+}
 const mockPrisma = prisma as any;
 const mockSendNotifications = sendDeliveryNotifications as jest.MockedFunction<typeof sendDeliveryNotifications>;
 const mockInvalidateCache = invalidateVendorCacheOnOrderCreate as jest.MockedFunction<typeof invalidateVendorCacheOnOrderCreate>;
@@ -101,10 +117,7 @@ describe("/api/orders", () => {
     jest.clearAllMocks();
 
     // Default: authenticated user
-    mockValidateApiAuth.mockResolvedValue({
-      isValid: true,
-      user: mockUser,
-    });
+    signInAs(mockUser, mockUser.type);
 
     // Default: empty orders
     mockPrisma.cateringRequest.findMany.mockResolvedValue([]);
@@ -122,10 +135,7 @@ describe("/api/orders", () => {
 
   describe("GET /api/orders", () => {
     it("should return 401 when not authenticated", async () => {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: false,
-        user: null,
-      });
+      signInAs(null);
 
       const request = createGetRequest("http://localhost:3000/api/orders");
       const response = await GET(request);
@@ -336,10 +346,7 @@ describe("/api/orders", () => {
     };
 
     it("should return 401 when not authenticated", async () => {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: false,
-        user: null,
-      });
+      signInAs(null);
 
       const request = createPostRequest(
         "http://localhost:3000/api/orders",
@@ -634,12 +641,8 @@ describe("/api/orders", () => {
       return create;
     }
 
-    function asRole(type: string) {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: true,
-        user: { ...mockUser, type },
-        userType: type as any,
-      });
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
     }
 
     const post = (body: unknown) =>
@@ -815,7 +818,35 @@ describe("/api/orders", () => {
       const response = await post(minimalCatering);
 
       expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: "Forbidden - this account type cannot create orders",
+      });
       expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.address.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, string | null]>([
+      ["no role", null],
+      ["an unknown role", "MYSTERY"],
+    ])("forbids a caller with %s from creating orders (deny by default)", async (_label, role) => {
+      asRole(role);
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post(minimalCatering);
+
+      expect(response.status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unauthenticated caller before reading the body", async () => {
+      signInAs(null);
+
+      const response = await POST(
+        new NextRequest("http://localhost:3000/api/orders", { method: "POST", body: "{not json" }),
+      );
+
+      await expectUnauthorized(response, "Authentication required");
     });
 
     it.each(["CLIENT", "VENDOR", "ADMIN", "SUPER_ADMIN", "HELPDESK"])(
@@ -853,12 +884,8 @@ describe("/api/orders", () => {
     });
   });
   describe("GET /api/orders — owner scoping", () => {
-    function asRole(type: string | undefined) {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: true,
-        user: { ...mockUser, type },
-        userType: type as any,
-      });
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
     }
 
     const whereOf = (model: "cateringRequest" | "onDemand") =>
@@ -892,12 +919,51 @@ describe("/api/orders", () => {
       expect(where.OR).toEqual(expect.any(Array));
     });
 
-    it("scopes a caller with no role to their own orders (deny by default)", async () => {
-      asRole(undefined);
+    it.each<[string, string | null]>([
+      ["no role", null],
+      ["an unknown role", "MYSTERY"],
+    ])("rejects a caller with %s and lists nothing (deny by default)", async (_label, role) => {
+      asRole(role);
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      expect(response.status).toBe(403);
+      expect(mockPrisma.cateringRequest.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.onDemand.findMany).not.toHaveBeenCalled();
+    });
+
+    it("scopes by the authenticated session's user id", async () => {
+      signInAs({ id: "session-user-id", email: "other@example.com" }, "CLIENT");
 
       await GET(createGetRequest("http://localhost:3000/api/orders"));
 
-      expect(whereOf("cateringRequest").userId).toBe(mockUser.id);
+      expect(whereOf("cateringRequest").userId).toBe("session-user-id");
+      expect(whereOf("onDemand").userId).toBe("session-user-id");
+    });
+
+    it("authenticates a Bearer token when one is sent", async () => {
+      const getUser = jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null });
+      mockCreateClient.mockResolvedValue({ auth: { getUser } });
+
+      const response = await GET(
+        createGetRequest("http://localhost:3000/api/orders", { authorization: "Bearer token-abc" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith("token-abc");
+    });
+
+    it("returns 401 when the Supabase session is invalid", async () => {
+      mockCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: "JWT expired" } }),
+        },
+      });
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      await expectUnauthorized(response, "Authentication required");
+      expect(mockPrisma.cateringRequest.findMany).not.toHaveBeenCalled();
     });
 
     it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK", "admin"])(
@@ -917,11 +983,7 @@ describe("/api/orders", () => {
     it.each(["CLIENT", "ADMIN"])(
       "excludes soft-deleted orders for %s",
       async (role) => {
-        mockValidateApiAuth.mockResolvedValue({
-          isValid: true,
-          user: { ...mockUser, type: role },
-          userType: role as any,
-        });
+        signInAs(mockUser, role);
 
         await GET(createGetRequest("http://localhost:3000/api/orders"));
 
@@ -952,12 +1014,8 @@ describe("/api/orders", () => {
       deliveryAddressId: DELIVERY_ADDRESS_ID,
     };
 
-    function asRole(type: string) {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: true,
-        user: { ...mockUser, type },
-        userType: type as any,
-      });
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
     }
 
     function captureCreate() {
@@ -989,6 +1047,22 @@ describe("/api/orders", () => {
           { userAddresses: { some: { userId: mockUser.id } } },
         ]),
       );
+    });
+
+    it("uses the authenticated session's user id for address ownership and the order's userId", async () => {
+      signInAs({ id: "session-user-id", email: "other@example.com" }, "CLIENT");
+      const create = captureCreate();
+
+      await expectSuccessResponse(await post(body), 200);
+
+      expect(addressWhere().OR).toEqual(
+        expect.arrayContaining([
+          { createdBy: "session-user-id" },
+          { userAddresses: { some: { userId: "session-user-id" } } },
+        ]),
+      );
+      expect(create.mock.calls[0][0].data.userId).toBe("session-user-id");
+      expect(mockInvalidateCache).toHaveBeenCalledWith("session-user-id", mockCateringOrder.id);
     });
 
     it("rejects a client using another user's pickup address (400, nothing created)", async () => {
