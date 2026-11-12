@@ -46,6 +46,9 @@ jest.mock("@/utils/prismaDB", () => ({
       findMany: jest.fn(),
       create: jest.fn(),
     },
+    address: {
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
 }));
@@ -106,6 +109,11 @@ describe("/api/orders", () => {
     // Default: empty orders
     mockPrisma.cateringRequest.findMany.mockResolvedValue([]);
     mockPrisma.onDemand.findMany.mockResolvedValue([]);
+
+    // Default: every requested address exists and is usable by the caller
+    mockPrisma.address.findMany.mockImplementation(async (args: any) =>
+      (args?.where?.id?.in ?? []).map((id: string) => ({ id })),
+    );
 
     // Default: successful notifications
     mockSendNotifications.mockResolvedValue(undefined);
@@ -842,6 +850,277 @@ describe("/api/orders", () => {
       });
 
       await expectValidationError(response);
+    });
+  });
+  describe("GET /api/orders — owner scoping", () => {
+    function asRole(type: string | undefined) {
+      mockValidateApiAuth.mockResolvedValue({
+        isValid: true,
+        user: { ...mockUser, type },
+        userType: type as any,
+      });
+    }
+
+    const whereOf = (model: "cateringRequest" | "onDemand") =>
+      mockPrisma[model].findMany.mock.calls[0][0].where;
+
+    it.each(["CLIENT", "VENDOR", "DRIVER"])(
+      "limits a %s caller to their own catering and on-demand orders",
+      async (role) => {
+        asRole(role);
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        expect(whereOf("cateringRequest").userId).toBe(mockUser.id);
+        expect(whereOf("onDemand").userId).toBe(mockUser.id);
+      },
+    );
+
+    it("keeps the owner filter when search and status are also applied", async () => {
+      asRole("CLIENT");
+
+      await GET(
+        createRequestWithParams("http://localhost:3000/api/orders", {
+          search: "someone-else@example.com",
+          status: "ACTIVE",
+        }),
+      );
+
+      const where = whereOf("cateringRequest");
+      expect(where.userId).toBe(mockUser.id);
+      expect(where.status).toBe("ACTIVE");
+      expect(where.OR).toEqual(expect.any(Array));
+    });
+
+    it("scopes a caller with no role to their own orders (deny by default)", async () => {
+      asRole(undefined);
+
+      await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      expect(whereOf("cateringRequest").userId).toBe(mockUser.id);
+    });
+
+    it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK", "admin"])(
+      "lets %s see every order",
+      async (role) => {
+        asRole(role);
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        expect(whereOf("cateringRequest")).not.toHaveProperty("userId");
+        expect(whereOf("onDemand")).not.toHaveProperty("userId");
+      },
+    );
+  });
+
+  describe("GET /api/orders — soft delete", () => {
+    it.each(["CLIENT", "ADMIN"])(
+      "excludes soft-deleted orders for %s",
+      async (role) => {
+        mockValidateApiAuth.mockResolvedValue({
+          isValid: true,
+          user: { ...mockUser, type: role },
+          userType: role as any,
+        });
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        for (const model of ["cateringRequest", "onDemand"] as const) {
+          expect(mockPrisma[model].findMany.mock.calls[0][0].where.deletedAt).toBeNull();
+        }
+      },
+    );
+
+    it("excludes soft-deleted addresses from the client's address book", async () => {
+      await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      for (const model of ["cateringRequest", "onDemand"] as const) {
+        const { include } = mockPrisma[model].findMany.mock.calls[0][0];
+        expect(include.user.include.userAddresses.where).toEqual({
+          address: { deletedAt: null },
+        });
+      }
+    });
+  });
+
+  describe("POST /api/orders — address ownership", () => {
+    const PICKUP_ADDRESS_ID = "11111111-1111-4111-8111-111111111111";
+    const DELIVERY_ADDRESS_ID = "22222222-2222-4222-8222-222222222222";
+    const body = {
+      type: "catering",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
+    };
+
+    function asRole(type: string) {
+      mockValidateApiAuth.mockResolvedValue({
+        isValid: true,
+        user: { ...mockUser, type },
+        userType: type as any,
+      });
+    }
+
+    function captureCreate() {
+      const create = jest.fn().mockResolvedValue(mockCateringOrder);
+      mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+        callback({ cateringRequest: { create } }),
+      );
+      return create;
+    }
+
+    const post = (payload: unknown) =>
+      POST(createPostRequest("http://localhost:3000/api/orders", payload));
+
+    const addressWhere = () => mockPrisma.address.findMany.mock.calls[0][0].where;
+
+    it("looks up both addresses scoped to the client's own, linked or shared addresses", async () => {
+      asRole("CLIENT");
+      captureCreate();
+
+      await post(body);
+
+      const where = addressWhere();
+      expect(where.id).toEqual({ in: expect.arrayContaining([PICKUP_ADDRESS_ID, DELIVERY_ADDRESS_ID]) });
+      expect(where.deletedAt).toBeNull();
+      expect(where.OR).toEqual(
+        expect.arrayContaining([
+          { createdBy: mockUser.id },
+          { isShared: true },
+          { userAddresses: { some: { userId: mockUser.id } } },
+        ]),
+      );
+    });
+
+    it("rejects a client using another user's pickup address (400, nothing created)", async () => {
+      asRole("CLIENT");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: DELIVERY_ADDRESS_ID }]);
+
+      const response = await post(body);
+
+      const data = await expectValidationError(response);
+      expect(data.fields).toEqual(["pickupAddressId"]);
+      expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects a client using another user's delivery address", async () => {
+      asRole("VENDOR");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: PICKUP_ADDRESS_ID }]);
+
+      const data = await expectValidationError(await post(body));
+
+      expect(data.fields).toEqual(["deliveryAddressId"]);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("gives the same answer for a missing address and a foreign one", async () => {
+      asRole("CLIENT");
+      captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([]);
+
+      const data = await expectValidationError(await post(body));
+
+      expect(data.error).toBe("Address not found");
+      expect(data.fields).toEqual(["pickupAddressId", "deliveryAddressId"]);
+    });
+
+    it("accepts the same address for pickup and delivery", async () => {
+      asRole("CLIENT");
+      captureCreate();
+
+      const response = await post({ ...body, deliveryAddressId: PICKUP_ADDRESS_ID });
+
+      await expectSuccessResponse(response, 200);
+    });
+
+    it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK"])(
+      "lets %s use any address, but never a soft-deleted one",
+      async (role) => {
+        asRole(role);
+        captureCreate();
+
+        await post(body);
+
+        const where = addressWhere();
+        expect(where).not.toHaveProperty("OR");
+        expect(where.deletedAt).toBeNull();
+      },
+    );
+
+    it("rejects an admin using a soft-deleted (or missing) address", async () => {
+      asRole("ADMIN");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: PICKUP_ADDRESS_ID }]);
+
+      await expectValidationError(await post(body));
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("/api/orders — error responses never leak internals", () => {
+    const PRISMA_DETAIL = "Invalid `prisma.cateringRequest.findMany()` invocation: table public.secret_internal_table does not exist";
+
+    beforeEach(() => {
+      jest.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      (console.error as jest.Mock).mockRestore();
+    });
+
+    it("GET returns a generic message for a Prisma error and logs the detail", async () => {
+      mockPrisma.cateringRequest.findMany.mockRejectedValue({ code: "P2021", message: PRISMA_DETAIL });
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      const data = await expectServerError(response);
+      expect(data).toEqual({ error: "Failed to fetch orders" });
+      expect(JSON.stringify(data)).not.toContain("secret_internal_table");
+      expect(JSON.stringify((console.error as jest.Mock).mock.calls)).toContain("secret_internal_table");
+    });
+
+    it("GET does not echo a generic error's message back", async () => {
+      mockPrisma.onDemand.findMany.mockRejectedValue(new Error(PRISMA_DETAIL));
+
+      const data = await expectServerError(
+        await GET(createGetRequest("http://localhost:3000/api/orders")),
+      );
+
+      expect(data).toEqual({ error: "Failed to fetch orders" });
+    });
+
+    it("POST returns a generic message for a Prisma error and logs the detail", async () => {
+      mockPrisma.$transaction.mockRejectedValue({ code: "P2002", message: PRISMA_DETAIL });
+
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/orders", {
+          type: "catering",
+          pickupAddressId: "11111111-1111-4111-8111-111111111111",
+          deliveryAddressId: "22222222-2222-4222-8222-222222222222",
+        }),
+      );
+
+      const data = await expectServerError(response);
+      expect(data).toEqual({ error: "Failed to create order" });
+      expect(JSON.stringify((console.error as jest.Mock).mock.calls)).toContain("secret_internal_table");
+    });
+
+    it("POST does not echo a generic error's message back", async () => {
+      mockPrisma.$transaction.mockRejectedValue(new Error(PRISMA_DETAIL));
+
+      const data = await expectServerError(
+        await POST(
+          createPostRequest("http://localhost:3000/api/orders", {
+            type: "catering",
+            pickupAddressId: "11111111-1111-4111-8111-111111111111",
+            deliveryAddressId: "22222222-2222-4222-8222-222222222222",
+          }),
+        ),
+      );
+
+      expect(data).toEqual({ error: "Failed to create order" });
     });
   });
 });

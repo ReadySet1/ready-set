@@ -62,6 +62,53 @@ type EmailOnDemandOrder = EmailBaseOrder & {
 type PrismaOrder = PrismaCateringOrder | PrismaOnDemandOrder;
 type EmailOrder = EmailCateringOrder | EmailOnDemandOrder;
 
+/**
+ * Staff roles that see every order and may use any address. Matches
+ * ORDER_EDIT_ROLES in ./[order_number]/route.ts. Every other role is scoped
+ * to its own orders and addresses (deny by default).
+ */
+const ORDER_STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
+
+function isOrderStaff(authValidation: { userType?: unknown; user?: { type?: unknown } }): boolean {
+  const role = String(authValidation.userType ?? authValidation.user?.type ?? '').toUpperCase();
+  return ORDER_STAFF_ROLES.includes(role);
+}
+
+/**
+ * Returns the address-ID fields the caller may not use: missing,
+ * soft-deleted, or (for non-staff) neither created by, linked to, nor shared
+ * with the caller. Missing and foreign addresses get the same answer so the
+ * response can't be used to probe which address IDs exist.
+ */
+async function findUnusableAddressFields(
+  callerId: string,
+  isStaff: boolean,
+  addressIds: { pickupAddressId: string; deliveryAddressId: string },
+): Promise<string[]> {
+  const ids = [...new Set([addressIds.pickupAddressId, addressIds.deliveryAddressId])];
+  const usable = await prismaClient.address.findMany({
+    where: {
+      id: { in: ids },
+      deletedAt: null,
+      ...(isStaff
+        ? {}
+        : {
+            OR: [
+              { createdBy: callerId },
+              { isShared: true },
+              { userAddresses: { some: { userId: callerId } } },
+            ],
+          }),
+    },
+    select: { id: true },
+  });
+  const usableIds = new Set(usable.map((address: { id: string }) => address.id));
+
+  return (['pickupAddressId', 'deliveryAddressId'] as const).filter(
+    (field) => !usableIds.has(addressIds[field]),
+  );
+}
+
 interface OrderData {
   id: string;
   type: 'catering' | 'ondemand';
@@ -100,8 +147,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Build where clauses for both catering and on-demand orders
-    const baseWhere: any = {};
+    // Build where clauses for both catering and on-demand orders.
+    // Soft-deleted orders are never listed; non-staff only see their own.
+    const baseWhere: any = { deletedAt: null };
+
+    if (!isOrderStaff(authValidation)) {
+      baseWhere.userId = authValidation.user.id;
+    }
     
     if (status) {
       baseWhere.status = status;
@@ -143,6 +195,7 @@ export async function GET(req: NextRequest) {
           user: {
             include: {
               userAddresses: {
+                where: { address: { deletedAt: null } },
                 include: {
                   address: true,
                 },
@@ -179,6 +232,7 @@ export async function GET(req: NextRequest) {
           user: {
             include: {
               userAddresses: {
+                where: { address: { deletedAt: null } },
                 include: {
                   address: true,
                 },
@@ -262,27 +316,9 @@ export async function GET(req: NextRequest) {
     return response;
 
   } catch (error: any) {
-    console.error('Error fetching orders:', error);
-    
-    // Handle specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      console.error("Prisma Error:", error.message);
-      console.error("Error Code:", error.code);
-      console.error("Meta:", error.meta);
-      
-      return NextResponse.json(
-        { error: `Database error: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch orders',
-        details: error?.message || 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Full detail goes to the server log only; the client gets a generic message.
+    logOrdersRouteError('Error fetching orders', error);
+    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
 
@@ -317,6 +353,20 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error, issues: parsed.issues },
+        { status: 400 }
+      );
+    }
+
+    // Address IDs are only format-checked by the schema; make sure the caller
+    // may actually use them before anything is written.
+    const unusableAddressFields = await findUnusableAddressFields(
+      authValidation.user.id as string,
+      isOrderStaff(authValidation),
+      parsed.data,
+    );
+    if (unusableAddressFields.length > 0) {
+      return NextResponse.json(
+        { error: 'Address not found', fields: unusableAddressFields },
         { status: 400 }
       );
     }
@@ -386,28 +436,18 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Error creating order:', error);
-    
-    // Handle specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      console.error("Prisma Error:", error.message);
-      console.error("Error Code:", error.code);
-      console.error("Meta:", error.meta);
-      
-      return NextResponse.json(
-        { error: `Database error: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to create order',
-        details: error?.message || 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Full detail goes to the server log only; the client gets a generic message.
+    logOrdersRouteError('Error creating order', error);
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
   }
+}
+
+function logOrdersRouteError(context: string, error: any): void {
+  if (error && typeof error === 'object' && 'code' in error) {
+    console.error(context, { code: error.code, message: error.message, meta: error.meta });
+    return;
+  }
+  console.error(context, error);
 }
 
 // Helper function to map Prisma order data (PascalCase fields and relations)
