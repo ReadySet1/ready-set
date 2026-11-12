@@ -284,8 +284,8 @@ describe("POST /api/job-applications - driver document columns", () => {
       buildRequest(
         {
           ...driverBody,
-          cateringBagsFileId: "bags-file",
-          cartDollyFileId: "cart-file",
+          cateringBagsPhotoFileId: "bags-file",
+          cartDollyPhotoFileId: "cart-file",
           secondIdFileId: "id-file",
         },
         TOKEN,
