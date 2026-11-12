@@ -21,6 +21,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import { CostEstimatorCard } from "./CostEstimatorCard";
+import { localTimeToUtc } from "@/lib/utils/timezone";
 
 // Form field components
 const NATIVE_PICKER_TYPES = new Set(["date", "time", "datetime-local"]);
@@ -209,6 +210,55 @@ interface OnDemandFormData {
   };
 }
 
+/** Parses an optional numeric form field; empty or non-numeric input is omitted. */
+function optionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/** Trims an optional text field; blank input is omitted. */
+function optionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
+ * Maps the form state to the POST /api/orders on-demand allowlist
+ * (src/app/api/orders/create-order-schema.ts). The schema is strict, so only
+ * allowlisted keys are sent: addresses go by ID, times are converted from the
+ * local date + time to UTC ISO strings, and vehicle type uses the enum value.
+ * Brokerage and the brokerage order number have no column on on-demand orders
+ * (the order number is generated server-side), so they are not sent.
+ */
+export function buildOnDemandOrderBody(data: OnDemandFormData) {
+  const body: Record<string, unknown> = {
+    type: "ondemand",
+    pickupAddressId: data.address.id,
+    deliveryAddressId: data.delivery_address.id,
+    pickupDateTime: localTimeToUtc(data.date, data.pickup_time),
+    arrivalDateTime: localTimeToUtc(data.date, data.arrival_time),
+    completeDateTime: data.complete_time
+      ? localTimeToUtc(data.date, data.complete_time)
+      : undefined,
+    clientAttention: data.client_attention.trim(),
+    itemDelivered: optionalText(data.item_delivered),
+    vehicleType: data.vehicle_type.toUpperCase(),
+    orderTotal: optionalNumber(data.order_total),
+    tip: optionalNumber(data.tip),
+    pickupNotes: optionalText(data.pickup_notes),
+    specialNotes: optionalText(data.special_notes),
+    length: optionalNumber(data.length),
+    width: optionalNumber(data.width),
+    height: optionalNumber(data.height),
+    weight: optionalNumber(data.weight),
+  };
+
+  return Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  );
+}
+
 const OnDemandOrderForm: React.FC = () => {
   const router = useRouter();
   const { userRole } = useUser();
@@ -312,14 +362,12 @@ const OnDemandOrderForm: React.FC = () => {
       return;
     }
 
-    if (!data.address) {
-      console.error("Pickup address not selected");
+    if (!data.address?.id) {
       toast.error("Please select a pickup address");
       return;
     }
 
-    if (!data.delivery_address) {
-      console.error("Delivery address not selected for on-demand order");
+    if (!data.delivery_address?.id) {
       toast.error("Please select a delivery address for on-demand order");
       return;
     }
@@ -331,27 +379,7 @@ const OnDemandOrderForm: React.FC = () => {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          order_type: "on_demand",
-          address: {
-            id: data.address.id,
-            street1: data.address.street1,
-            street2: data.address.street2,
-            city: data.address.city,
-            state: data.address.state,
-            zip: data.address.zip,
-          },
-          delivery_address: {
-            id: data.delivery_address.id,
-            street1: data.delivery_address.street1,
-            street2: data.delivery_address.street2,
-            city: data.delivery_address.city,
-            state: data.delivery_address.state,
-            zip: data.delivery_address.zip,
-          },
-          tip: data.tip ? parseFloat(data.tip) : undefined,
-        }),
+        body: JSON.stringify(buildOnDemandOrderBody(data)),
       });
 
       if (response.ok) {

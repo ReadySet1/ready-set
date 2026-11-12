@@ -5,6 +5,8 @@ import OnDemandOrderForm from "../OnDemandForm";
 import { Address } from "@/types/address";
 import { useUser } from "@/contexts/UserContext";
 import { UserType } from "@/types/user";
+import { parseCreateOrderBody } from "@/app/api/orders/create-order-schema";
+import { localTimeToUtc } from "@/lib/utils/timezone";
 
 // Mock Next.js router
 const mockPush = jest.fn();
@@ -142,8 +144,17 @@ jest.mock("@/contexts/UserContext");
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
 
 const mockAddress = {
-  id: "1",
+  id: "11111111-1111-4111-8111-111111111111",
   street1: "123 Test St",
+  street2: null,
+  city: "Test City",
+  state: "TS",
+  zip: "12345",
+};
+
+const mockDeliveryAddress = {
+  id: "22222222-2222-4222-8222-222222222222",
+  street1: "456 Dropoff Ave",
   street2: null,
   city: "Test City",
   state: "TS",
@@ -516,86 +527,78 @@ describe("OnDemandOrderForm", () => {
     });
   });
 
-  it("submits the form with correct data structure", async () => {
+  it("posts a body that POST /api/orders accepts as an on-demand order", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<OnDemandOrderForm />);
     });
 
-    // Wait for form to initialize and Supabase client + user to be loaded
     await waitForInit();
     await waitForInit();
 
-    // Simulate address loading (populates component's addresses state)
+    // Both AddressManagers share the same loaded address list
     await act(async () => {
-      addressLoadCallbacks.pickup?.([mockAddress]);
-      addressLoadCallbacks.delivery?.([mockAddress]);
+      addressLoadCallbacks.pickup?.([mockAddress, mockDeliveryAddress]);
+      addressLoadCallbacks.delivery?.([mockAddress, mockDeliveryAddress]);
     });
     await waitForInit();
 
-    // Fill out the form
-    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-    await user.selectOptions(brokerageSelect, "direct");
+    await user.selectOptions(screen.getByLabelText(/brokerage.*direct/i), "direct");
     await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-    // Fill date
     const dateInput = screen.getByLabelText(/date/i);
     await user.clear(dateInput);
     await user.type(dateInput, "2024-12-31");
-
-    // Fill pickup time
     await user.type(screen.getByLabelText(/pickup time/i), "10:00");
-
-    // Fill arrival time
     await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-    // Fill client attention
     await user.type(screen.getByLabelText(/client attention/i), "John Doe");
-
-    // Fill item being delivered
     await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
-
-    // Fill vehicle type
-    const vehicleSelect = screen.getByLabelText(/vehicle type/i);
-    await user.selectOptions(vehicleSelect, "Car");
-
-    // Fill order total
+    await user.selectOptions(screen.getByLabelText(/vehicle type/i), "Van");
     await user.type(screen.getByLabelText(/order total/i), "100");
+    await user.type(screen.getByLabelText(/^tip/i), "5");
+    await user.type(screen.getByLabelText(/pickup notes/i), "Ring the bell");
 
-    // Simulate address selection
     await act(async () => {
       addressSelectCallbacks.pickup?.(mockAddress.id);
-      addressSelectCallbacks.delivery?.(mockAddress.id);
+      addressSelectCallbacks.delivery?.(mockDeliveryAddress.id);
     });
     await waitForInit();
 
-    // Submit the form using fireEvent.submit (more reliable than button click in tests)
-    const submitButton = screen.getByRole("button", {
-      name: /submit.*request/i,
-    });
-    const form = submitButton.closest('form');
-
+    const form = screen.getByRole("button", { name: /submit.*request/i }).closest("form");
     await act(async () => {
-      if (form) {
-        fireEvent.submit(form);
-      }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (form) fireEvent.submit(form);
+      await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
-    // Wait for fetch to be called
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/orders",
+        expect.objectContaining({ method: "POST" }),
+      );
     }, { timeout: 5000 });
 
-    // Verify the API call was made with correct data
-    // Note: Component submits to /api/orders with order_type: "on_demand"
-    expect(mockFetch).toHaveBeenCalledWith("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: expect.stringContaining("TEST-12345"),
+    const [, options] = mockFetch.mock.calls.find(
+      ([url, init]) => url === "/api/orders" && init?.method === "POST",
+    )!;
+    const body = JSON.parse(options.body);
+
+    // The route's strict allowlist must accept the body as-is.
+    const parsed = parseCreateOrderBody(body);
+    expect(parsed).toMatchObject({ success: true, type: "ondemand" });
+
+    expect(body).toEqual({
+      type: "ondemand",
+      pickupAddressId: mockAddress.id,
+      deliveryAddressId: mockDeliveryAddress.id,
+      pickupDateTime: localTimeToUtc("2024-12-31", "10:00"),
+      arrivalDateTime: localTimeToUtc("2024-12-31", "11:00"),
+      clientAttention: "John Doe",
+      itemDelivered: "Test Package",
+      vehicleType: "VAN",
+      orderTotal: 100,
+      tip: 5,
+      pickupNotes: "Ring the bell",
     });
 
-    // Verify redirect happened
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
     }, { timeout: 5000 });
