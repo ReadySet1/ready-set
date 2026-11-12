@@ -41,7 +41,7 @@ export interface DriverDocument extends ApplicationDocument {
 const IMAGE_TYPES = [".jpg", ".jpeg", ".png"] as const;
 const IMAGE_PDF_TYPES = [".pdf", ".jpg", ".jpeg", ".png"] as const;
 
-function document(
+function defineDocument(
   key: string,
   fileIdField: string,
   filePathColumn: JobApplicationFilePathColumn,
@@ -50,7 +50,7 @@ function document(
   return { key, category: `${TEMP_CATEGORY_PREFIX}${key}`, fileIdField, filePathColumn, label };
 }
 
-export const RESUME_DOCUMENT: ApplicationDocument = document(
+export const RESUME_DOCUMENT: ApplicationDocument = defineDocument(
   "resume",
   "resumeFileId",
   "resumeFilePath",
@@ -60,47 +60,47 @@ export const RESUME_DOCUMENT: ApplicationDocument = document(
 /** Documents a new driver applicant can upload. */
 export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
   {
-    ...document("license", "driversLicenseFileId", "driversLicenseFilePath", "Driver's License"),
+    ...defineDocument("license", "driversLicenseFileId", "driversLicenseFilePath", "Driver's License"),
     required: true,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("insurance", "insuranceFileId", "insuranceFilePath", "Insurance"),
+    ...defineDocument("insurance", "insuranceFileId", "insuranceFilePath", "Insurance"),
     required: true,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("registration", "vehicleRegFileId", "vehicleRegFilePath", "Vehicle Registration"),
+    ...defineDocument("registration", "vehicleRegFileId", "vehicleRegFilePath", "Vehicle Registration"),
     required: false,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("second_id", "secondIdFileId", "secondIdFilePath", "Second Form of ID"),
+    ...defineDocument("second_id", "secondIdFileId", "secondIdFilePath", "Second Form of ID"),
     required: false,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("food_handler", "foodHandlerFileId", "foodHandlerFilePath", "Food Handler Certificate"),
+    ...defineDocument("food_handler", "foodHandlerFileId", "foodHandlerFilePath", "Food Handler Certificate"),
     required: false,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("hipaa", "hipaaFileId", "hipaaFilePath", "HIPAA Certificate"),
+    ...defineDocument("hipaa", "hipaaFileId", "hipaaFilePath", "HIPAA Certificate"),
     required: false,
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...document("car_photo", "carPhotoFileId", "carPhotoFilePath", "Vehicle Photo"),
-    required: true,
-    accept: IMAGE_TYPES,
-  },
-  {
-    ...document("catering_bags", "cateringBagsFileId", "cateringBagsPhotoFilePath", "Catering Bags Photo"),
+    ...defineDocument("car_photo", "carPhotoFileId", "carPhotoFilePath", "Vehicle Photo"),
     required: true,
     accept: IMAGE_TYPES,
   },
   {
-    ...document("cart_dolly", "cartDollyFileId", "cartDollyPhotoFilePath", "Cart/Dolly Photo"),
+    ...defineDocument("catering_bags", "cateringBagsPhotoFileId", "cateringBagsPhotoFilePath", "Catering Bags Photo"),
+    required: true,
+    accept: IMAGE_TYPES,
+  },
+  {
+    ...defineDocument("cart_dolly", "cartDollyPhotoFileId", "cartDollyPhotoFilePath", "Cart/Dolly Photo"),
     required: true,
     accept: IMAGE_TYPES,
   },
@@ -111,8 +111,8 @@ export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
  * their labels and so older clients still get their uploads mapped.
  */
 export const LEGACY_DRIVER_DOCUMENTS: readonly ApplicationDocument[] = [
-  document("driver_photo", "driverPhotoFileId", "driverPhotoFilePath", "Driver Photo"),
-  document("equipment_photo", "equipmentPhotoFileId", "equipmentPhotoFilePath", "Equipment Photo"),
+  defineDocument("driver_photo", "driverPhotoFileId", "driverPhotoFilePath", "Driver Photo"),
+  defineDocument("equipment_photo", "equipmentPhotoFileId", "equipmentPhotoFilePath", "Equipment Photo"),
 ];
 
 const ALL_DOCUMENTS: readonly ApplicationDocument[] = [

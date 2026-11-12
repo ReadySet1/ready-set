@@ -1,6 +1,7 @@
 import {
   DRIVER_DOCUMENTS,
   LEGACY_DRIVER_DOCUMENTS,
+  RESUME_DOCUMENT,
   categoryBase,
   findDocumentByCategory,
   getDocumentLabel,
@@ -36,9 +37,26 @@ describe("job application document config", () => {
   });
 
   it("uses the upload category the form sends for each document", () => {
-    for (const doc of DRIVER_DOCUMENTS) {
-      expect(doc.category).toBe(`job-applications/temp/${doc.key}`);
-    }
+    // Categories ApplyForm.tsx sends today, plus the three added by this config.
+    const expected = [
+      "job-applications/temp/resume",
+      "job-applications/temp/license",
+      "job-applications/temp/insurance",
+      "job-applications/temp/registration",
+      "job-applications/temp/food_handler",
+      "job-applications/temp/hipaa",
+      "job-applications/temp/driver_photo",
+      "job-applications/temp/car_photo",
+      "job-applications/temp/equipment_photo",
+      "job-applications/temp/second_id",
+      "job-applications/temp/catering_bags",
+      "job-applications/temp/cart_dolly",
+    ];
+    const categories = [RESUME_DOCUMENT, ...DRIVER_DOCUMENTS, ...LEGACY_DRIVER_DOCUMENTS].map(
+      (doc) => doc.category,
+    );
+
+    expect(categories.sort()).toEqual(expected.sort());
   });
 
   it("strips the temp prefix from a category", () => {
@@ -48,8 +66,8 @@ describe("job application document config", () => {
 
   it.each([
     ["job-applications/temp/second_id", "secondIdFilePath", "secondIdFileId"],
-    ["job-applications/temp/catering_bags", "cateringBagsPhotoFilePath", "cateringBagsFileId"],
-    ["job-applications/temp/cart_dolly", "cartDollyPhotoFilePath", "cartDollyFileId"],
+    ["job-applications/temp/catering_bags", "cateringBagsPhotoFilePath", "cateringBagsPhotoFileId"],
+    ["job-applications/temp/cart_dolly", "cartDollyPhotoFilePath", "cartDollyPhotoFileId"],
     ["job-applications/temp/registration", "vehicleRegFilePath", "vehicleRegFileId"],
     ["registration", "vehicleRegFilePath", "vehicleRegFileId"],
     ["job-applications/temp/driver_photo", "driverPhotoFilePath", "driverPhotoFileId"],
