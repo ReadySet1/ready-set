@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { prisma } from "@/utils/prismaDB";
-import { UserType } from "@/types/prisma";
 
 // Helper function to check if user has admin privileges
 function hasAdminPrivileges(userType: string): boolean {
@@ -123,44 +121,3 @@ export async function authenticateAdminRequest(request: NextRequest) {
     isAdmin: true
   };
 }
-
-export async function validateApiAuth(request: NextRequest): Promise<{
-  isValid: boolean;
-  user?: any;
-  userType?: UserType;
-  error?: string;
-}> {
-  try {
-    // Get session from cookies
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get("session")?.value;
-
-    if (!sessionToken) {
-      return { isValid: false, error: "No session token found" };
-    }
-
-    // Find user session
-    const session = await prisma.session.findUnique({
-      where: { sessionToken },
-      include: { user: true }
-    });
-
-    if (!session || !session.user) {
-      return { isValid: false, error: "Invalid session" };
-    }
-
-    // Check if session is expired
-    if (session.expires < new Date()) {
-      return { isValid: false, error: "Session expired" };
-    }
-
-    return {
-      isValid: true,
-      user: session.user,
-      userType: session.user.type as UserType
-    };
-  } catch (error) {
-    console.error("Auth validation error:", error);
-    return { isValid: false, error: "Authentication failed" };
-  }
-} 
