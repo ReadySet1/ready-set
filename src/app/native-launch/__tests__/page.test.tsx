@@ -77,7 +77,13 @@ describe('NativeLaunchPage (/native-launch)', () => {
       expect(mockReplace).toHaveBeenCalledTimes(1);
     });
 
-    it.each(['//evil.example', 'https://evil.example', '/\\evil.example'])(
+    it.each([
+      '//evil.example',
+      'https://evil.example',
+      '/\\evil.example',
+      '/\t/evil.example',
+      '/\n/evil.example',
+    ])(
       'ignores an off-site next %p and routes to /driver',
       async (next) => {
         window.history.replaceState(

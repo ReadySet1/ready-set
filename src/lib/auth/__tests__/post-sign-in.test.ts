@@ -47,7 +47,15 @@ describe('post-sign-in navigation', () => {
       );
     });
 
-    it.each(['', '/', '//evil.example', 'https://evil.example/driver', '/\\evil.example'])(
+    it.each([
+      '',
+      '/',
+      '//evil.example',
+      'https://evil.example/driver',
+      '/\\evil.example',
+      '/\t/evil.example',
+      '/\n/evil.example',
+    ])(
       'drops an empty or off-site destination %p and lands on plain /native-launch',
       (redirectTo) => {
         expect(signedInDestination(redirectTo)).toBe('/native-launch');
@@ -71,11 +79,26 @@ describe('post-sign-in navigation', () => {
   });
 
   describe('isSafeInternalPath', () => {
-    it.each(['/driver', '/force-password-change', '/a?b=c'])('accepts %s', (path) => {
+    it.each(['/driver', '/force-password-change', '/a?b=c', '/a#section'])('accepts %s', (path) => {
       expect(isSafeInternalPath(path)).toBe(true);
     });
 
-    it.each([null, undefined, '', 'driver', '//evil.example', '/\\evil.example', 'https://x.y'])(
+    // URL parsing strips tab/LF/CR, so `/\t/host` resolves to `//host` (off-site).
+    it.each([
+      null,
+      undefined,
+      '',
+      'driver',
+      '//evil.example',
+      '/\\evil.example',
+      'https://x.y',
+      '/\t/evil.example',
+      '/\n/evil.example',
+      '/\r/evil.example',
+      '/\t\\evil.example',
+      '/\u0000/evil.example',
+      '/ /evil.example',
+    ])(
       'rejects %p',
       (path) => {
         expect(isSafeInternalPath(path)).toBe(false);

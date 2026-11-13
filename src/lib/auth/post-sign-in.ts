@@ -25,17 +25,28 @@ import { isCapacitorNative } from '@/lib/tracking/native-shift-tracking';
 export const NATIVE_LAUNCH_PATH = '/native-launch';
 const NATIVE_HOME = '/driver';
 
+// Placeholder origin: only used to check that a path cannot leave the site.
+const PROBE_ORIGIN = 'https://internal.invalid';
+// Control characters and whitespace. The URL parser silently strips tab/LF/CR,
+// so `/\t/evil.example` would otherwise resolve to `//evil.example`.
+const CONTROL_OR_WHITESPACE = /[\u0000-\u001f\u007f\s]/;
+
 /**
- * Same-origin, root-relative path only. Rejects protocol-relative (`//host`)
- * and backslash (`/\host`, which browsers normalise to `//host`) forms.
+ * Same-origin, root-relative path only. Rejects protocol-relative (`//host`),
+ * backslash (`/\host`, which browsers normalise to `//host`) and any path with
+ * control characters or whitespace, then confirms the path resolves on the
+ * same origin the way a browser would parse it.
  */
 export function isSafeInternalPath(path: string | null | undefined): path is string {
-  return (
-    typeof path === 'string' &&
-    path.startsWith('/') &&
-    !path.startsWith('//') &&
-    !path.startsWith('/\\')
-  );
+  if (typeof path !== 'string' || !path.startsWith('/')) return false;
+  if (path.startsWith('//') || path.startsWith('/\\')) return false;
+  if (CONTROL_OR_WHITESPACE.test(path)) return false;
+
+  try {
+    return new URL(path, PROBE_ORIGIN).origin === PROBE_ORIGIN;
+  } catch {
+    return false;
+  }
 }
 
 export function signedInDestination(redirectTo: string): string {
