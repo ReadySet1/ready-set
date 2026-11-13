@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth-middleware';
 import { withRawTx, DbHttpError } from '@/lib/db/raw';
 import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { BatteryLevelSchema } from '@/lib/tracking/battery';
+import { LOCATION_BATCH_MAX_POINTS } from '@/lib/tracking/location-batch';
 import { resolveRecordedAt } from '@/lib/tracking/recorded-at';
 import { shouldCheckClosedShift, shouldUpdateLastKnownLocation } from '@/lib/tracking/late-point';
 import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
@@ -27,7 +28,7 @@ import * as Sentry from '@sentry/nextjs';
  * interval and steals the slot from live posts, so a 5-minute outage never
  * caught up before End shift. This route takes the backlog in one request:
  * - not subject to the live cadence limiter (it carries history, not the live
- *   position); bounded instead by MAX_BATCH_POINTS and its own abuse bucket;
+ *   position); bounded instead by LOCATION_BATCH_MAX_POINTS and its own abuse bucket;
  * - every point is filed by its own fix time (clock-skew corrected), so mileage
  *   and trails place it in the right shift;
  * - only the newest point may move the live marker, and only when it is newer
@@ -43,9 +44,6 @@ import * as Sentry from '@sentry/nextjs';
  *   serialized per driver by a transaction-scoped advisory lock shared with
  *   the single-point route, so they cannot both pass the existence check.
  */
-
-/** Upper bound per request — the client sends backlogs in chunks of this size or less. */
-export const MAX_BATCH_POINTS = 100;
 
 interface BatchPointInput {
   latitude?: unknown;
@@ -120,9 +118,9 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (points.length === 0 || points.length > MAX_BATCH_POINTS) {
+    if (points.length === 0 || points.length > LOCATION_BATCH_MAX_POINTS) {
       return NextResponse.json(
-        { success: false, error: `points must hold 1-${MAX_BATCH_POINTS} items` },
+        { success: false, error: `points must hold 1-${LOCATION_BATCH_MAX_POINTS} items` },
         { status: 400 },
       );
     }

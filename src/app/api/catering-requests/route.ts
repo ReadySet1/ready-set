@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
 import { localTimeToUtc } from "@/lib/utils/timezone";
 import { resolveAddressTimezone } from "@/lib/utils/address-timezone";
+import { formatDateTimeForDisplay, formatDateTimeWithZone } from "@/lib/utils/date-display";
 import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
 import { randomUUID } from "crypto";
 import { Resend } from "resend";
@@ -46,29 +47,20 @@ const sendOrderConfirmationEmail = async (
     headcount: number | null;
     orderTotal: string | null;
     orderId: string;
+    /** The order's pickup-address zone: the email shows times on that clock. */
+    timeZone: string;
   }
 ) => {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
-  // Format dates
-  const orderDateStr = orderDetails.orderDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  const pickupTimeStr = orderDetails.pickupTime.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-
-  const arrivalTimeStr = orderDetails.arrivalTime.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  // Format dates on the order's clock, never the server's (UTC)
+  const orderDateStr = formatDateTimeForDisplay(
+    orderDetails.orderDate,
+    'EEEE, MMMM d, yyyy',
+    orderDetails.timeZone,
+  );
+  const pickupTimeStr = formatDateTimeWithZone(orderDetails.pickupTime, orderDetails.timeZone, 'h:mm a');
+  const arrivalTimeStr = formatDateTimeWithZone(orderDetails.arrivalTime, orderDetails.timeZone, 'h:mm a');
 
   // Generate order details table (omit null fields rather than showing "null people" or "$null")
   const orderDetailsTable = generateDetailsTable([
@@ -442,6 +434,7 @@ export async function POST(request: NextRequest) {
             headcount: cateringRequest.headcount ?? null,
             orderTotal: cateringRequest.orderTotal?.toString() ?? null,
             orderId: cateringRequest.id,
+            timeZone: orderZone,
           }
         );
       }

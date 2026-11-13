@@ -26,6 +26,7 @@ import {
   StatusPill,
   StatusTimeline,
   Spinner,
+  formatOrderTime,
   formatTime,
   getDriverNextActionLabel,
   getNextStatus,
@@ -38,6 +39,7 @@ import { ReturnDeclinedNotice } from "@/components/Driver/ui/ReturnDeclinedNotic
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { addressQuery } from "@/lib/driver-navigation";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 import { useDriverTracking } from "@/contexts/DriverTrackingContext";
 import { checkArrivalGeofence, geofenceHint } from "@/lib/driver/geofence";
 import { requiresActiveShift } from "@/lib/state-machine/driver-state";
@@ -86,6 +88,8 @@ interface AddressLike {
   /** Present when the address was geocoded — used by the arrival geofence. */
   latitude?: number | null;
   longitude?: number | null;
+  /** Stored IANA zone (addresses.timezone); order times are shown on it. */
+  timezone?: string | null;
 }
 
 /** [lng, lat] tuple for the geofence check, or null when ungeocoded (fail-open). */
@@ -680,12 +684,15 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
   const completing = nextStatus === DriverStatus.COMPLETED;
   const pickingUp = nextStatus === DriverStatus.PICKED_UP;
 
+  // Every order time reads on the pickup address clock, not the phone's.
+  const orderZone = orderTimezone(order);
+
   // Build formatted timestamps keyed by DriverStatus for the timeline.
   const timestamps: Partial<Record<DriverStatus, string>> = {};
   if (order.deliveryTimestamps) {
     for (const [status, field] of Object.entries(TIMESTAMP_FIELD_BY_STATUS)) {
       const raw = order.deliveryTimestamps[field as keyof DeliveryTimestampMap];
-      const formatted = formatTime(raw);
+      const formatted = formatTime(raw, orderZone);
       if (formatted) timestamps[status as DriverStatus] = formatted;
     }
   }
@@ -750,7 +757,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         </div>
         {order.arrivalDateTime ? (
           <div className="text-[12.5px] font-semibold text-driver-muted">
-            Drop-off scheduled {formatTime(order.arrivalDateTime)}
+            Drop-off scheduled {formatOrderTime(order.arrivalDateTime, orderZone)}
           </div>
         ) : null}
         {pendingReturn && !isDone ? (
@@ -804,7 +811,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         ) : null}
         {order.pickupDateTime ? (
           <div className="text-[12.5px] font-semibold text-driver-muted">
-            Pickup {formatTime(order.pickupDateTime)}
+            Pickup {formatOrderTime(order.pickupDateTime, orderZone)}
           </div>
         ) : null}
         {order.pickupNotes ? (
@@ -848,7 +855,7 @@ export function DriverDeliveryDetail({ orderNumber }: DriverDeliveryDetailProps)
         ) : null}
         {order.arrivalDateTime ? (
           <div className="text-[12.5px] font-semibold text-driver-muted">
-            Arrive by {formatTime(order.arrivalDateTime)}
+            Arrive by {formatOrderTime(order.arrivalDateTime, orderZone)}
           </div>
         ) : null}
         {order.specialNotes ? (

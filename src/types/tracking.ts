@@ -77,6 +77,8 @@ export interface DeliveryTracking {
   actualArrival?: Date;
   /** Scheduled pickup time from the order (drives the Today/All filter + card label). */
   scheduledPickupAt?: Date;
+  /** IANA zone of the order's pickup address; scheduled times are shown on it. */
+  timeZone?: string;
   route: LocationUpdate[];
   proofOfDelivery?: string;
   actualDistanceMiles?: number;

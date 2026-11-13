@@ -62,6 +62,13 @@ jest.mock("@/components/Auth/GoogleAuthButton", () => {
   };
 });
 
+// Post-sign-in navigation goes through the shell-aware helper (the native
+// wrapper must hop via /native-launch, never full-load a redirecting URL).
+const mockNavigateAfterSignIn = jest.fn();
+jest.mock("@/lib/auth/post-sign-in", () => ({
+  navigateAfterSignIn: (...args: unknown[]) => mockNavigateAfterSignIn(...args),
+}));
+
 jest.mock("@/components/Common/Loader", () => {
   return function MockLoader() {
     return <div>Loading...</div>;
@@ -70,6 +77,7 @@ jest.mock("@/components/Common/Loader", () => {
 
 // Import the component after setting up mocks
 import SignIn from "../SignIn";
+import { login } from "@/app/actions/login";
 
 const mockRouter = {
   push: jest.fn(),
@@ -510,6 +518,26 @@ describe("SignIn Component", () => {
       // Verify form was submitted (login action would be called)
       expect(emailInput).toHaveValue("test@example.com");
       expect(passwordInput).toHaveValue("password123");
+    });
+
+    it("hands the server's redirectTo to the shell-aware post-sign-in navigation", async () => {
+      (login as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        redirectTo: "/driver",
+        message: "Welcome back! Redirecting to your dashboard...",
+      });
+      const user = userEvent.setup();
+      render(<SignIn />);
+
+      await user.type(screen.getByPlaceholderText("Email"), "driver@example.com");
+      await user.type(screen.getByPlaceholderText("Password"), "password123");
+      await user.click(screen.getByRole("button", { name: /^Sign in$/ }));
+
+      await waitFor(
+        () => expect(mockNavigateAfterSignIn).toHaveBeenCalledWith("/driver"),
+        { timeout: 2000 },
+      );
+      expect(mockNavigateAfterSignIn).toHaveBeenCalledTimes(1);
     });
   });
 

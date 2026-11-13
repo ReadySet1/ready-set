@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatTimeForDisplay, formatDateTimeForDisplay } from '@/lib/utils/date-display';
+import { TIMEZONE_CONFIG } from '@/lib/config/timezone';
+import { timezoneAbbreviation } from '@/lib/utils/address-timezone';
 import { DriverStatus } from '@/types/order';
 import { getStatusIndex, STATUS_ORDER } from '@/lib/delivery-status-transitions';
 
@@ -54,6 +56,8 @@ export interface DeliveryTimelineProps {
   canUpdateStatus?: boolean;
   /** Callback fired when the user clicks a timeline step to advance driver status */
   onStatusUpdate?: (newStatus: DriverStatus) => Promise<void>;
+  /** IANA zone the times are shown in: the order's pickup-address zone (default: app zone) */
+  timeZone?: string;
 }
 
 function getDuration(
@@ -111,6 +115,7 @@ export function DeliveryTimeline({
   compact = false,
   canUpdateStatus = false,
   onStatusUpdate,
+  timeZone = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
 }: DeliveryTimelineProps) {
   const [updatingStatus, setUpdatingStatus] = useState<DriverStatus | null>(null);
 
@@ -276,7 +281,7 @@ export function DeliveryTimeline({
 
                 {isCompleted && hasTimestamp && (
                   <span className={cn('text-muted-foreground', compact ? 'text-[10px]' : 'text-xs')}>
-                    {formatTimeForDisplay(stage.timestamp)}
+                    {formatTimeForDisplay(stage.timestamp, timeZone)}
                   </span>
                 )}
 
@@ -325,7 +330,8 @@ export function DeliveryTimeline({
                     <Clock className="h-3 w-3" />
                   )}
                   <span className="text-xs">
-                    Est. {formatTimeForDisplay(stage.estimatedTime)}
+                    Est. {formatTimeForDisplay(stage.estimatedTime, timeZone)}{' '}
+                    {timezoneAbbreviation(timeZone)}
                     {isLateStage && ' (late)'}
                   </span>
                 </div>
@@ -334,7 +340,7 @@ export function DeliveryTimeline({
               {/* Full date for first and last stages when not compact */}
               {isCompleted && (stage.key === 'created' || stage.key === 'delivered') && !compact && (
                 <span className="text-[10px] text-muted-foreground">
-                  {formatDateTimeForDisplay(stage.timestamp, 'MMM d, yyyy')}
+                  {formatDateTimeForDisplay(stage.timestamp, 'MMM d, yyyy', timeZone)}
                 </span>
               )}
             </div>

@@ -15,7 +15,8 @@
 
 import { NextRequest } from "next/server";
 import { GET, POST } from "../route";
-import { validateApiAuth } from "@/utils/api-auth";
+import { getUserRole } from "@/lib/auth";
+import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendDeliveryNotifications } from "@/services/notifications/delivery-notifications";
 import { invalidateVendorCacheOnOrderCreate } from "@/lib/cache/cache-invalidation";
@@ -31,9 +32,14 @@ import {
   createMockOnDemandOrder,
 } from "@/__tests__/helpers/api-test-helpers";
 
-// Mock dependencies
-jest.mock("@/utils/api-auth", () => ({
-  validateApiAuth: jest.fn(),
+// Mock dependencies. Auth runs through the real withAuth: the Supabase session
+// supplies the user and profiles.type (getUserRole) supplies the role.
+jest.mock("@/utils/supabase/server", () => ({
+  createClient: jest.fn(),
+}));
+
+jest.mock("@/lib/auth", () => ({
+  getUserRole: jest.fn(),
 }));
 
 jest.mock("@/utils/prismaDB", () => ({
@@ -45,6 +51,9 @@ jest.mock("@/utils/prismaDB", () => ({
     onDemand: {
       findMany: jest.fn(),
       create: jest.fn(),
+    },
+    address: {
+      findMany: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -62,7 +71,17 @@ jest.mock("next/headers", () => ({
   cookies: jest.fn().mockResolvedValue({}),
 }));
 
-const mockValidateApiAuth = validateApiAuth as jest.MockedFunction<typeof validateApiAuth>;
+const mockCreateClient = createClient as jest.Mock;
+const mockGetUserRole = getUserRole as jest.Mock;
+
+type SessionUser = { id: string; email: string };
+
+function signInAs(user: SessionUser | null, role: string | null = null) {
+  mockCreateClient.mockResolvedValue({
+    auth: { getUser: jest.fn().mockResolvedValue({ data: { user }, error: null }) },
+  });
+  mockGetUserRole.mockResolvedValue(role);
+}
 const mockPrisma = prisma as any;
 const mockSendNotifications = sendDeliveryNotifications as jest.MockedFunction<typeof sendDeliveryNotifications>;
 const mockInvalidateCache = invalidateVendorCacheOnOrderCreate as jest.MockedFunction<typeof invalidateVendorCacheOnOrderCreate>;
@@ -98,14 +117,16 @@ describe("/api/orders", () => {
     jest.clearAllMocks();
 
     // Default: authenticated user
-    mockValidateApiAuth.mockResolvedValue({
-      isValid: true,
-      user: mockUser,
-    });
+    signInAs(mockUser, mockUser.type);
 
     // Default: empty orders
     mockPrisma.cateringRequest.findMany.mockResolvedValue([]);
     mockPrisma.onDemand.findMany.mockResolvedValue([]);
+
+    // Default: every requested address exists and is usable by the caller
+    mockPrisma.address.findMany.mockImplementation(async (args: any) =>
+      (args?.where?.id?.in ?? []).map((id: string) => ({ id })),
+    );
 
     // Default: successful notifications
     mockSendNotifications.mockResolvedValue(undefined);
@@ -114,10 +135,7 @@ describe("/api/orders", () => {
 
   describe("GET /api/orders", () => {
     it("should return 401 when not authenticated", async () => {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: false,
-        user: null,
-      });
+      signInAs(null);
 
       const request = createGetRequest("http://localhost:3000/api/orders");
       const response = await GET(request);
@@ -328,10 +346,7 @@ describe("/api/orders", () => {
     };
 
     it("should return 401 when not authenticated", async () => {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: false,
-        user: null,
-      });
+      signInAs(null);
 
       const request = createPostRequest(
         "http://localhost:3000/api/orders",
@@ -626,12 +641,8 @@ describe("/api/orders", () => {
       return create;
     }
 
-    function asRole(type: string) {
-      mockValidateApiAuth.mockResolvedValue({
-        isValid: true,
-        user: { ...mockUser, type },
-        userType: type as any,
-      });
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
     }
 
     const post = (body: unknown) =>
@@ -807,7 +818,35 @@ describe("/api/orders", () => {
       const response = await post(minimalCatering);
 
       expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: "Forbidden - this account type cannot create orders",
+      });
       expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.address.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, string | null]>([
+      ["no role", null],
+      ["an unknown role", "MYSTERY"],
+    ])("forbids a caller with %s from creating orders (deny by default)", async (_label, role) => {
+      asRole(role);
+      const create = captureCreate("cateringRequest", mockCateringOrder);
+
+      const response = await post(minimalCatering);
+
+      expect(response.status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unauthenticated caller before reading the body", async () => {
+      signInAs(null);
+
+      const response = await POST(
+        new NextRequest("http://localhost:3000/api/orders", { method: "POST", body: "{not json" }),
+      );
+
+      await expectUnauthorized(response, "Authentication required");
     });
 
     it.each(["CLIENT", "VENDOR", "ADMIN", "SUPER_ADMIN", "HELPDESK"])(
@@ -842,6 +881,377 @@ describe("/api/orders", () => {
       });
 
       await expectValidationError(response);
+    });
+  });
+  describe("GET /api/orders — owner scoping", () => {
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
+    }
+
+    const whereOf = (model: "cateringRequest" | "onDemand") =>
+      mockPrisma[model].findMany.mock.calls[0][0].where;
+
+    it.each(["CLIENT", "VENDOR", "DRIVER"])(
+      "limits a %s caller to their own catering and on-demand orders",
+      async (role) => {
+        asRole(role);
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        expect(whereOf("cateringRequest").userId).toBe(mockUser.id);
+        expect(whereOf("onDemand").userId).toBe(mockUser.id);
+      },
+    );
+
+    it("keeps the owner filter when search and status are also applied", async () => {
+      asRole("CLIENT");
+
+      await GET(
+        createRequestWithParams("http://localhost:3000/api/orders", {
+          search: "someone-else@example.com",
+          status: "ACTIVE",
+        }),
+      );
+
+      const where = whereOf("cateringRequest");
+      expect(where.userId).toBe(mockUser.id);
+      expect(where.status).toBe("ACTIVE");
+      expect(where.OR).toEqual(expect.any(Array));
+    });
+
+    it.each<[string, string | null]>([
+      ["no role", null],
+      ["an unknown role", "MYSTERY"],
+    ])("rejects a caller with %s and lists nothing (deny by default)", async (_label, role) => {
+      asRole(role);
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      expect(response.status).toBe(403);
+      expect(mockPrisma.cateringRequest.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.onDemand.findMany).not.toHaveBeenCalled();
+    });
+
+    it("scopes by the authenticated session's user id", async () => {
+      signInAs({ id: "session-user-id", email: "other@example.com" }, "CLIENT");
+
+      await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      expect(whereOf("cateringRequest").userId).toBe("session-user-id");
+      expect(whereOf("onDemand").userId).toBe("session-user-id");
+    });
+
+    it("authenticates a Bearer token when one is sent", async () => {
+      const getUser = jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null });
+      mockCreateClient.mockResolvedValue({ auth: { getUser } });
+
+      const response = await GET(
+        createGetRequest("http://localhost:3000/api/orders", { authorization: "Bearer token-abc" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(getUser).toHaveBeenCalledWith("token-abc");
+    });
+
+    it("returns 401 when the Supabase session is invalid", async () => {
+      mockCreateClient.mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: "JWT expired" } }),
+        },
+      });
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      await expectUnauthorized(response, "Authentication required");
+      expect(mockPrisma.cateringRequest.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK", "admin"])(
+      "lets %s see every order",
+      async (role) => {
+        asRole(role);
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        expect(whereOf("cateringRequest")).not.toHaveProperty("userId");
+        expect(whereOf("onDemand")).not.toHaveProperty("userId");
+      },
+    );
+  });
+
+  describe("GET /api/orders — soft delete", () => {
+    it.each(["CLIENT", "ADMIN"])(
+      "excludes soft-deleted orders for %s",
+      async (role) => {
+        signInAs(mockUser, role);
+
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        for (const model of ["cateringRequest", "onDemand"] as const) {
+          expect(mockPrisma[model].findMany.mock.calls[0][0].where.deletedAt).toBeNull();
+        }
+      },
+    );
+
+    describe("embedded client profile", () => {
+      const fullProfileRow = {
+        id: "client-1",
+        guid: null,
+        name: "Client Name",
+        email: "client@example.com",
+        type: "CLIENT",
+        contactNumber: "555-0100",
+        companyName: "Client Co",
+        street1: "1 Private Rd",
+        sideNotes: "internal note",
+        confirmationCode: "secret-code",
+        isTemporaryPassword: true,
+        status: "ACTIVE",
+        deletedAt: null,
+        deletedBy: null,
+        userAddresses: [{ address: { id: "addr-1", street1: "1 Private Rd" } }],
+      };
+
+      // Behaves like Prisma: returns only the profile columns the query selects.
+      function findManyHonouringUserSelect(order: Record<string, unknown>) {
+        return async (args: any) => {
+          const select = args?.include?.user?.select;
+          const user = select
+            ? Object.fromEntries(
+                Object.keys(select)
+                  .filter((key) => select[key])
+                  .map((key) => [key, (fullProfileRow as any)[key]]),
+              )
+            : fullProfileRow;
+          return [{ ...order, user }];
+        };
+      }
+
+      it("selects only the client fields consumers use, never auth flags or the address book", async () => {
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        for (const model of ["cateringRequest", "onDemand"] as const) {
+          const { include } = mockPrisma[model].findMany.mock.calls[0][0];
+          expect(include.user).toEqual({
+            select: { id: true, name: true, email: true },
+          });
+        }
+      });
+
+      it("omits sensitive profile fields from every order in the response", async () => {
+        signInAs(mockUser, "ADMIN");
+        mockPrisma.cateringRequest.findMany.mockImplementation(
+          findManyHonouringUserSelect(mockCateringOrder),
+        );
+        mockPrisma.onDemand.findMany.mockImplementation(
+          findManyHonouringUserSelect(mockOnDemandOrder),
+        );
+
+        const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.orders).toHaveLength(2);
+        for (const order of data.orders) {
+          expect(order.client).toEqual({
+            id: "client-1",
+            name: "Client Name",
+            email: "client@example.com",
+          });
+        }
+      });
+    });
+  });
+
+  describe("POST /api/orders — address ownership", () => {
+    const PICKUP_ADDRESS_ID = "11111111-1111-4111-8111-111111111111";
+    const DELIVERY_ADDRESS_ID = "22222222-2222-4222-8222-222222222222";
+    const body = {
+      type: "catering",
+      pickupAddressId: PICKUP_ADDRESS_ID,
+      deliveryAddressId: DELIVERY_ADDRESS_ID,
+    };
+
+    function asRole(type: string | null) {
+      signInAs(mockUser, type);
+    }
+
+    function captureCreate() {
+      const create = jest.fn().mockResolvedValue(mockCateringOrder);
+      mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+        callback({ cateringRequest: { create } }),
+      );
+      return create;
+    }
+
+    const post = (payload: unknown) =>
+      POST(createPostRequest("http://localhost:3000/api/orders", payload));
+
+    const addressWhere = () => mockPrisma.address.findMany.mock.calls[0][0].where;
+
+    it("looks up both addresses scoped to the client's own, linked or shared addresses", async () => {
+      asRole("CLIENT");
+      captureCreate();
+
+      await post(body);
+
+      const where = addressWhere();
+      expect(where.id).toEqual({ in: expect.arrayContaining([PICKUP_ADDRESS_ID, DELIVERY_ADDRESS_ID]) });
+      expect(where.deletedAt).toBeNull();
+      expect(where.OR).toEqual(
+        expect.arrayContaining([
+          { createdBy: mockUser.id },
+          { isShared: true },
+          { userAddresses: { some: { userId: mockUser.id } } },
+        ]),
+      );
+    });
+
+    it("uses the authenticated session's user id for address ownership and the order's userId", async () => {
+      signInAs({ id: "session-user-id", email: "other@example.com" }, "CLIENT");
+      const create = captureCreate();
+
+      await expectSuccessResponse(await post(body), 200);
+
+      expect(addressWhere().OR).toEqual(
+        expect.arrayContaining([
+          { createdBy: "session-user-id" },
+          { userAddresses: { some: { userId: "session-user-id" } } },
+        ]),
+      );
+      expect(create.mock.calls[0][0].data.userId).toBe("session-user-id");
+      expect(mockInvalidateCache).toHaveBeenCalledWith("session-user-id", mockCateringOrder.id);
+    });
+
+    it("rejects a client using another user's pickup address (400, nothing created)", async () => {
+      asRole("CLIENT");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: DELIVERY_ADDRESS_ID }]);
+
+      const response = await post(body);
+
+      const data = await expectValidationError(response);
+      expect(data.fields).toEqual(["pickupAddressId"]);
+      expect(create).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects a client using another user's delivery address", async () => {
+      asRole("VENDOR");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: PICKUP_ADDRESS_ID }]);
+
+      const data = await expectValidationError(await post(body));
+
+      expect(data.fields).toEqual(["deliveryAddressId"]);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("gives the same answer for a missing address and a foreign one", async () => {
+      asRole("CLIENT");
+      captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([]);
+
+      const data = await expectValidationError(await post(body));
+
+      expect(data.error).toBe("Address not found");
+      expect(data.fields).toEqual(["pickupAddressId", "deliveryAddressId"]);
+    });
+
+    it("accepts the same address for pickup and delivery", async () => {
+      asRole("CLIENT");
+      captureCreate();
+
+      const response = await post({ ...body, deliveryAddressId: PICKUP_ADDRESS_ID });
+
+      await expectSuccessResponse(response, 200);
+    });
+
+    it.each(["ADMIN", "SUPER_ADMIN", "HELPDESK"])(
+      "lets %s use any address, but never a soft-deleted one",
+      async (role) => {
+        asRole(role);
+        captureCreate();
+
+        await post(body);
+
+        const where = addressWhere();
+        expect(where).not.toHaveProperty("OR");
+        expect(where.deletedAt).toBeNull();
+      },
+    );
+
+    it("rejects an admin using a soft-deleted (or missing) address", async () => {
+      asRole("ADMIN");
+      const create = captureCreate();
+      mockPrisma.address.findMany.mockResolvedValue([{ id: PICKUP_ADDRESS_ID }]);
+
+      await expectValidationError(await post(body));
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("/api/orders — error responses never leak internals", () => {
+    const PRISMA_DETAIL = "Invalid `prisma.cateringRequest.findMany()` invocation: table public.secret_internal_table does not exist";
+
+    beforeEach(() => {
+      jest.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      (console.error as jest.Mock).mockRestore();
+    });
+
+    it("GET returns a generic message for a Prisma error and logs the detail", async () => {
+      mockPrisma.cateringRequest.findMany.mockRejectedValue({ code: "P2021", message: PRISMA_DETAIL });
+
+      const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+      const data = await expectServerError(response);
+      expect(data).toEqual({ error: "Failed to fetch orders" });
+      expect(JSON.stringify(data)).not.toContain("secret_internal_table");
+      expect(JSON.stringify((console.error as jest.Mock).mock.calls)).toContain("secret_internal_table");
+    });
+
+    it("GET does not echo a generic error's message back", async () => {
+      mockPrisma.onDemand.findMany.mockRejectedValue(new Error(PRISMA_DETAIL));
+
+      const data = await expectServerError(
+        await GET(createGetRequest("http://localhost:3000/api/orders")),
+      );
+
+      expect(data).toEqual({ error: "Failed to fetch orders" });
+    });
+
+    it("POST returns a generic message for a Prisma error and logs the detail", async () => {
+      mockPrisma.$transaction.mockRejectedValue({ code: "P2002", message: PRISMA_DETAIL });
+
+      const response = await POST(
+        createPostRequest("http://localhost:3000/api/orders", {
+          type: "catering",
+          pickupAddressId: "11111111-1111-4111-8111-111111111111",
+          deliveryAddressId: "22222222-2222-4222-8222-222222222222",
+        }),
+      );
+
+      const data = await expectServerError(response);
+      expect(data).toEqual({ error: "Failed to create order" });
+      expect(JSON.stringify((console.error as jest.Mock).mock.calls)).toContain("secret_internal_table");
+    });
+
+    it("POST does not echo a generic error's message back", async () => {
+      mockPrisma.$transaction.mockRejectedValue(new Error(PRISMA_DETAIL));
+
+      const data = await expectServerError(
+        await POST(
+          createPostRequest("http://localhost:3000/api/orders", {
+            type: "catering",
+            pickupAddressId: "11111111-1111-4111-8111-111111111111",
+            deliveryAddressId: "22222222-2222-4222-8222-222222222222",
+          }),
+        ),
+      );
+
+      expect(data).toEqual({ error: "Failed to create order" });
     });
   });
 });

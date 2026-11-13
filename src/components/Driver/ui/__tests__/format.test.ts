@@ -1,4 +1,9 @@
-import { formatDuration, formatDurationShort, formatTime } from "../format";
+import {
+  formatDuration,
+  formatDurationShort,
+  formatOrderTime,
+  formatTime,
+} from "../format";
 
 describe("driver format helpers", () => {
   describe("formatDuration", () => {
@@ -31,6 +36,33 @@ describe("driver format helpers", () => {
     it("formats a valid date to a time string", () => {
       const result = formatTime(new Date("2026-06-05T09:05:00"));
       expect(result).toMatch(/9:05/);
+    });
+  });
+
+  describe("formatTime in an order time zone", () => {
+    // 2026-11-20T17:00Z = 11:00 AM Central (CST) = 9:00 AM Pacific (PST)
+    const instant = "2026-11-20T17:00:00.000Z";
+
+    it("formats the wall clock of the given zone, not the device zone", () => {
+      expect(formatTime(instant, "America/Chicago")).toBe("11:00 AM");
+      expect(formatTime(instant, "America/Los_Angeles")).toBe("9:00 AM");
+    });
+  });
+
+  describe("formatOrderTime", () => {
+    const instant = "2026-11-20T17:00:00.000Z";
+
+    it("shows a Central order's time on the Central clock with its label", () => {
+      expect(formatOrderTime(instant, "America/Chicago")).toBe("11:00 AM CT");
+    });
+
+    it("shows a Pacific order's time on the Pacific clock with its label", () => {
+      expect(formatOrderTime(instant, "America/Los_Angeles")).toBe("9:00 AM PT");
+    });
+
+    it("returns empty string for nullish/invalid input", () => {
+      expect(formatOrderTime(null, "America/Chicago")).toBe("");
+      expect(formatOrderTime("not-a-date", "America/Chicago")).toBe("");
     });
   });
 });

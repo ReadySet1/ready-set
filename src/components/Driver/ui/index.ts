@@ -6,7 +6,12 @@ export type { DriverThemeMode } from "./DriverThemeProvider";
 export { DriverScreen } from "./DriverScreen";
 export { BottomNav } from "./BottomNav";
 export { ShiftPill } from "./ShiftPill";
-export { formatDuration, formatDurationShort, formatTime } from "./format";
+export {
+  formatDuration,
+  formatDurationShort,
+  formatOrderTime,
+  formatTime,
+} from "./format";
 export { DriverCard } from "./Card";
 export { DriverButton } from "./DriverButton";
 export { StatusPill } from "./StatusPill";

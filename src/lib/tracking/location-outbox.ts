@@ -36,7 +36,7 @@ import { RECORDED_AT_MAX_PAST_MS } from '@/lib/tracking/recorded-at';
 export const OUTBOX_MAX_POINTS = 2000;
 /** Older fixes can't be filed by the server (it would stamp them NOW()), so drop them. */
 export const OUTBOX_MAX_AGE_MS = RECORDED_AT_MAX_PAST_MS - 60 * 60 * 1000;
-/** Points per batch request (the route accepts up to 100). */
+/** Points per batch request (the route accepts up to LOCATION_BATCH_MAX_POINTS). */
 export const OUTBOX_BATCH_SIZE = 50;
 /** Quiet period after the server answers 429. */
 export const OUTBOX_429_BACKOFF_MS = 30_000;

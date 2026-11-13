@@ -16,6 +16,8 @@
 
 import { Resend } from "resend";
 import { sendEmailWithResilience } from "@/utils/email-resilience";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import { formatDateTimeForDisplay, formatDateTimeWithZone } from "@/lib/utils/date-display";
 import {
   generateUnifiedEmailTemplate,
   generateDetailsTable,
@@ -118,6 +120,10 @@ export interface AddressData {
   state: string;
   zip: string;
   county?: string | null;
+  /** Zone inputs: order times in emails are shown on the pickup address clock. */
+  timezone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /**
@@ -323,23 +329,17 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
     return false;
   }
 
+  // Order times read on the pickup address clock, never the server's (UTC).
+  const orderZone = orderTimezone(data);
+
   const formatDate = (date: Date | null) => {
     if (!date) return "N/A";
-    return new Date(date).toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return formatDateTimeForDisplay(date, "EEE, MMM d, yyyy", orderZone);
   };
 
   const formatTime = (time: Date | null) => {
     if (!time) return "N/A";
-    return new Date(time).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
+    return formatDateTimeWithZone(time, orderZone, "h:mm a");
   };
 
   const formatAddress = (address: AddressData) => {
@@ -491,16 +491,12 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
  * Send order confirmation to customer
  */
 export async function sendOrderConfirmationToCustomer(data: CustomerOrderConfirmationData): Promise<boolean> {
+  // Order times read on the pickup address clock, never the server's (UTC).
+  const orderZone = orderTimezone(data);
+
   const formatTime = (time: Date | null) => {
     if (!time) return "N/A";
-    return new Date(time).toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTimeWithZone(time, orderZone, "EEEE, MMMM d, yyyy h:mm a");
   };
 
   const formatAddress = (address: AddressData) => {
