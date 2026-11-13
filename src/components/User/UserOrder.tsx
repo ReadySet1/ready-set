@@ -21,6 +21,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import {
+  formatDateForDisplay,
+  formatDateTimeWithZone,
+} from "@/lib/utils/date-display";
 
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
@@ -36,6 +41,9 @@ interface Address {
   city?: string | null;
   state?: string | null;
   zip?: string | null;
+  timezone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface Driver {
@@ -139,15 +147,14 @@ const UserOrderDetail: React.FC = () => {
     return [street1, city, state, zip].filter(Boolean).join(", ") || "N/A";
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString();
-  };
+  // Order times read on the pickup address clock, same as the timeline below.
+  const orderZone = orderTimezone({ pickupAddress: order?.address });
 
-  const formatTime = (dateString: string | null) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleTimeString();
-  };
+  const formatDate = (dateString: string | null) =>
+    formatDateForDisplay(dateString, orderZone);
+
+  const formatTime = (dateString: string | null) =>
+    formatDateTimeWithZone(dateString, orderZone, "h:mm a");
 
   const updateDriverStatus = async (newStatus: string) => {
     if (!order) return;
@@ -328,6 +335,7 @@ const UserOrderDetail: React.FC = () => {
             deliveredAt={order.deliveryTimestamps?.deliveredAt}
             estimatedPickupTime={order.pickup_time}
             estimatedDeliveryTime={order.arrival_time}
+            timeZone={orderZone}
             currentStatus={order.driver_status}
           />
         </CardContent>

@@ -304,6 +304,25 @@ describe("DriverDashboardPage", () => {
       });
     });
 
+    it("shows an Austin order's pickup and delivery times on the Central clock", async () => {
+      // 2026-11-21T05:30Z = Nov 20, 11:30 PM CST; 2026-11-20T18:00Z = 12:00 PM CST
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ...mockCateringOrder,
+          pickupDateTime: "2026-11-21T05:30:00Z",
+          arrivalDateTime: "2026-11-20T18:00:00Z",
+          pickupAddress: { ...mockCateringOrder.pickupAddress, state: "TX", zip: "78701" },
+        }),
+      });
+
+      render(<DriverDashboardPage />);
+
+      expect(await screen.findByText("11:30 PM CT")).toBeInTheDocument();
+      expect(screen.getByText("12:00 PM CT")).toBeInTheDocument();
+      expect(screen.getAllByText("Nov 20, 2026")).toHaveLength(2);
+    });
+
     it("should display pickup and delivery addresses", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

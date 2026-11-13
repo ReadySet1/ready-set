@@ -10,8 +10,9 @@ import {
   DriverButton,
   Segmented,
   StateBlock,
-  formatTime,
+  formatOrderTime,
 } from "@/components/Driver/ui";
+import { orderTimezone } from "@/lib/utils/address-timezone";
 import type { ApiDelivery } from "@/hooks/driver/useDriverDeliveriesFeed";
 
 type Tab = "today" | "upcoming" | "completed";
@@ -141,7 +142,7 @@ export function DriverDeliveryList({
               status={d.driverStatus}
               pickupName={pickupName(d)}
               dropoffName={dropoffName(d)}
-              timeLabel={formatTime(d.pickupDateTime)}
+              timeLabel={formatOrderTime(d.pickupDateTime, orderTimezone(d))}
               meta={metaFor(d)}
               total={formatCurrency(d.order_total)}
               onClick={() =>

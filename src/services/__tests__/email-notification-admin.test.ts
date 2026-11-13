@@ -365,6 +365,23 @@ describe("Email Notification Service - Admin Notifications", () => {
         expect(mockResendClient.emails.send).toHaveBeenCalled();
       });
 
+      it("shows an Austin order's date and times on the Central clock", async () => {
+        // 2026-11-21T05:30Z is still Nov 20 in Central (11:30 PM CST)
+        await sendOrderNotificationToAdmin({
+          ...baseOrderData,
+          orderType: "catering" as const,
+          date: new Date("2026-11-21T05:30:00Z"),
+          pickupTime: new Date("2026-11-21T05:30:00Z"),
+          arrivalTime: new Date("2026-11-20T18:30:00Z"),
+          pickupAddress: { street1: "1 Congress Ave", city: "Austin", state: "TX", zip: "78701" },
+        });
+
+        const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
+        expect(lastCall.html).toContain("Fri, Nov 20, 2026");
+        expect(lastCall.html).toContain("11:30 PM CT");
+        expect(lastCall.html).toContain("12:30 PM CT");
+      });
+
       it("should handle null dates gracefully", async () => {
         const orderData = {
           ...baseOrderData,
