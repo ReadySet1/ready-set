@@ -3,6 +3,38 @@
   "subtitle": "Product updates, in plain language",
   "entries": [
     {
+      "version": "2.13.0",
+      "date": "2026-11-13",
+      "title": "Release 2.13.0",
+      "summary": "",
+      "changes": [
+        {
+          "text": "Customer and vendor order pages now show times in the restaurant's local timezone.",
+          "type": "fixed"
+        },
+        {
+          "text": "Order times now show in the restaurant's local timezone for drivers and in order emails.",
+          "type": "fixed"
+        },
+        {
+          "text": "Customers can place on-demand orders from the website again.",
+          "type": "fixed"
+        },
+        {
+          "text": "Signing in to the driver app on iPhone no longer opens Safari.",
+          "type": "fixed"
+        },
+        {
+          "text": "Vendors and clients can now edit the headcount and order total on their own catering orders from the order page, until a driver is assigned.",
+          "type": "new"
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.13.0"
+      }
+    },
+    {
       "version": "2.12.0",
       "date": "2026-11-10",
       "title": "Reliable partner order updates and accurate order times",
