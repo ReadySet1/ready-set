@@ -259,8 +259,18 @@ describe("OnDemandOrderForm", () => {
 
     // Check that key form elements are rendered
     expect(screen.getAllByTestId("mock-address-manager")).toHaveLength(2); // Two address managers (pickup and delivery)
-    expect(screen.getByLabelText(/brokerage.*direct/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/client attention/i)).toBeInTheDocument();
+  });
+
+  it("does not render brokerage or order number inputs the order cannot store", async () => {
+    await act(async () => {
+      render(<OnDemandOrderForm />);
+    });
+
+    // On-demand orders have no brokerage column and the order number is
+    // generated server-side, so typed values would silently vanish.
+    expect(screen.queryByLabelText(/brokerage/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/order number/i)).not.toBeInTheDocument();
   });
 
   it("redirects to client dashboard for client users after successful form submission", async () => {
@@ -295,13 +305,6 @@ describe("OnDemandOrderForm", () => {
     await waitForInit();
 
     // Fill out the form with valid data
-    // Fill brokerage/direct field
-    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-    await user.selectOptions(brokerageSelect, "direct");
-
-    // Fill order number
-    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
     // Fill date
     const dateInput = screen.getByLabelText(/date/i);
     await user.clear(dateInput);
@@ -388,13 +391,6 @@ describe("OnDemandOrderForm", () => {
     await waitForInit();
 
     // Fill out the form with valid data
-    // Fill brokerage/direct field
-    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-    await user.selectOptions(brokerageSelect, "direct");
-
-    // Fill order number
-    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
     // Fill date
     const dateInput = screen.getByLabelText(/date/i);
     await user.clear(dateInput);
@@ -485,7 +481,7 @@ describe("OnDemandOrderForm", () => {
 
     // Wait for form to initialize (Supabase client and user)
     await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+      expect(screen.getByLabelText(/client attention/i)).toBeEnabled();
     });
 
     // Simulate address loading (populates component's addresses state)
@@ -496,10 +492,6 @@ describe("OnDemandOrderForm", () => {
 
     // Fill out the form with valid data
     await act(async () => {
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "direct");
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
       // Fill date
       const dateInput = screen.getByLabelText(/date/i);
       await user.clear(dateInput);
@@ -547,7 +539,7 @@ describe("OnDemandOrderForm", () => {
   // Fills every field, picks the given addresses, submits, and returns the
   // JSON body posted to /api/orders.
   async function submitWithAddresses(
-    pickup: typeof mockAddress,
+    pickup: typeof mockAddress & { timezone?: string | null },
     delivery: typeof mockAddress,
   ): Promise<Record<string, unknown>> {
     const user = userEvent.setup();
@@ -565,8 +557,6 @@ describe("OnDemandOrderForm", () => {
     });
     await waitForInit();
 
-    await user.selectOptions(screen.getByLabelText(/brokerage.*direct/i), "direct");
-    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
     const dateInput = screen.getByLabelText(/date/i);
     await user.clear(dateInput);
     await user.type(dateInput, "2024-12-31");
@@ -643,6 +633,24 @@ describe("OnDemandOrderForm", () => {
     });
   });
 
+  it("reads the times in the timezone stored on the picked pickup address", async () => {
+    // A San Francisco ZIP would resolve to Pacific; the stored zone overrides
+    // it. If the addresses API (or the pick) dropped `timezone`, the times
+    // would fall back to Pacific and this would post 18:00Z / 19:00Z.
+    const pickupWithStoredZone = {
+      ...mockAddress,
+      timezone: "America/Chicago",
+    };
+    const body = await submitWithAddresses(pickupWithStoredZone, mockDeliveryAddress);
+
+    // 10:00 / 11:00 Central (CST, UTC-6) on 2024-12-31.
+    expect(body).toMatchObject({
+      pickupAddressId: mockAddress.id,
+      pickupDateTime: "2024-12-31T16:00:00.000Z",
+      arrivalDateTime: "2024-12-31T17:00:00.000Z",
+    });
+  });
+
   it("validates required fields before submission", async () => {
     const user = userEvent.setup();
     await act(async () => {
@@ -693,6 +701,6 @@ describe("OnDemandOrderForm — native-picker-input class", () => {
     expect(screen.getByLabelText(/arrival time/i)).toHaveClass("native-picker-input");
 
     // Text fields should NOT have the class
-    expect(screen.getByLabelText(/order number/i)).not.toHaveClass("native-picker-input");
+    expect(screen.getByLabelText(/client attention/i)).not.toHaveClass("native-picker-input");
   });
 });

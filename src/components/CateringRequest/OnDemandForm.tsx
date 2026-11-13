@@ -8,12 +8,10 @@ import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
 import {
   Loader2,
-  AlertCircle,
   Calendar,
   Clock,
   DollarSign,
   Users,
-  Clipboard,
   MapPin,
   Package,
   Truck,
@@ -173,8 +171,6 @@ const SelectField: React.FC<{
 );
 
 interface OnDemandFormData {
-  brokerage: string;
-  order_number: string;
   address_id: string;
   delivery_address_id: string;
   date: string;
@@ -232,9 +228,8 @@ function optionalText(value: string | undefined): string | undefined {
  * (src/app/api/orders/create-order-schema.ts). The schema is strict, so only
  * allowlisted keys are sent: addresses go by ID, times are read in the pickup
  * address zone (PT/CT, same as the admin form) and sent as UTC ISO strings,
- * and vehicle type uses the enum value.
- * Brokerage and the brokerage order number have no column on on-demand orders
- * (the order number is generated server-side), so they are not sent.
+ * and vehicle type uses the enum value. The order number is generated
+ * server-side.
  */
 export function buildOnDemandOrderBody(data: OnDemandFormData) {
   // The inputs hold wall-clock date + time; build browser-local Dates and let
@@ -327,8 +322,6 @@ const OnDemandOrderForm: React.FC = () => {
     reset,
   } = useForm<OnDemandFormData>({
     defaultValues: {
-      brokerage: "",
-      order_number: "",
       date: "",
       pickup_time: "",
       arrival_time: "",
@@ -364,7 +357,6 @@ const OnDemandOrderForm: React.FC = () => {
   });
 
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
     setAddresses(loadedAddresses);
@@ -407,14 +399,7 @@ const OnDemandOrderForm: React.FC = () => {
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);
-
-        if (errorData.message === "Order number already exists") {
-          setErrorMessage(
-            "This order number already exists. Please use a different order number.",
-          );
-        } else {
-          toast.error("Failed to submit on-demand request. Please try again.");
-        }
+        toast.error("Failed to submit on-demand request. Please try again.");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -429,13 +414,6 @@ const OnDemandOrderForm: React.FC = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="mx-auto w-full max-w-3xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
     >
-      {errorMessage && (
-        <div className="mb-6 flex items-center rounded-md bg-red-50 p-4 text-red-800">
-          <AlertCircle className="mr-2 h-5 w-5" />
-          <p>{errorMessage}</p>
-        </div>
-      )}
-
       <div className="mb-8">
         <h3 className="mb-4 text-xl font-semibold text-gray-800">
           Pickup Location
@@ -491,32 +469,6 @@ const OnDemandOrderForm: React.FC = () => {
             showManagementButtons={false}
           />
         </div>
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <SelectField
-          control={control}
-          name="brokerage"
-          label="Brokerage / Direct"
-          required
-          icon={<Clipboard size={16} />}
-          options={[
-            { value: "doordash", label: "DoorDash" },
-            { value: "ubereats", label: "UberEats" },
-            { value: "postmates", label: "Postmates" },
-            { value: "grubhub", label: "GrubHub" },
-            { value: "direct", label: "Direct" },
-          ]}
-        />
-
-        <InputField
-          control={control}
-          name="order_number"
-          label="Order Number"
-          required
-          icon={<Clipboard size={16} />}
-          placeholder="e.g., ORD-12345"
-        />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
