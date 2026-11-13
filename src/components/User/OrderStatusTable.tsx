@@ -20,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Package } from "lucide-react";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import { formatDateForDisplay } from "@/lib/utils/date-display";
 
 interface Order {
   id: string;
@@ -35,6 +37,11 @@ interface Order {
     street1: string | null;
     city: string | null;
     state: string | null;
+    // Zone fields: the order date renders on the pickup address clock.
+    zip?: string | null;
+    timezone?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   };
   delivery_address?: {
     street1: string | null;
@@ -181,7 +188,10 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {new Date(order.date).toLocaleDateString()}
+                      {formatDateForDisplay(
+                        order.date,
+                        orderTimezone({ pickupAddress: order.address }),
+                      )}
                     </TableCell>
                     {userType === "driver" && (
                       <>

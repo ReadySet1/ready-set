@@ -81,3 +81,54 @@ describe("OrderStatusTable - Address rendering for driver", () => {
     });
   });
 });
+
+describe("OrderStatusTable - order date on the pickup address clock", () => {
+  const originalTz = process.env.TZ;
+
+  beforeAll(() => {
+    // A UTC browser would roll this late-evening Austin order into the next day.
+    process.env.TZ = "UTC";
+  });
+
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("shows an Austin summer order on its Central date", async () => {
+    const orders = [
+      {
+        id: "3",
+        order_number: "C300",
+        order_type: "catering",
+        status: "active",
+        // 03:30Z on 15 Jun = 10:30 PM CDT on 14 Jun
+        date: "2026-06-15T03:30:00Z",
+        order_total: "50.00",
+        address: { street1: "100 Congress Ave", city: "Austin", state: "TX", zip: "78701" },
+        delivery_address: { street1: "1 Main St", city: "Austin", state: "TX" },
+      },
+    ];
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => orders,
+    } as Response);
+
+    render(
+      <OrderStatusTable
+        userType="client"
+        apiEndpoint="/api/client/orders"
+        title="Orders"
+        description="Recent orders"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Jun 14, 2026")).toBeInTheDocument();
+    });
+  });
+});

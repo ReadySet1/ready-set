@@ -57,6 +57,8 @@ function normalizeOrderForClient(order: Order) {
           zip: (order.pickupAddress as any).zip ?? null,
           // Lets the client page show order times on the pickup address clock.
           timezone: (order.pickupAddress as any).timezone ?? null,
+          latitude: (order.pickupAddress as any).latitude ?? null,
+          longitude: (order.pickupAddress as any).longitude ?? null,
         }
       : null,
     delivery_address: order.deliveryAddress

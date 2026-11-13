@@ -80,6 +80,8 @@ export function timezoneFromCoordinates(
 }
 
 export interface AddressTimezoneSource {
+  /** Only used to de-duplicate the fallback warning. */
+  id?: string | null;
   timezone?: string | null;
   zip?: string | null;
   latitude?: number | null;
@@ -97,14 +99,42 @@ export function deriveAddressTimezone(
   return timezoneFromZip(address.zip) ?? timezoneFromCoordinates(address.latitude, address.longitude);
 }
 
-/** The zone an address is in, never null: stored → ZIP → coordinates → app default. */
+const warnedFallbackKeys = new Set<string>();
+
+/** Test hook: forget which addresses already logged a fallback warning. */
+export function resetTimezoneFallbackWarnings(): void {
+  warnedFallbackKeys.clear();
+}
+
+/**
+ * An address that resolves to nothing would silently show, say, Central times
+ * on the Pacific clock, so say so once per address. Logs id and ZIP only.
+ */
+function warnDefaultZoneFallback(address: AddressTimezoneSource): void {
+  const zip = address.zip?.trim() || null;
+  const key = address.id ?? `zip:${zip ?? 'none'}`;
+  if (warnedFallbackKeys.has(key)) return;
+  warnedFallbackKeys.add(key);
+  console.warn(
+    '[address-timezone] No stored timezone, unknown ZIP and no coordinates; using the default zone',
+    { addressId: address.id ?? null, zip, fallback: TIMEZONE_CONFIG.LOCAL_TIMEZONE },
+  );
+}
+
+/**
+ * The zone an address is in, never null: stored → ZIP → coordinates → app
+ * default. Falling back to the default logs a warning once per address.
+ */
 export function resolveAddressTimezone(
   address: AddressTimezoneSource | null | undefined,
 ): string {
   if (!address) return TIMEZONE_CONFIG.LOCAL_TIMEZONE;
   const stored = address.timezone?.trim();
   if (stored) return stored;
-  return deriveAddressTimezone(address) ?? TIMEZONE_CONFIG.LOCAL_TIMEZONE;
+  const derived = deriveAddressTimezone(address);
+  if (derived) return derived;
+  warnDefaultZoneFallback(address);
+  return TIMEZONE_CONFIG.LOCAL_TIMEZONE;
 }
 
 export interface OrderTimezoneSource {
