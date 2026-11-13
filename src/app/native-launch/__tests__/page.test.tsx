@@ -55,6 +55,62 @@ describe('NativeLaunchPage (/native-launch)', () => {
     expect(mockReplace).toHaveBeenCalledTimes(1);
   });
 
+  describe('?next= (post-sign-in hand-off)', () => {
+    const withSession = () =>
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
+      });
+
+    afterEach(() => {
+      window.history.replaceState(null, '', '/');
+    });
+
+    it('routes a signed-in user to a same-origin next path', async () => {
+      window.history.replaceState(null, '', '/native-launch?next=%2Fforce-password-change');
+      withSession();
+      render(<NativeLaunchPage />);
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/force-password-change');
+      });
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      '//evil.example',
+      'https://evil.example',
+      '/\\evil.example',
+      '/\t/evil.example',
+      '/\n/evil.example',
+    ])(
+      'ignores an off-site next %p and routes to /driver',
+      async (next) => {
+        window.history.replaceState(
+          null,
+          '',
+          `/native-launch?next=${encodeURIComponent(next)}`,
+        );
+        withSession();
+        render(<NativeLaunchPage />);
+
+        await waitFor(() => {
+          expect(mockReplace).toHaveBeenCalledWith('/driver');
+        });
+      },
+    );
+
+    it('still sends a signed-out user to sign-in', async () => {
+      window.history.replaceState(null, '', '/native-launch?next=%2Fforce-password-change');
+      mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+      render(<NativeLaunchPage />);
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(SIGN_IN_DESTINATION);
+      });
+    });
+  });
+
   it('falls back to sign-in when getSession rejects', async () => {
     mockGetSession.mockRejectedValue(new Error('network down'));
     render(<NativeLaunchPage />);

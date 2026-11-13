@@ -12,6 +12,7 @@ import { useUser } from "@/contexts/UserContext";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/use-toast";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { navigateAfterSignIn } from "@/lib/auth/post-sign-in";
 
 const Signin = ({
   searchParams,
@@ -97,10 +98,11 @@ const Signin = ({
         description: formState.message || "Redirecting to your dashboard...",
       });
 
-      // Use window.location.href instead of router.push() to ensure cookies are processed
-      // This forces a full page load, which guarantees the Set-Cookie headers are applied
+      // Full page load (not router.push()) so the Set-Cookie headers are applied.
+      // Inside the native shell this goes through /native-launch: a redirect on
+      // a top-level WKWebView load bounces the driver out to Safari.
       setTimeout(() => {
-        window.location.href = formState.redirectTo || "/";
+        navigateAfterSignIn(formState.redirectTo || "/");
       }, 500); // Small delay to show success message
     }
 
