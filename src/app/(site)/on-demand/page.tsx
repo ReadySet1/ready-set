@@ -100,10 +100,10 @@ const OnDemandPage = () => {
     };
   }, [supabase]); // Depend on supabase client
 
-  // Redirect to login if not authenticated
+  // Redirect to sign-in if not authenticated, then come back here
   useEffect(() => {
     if (!isLoading && !session) {
-      router.push("/login?redirect=/on-demand");
+      router.push(`/sign-in?returnTo=${encodeURIComponent("/on-demand")}`);
     }
   }, [session, isLoading, router]);
 

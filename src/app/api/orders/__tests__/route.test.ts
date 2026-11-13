@@ -993,15 +993,72 @@ describe("/api/orders", () => {
       },
     );
 
-    it("excludes soft-deleted addresses from the client's address book", async () => {
-      await GET(createGetRequest("http://localhost:3000/api/orders"));
+    describe("embedded client profile", () => {
+      const fullProfileRow = {
+        id: "client-1",
+        guid: null,
+        name: "Client Name",
+        email: "client@example.com",
+        type: "CLIENT",
+        contactNumber: "555-0100",
+        companyName: "Client Co",
+        street1: "1 Private Rd",
+        sideNotes: "internal note",
+        confirmationCode: "secret-code",
+        isTemporaryPassword: true,
+        status: "ACTIVE",
+        deletedAt: null,
+        deletedBy: null,
+        userAddresses: [{ address: { id: "addr-1", street1: "1 Private Rd" } }],
+      };
 
-      for (const model of ["cateringRequest", "onDemand"] as const) {
-        const { include } = mockPrisma[model].findMany.mock.calls[0][0];
-        expect(include.user.include.userAddresses.where).toEqual({
-          address: { deletedAt: null },
-        });
+      // Behaves like Prisma: returns only the profile columns the query selects.
+      function findManyHonouringUserSelect(order: Record<string, unknown>) {
+        return async (args: any) => {
+          const select = args?.include?.user?.select;
+          const user = select
+            ? Object.fromEntries(
+                Object.keys(select)
+                  .filter((key) => select[key])
+                  .map((key) => [key, (fullProfileRow as any)[key]]),
+              )
+            : fullProfileRow;
+          return [{ ...order, user }];
+        };
       }
+
+      it("selects only the client fields consumers use, never auth flags or the address book", async () => {
+        await GET(createGetRequest("http://localhost:3000/api/orders"));
+
+        for (const model of ["cateringRequest", "onDemand"] as const) {
+          const { include } = mockPrisma[model].findMany.mock.calls[0][0];
+          expect(include.user).toEqual({
+            select: { id: true, name: true, email: true },
+          });
+        }
+      });
+
+      it("omits sensitive profile fields from every order in the response", async () => {
+        signInAs(mockUser, "ADMIN");
+        mockPrisma.cateringRequest.findMany.mockImplementation(
+          findManyHonouringUserSelect(mockCateringOrder),
+        );
+        mockPrisma.onDemand.findMany.mockImplementation(
+          findManyHonouringUserSelect(mockOnDemandOrder),
+        );
+
+        const response = await GET(createGetRequest("http://localhost:3000/api/orders"));
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.orders).toHaveLength(2);
+        for (const order of data.orders) {
+          expect(order.client).toEqual({
+            id: "client-1",
+            name: "Client Name",
+            email: "client@example.com",
+          });
+        }
+      });
     });
   });
 
