@@ -10,6 +10,7 @@
  */
 import type { LocationUpdate } from '@/types/tracking';
 import { MemoryLocationStore } from '@/__tests__/helpers/memory-location-store';
+import { LOCATION_BATCH_MAX_POINTS } from '@/lib/tracking/location-batch';
 
 type Outbox = typeof import('../location-outbox');
 
@@ -381,5 +382,11 @@ describe('location outbox', () => {
       expect(await send(DRIVER_ID, [])).toEqual({ ok: false, status: 401 });
       expect(fetchMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('outbox batch size', () => {
+  it('never exceeds what the batch route accepts per request', () => {
+    expect(loadOutbox().OUTBOX_BATCH_SIZE).toBeLessThanOrEqual(LOCATION_BATCH_MAX_POINTS);
   });
 });

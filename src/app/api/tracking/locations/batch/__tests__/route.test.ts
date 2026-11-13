@@ -52,7 +52,26 @@ import { enforceRateLimit } from '@/lib/security/rate-limit';
 import { locationRateLimiter } from '@/lib/rate-limiting/location-rate-limiter';
 import { recomputeClosedShiftsMileageForPoints } from '@/services/tracking/late-point-mileage';
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
-import { POST, MAX_BATCH_POINTS } from '../route';
+import { LOCATION_BATCH_MAX_POINTS as MAX_BATCH_POINTS } from '@/lib/tracking/location-batch';
+import * as routeModule from '../route';
+import { POST } from '../route';
+
+// Next.js type-checks route modules (.next/types) and rejects any export that
+// is not an HTTP handler or a route segment config option.
+const ALLOWED_ROUTE_EXPORTS = new Set([
+  'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'DELETE', 'PATCH',
+  'config', 'generateStaticParams', 'revalidate', 'dynamic', 'dynamicParams',
+  'fetchCache', 'preferredRegion', 'runtime', 'maxDuration',
+]);
+
+describe('batch route module', () => {
+  it('exports only route handlers and segment config', () => {
+    const extra = Object.keys(routeModule).filter(
+      (key) => key !== '__esModule' && !ALLOWED_ROUTE_EXPORTS.has(key),
+    );
+    expect(extra).toEqual([]);
+  });
+});
 
 const mockWithAuth = withAuth as jest.Mock;
 const mockWithRawTx = withRawTx as jest.Mock;
