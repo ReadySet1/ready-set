@@ -197,7 +197,7 @@ describe("POST /api/job-applications - upload ownership", () => {
 describe("POST /api/job-applications - driver document columns", () => {
   const DRIVER_ROLE = "Driver for Catering Deliveries";
 
-  // Today's server-side required check (route.ts:60-76) is unchanged in PR 1,
+  // Today's server-side required check (route.ts:66-81) is unchanged in PR 1,
   // so the body still carries every path it requires.
   const driverBody = {
     ...baseBody,
@@ -309,8 +309,9 @@ describe("POST /api/job-applications - driver document columns", () => {
     );
   });
 
-  // Regression guard for the switch at route.ts:278-315: every category it maps
-  // today, in both the bare and the temp-prefixed form, keeps its column.
+  // Regression guard for the findDocumentByCategory mapping in route.ts: every
+  // category the old switch mapped, in both the bare and the temp-prefixed form,
+  // keeps its column.
   // Uses a non-driver role so the required-documents check does not apply.
   describe.each(["", "job-applications/temp/"])("existing categories (prefix %p)", (prefix) => {
     it.each([
@@ -351,7 +352,7 @@ describe("POST /api/job-applications - driver document columns", () => {
     },
   );
 
-  // Regression guard: passes today and must keep passing after the switch is replaced.
+  // Regression guard: legacy driver photo and equipment photo uploads keep their old columns.
   it("still writes legacy driver photo and equipment photo uploads to their old columns", async () => {
     mockOwnedUploads([
       ownUpload("driver-file", "job-applications/temp/driver_photo", "driver.jpg"),
