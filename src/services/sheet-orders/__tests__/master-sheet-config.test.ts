@@ -29,6 +29,30 @@ describe("getMasterSheetConfig", () => {
     }
   });
 
+  it.each([
+    "https://docs.google.com/spreadsheets/d/1AbC-dEf_123/edit#gid=0",
+    "https://docs.google.com/spreadsheets/d/1AbC-dEf_123/edit?usp=sharing",
+    "  https://docs.google.com/spreadsheets/d/1AbC-dEf_123  ",
+    "docs.google.com/spreadsheets/u/0/d/1AbC-dEf_123/",
+  ])("extracts the spreadsheet id from a pasted URL %p", (value) => {
+    expect(getMasterSheetConfig({ [MASTER_SHEET_ID_ENV]: value })).toEqual({
+      configured: true,
+      spreadsheetId: "1AbC-dEf_123",
+      tabName: "Drives - Coolfire",
+    });
+  });
+
+  it("is not configured when the value is a URL without a spreadsheet id", () => {
+    expect(
+      getMasterSheetConfig({
+        [MASTER_SHEET_ID_ENV]: "https://drive.google.com/drive/folders/xyz",
+      }),
+    ).toEqual({
+      configured: false,
+      reason: expect.stringContaining("spreadsheet id"),
+    });
+  });
+
   it("never falls back to the legacy GOOGLE_SHEETS_SHEET_ID (Web Quotes sheet)", () => {
     expect(
       getMasterSheetConfig({ GOOGLE_SHEETS_SHEET_ID: "legacy-quotes-id" }),

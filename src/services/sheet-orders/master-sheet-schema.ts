@@ -114,6 +114,12 @@ export interface InvalidMasterSheetRow {
   raw: Record<string, string>;
 }
 
+/** A problem with the header row that did not stop parsing. */
+export interface HeaderWarning {
+  header: string;
+  message: string;
+}
+
 export type MasterSheetParseResult =
   | {
       ok: true;
@@ -122,5 +128,7 @@ export type MasterSheetParseResult =
       blankRowCount: number;
       /** Mapped optional headers absent from the sheet (their fields are null). */
       missingOptionalHeaders: string[];
+      /** Mapped headers that appear more than once; the first column wins. */
+      headerWarnings: HeaderWarning[];
     }
   | { ok: false; missingRequiredHeaders: string[] };

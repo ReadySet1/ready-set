@@ -15,6 +15,7 @@
 import {
   MasterSheetRowSchema,
   UUID_PATTERN,
+  type HeaderWarning,
   type InvalidMasterSheetRow,
   type MasterSheetParseResult,
   type RowIssue,
@@ -159,6 +160,19 @@ export function parseSheetAmount(value: string): number | null {
   return negative ? -n : n;
 }
 
+/**
+ * Error values a formula cell renders as (`#N/A`, `#REF!`, …). They are text to
+ * the Sheets API, so without this check they would pass as real addresses.
+ */
+const SPREADSHEET_ERROR_PATTERN =
+  /^#(N\/A|REF!|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!|ERROR!|SPILL!|CALC!)$/i;
+
+export function isSpreadsheetError(value: string): boolean {
+  return SPREADSHEET_ERROR_PATTERN.test(value.trim());
+}
+
+const SPREADSHEET_ERROR_MESSAGE = "Invalid value (spreadsheet error)";
+
 function parseWholeNumber(value: string): number | null {
   const s = value.replace(/,/g, "");
   return /^\d+$/.test(s) ? Number(s) : null;
@@ -185,12 +199,27 @@ class RowReader {
 
   requiredText(field: string, header: string): string {
     const value = this.cell(header);
-    if (!value) this.errors.push({ field, header, message: "Required", value });
+    if (!value) {
+      this.errors.push({ field, header, message: "Required", value });
+    } else if (isSpreadsheetError(value)) {
+      this.errors.push({ field, header, message: SPREADSHEET_ERROR_MESSAGE, value });
+    }
     return value;
   }
 
-  text(header: string): string | null {
-    return this.cell(header) || null;
+  text(field: string, header: string): string | null {
+    const value = this.cell(header);
+    if (!value) return null;
+    if (isSpreadsheetError(value)) {
+      this.warnings.push({
+        field,
+        header,
+        message: `${SPREADSHEET_ERROR_MESSAGE}; value ignored`,
+        value,
+      });
+      return null;
+    }
+    return value;
   }
 
   required<T>(
@@ -243,8 +272,8 @@ function readRow(reader: RowReader, rowNumber: number) {
   const money = (field: string, header: string) =>
     r.optional(field, header, parseSheetAmount, AMOUNT);
 
-  const coolfireUploadMarker = r.text(H.coolfireUpload);
-  const type = r.text(H.type);
+  const coolfireUploadMarker = r.text("coolfireUploadMarker", H.coolfireUpload);
+  const type = r.text("type", H.type);
   const routeOrder = r.requiredText("routeOrder", H.routeOrder);
   const successId = r.optional(
     "coolfireSuccessId",
@@ -269,8 +298,10 @@ function readRow(reader: RowReader, rowNumber: number) {
     coolfireUploadMarker,
     uploadedToCoolfire: coolfireUploadMarker !== null,
     type,
-    isCancelled: type?.toLowerCase() === "cancelled",
-    invoiceNumber: r.text(H.invoiceNumber),
+    // Prefix match: the sheet has "Cancelled", "Canceled" and
+    // "Cancelled - <reason>"; any of them must not import as a live order.
+    isCancelled: type !== null && /^cancel/i.test(type),
+    invoiceNumber: r.text("invoiceNumber", H.invoiceNumber),
     date: r.required("date", H.date, parseSheetDate, DATE),
     vendor: r.requiredText("vendor", H.vendor),
     routeOrder,
@@ -287,23 +318,23 @@ function readRow(reader: RowReader, rowNumber: number) {
       arrivedClient: time("timestamps.arrivedClient", H.arrivedClient),
       completionTime: time("timestamps.completionTime", H.completionTime),
     },
-    driverName: r.text(H.driverName),
-    backupDriver: r.text(H.backupDriver),
-    helpdeskAgent: r.text(H.helpdeskAgent),
-    vendorPickupLocation: r.text(H.vendorPickupLocation),
+    driverName: r.text("driverName", H.driverName),
+    backupDriver: r.text("backupDriver", H.backupDriver),
+    helpdeskAgent: r.text("helpdeskAgent", H.helpdeskAgent),
+    vendorPickupLocation: r.text("vendorPickupLocation", H.vendorPickupLocation),
     vendorAddress: r.requiredText("vendorAddress", H.vendorAddress),
-    client: r.text(H.client),
+    client: r.text("client", H.client),
     clientAddress: r.requiredText("clientAddress", H.clientAddress),
-    specialNotes: r.text(H.specialNotes),
-    parkingInstructions: r.text(H.parkingInstructions),
-    adminNotes: r.text(H.adminNotes),
+    specialNotes: r.text("specialNotes", H.specialNotes),
+    parkingInstructions: r.text("parkingInstructions", H.parkingInstructions),
+    adminNotes: r.text("adminNotes", H.adminNotes),
     contact: {
-      contactPhone: r.text(H.contactPhone),
-      primaryContact: r.text(H.primaryContact),
-      contactEmail: r.text(H.contactEmail),
-      locationPhone: r.text(H.locationPhone),
-      generalEmail: r.text(H.generalEmail),
-      website: r.text(H.website),
+      contactPhone: r.text("contact.contactPhone", H.contactPhone),
+      primaryContact: r.text("contact.primaryContact", H.primaryContact),
+      contactEmail: r.text("contact.contactEmail", H.contactEmail),
+      locationPhone: r.text("contact.locationPhone", H.locationPhone),
+      generalEmail: r.text("contact.generalEmail", H.generalEmail),
+      website: r.text("contact.website", H.website),
     },
     coolfireSuccessId: successId,
     stopNumber,
@@ -346,9 +377,15 @@ function rawByHeader(
  */
 export function parseMasterSheetRows(rows: string[][]): MasterSheetParseResult {
   const columnIndex = new Map<string, number>();
+  const repeatedColumns = new Map<string, number[]>();
   (rows[0] ?? []).forEach((header, i) => {
     const name = normalizeHeader(header);
-    if (name && !columnIndex.has(name)) columnIndex.set(name, i);
+    if (!name) return;
+    if (!columnIndex.has(name)) {
+      columnIndex.set(name, i);
+    } else {
+      repeatedColumns.set(name, [...(repeatedColumns.get(name) ?? []), i]);
+    }
   });
 
   const missingRequiredHeaders = MASTER_SHEET_REQUIRED_HEADERS.filter(
@@ -361,6 +398,18 @@ export function parseMasterSheetRows(rows: string[][]): MasterSheetParseResult {
   const missingOptionalHeaders = Object.values(MASTER_SHEET_HEADERS).filter(
     (h) => !columnIndex.has(h) && !MASTER_SHEET_REQUIRED_HEADERS.includes(h),
   );
+
+  const mappedHeaders = new Set<string>(Object.values(MASTER_SHEET_HEADERS));
+  const headerWarnings: HeaderWarning[] = [];
+  for (const [header, extra] of repeatedColumns) {
+    if (!mappedHeaders.has(header)) continue;
+    const first = (columnIndex.get(header) ?? 0) + 1;
+    const others = extra.map((i) => i + 1).join(", ");
+    headerWarnings.push({
+      header,
+      message: `Header "${header}" is repeated (column ${first}, also ${others}); using column ${first}.`,
+    });
+  }
 
   const valid: ValidMasterSheetRow[] = [];
   const invalid: InvalidMasterSheetRow[] = [];
@@ -402,5 +451,12 @@ export function parseMasterSheetRows(rows: string[][]): MasterSheetParseResult {
     });
   }
 
-  return { ok: true, valid, invalid, blankRowCount, missingOptionalHeaders };
+  return {
+    ok: true,
+    valid,
+    invalid,
+    blankRowCount,
+    missingOptionalHeaders,
+    headerWarnings,
+  };
 }

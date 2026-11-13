@@ -1,4 +1,4 @@
-import { parseMasterSheetRows } from "../master-sheet-parser";
+import { parseMasterSheetRows, parseSheetTime } from "../master-sheet-parser";
 import { REAL_MASTER_SHEET_HEADERS, makeRow } from "./fixtures";
 
 function parseOne(overrides: Record<string, string> = {}) {
@@ -111,9 +111,24 @@ describe("parseMasterSheetRows", () => {
       expect(row.vendor).toBe("CaterValley");
     });
 
-    it("flags Cancelled rows instead of dropping them", () => {
-      const row = parseOne({ Type: "Cancelled" }).valid[0]!.row;
-      expect(row.isCancelled).toBe(true);
+    it.each(["Cancelled", "Canceled", "CANCELLED", "Cancelled - client called"])(
+      "flags Type %p as cancelled instead of dropping the row",
+      (type) => {
+        const row = parseOne({ Type: type }).valid[0]!.row;
+        expect(row.isCancelled).toBe(true);
+      },
+    );
+
+    it("does not flag a Type that only mentions cancel later", () => {
+      const row = parseOne({ Type: "Food (not cancelled)" }).valid[0]!.row;
+      expect(row.isCancelled).toBe(false);
+    });
+
+    it("treats 12 PM as noon", () => {
+      expect(parseSheetTime("12:00 PM")).toBe("12:00");
+      expect(parseOne({ "Pick Up": "12:00 PM" }).valid[0]!.row.pickupTime).toBe(
+        "12:00",
+      );
     });
 
     it("leaves routeGroup null when Route/Order has no GRP prefix", () => {
@@ -157,7 +172,14 @@ describe("parseMasterSheetRows", () => {
   });
 
   describe("bad dates and times", () => {
-    it.each(["2026-06-29", "13/1/26", "2/30/26", "6/29", "tomorrow"])(
+    it.each([
+      "2026-06-29",
+      "13/1/26",
+      "2/30/26",
+      "2/29/26", // 2026 is not a leap year
+      "6/29",
+      "tomorrow",
+    ])(
       "rejects date %p",
       (value) => {
         const result = parseOne({ Date: value });
@@ -218,6 +240,57 @@ describe("parseMasterSheetRows", () => {
     });
   });
 
+  describe("spreadsheet error values", () => {
+    const SHEET_ERRORS = ["#N/A", "#REF!", "#VALUE!", "#DIV/0!", "#NAME?"];
+
+    it.each(
+      SHEET_ERRORS.flatMap((value) => [
+        ["Vendor", "vendor", value],
+        ["Vendor Address", "vendorAddress", value],
+        ["Client Address", "clientAddress", value],
+        ["Route/Order", "routeOrder", value],
+      ]),
+    )("rejects the row when %s holds %p", (header, field, value) => {
+      const result = parseOne({ [header]: value });
+
+      expect(result.valid).toEqual([]);
+      expect(result.invalid[0]!.errors).toEqual([
+        expect.objectContaining({
+          field,
+          header,
+          value,
+          message: expect.stringContaining("spreadsheet error"),
+        }),
+      ]);
+    });
+
+    it.each(SHEET_ERRORS)(
+      "nulls an optional text cell holding %p with a warning",
+      (value) => {
+        const result = parseOne({ Client: value, "Contact Email": value });
+
+        expect(result.invalid).toEqual([]);
+        const { row, warnings } = result.valid[0]!;
+        expect(row.client).toBeNull();
+        expect(row.contact.contactEmail).toBeNull();
+        expect(warnings).toEqual([
+          expect.objectContaining({ field: "client", header: "Client", value }),
+          expect.objectContaining({
+            field: "contact.contactEmail",
+            header: "Contact Email",
+            value,
+          }),
+        ]);
+      },
+    );
+
+    it("keeps ordinary text that merely starts with #", () => {
+      const row = parseOne({ "Special Notes": "#2 door, ring twice" }).valid[0]!
+        .row;
+      expect(row.specialNotes).toBe("#2 door, ring twice");
+    });
+  });
+
   describe("multi-stop routes", () => {
     it("groups pickup legs that share a GRP prefix and reads Stop #", () => {
       const result = parseMasterSheetRows([
@@ -252,6 +325,39 @@ describe("parseMasterSheetRows", () => {
       expect(result).toEqual({
         ok: false,
         missingRequiredHeaders: ["Pick Up", "Client Address"],
+      });
+    });
+
+    it("warns about a repeated mapped header and reads the first column", () => {
+      const headers = [...REAL_MASTER_SHEET_HEADERS, "Date"];
+      const row = [...makeRow(), "7/4/26"];
+      const result = parseMasterSheetRows([headers, row]);
+      if (!result.ok) throw new Error("expected ok");
+
+      expect(result.valid[0]!.row.date).toBe("2026-06-29");
+      expect(result.headerWarnings).toEqual([
+        {
+          header: "Date",
+          message: expect.stringMatching(/repeated.*column 4/i),
+        },
+      ]);
+    });
+
+    it("does not warn about repeated headers the parser does not map", () => {
+      const headers = [...REAL_MASTER_SHEET_HEADERS, "Old Total", "Old Total"];
+      const result = parseMasterSheetRows([headers, makeRow({}, headers)]);
+      if (!result.ok) throw new Error("expected ok");
+      expect(result.headerWarnings).toEqual([]);
+    });
+
+    it("returns an empty ok result when the sheet has only the header row", () => {
+      expect(parseMasterSheetRows([REAL_MASTER_SHEET_HEADERS])).toEqual({
+        ok: true,
+        valid: [],
+        invalid: [],
+        blankRowCount: 0,
+        missingOptionalHeaders: [],
+        headerWarnings: [],
       });
     });
 
@@ -310,6 +416,33 @@ describe("parseMasterSheetRows", () => {
       if (!result.ok) throw new Error("expected ok");
       expect(result.invalid).toEqual([]);
       expect(result.valid[0]!.row.coolfireSuccessId).toBeNull();
+    });
+
+    it("rejects a ragged row that stops before the required columns", () => {
+      const full = makeRow();
+      const vendorAddress = REAL_MASTER_SHEET_HEADERS.indexOf("Vendor Address");
+      const result = parseMasterSheetRows([
+        REAL_MASTER_SHEET_HEADERS,
+        full,
+        full.slice(0, vendorAddress), // ends just before Vendor Address
+        full.slice(0, 3), // only the first three cells
+      ]);
+      if (!result.ok) throw new Error("expected ok");
+
+      expect(result.valid.map((v) => v.rowNumber)).toEqual([2]);
+      expect(result.invalid.map((v) => v.rowNumber)).toEqual([3, 4]);
+      expect(result.invalid[0]!.errors.map((e) => e.field)).toEqual([
+        "vendorAddress",
+        "clientAddress",
+      ]);
+      expect(result.invalid[1]!.errors.map((e) => e.field)).toEqual([
+        "routeOrder",
+        "date",
+        "vendor",
+        "pickupTime",
+        "vendorAddress",
+        "clientAddress",
+      ]);
     });
   });
 });
