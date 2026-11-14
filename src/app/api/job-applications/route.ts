@@ -63,14 +63,13 @@ export async function POST(request: Request) {
     const data = await request.json();
 
     // --- Server-side validation for required driver documents ---
+    // Registration, driver photo and equipment photo are optional but still
+    // accepted. Catering bags and cart/dolly become required with the new form.
     if (data.role === "Driver for Catering Deliveries") {
       const missingDocs: string[] = [];
       if (!data.driversLicenseFilePath) missingDocs.push("driver's license");
       if (!data.insuranceFilePath) missingDocs.push("insurance");
-      if (!data.vehicleRegFilePath) missingDocs.push("vehicle registration");
-      if (!data.driverPhotoFilePath) missingDocs.push("driver photo");
       if (!data.carPhotoFilePath) missingDocs.push("car photo");
-      if (!data.equipmentPhotoFilePath) missingDocs.push("equipment photo");
 
       if (missingDocs.length > 0) {
         return NextResponse.json(
