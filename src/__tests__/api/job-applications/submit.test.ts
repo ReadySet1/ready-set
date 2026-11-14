@@ -197,8 +197,7 @@ describe("POST /api/job-applications - upload ownership", () => {
 describe("POST /api/job-applications - driver document columns", () => {
   const DRIVER_ROLE = "Driver for Catering Deliveries";
 
-  // Today's server-side required check (route.ts:66-81) is unchanged in PR 1,
-  // so the body still carries every path it requires.
+  // Mirrors what the current form sends, including the now-optional paths.
   const driverBody = {
     ...baseBody,
     role: DRIVER_ROLE,
@@ -379,6 +378,80 @@ describe("POST /api/job-applications - driver document columns", () => {
         ),
       }),
     );
+  });
+});
+
+describe("POST /api/job-applications - driver required documents", () => {
+  const DRIVER_ROLE = "Driver for Catering Deliveries";
+
+  // Paths only: the required check reads the payload before any upload lookup.
+  const requiredPaths = {
+    driversLicenseFilePath: "job-applications/temp/s/license.pdf",
+    insuranceFilePath: "job-applications/temp/s/insurance.pdf",
+    carPhotoFilePath: "job-applications/temp/s/car.jpg",
+  };
+  const noLongerRequiredPaths = {
+    vehicleRegFilePath: "job-applications/temp/s/registration.pdf",
+    driverPhotoFilePath: "job-applications/temp/s/driver.jpg",
+    equipmentPhotoFilePath: "job-applications/temp/s/equipment.jpg",
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    deferredWork = [];
+    (createAdminClient as jest.Mock).mockResolvedValue({ storage: { from: jest.fn() } });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (prisma.jobApplication.create as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      position: DRIVER_ROLE,
+    });
+    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      fileUploads: [],
+    });
+  });
+
+  function submit(paths: Record<string, string>) {
+    return POST(buildRequest({ ...baseBody, role: DRIVER_ROLE, ...paths }));
+  }
+
+  it("accepts a driver without vehicle registration, driver photo or equipment photo", async () => {
+    const response = await submit(requiredPaths);
+
+    expect(response.status).toBe(200);
+    expect(prisma.jobApplication.create).toHaveBeenCalled();
+  });
+
+  it("still accepts a driver who sends vehicle registration, driver photo and equipment photo", async () => {
+    const response = await submit({ ...requiredPaths, ...noLongerRequiredPaths });
+
+    expect(response.status).toBe(200);
+    expect(prisma.jobApplication.create).toHaveBeenCalled();
+  });
+
+  // The current form does not send these yet; PR 4 makes them required.
+  it("does not require catering bags or cart/dolly photos yet", async () => {
+    const response = await submit({ ...requiredPaths, ...noLongerRequiredPaths });
+
+    expect(response.status).toBe(200);
+    expect(prisma.jobApplication.create).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["driversLicenseFilePath", "driver's license"],
+    ["insuranceFilePath", "insurance"],
+    ["carPhotoFilePath", "car photo"],
+  ])("rejects a driver missing %s with the current message", async (field, name) => {
+    const { [field as keyof typeof requiredPaths]: _omitted, ...rest } = requiredPaths;
+    const response = await submit({ ...rest, ...noLongerRequiredPaths });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: `Missing required documents: ${name}`,
+    });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 });
 
