@@ -417,7 +417,8 @@ describe("POST /api/job-applications - driver required documents", () => {
     return POST(buildRequest({ ...baseBody, role: DRIVER_ROLE, ...paths }));
   }
 
-  it("accepts a driver without vehicle registration, driver photo or equipment photo", async () => {
+  // The current form does not send catering bags or cart/dolly yet; PR 4 makes them required.
+  it("accepts a driver without vehicle registration, driver photo, equipment photo, catering bags or cart/dolly", async () => {
     const response = await submit(requiredPaths);
 
     expect(response.status).toBe(200);
@@ -431,12 +432,14 @@ describe("POST /api/job-applications - driver required documents", () => {
     expect(prisma.jobApplication.create).toHaveBeenCalled();
   });
 
-  // The current form does not send these yet; PR 4 makes them required.
-  it("does not require catering bags or cart/dolly photos yet", async () => {
-    const response = await submit({ ...requiredPaths, ...noLongerRequiredPaths });
+  it("lists every missing required document in order", async () => {
+    const response = await submit(noLongerRequiredPaths);
 
-    expect(response.status).toBe(200);
-    expect(prisma.jobApplication.create).toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Missing required documents: driver's license, insurance, car photo",
+    });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 
   it.each([
