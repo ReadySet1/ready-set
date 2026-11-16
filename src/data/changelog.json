@@ -5,15 +5,11 @@
     {
       "version": "2.13.0",
       "date": "2026-11-13",
-      "title": "Release 2.13.0",
-      "summary": "",
+      "title": "Local order times, on-demand orders and self-service edits",
+      "summary": "Order times now show in the restaurant's local timezone everywhere, the on-demand order form works again, and vendors and clients can edit their own catering orders.",
       "changes": [
         {
-          "text": "Customer and vendor order pages now show times in the restaurant's local timezone.",
-          "type": "fixed"
-        },
-        {
-          "text": "Order times now show in the restaurant's local timezone for drivers and in order emails.",
+          "text": "Order times now show in the restaurant's local timezone for customers, vendors and drivers, and in order emails.",
           "type": "fixed"
         },
         {
