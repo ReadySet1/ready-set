@@ -38,6 +38,18 @@ export interface DriverDocument extends ApplicationDocument {
   accept: readonly string[];
 }
 
+/** Keys of DRIVER_DOCUMENTS, the documents the apply form shows (legacy ones excluded). */
+export type DriverDocumentKey =
+  | "license"
+  | "insurance"
+  | "registration"
+  | "second_id"
+  | "food_handler"
+  | "hipaa"
+  | "car_photo"
+  | "catering_bags"
+  | "cart_dolly";
+
 const IMAGE_TYPES = [".jpg", ".jpeg", ".png"] as const;
 const IMAGE_PDF_TYPES = [".pdf", ".jpg", ".jpeg", ".png"] as const;
 

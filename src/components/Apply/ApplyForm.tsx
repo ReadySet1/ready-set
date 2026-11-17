@@ -17,7 +17,10 @@ import { useSearchParams } from "next/navigation";
 import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
 import { logger } from "@/utils/logger";
 import { captureException } from "@/lib/monitoring/sentry";
-import { missingRequiredDriverDocuments } from "@/lib/job-application-documents";
+import {
+  missingRequiredDriverDocuments,
+  type DriverDocumentKey,
+} from "@/lib/job-application-documents";
 
 // Helper to generate accept string from allowed file types
 const generateAcceptString = (types: string[]): string => types.join(",");
@@ -701,17 +704,21 @@ const JobApplicationForm = () => {
 
     // Driver-specific file requirements come from the shared document config
     if (role === "Driver for Catering Deliveries") {
-      const uploadedCategories = [
-        licenseUpload,
-        insuranceUpload,
-        registrationUpload,
-        secondIdUpload,
-        foodHandlerUpload,
-        hipaaUpload,
-        carPhotoUpload,
-        cateringBagsUpload,
-        cartDollyUpload,
-      ].flatMap((upload) => upload.uploadedFiles.map((file) => file.category));
+      // Typed by document key so a missing or unknown document fails to compile
+      const driverUploads = {
+        license: licenseUpload,
+        insurance: insuranceUpload,
+        registration: registrationUpload,
+        second_id: secondIdUpload,
+        food_handler: foodHandlerUpload,
+        hipaa: hipaaUpload,
+        car_photo: carPhotoUpload,
+        catering_bags: cateringBagsUpload,
+        cart_dolly: cartDollyUpload,
+      } satisfies Record<DriverDocumentKey, typeof licenseUpload>;
+      const uploadedCategories = Object.values(driverUploads).flatMap((upload) =>
+        upload.uploadedFiles.map((file) => file.category),
+      );
       for (const doc of missingRequiredDriverDocuments(uploadedCategories)) {
         errors.push(`Please upload your ${doc.label}`);
       }
@@ -1268,9 +1275,12 @@ const JobApplicationForm = () => {
                     {/* Insurance Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Proof of Insurance
+                        Insurance
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        Proof of your current auto insurance.
+                      </p>
                       <FileUpload
                         name="insurance"
                         label="Upload Insurance"
@@ -1332,6 +1342,10 @@ const JobApplicationForm = () => {
                         Second Form of ID
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        Passport, state ID or another valid form of
+                        identification.
+                      </p>
                       <FileUpload
                         name="secondId"
                         label="Upload ID"
@@ -1350,7 +1364,7 @@ const JobApplicationForm = () => {
                     {/* Car Photo Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Car Photo
+                        Vehicle Photo
                         <span className="ml-1 text-red-500">*</span>
                       </label>
                       <FileUpload
@@ -1374,6 +1388,10 @@ const JobApplicationForm = () => {
                         Catering Bags Photo
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        A clear photo of the catering bags you will use for
+                        deliveries.
+                      </p>
                       <FileUpload
                         name="cateringBags"
                         label="Upload Photo"
@@ -1395,6 +1413,9 @@ const JobApplicationForm = () => {
                         Cart/Dolly Photo
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        A clear photo of your cart or dolly.
+                      </p>
                       <FileUpload
                         name="cartDolly"
                         label="Upload Photo"
@@ -1587,7 +1608,7 @@ const JobApplicationForm = () => {
                             : "Not provided"}
                         </p>
                         <p>
-                          Car Photo:{" "}
+                          Vehicle Photo:{" "}
                           {carPhotoUpload.uploadedFiles.length > 0
                             ? "Uploaded"
                             : "Not uploaded"}
