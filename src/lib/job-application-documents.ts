@@ -76,7 +76,7 @@ export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
   },
   {
     ...defineDocument("second_id", "secondIdFileId", "secondIdFilePath", "Second Form of ID"),
-    required: false,
+    required: true,
     accept: IMAGE_PDF_TYPES,
   },
   {
@@ -128,6 +128,16 @@ export const APPLICATION_FILE_ID_FIELDS: readonly string[] = ALL_DOCUMENTS.map(
 
 export function requiredDriverDocuments(): DriverDocument[] {
   return DRIVER_DOCUMENTS.filter((doc) => doc.required);
+}
+
+/** Required driver documents not covered by the given upload categories, in config order. */
+export function missingRequiredDriverDocuments(
+  categories: readonly (string | null | undefined)[],
+): DriverDocument[] {
+  const uploadedKeys = new Set(
+    categories.map((category) => (category ? findDocumentByCategory(category)?.key : undefined)),
+  );
+  return requiredDriverDocuments().filter((doc) => !uploadedKeys.has(doc.key));
 }
 
 /** Strips only the exact "job-applications/temp/" prefix. */
