@@ -80,6 +80,17 @@ describe("job application document config", () => {
     expect(doc?.fileIdField).toBe(fileIdField);
   });
 
+  it("maps every document to an existing JobApplication column", () => {
+    // jest.setup.ts mocks @prisma/client globally; the real enum lives in the actual module.
+    const { Prisma } = jest.requireActual<typeof import("@prisma/client")>("@prisma/client");
+    const columns = Object.values(Prisma.JobApplicationScalarFieldEnum) as string[];
+    const documents = [RESUME_DOCUMENT, ...DRIVER_DOCUMENTS, ...LEGACY_DRIVER_DOCUMENTS];
+
+    for (const doc of documents) {
+      expect(columns).toContain(doc.filePathColumn);
+    }
+  });
+
   it("returns undefined for an unknown category", () => {
     expect(findDocumentByCategory("job-applications/temp/unknown")).toBeUndefined();
   });

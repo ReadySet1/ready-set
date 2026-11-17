@@ -613,6 +613,9 @@ model JobApplication {
   driverPhotoFilePath    String?
   carPhotoFilePath       String?
   equipmentPhotoFilePath String?
+  secondIdFilePath       String?
+  cateringBagsPhotoFilePath String?
+  cartDollyPhotoFilePath String?
   status                 ApplicationStatus @default(PENDING)
   createdAt              DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt              DateTime          @default(now()) @updatedAt @db.Timestamptz(6)

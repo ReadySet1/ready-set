@@ -3,6 +3,11 @@ import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
 import { buildJobApplicationEmailHtml } from "@/lib/job-application-email";
 import { resolveOwnedApplicationUploads } from "@/lib/job-application-uploads";
+import {
+  APPLICATION_FILE_ID_FIELDS,
+  findDocumentByCategory,
+  type JobApplicationFilePathColumn,
+} from "@/lib/job-application-documents";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
@@ -76,17 +81,8 @@ export async function POST(request: Request) {
     }
 
     // --- Step 1: Identify and Fetch FileUpload Records ---
-    const fileIdsToProcess = [
-      data.resumeFileId,
-      data.driversLicenseFileId,
-      data.insuranceFileId,
-      data.vehicleRegFileId,
-      data.foodHandlerFileId,
-      data.hipaaFileId,
-      data.driverPhotoFileId,
-      data.carPhotoFileId,
-      data.equipmentPhotoFileId
-    ].filter((id): id is string => typeof id === 'string' && id !== '');
+    const fileIdsToProcess = APPLICATION_FILE_ID_FIELDS.map((field) => data[field])
+      .filter((id): id is string => typeof id === 'string' && id !== '');
 
     // Only accept files uploaded in the caller's own application session and
     // not yet linked to any application. Resolved before anything is created.
@@ -267,51 +263,16 @@ export async function POST(request: Request) {
       // Update the JobApplication record with the final permanent paths
       if (processedFilesInfo.length > 0) {
                 
-        // Map file categories to the corresponding file path fields in the JobApplication model
-        const filePathUpdates: Record<string, string> = {};
-        
+        // Map file categories to the corresponding file path columns in the JobApplication model
+        const filePathUpdates: Partial<Record<JobApplicationFilePathColumn, string>> = {};
+
         for (const file of temporaryFileUploads) {
-          const processedFile = processedFilesInfo.find((p: any) => p.id === file.id);
+          const processedFile = processedFilesInfo.find((p) => p.id === file.id);
           if (!processedFile) continue;
-          
-          // Map category to the appropriate *FilePath field
-          switch (file.category) {
-            case 'resume':
-            case 'job-applications/temp/resume':
-              filePathUpdates.resumeFilePath = processedFile.newPath;
-              break;
-            case 'license':
-            case 'job-applications/temp/license':
-              filePathUpdates.driversLicenseFilePath = processedFile.newPath;
-              break;
-            case 'insurance':
-            case 'job-applications/temp/insurance':
-              filePathUpdates.insuranceFilePath = processedFile.newPath;
-              break;
-            case 'registration':
-            case 'job-applications/temp/registration':
-              filePathUpdates.vehicleRegFilePath = processedFile.newPath;
-              break;
-            case 'food_handler':
-            case 'job-applications/temp/food_handler':
-              filePathUpdates.foodHandlerFilePath = processedFile.newPath;
-              break;
-            case 'hipaa':
-            case 'job-applications/temp/hipaa':
-              filePathUpdates.hipaaFilePath = processedFile.newPath;
-              break;
-            case 'driver_photo':
-            case 'job-applications/temp/driver_photo':
-              filePathUpdates.driverPhotoFilePath = processedFile.newPath;
-              break;
-            case 'car_photo':
-            case 'job-applications/temp/car_photo':
-              filePathUpdates.carPhotoFilePath = processedFile.newPath;
-              break;
-            case 'equipment_photo':
-            case 'job-applications/temp/equipment_photo':
-              filePathUpdates.equipmentPhotoFilePath = processedFile.newPath;
-              break;
+
+          const document = file.category ? findDocumentByCategory(file.category) : undefined;
+          if (document) {
+            filePathUpdates[document.filePathColumn] = processedFile.newPath;
           }
         }
         

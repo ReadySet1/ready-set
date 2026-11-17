@@ -194,6 +194,194 @@ describe("POST /api/job-applications - upload ownership", () => {
   });
 });
 
+describe("POST /api/job-applications - driver document columns", () => {
+  const DRIVER_ROLE = "Driver for Catering Deliveries";
+
+  // Today's server-side required check (route.ts:66-81) is unchanged in PR 1,
+  // so the body still carries every path it requires.
+  const driverBody = {
+    ...baseBody,
+    role: DRIVER_ROLE,
+    driversLicenseFilePath: "job-applications/temp/s/license.pdf",
+    insuranceFilePath: "job-applications/temp/s/insurance.pdf",
+    vehicleRegFilePath: "job-applications/temp/s/registration.pdf",
+    driverPhotoFilePath: "job-applications/temp/s/driver.jpg",
+    carPhotoFilePath: "job-applications/temp/s/car.jpg",
+    equipmentPhotoFilePath: "job-applications/temp/s/equipment.jpg",
+  };
+
+  function ownUpload(id: string, category: string, fileName: string) {
+    const filePath = `job-applications/temp/${SESSION_ID}/${fileName}`;
+    return {
+      id,
+      fileName,
+      fileUrl: `https://x.supabase.co/storage/v1/object/public/user-assets/${filePath}`,
+      filePath,
+      jobApplicationId: null,
+      category,
+    };
+  }
+
+  function columnsWritten(): Record<string, string> {
+    const call = (prisma.jobApplication.update as jest.Mock).mock.calls[0];
+    return call ? call[0].data : {};
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    deferredWork = [];
+    const single = jest.fn().mockResolvedValue({
+      data: {
+        id: SESSION_ID,
+        session_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        completed: false,
+      },
+      error: null,
+    });
+    const eq = jest.fn().mockReturnValue({ single });
+    const select = jest.fn().mockReturnValue({ eq });
+    (createAdminClient as jest.Mock).mockResolvedValue({
+      from: jest.fn().mockReturnValue({ select }),
+      storage: {
+        from: jest.fn().mockReturnValue({
+          move: jest.fn().mockResolvedValue({ data: {}, error: null }),
+          createSignedUrl: jest
+            .fn()
+            .mockResolvedValue({ data: { signedUrl: "https://signed" }, error: null }),
+          getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: "" } }),
+        }),
+      },
+    });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (prisma.jobApplication.create as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      position: DRIVER_ROLE,
+    });
+    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
+      id: "app-1",
+      fileUploads: [],
+    });
+  });
+
+  function mockOwnedUploads(uploads: ReturnType<typeof ownUpload>[]) {
+    // Behave like the database: return only the rows whose ids were requested.
+    (prisma.fileUpload.findMany as jest.Mock).mockImplementation(
+      async ({ where }: { where: { id: { in: string[] } } }) =>
+        uploads.filter((upload) => where.id.in.includes(upload.id)),
+    );
+  }
+
+  it("writes the new catering bags, cart/dolly and second ID uploads to their columns", async () => {
+    mockOwnedUploads([
+      ownUpload("bags-file", "job-applications/temp/catering_bags", "bags.jpg"),
+      ownUpload("cart-file", "job-applications/temp/cart_dolly", "cart.jpg"),
+      ownUpload("id-file", "job-applications/temp/second_id", "passport.pdf"),
+    ]);
+
+    const response = await POST(
+      buildRequest(
+        {
+          ...driverBody,
+          cateringBagsPhotoFileId: "bags-file",
+          cartDollyPhotoFileId: "cart-file",
+          secondIdFileId: "id-file",
+        },
+        TOKEN,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.fileUpload.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: expect.arrayContaining(["bags-file", "cart-file", "id-file"]) },
+        }),
+      }),
+    );
+    expect(columnsWritten()).toEqual(
+      expect.objectContaining({
+        cateringBagsPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/bags_\d+\.jpg$/),
+        cartDollyPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/cart_\d+\.jpg$/),
+        secondIdFilePath: expect.stringMatching(/^job-applications\/app-1\/passport_\d+\.pdf$/),
+      }),
+    );
+  });
+
+  // Regression guard for the findDocumentByCategory mapping in route.ts: every
+  // category the old switch mapped, in both the bare and the temp-prefixed form,
+  // keeps its column.
+  // Uses a non-driver role so the required-documents check does not apply.
+  describe.each(["", "job-applications/temp/"])("existing categories (prefix %p)", (prefix) => {
+    it.each([
+      ["resume", "resumeFileId", "resumeFilePath"],
+      ["license", "driversLicenseFileId", "driversLicenseFilePath"],
+      ["insurance", "insuranceFileId", "insuranceFilePath"],
+      ["registration", "vehicleRegFileId", "vehicleRegFilePath"],
+      ["food_handler", "foodHandlerFileId", "foodHandlerFilePath"],
+      ["hipaa", "hipaaFileId", "hipaaFilePath"],
+      ["driver_photo", "driverPhotoFileId", "driverPhotoFilePath"],
+      ["car_photo", "carPhotoFileId", "carPhotoFilePath"],
+      ["equipment_photo", "equipmentPhotoFileId", "equipmentPhotoFilePath"],
+    ])("maps %s to %s -> %s", async (category, fileIdField, column) => {
+      mockOwnedUploads([ownUpload("file-1", `${prefix}${category}`, "doc.pdf")]);
+
+      const response = await POST(buildRequest({ ...baseBody, [fileIdField]: "file-1" }, TOKEN));
+
+      expect(response.status).toBe(200);
+      expect(columnsWritten()).toEqual({
+        [column]: expect.stringMatching(/^job-applications\/app-1\/doc_\d+\.pdf$/),
+      });
+    });
+  });
+
+  // Regression guard: an unknown category is linked but writes no column.
+  it.each(["other", "job-applications/temp/other", "uploads/license"])(
+    "links a %p upload without writing any column",
+    async (category) => {
+      mockOwnedUploads([ownUpload("file-1", category, "doc.pdf")]);
+
+      const response = await POST(buildRequest({ ...baseBody, resumeFileId: "file-1" }, TOKEN));
+
+      expect(response.status).toBe(200);
+      expect(prisma.fileUpload.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "file-1" } }),
+      );
+      expect(prisma.jobApplication.update).not.toHaveBeenCalled();
+    },
+  );
+
+  // Regression guard: legacy driver photo and equipment photo uploads keep their old columns.
+  it("still writes legacy driver photo and equipment photo uploads to their old columns", async () => {
+    mockOwnedUploads([
+      ownUpload("driver-file", "job-applications/temp/driver_photo", "driver.jpg"),
+      ownUpload("equipment-file", "equipment_photo", "equipment.jpg"),
+    ]);
+
+    const response = await POST(
+      buildRequest(
+        {
+          ...driverBody,
+          driverPhotoFileId: "driver-file",
+          equipmentPhotoFileId: "equipment-file",
+        },
+        TOKEN,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(columnsWritten()).toEqual(
+      expect.objectContaining({
+        driverPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/driver_\d+\.jpg$/),
+        equipmentPhotoFilePath: expect.stringMatching(
+          /^job-applications\/app-1\/equipment_\d+\.jpg$/,
+        ),
+      }),
+    );
+  });
+});
+
 describe("POST /api/job-applications - admin notification email", () => {
   const PII = ["Ada", "Lovelace", "ada@example.com", "415-555-0100", "resume.pdf"];
 
