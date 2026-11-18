@@ -1,5 +1,5 @@
 import { jobApplicationAdminUrl } from "@/lib/admin-links";
-import { getDocumentLabel } from "@/lib/job-application-documents";
+import { findDocumentByCategory } from "@/lib/job-application-documents";
 import { escapeHtml } from "@/lib/utils/escape-html";
 
 /** The uploaded-file fields the admin notification email renders. */
@@ -25,7 +25,10 @@ function isHttpsUrl(url: string | null): url is string {
  * Every applicant field is listed with a label derived from its key, followed
  * by a link per uploaded document. The `*FilePath` columns are skipped: they
  * hold internal storage paths, and each upload is already linked under
- * Uploaded Documents. All interpolated values are HTML-escaped:
+ * Uploaded Documents. An upload without a usable https link falls back to
+ * its document's storage path column, when set. A label comes from the
+ * document config only on an exact category match ("<key>" or
+ * "job-applications/temp/<key>"). All interpolated values are HTML-escaped:
  * the application comes from a public form, so its fields are untrusted.
  *
  * `fields` must hold only the application's scalar columns; pass relations
@@ -52,13 +55,22 @@ export function buildJobApplicationEmailHtml(
   if (files.length > 0) {
     htmlBody += `<h2>Uploaded Documents:</h2><ul>`;
     for (const file of files) {
-      const linkText = file.category
-        ? getDocumentLabel(file.category)
-        : file.fileName || "View File";
+      const doc = file.category ? findDocumentByCategory(file.category) : undefined;
+      const linkText = doc
+        ? doc.label
+        : file.category
+          ? file.category.charAt(0).toUpperCase() + file.category.slice(1)
+          : file.fileName || "View File";
       if (isHttpsUrl(file.fileUrl)) {
         htmlBody += `<li><strong>${escapeHtml(linkText)}:</strong> <a href="${escapeHtml(file.fileUrl)}" target="_blank">Open File</a></li>`;
       } else {
-        htmlBody += `<li><strong>${escapeHtml(linkText)}:</strong> Link unavailable (Original Name: ${escapeHtml(file.fileName)})</li>`;
+        // FileUpload.filePath is not updated when the file moves; the column is.
+        const storagePath = doc ? fields[doc.filePathColumn] : undefined;
+        const pathNote =
+          typeof storagePath === "string" && storagePath !== ""
+            ? `; Storage Path: ${escapeHtml(storagePath)}`
+            : "";
+        htmlBody += `<li><strong>${escapeHtml(linkText)}:</strong> Link unavailable (Original Name: ${escapeHtml(file.fileName)}${pathNote})</li>`;
       }
     }
     htmlBody += `</ul>`;
