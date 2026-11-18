@@ -1,4 +1,5 @@
 import { jobApplicationAdminUrl } from "@/lib/admin-links";
+import { getDocumentLabel } from "@/lib/job-application-documents";
 import { escapeHtml } from "@/lib/utils/escape-html";
 
 /** The uploaded-file fields the admin notification email renders. */
@@ -52,7 +53,7 @@ export function buildJobApplicationEmailHtml(
     htmlBody += `<h2>Uploaded Documents:</h2><ul>`;
     for (const file of files) {
       const linkText = file.category
-        ? file.category.charAt(0).toUpperCase() + file.category.slice(1)
+        ? getDocumentLabel(file.category)
         : file.fileName || "View File";
       if (isHttpsUrl(file.fileUrl)) {
         htmlBody += `<li><strong>${escapeHtml(linkText)}:</strong> <a href="${escapeHtml(file.fileUrl)}" target="_blank">Open File</a></li>`;

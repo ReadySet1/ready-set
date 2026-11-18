@@ -74,7 +74,7 @@ describe("buildJobApplicationEmailHtml", () => {
 
     expect(html).not.toContain("href=\"javascript:");
     expect(html).toContain(
-      "<li><strong>License:</strong> Link unavailable (Original Name: license.png)</li>",
+      "<li><strong>Driver&#39;s License:</strong> Link unavailable (Original Name: license.png)</li>",
     );
     expect(html).toContain(
       "<li><strong>Insurance:</strong> Link unavailable (Original Name: ins.pdf)</li>",
@@ -131,5 +131,18 @@ describe("buildJobApplicationEmailHtml", () => {
     ]);
 
     expect(html).toContain("<li><strong>Resume:</strong> <a href=");
+  });
+
+  it("labels a stored upload category with its configured document label", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      {
+        category: "job-applications/temp/license",
+        fileName: "license.pdf",
+        fileUrl: "https://files.example.com/license.pdf",
+      },
+    ]);
+
+    expect(html).toContain("<li><strong>Driver&#39;s License:</strong> <a href=");
+    expect(html).not.toContain("Job-applications/temp/license");
   });
 });
