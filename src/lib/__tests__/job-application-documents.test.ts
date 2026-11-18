@@ -62,7 +62,7 @@ describe("job application document config", () => {
   });
 
   it("uses the upload category the form sends for each document", () => {
-    // Categories ApplyForm.tsx sends today, plus the three added by this config.
+    // Categories ApplyForm.tsx sends, plus the legacy ones older clients sent.
     const expected = [
       "job-applications/temp/resume",
       "job-applications/temp/license",
