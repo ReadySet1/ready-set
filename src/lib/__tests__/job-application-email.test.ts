@@ -92,13 +92,26 @@ describe("buildJobApplicationEmailHtml", () => {
       [],
     );
 
-    expect(html).toContain(
-      "<li><strong>Resume File Path:</strong> applications/app-123/cv.pdf</li>",
-    );
+    expect(html).not.toContain("Resume File Path");
     expect(html).toContain("<li><strong>Phone:</strong> N/A</li>");
     expect(html).toContain(
       "<li><strong>Created At:</strong> 2026-01-01T00:00:00.000Z</li>",
     );
+  });
+
+  it("omits storage path columns, set or empty", () => {
+    const html = buildJobApplicationEmailHtml(
+      {
+        ...baseApplication,
+        driversLicenseFilePath: "job-applications/app-123/license.pdf",
+        secondIdFilePath: null,
+      },
+      [],
+    );
+
+    expect(html).not.toContain("File Path");
+    expect(html).not.toContain("job-applications/app-123/license.pdf");
+    expect(html).toContain("<li><strong>First Name:</strong> Ada</li>");
   });
 
   it("closes the applicant list before the documents section", () => {

@@ -22,7 +22,9 @@ function isHttpsUrl(url: string | null): url is string {
  * Build the HTML body of the "new job application" email sent to admins.
  *
  * Every applicant field is listed with a label derived from its key, followed
- * by a link per uploaded document. All interpolated values are HTML-escaped:
+ * by a link per uploaded document. The `*FilePath` columns are skipped: they
+ * hold internal storage paths, and each upload is already linked under
+ * Uploaded Documents. All interpolated values are HTML-escaped:
  * the application comes from a public form, so its fields are untrusted.
  *
  * `fields` must hold only the application's scalar columns; pass relations
@@ -37,6 +39,7 @@ export function buildJobApplicationEmailHtml(
   htmlBody += `<h2>Applicant Details:</h2><ul>`;
 
   for (const [key, value] of Object.entries(fields)) {
+    if (key.endsWith("FilePath")) continue;
     const formattedKey = key
       .replace(/([A-Z])/g, " $1")
       .replace(/^./, (str) => str.toUpperCase());
