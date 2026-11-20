@@ -5,9 +5,13 @@
     {
       "version": "2.14.0",
       "date": "2026-11-20",
-      "title": "Release 2.14.0",
-      "summary": "",
+      "title": "Clearer driver application emails and an admin sign-in fix",
+      "summary": "Driver application emails to the Ready Set team are easier to read, and the Sign In button on the admin user profile page works again.",
       "changes": [
+        {
+          "text": "Driver application emails to the Ready Set team now name each uploaded document and link to it, instead of listing raw file paths.",
+          "type": "improved"
+        },
         {
           "text": "The Sign In button on the admin user profile page now opens the sign-in page instead of a missing page.",
           "type": "fixed"
