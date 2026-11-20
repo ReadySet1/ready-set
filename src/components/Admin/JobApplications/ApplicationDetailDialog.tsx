@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { JobApplication, ApplicationStatus } from "@/types/job-application";
+import { getDocumentLabel } from "@/lib/job-application-documents";
 
 // Enhanced status config with modern styling
 const statusConfig = {
@@ -105,35 +106,6 @@ export const ApplicationDetailDialog: React.FC<ApplicationDetailDialogProps> = (
   };
 
   // Get document sources from both legacy fields and new fileUploads
-  // Helper function to convert category to friendly label
-  const getCategoryLabel = (category: string): string => {
-    const categoryMap: Record<string, string> = {
-      'resume': 'Resume',
-      'license': 'Driver\'s License',
-      'insurance': 'Insurance',
-      'registration': 'Vehicle Registration',
-      'food_handler': 'Food Handler Certificate',
-      'hipaa': 'HIPAA Certificate',
-      'driver_photo': 'Driver Photo',
-      'car_photo': 'Vehicle Photo',
-      'equipment_photo': 'Equipment Photo',
-    };
-
-    // Extract the base category from paths like "job-applications/temp/license"
-    const match = category.match(/\/(license|insurance|registration|food_handler|hipaa|driver_photo|car_photo|equipment_photo|resume)$/);
-    if (match && match[1]) {
-      return categoryMap[match[1]] || category;
-    }
-
-    // Check for exact match
-    if (categoryMap[category]) {
-      return categoryMap[category];
-    }
-
-    // Fallback: capitalize first letter
-    return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
-  };
-
   const getDocumentSources = () => {
     const sources: { label: string; url: string | null; category?: string; icon: React.ReactNode }[] = [];
 
@@ -183,7 +155,7 @@ export const ApplicationDetailDialog: React.FC<ApplicationDetailDialogProps> = (
     // Add any file uploads
     if (application.fileUploads?.length) {
       application.fileUploads.forEach(upload => {
-        const friendlyLabel = upload.category ? getCategoryLabel(upload.category) : upload.fileName;
+        const friendlyLabel = upload.category ? getDocumentLabel(upload.category) : upload.fileName;
         sources.push({
           label: friendlyLabel,
           url: upload.fileUrl,
