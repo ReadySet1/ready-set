@@ -141,7 +141,7 @@ export default function ModernUserProfile({
 
   // Not authenticated state - bypass if in admin mode
   if (!session && !isAdminMode) {
-    return <AuthenticationRequired router={router} />;
+    return <AuthenticationRequired router={router} userId={userId} />;
   }
 
   // Loading state: Initial data fetch
@@ -211,12 +211,25 @@ export default function ModernUserProfile({
 }
 
 // Authentication required component
-const AuthenticationRequired = ({ router }: { router: any }) => (
+const AuthenticationRequired = ({
+  router,
+  userId,
+}: {
+  router: any;
+  userId: string;
+}) => (
   <div className="bg-muted/40 flex h-screen flex-col items-center justify-center space-y-4 p-4">
     <AlertOctagon className="text-destructive h-16 w-16" />
     <h2 className="text-2xl font-bold">Authentication Required</h2>
     <p className="text-muted-foreground">Please sign in to access this page</p>
-    <Button onClick={() => router.push("/login")} className="mt-4">
+    <Button
+      onClick={() =>
+        router.push(
+          `/sign-in?returnTo=${encodeURIComponent(`/admin/users/${userId}`)}`,
+        )
+      }
+      className="mt-4"
+    >
       Sign In
     </Button>
   </div>
