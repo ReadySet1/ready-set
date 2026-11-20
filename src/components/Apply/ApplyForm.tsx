@@ -18,7 +18,7 @@ import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
 import { logger } from "@/utils/logger";
 import { captureException } from "@/lib/monitoring/sentry";
 import {
-  missingRequiredDriverDocuments,
+  requiredDriverDocuments,
   type DriverDocumentKey,
 } from "@/lib/job-application-documents";
 
@@ -702,7 +702,9 @@ const JobApplicationForm = () => {
       errors.push("Please upload your resume");
     }
 
-    // Driver-specific file requirements come from the shared document config
+    // Required driver documents are checked by document key: each upload hook
+    // is looked up by its config key, so the category the server returns never
+    // decides whether a document is present.
     if (role === "Driver for Catering Deliveries") {
       // Typed by document key so a missing or unknown document fails to compile
       const driverUploads = {
@@ -716,11 +718,10 @@ const JobApplicationForm = () => {
         catering_bags: cateringBagsUpload,
         cart_dolly: cartDollyUpload,
       } satisfies Record<DriverDocumentKey, typeof licenseUpload>;
-      const uploadedCategories = Object.values(driverUploads).flatMap((upload) =>
-        upload.uploadedFiles.map((file) => file.category),
-      );
-      for (const doc of missingRequiredDriverDocuments(uploadedCategories)) {
-        errors.push(`Please upload your ${doc.label}`);
+      for (const doc of requiredDriverDocuments()) {
+        if (driverUploads[doc.key].uploadedFiles.length === 0) {
+          errors.push(`Please upload your ${doc.label}`);
+        }
       }
     }
 
