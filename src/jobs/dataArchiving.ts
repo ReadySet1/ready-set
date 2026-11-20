@@ -367,7 +367,8 @@ export class DataArchivingService {
               : batchResult.maxDate;
           }
 
-          if (batchResult.processed === 0) break; // No more records
+          // A short (or empty) batch means the source table is drained
+          if (batchResult.processed < this.config.batchSize) break;
 
           // Small delay between batches
           if (processed < eligibleCount) {
@@ -447,8 +448,10 @@ export class DataArchivingService {
       };
     }
 
-    // Use raw SQL for efficient batch insert + delete
-    const archiveResult = await prisma.$executeRaw`
+    // Use raw SQL for efficient batch insert + delete.
+    // $queryRaw, not $executeRaw: the statement ends in a SELECT, so the
+    // affected-row count is always 1 while the real total is the returned row.
+    const archiveResult = await prisma.$queryRaw<{ count: bigint }[]>`
       WITH archived AS (
         INSERT INTO driver_locations_archive (
           id, driver_id, location, latitude, longitude, accuracy,
@@ -483,9 +486,11 @@ export class DataArchivingService {
       WHERE archive_batch_id = ${batchId}::uuid
     `;
 
+    const archivedCount = Number(archiveResult[0]?.count ?? 0);
+
     return {
-      processed: Number(archiveResult),
-      archived: Number(archiveResult),
+      processed: archivedCount,
+      archived: archivedCount,
       failed: 0,
       minDate: dateRange[0]?.min_date ?? null,
       maxDate: dateRange[0]?.max_date ?? null,
@@ -580,7 +585,8 @@ export class DataArchivingService {
               : batchResult.maxDate;
           }
 
-          if (batchResult.processed === 0) break;
+          // A short (or empty) batch means the source table is drained
+          if (batchResult.processed < this.config.batchSize) break;
 
           if (processed < eligibleCount) {
             await this.delay(100);
@@ -658,8 +664,9 @@ export class DataArchivingService {
       };
     }
 
-    // Use raw SQL for efficient batch insert + delete with JSONB snapshot
-    const archiveResult = await prisma.$executeRaw`
+    // Use raw SQL for efficient batch insert + delete with JSONB snapshot.
+    // $queryRaw, not $executeRaw: see archiveLocationsBatch.
+    const archiveResult = await prisma.$queryRaw<{ count: bigint }[]>`
       WITH to_archive AS (
         SELECT *
         FROM driver_shifts
@@ -707,9 +714,11 @@ export class DataArchivingService {
       WHERE archive_batch_id = ${batchId}::uuid
     `;
 
+    const archivedCount = Number(archiveResult[0]?.count ?? 0);
+
     return {
-      processed: Number(archiveResult),
-      archived: Number(archiveResult),
+      processed: archivedCount,
+      archived: archivedCount,
       failed: 0,
       minDate: dateRange[0]?.min_date ?? null,
       maxDate: dateRange[0]?.max_date ?? null,
