@@ -20,11 +20,12 @@ export interface FormData {
   driversLicense: File | null;
   insurance: File | null;
   vehicleRegistration: File | null;
+  secondId?: File | null;
   foodHandler?: File | null;
   hipaa?: File | null;
-  driverPhoto?: File | null;
   carPhoto?: File | null;
-  equipmentPhoto?: File | null;
+  cateringBags?: File | null;
+  cartDolly?: File | null;
 }
 
 export interface SubmissionData {

@@ -41,12 +41,12 @@ export interface DriverDocument extends ApplicationDocument {
 const IMAGE_TYPES = [".jpg", ".jpeg", ".png"] as const;
 const IMAGE_PDF_TYPES = [".pdf", ".jpg", ".jpeg", ".png"] as const;
 
-function defineDocument(
-  key: string,
+function defineDocument<K extends string>(
+  key: K,
   fileIdField: string,
   filePathColumn: JobApplicationFilePathColumn,
   label: string,
-): ApplicationDocument {
+): ApplicationDocument & { key: K } {
   return { key, category: `${TEMP_CATEGORY_PREFIX}${key}`, fileIdField, filePathColumn, label };
 }
 
@@ -58,7 +58,7 @@ export const RESUME_DOCUMENT: ApplicationDocument = defineDocument(
 );
 
 /** Documents a new driver applicant can upload. */
-export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
+export const DRIVER_DOCUMENTS = [
   {
     ...defineDocument("license", "driversLicenseFileId", "driversLicenseFilePath", "Driver's License"),
     required: true,
@@ -76,7 +76,7 @@ export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
   },
   {
     ...defineDocument("second_id", "secondIdFileId", "secondIdFilePath", "Second Form of ID"),
-    required: false,
+    required: true,
     accept: IMAGE_PDF_TYPES,
   },
   {
@@ -104,7 +104,10 @@ export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
     required: true,
     accept: IMAGE_TYPES,
   },
-];
+] as const satisfies readonly DriverDocument[];
+
+/** Keys of DRIVER_DOCUMENTS, the documents the apply form shows (legacy ones excluded). */
+export type DriverDocumentKey = (typeof DRIVER_DOCUMENTS)[number]["key"];
 
 /**
  * No longer offered to new applicants. Kept so existing applications keep
@@ -126,8 +129,18 @@ export const APPLICATION_FILE_ID_FIELDS: readonly string[] = ALL_DOCUMENTS.map(
   (doc) => doc.fileIdField,
 );
 
-export function requiredDriverDocuments(): DriverDocument[] {
+export function requiredDriverDocuments(): (typeof DRIVER_DOCUMENTS)[number][] {
   return DRIVER_DOCUMENTS.filter((doc) => doc.required);
+}
+
+/** Required driver documents not covered by the given upload categories, in config order. */
+export function missingRequiredDriverDocuments(
+  categories: readonly (string | null | undefined)[],
+): DriverDocument[] {
+  const uploadedKeys = new Set(
+    categories.map((category) => (category ? findDocumentByCategory(category)?.key : undefined)),
+  );
+  return requiredDriverDocuments().filter((doc) => !uploadedKeys.has(doc.key));
 }
 
 /** Strips only the exact "job-applications/temp/" prefix. */
