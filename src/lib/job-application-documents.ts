@@ -38,27 +38,15 @@ export interface DriverDocument extends ApplicationDocument {
   accept: readonly string[];
 }
 
-/** Keys of DRIVER_DOCUMENTS, the documents the apply form shows (legacy ones excluded). */
-export type DriverDocumentKey =
-  | "license"
-  | "insurance"
-  | "registration"
-  | "second_id"
-  | "food_handler"
-  | "hipaa"
-  | "car_photo"
-  | "catering_bags"
-  | "cart_dolly";
-
 const IMAGE_TYPES = [".jpg", ".jpeg", ".png"] as const;
 const IMAGE_PDF_TYPES = [".pdf", ".jpg", ".jpeg", ".png"] as const;
 
-function defineDocument(
-  key: string,
+function defineDocument<K extends string>(
+  key: K,
   fileIdField: string,
   filePathColumn: JobApplicationFilePathColumn,
   label: string,
-): ApplicationDocument {
+): ApplicationDocument & { key: K } {
   return { key, category: `${TEMP_CATEGORY_PREFIX}${key}`, fileIdField, filePathColumn, label };
 }
 
@@ -70,7 +58,7 @@ export const RESUME_DOCUMENT: ApplicationDocument = defineDocument(
 );
 
 /** Documents a new driver applicant can upload. */
-export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
+export const DRIVER_DOCUMENTS = [
   {
     ...defineDocument("license", "driversLicenseFileId", "driversLicenseFilePath", "Driver's License"),
     required: true,
@@ -116,7 +104,10 @@ export const DRIVER_DOCUMENTS: readonly DriverDocument[] = [
     required: true,
     accept: IMAGE_TYPES,
   },
-];
+] as const satisfies readonly DriverDocument[];
+
+/** Keys of DRIVER_DOCUMENTS, the documents the apply form shows (legacy ones excluded). */
+export type DriverDocumentKey = (typeof DRIVER_DOCUMENTS)[number]["key"];
 
 /**
  * No longer offered to new applicants. Kept so existing applications keep
@@ -138,7 +129,7 @@ export const APPLICATION_FILE_ID_FIELDS: readonly string[] = ALL_DOCUMENTS.map(
   (doc) => doc.fileIdField,
 );
 
-export function requiredDriverDocuments(): DriverDocument[] {
+export function requiredDriverDocuments(): (typeof DRIVER_DOCUMENTS)[number][] {
   return DRIVER_DOCUMENTS.filter((doc) => doc.required);
 }
 

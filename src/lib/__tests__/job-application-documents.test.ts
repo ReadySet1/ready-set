@@ -7,7 +7,6 @@ import {
   getDocumentLabel,
   missingRequiredDriverDocuments,
   requiredDriverDocuments,
-  type DriverDocumentKey,
 } from "@/lib/job-application-documents";
 
 describe("job application document config", () => {
@@ -36,29 +35,6 @@ describe("job application document config", () => {
       "driver_photo",
       "equipment_photo",
     ]);
-  });
-
-  it("keeps DriverDocumentKey in sync with the non-legacy driver documents", () => {
-    // The apply form keys its upload hooks by DriverDocumentKey, so every
-    // non-legacy document needs a key. The Record makes the compiler reject a
-    // missing or unknown key here; the assertion catches config drift.
-    const formDocumentKeys: Record<DriverDocumentKey, true> = {
-      license: true,
-      insurance: true,
-      registration: true,
-      second_id: true,
-      food_handler: true,
-      hipaa: true,
-      car_photo: true,
-      catering_bags: true,
-      cart_dolly: true,
-    };
-    const legacyKeys = new Set(LEGACY_DRIVER_DOCUMENTS.map((doc) => doc.key));
-    const configKeys = DRIVER_DOCUMENTS.map((doc) => doc.key)
-      .filter((key) => !legacyKeys.has(key))
-      .sort();
-
-    expect(configKeys).toEqual(Object.keys(formDocumentKeys).sort());
   });
 
   it("uses the upload category the form sends for each document", () => {
