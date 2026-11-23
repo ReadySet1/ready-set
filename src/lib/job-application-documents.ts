@@ -28,7 +28,7 @@ export interface ApplicationDocument {
   category: string;
   /** Submit payload field carrying the FileUpload id. */
   fileIdField: string;
-  /** JobApplication column (and payload path field) for the moved file. */
+  /** JobApplication column that stores the moved file's path. */
   filePathColumn: JobApplicationFilePathColumn;
   label: string;
 }

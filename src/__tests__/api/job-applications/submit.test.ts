@@ -194,20 +194,36 @@ describe("POST /api/job-applications - upload ownership", () => {
   });
 });
 
-describe("POST /api/job-applications - driver document columns", () => {
+describe("POST /api/job-applications - driver document columns and required uploads", () => {
   const DRIVER_ROLE = "Driver for Catering Deliveries";
 
-  // Mirrors what the current form sends, including the now-optional paths.
-  const driverBody = {
-    ...baseBody,
-    role: DRIVER_ROLE,
-    driversLicenseFilePath: "job-applications/temp/s/license.pdf",
-    insuranceFilePath: "job-applications/temp/s/insurance.pdf",
-    vehicleRegFilePath: "job-applications/temp/s/registration.pdf",
-    driverPhotoFilePath: "job-applications/temp/s/driver.jpg",
-    carPhotoFilePath: "job-applications/temp/s/car.jpg",
-    equipmentPhotoFilePath: "job-applications/temp/s/equipment.jpg",
-  };
+  // Written out literally, not read from the config: renaming a label or
+  // changing the required set must fail these tests on purpose.
+  const REQUIRED_UPLOADS = [
+    ["license", "driversLicenseFileId", "Driver's License", "license.pdf"],
+    ["insurance", "insuranceFileId", "Insurance", "insurance.pdf"],
+    ["second_id", "secondIdFileId", "Second Form of ID", "passport.pdf"],
+    ["car_photo", "carPhotoFileId", "Vehicle Photo", "car.jpg"],
+    ["catering_bags", "cateringBagsPhotoFileId", "Catering Bags Photo", "bags.jpg"],
+    ["cart_dolly", "cartDollyPhotoFileId", "Cart/Dolly Photo", "cart.jpg"],
+  ] as const;
+
+  const ALL_REQUIRED_MISSING =
+    "Missing required documents: Driver's License, Insurance, Second Form of ID, Vehicle Photo, Catering Bags Photo, Cart/Dolly Photo. Please reload the page and try again.";
+
+  /** Session uploads for every required document (minus `except`) and the ids the form sends. */
+  function requiredUploads(except?: string) {
+    const rows = REQUIRED_UPLOADS.filter(([key]) => key !== except);
+    return {
+      uploads: rows.map(([key, , , fileName]) =>
+        ownUpload(`${key}-file`, `job-applications/temp/${key}`, fileName),
+      ),
+      fileIds: Object.fromEntries(rows.map(([key, field]) => [field, `${key}-file`])),
+    };
+  }
+
+  // A driver submission whose required documents were all uploaded in the caller's session.
+  const driverBody = { ...baseBody, role: DRIVER_ROLE, ...requiredUploads().fileIds };
 
   function ownUpload(id: string, category: string, fileName: string) {
     const filePath = `job-applications/temp/${SESSION_ID}/${fileName}`;
@@ -272,40 +288,94 @@ describe("POST /api/job-applications - driver document columns", () => {
     );
   }
 
-  it("writes the new catering bags, cart/dolly and second ID uploads to their columns", async () => {
+  it("accepts a driver with the six required uploads and no optional ones, writing their columns", async () => {
+    mockOwnedUploads(requiredUploads().uploads);
+
+    const response = await POST(buildRequest(driverBody, TOKEN));
+
+    expect(response.status).toBe(200);
+    expect(columnsWritten()).toEqual({
+      driversLicenseFilePath: expect.stringMatching(/^job-applications\/app-1\/license_\d+\.pdf$/),
+      insuranceFilePath: expect.stringMatching(/^job-applications\/app-1\/insurance_\d+\.pdf$/),
+      secondIdFilePath: expect.stringMatching(/^job-applications\/app-1\/passport_\d+\.pdf$/),
+      carPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/car_\d+\.jpg$/),
+      cateringBagsPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/bags_\d+\.jpg$/),
+      cartDollyPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/cart_\d+\.jpg$/),
+    });
+  });
+
+  it.each(REQUIRED_UPLOADS)("rejects a driver missing the %s upload", async (key, _field, label) => {
+    const { uploads, fileIds } = requiredUploads(key);
+    mockOwnedUploads(uploads);
+
+    const response = await POST(buildRequest({ ...baseBody, role: DRIVER_ROLE, ...fileIds }, TOKEN));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: `Missing required documents: ${label}. Please reload the page and try again.`,
+    });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
+
+  it("lists every required document, in order, when a driver uploads nothing", async () => {
+    const response = await POST(buildRequest({ ...baseBody, role: DRIVER_ROLE }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: ALL_REQUIRED_MISSING });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
+
+  // File paths in the payload are client claims, not uploads: they satisfy nothing.
+  it("rejects a driver who sends only file paths", async () => {
+    const response = await POST(
+      buildRequest({
+        ...baseBody,
+        role: DRIVER_ROLE,
+        driversLicenseFilePath: "job-applications/temp/s/license.pdf",
+        insuranceFilePath: "job-applications/temp/s/insurance.pdf",
+        secondIdFilePath: "job-applications/temp/s/passport.pdf",
+        carPhotoFilePath: "job-applications/temp/s/car.jpg",
+        cateringBagsPhotoFilePath: "job-applications/temp/s/bags.jpg",
+        cartDollyPhotoFilePath: "job-applications/temp/s/cart.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: ALL_REQUIRED_MISSING });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
+
+  // The upload's own category decides what it covers, not the payload field it arrives in.
+  it("does not count an insurance upload sent as the driver's license", async () => {
+    const { uploads, fileIds } = requiredUploads("license");
     mockOwnedUploads([
-      ownUpload("bags-file", "job-applications/temp/catering_bags", "bags.jpg"),
-      ownUpload("cart-file", "job-applications/temp/cart_dolly", "cart.jpg"),
-      ownUpload("id-file", "job-applications/temp/second_id", "passport.pdf"),
+      ...uploads,
+      ownUpload("fake-license", "job-applications/temp/insurance", "license.pdf"),
     ]);
 
     const response = await POST(
       buildRequest(
-        {
-          ...driverBody,
-          cateringBagsPhotoFileId: "bags-file",
-          cartDollyPhotoFileId: "cart-file",
-          secondIdFileId: "id-file",
-        },
+        { ...baseBody, role: DRIVER_ROLE, ...fileIds, driversLicenseFileId: "fake-license" },
         TOKEN,
       ),
     );
 
-    expect(response.status).toBe(200);
-    expect(prisma.fileUpload.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: { in: expect.arrayContaining(["bags-file", "cart-file", "id-file"]) },
-        }),
-      }),
-    );
-    expect(columnsWritten()).toEqual(
-      expect.objectContaining({
-        cateringBagsPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/bags_\d+\.jpg$/),
-        cartDollyPhotoFilePath: expect.stringMatching(/^job-applications\/app-1\/cart_\d+\.jpg$/),
-        secondIdFilePath: expect.stringMatching(/^job-applications\/app-1\/passport_\d+\.pdf$/),
-      }),
-    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Missing required documents: Driver's License. Please reload the page and try again.",
+    });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
+
+  // A missing session is reported before missing documents: reloading fixes the session first.
+  it("rejects a driver's file ids without an upload token before checking documents", async () => {
+    const response = await POST(buildRequest(driverBody));
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringMatching(/upload session is missing or expired/i),
+    });
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 
   // Regression guard for the findDocumentByCategory mapping in route.ts: every
@@ -354,6 +424,7 @@ describe("POST /api/job-applications - driver document columns", () => {
   // Regression guard: legacy driver photo and equipment photo uploads keep their old columns.
   it("still writes legacy driver photo and equipment photo uploads to their old columns", async () => {
     mockOwnedUploads([
+      ...requiredUploads().uploads,
       ownUpload("driver-file", "job-applications/temp/driver_photo", "driver.jpg"),
       ownUpload("equipment-file", "equipment_photo", "equipment.jpg"),
     ]);
@@ -378,83 +449,6 @@ describe("POST /api/job-applications - driver document columns", () => {
         ),
       }),
     );
-  });
-});
-
-describe("POST /api/job-applications - driver required documents", () => {
-  const DRIVER_ROLE = "Driver for Catering Deliveries";
-
-  // Paths only: the required check reads the payload before any upload lookup.
-  const requiredPaths = {
-    driversLicenseFilePath: "job-applications/temp/s/license.pdf",
-    insuranceFilePath: "job-applications/temp/s/insurance.pdf",
-    carPhotoFilePath: "job-applications/temp/s/car.jpg",
-  };
-  const noLongerRequiredPaths = {
-    vehicleRegFilePath: "job-applications/temp/s/registration.pdf",
-    driverPhotoFilePath: "job-applications/temp/s/driver.jpg",
-    equipmentPhotoFilePath: "job-applications/temp/s/equipment.jpg",
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    deferredWork = [];
-    (createAdminClient as jest.Mock).mockResolvedValue({ storage: { from: jest.fn() } });
-    (createClient as jest.Mock).mockResolvedValue({});
-    (prisma.jobApplication.create as jest.Mock).mockResolvedValue({
-      id: "app-1",
-      firstName: "Ada",
-      lastName: "Lovelace",
-      position: DRIVER_ROLE,
-    });
-    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
-      id: "app-1",
-      fileUploads: [],
-    });
-  });
-
-  function submit(paths: Record<string, string>) {
-    return POST(buildRequest({ ...baseBody, role: DRIVER_ROLE, ...paths }));
-  }
-
-  // The current form does not send catering bags or cart/dolly yet; PR 4 makes them required.
-  it("accepts a driver without vehicle registration, driver photo, equipment photo, catering bags or cart/dolly", async () => {
-    const response = await submit(requiredPaths);
-
-    expect(response.status).toBe(200);
-    expect(prisma.jobApplication.create).toHaveBeenCalled();
-  });
-
-  it("still accepts a driver who sends vehicle registration, driver photo and equipment photo", async () => {
-    const response = await submit({ ...requiredPaths, ...noLongerRequiredPaths });
-
-    expect(response.status).toBe(200);
-    expect(prisma.jobApplication.create).toHaveBeenCalled();
-  });
-
-  it("lists every missing required document in order", async () => {
-    const response = await submit(noLongerRequiredPaths);
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: "Missing required documents: driver's license, insurance, car photo",
-    });
-    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["driversLicenseFilePath", "driver's license"],
-    ["insuranceFilePath", "insurance"],
-    ["carPhotoFilePath", "car photo"],
-  ])("rejects a driver missing %s with the current message", async (field, name) => {
-    const { [field as keyof typeof requiredPaths]: _omitted, ...rest } = requiredPaths;
-    const response = await submit({ ...rest, ...noLongerRequiredPaths });
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: `Missing required documents: ${name}`,
-    });
-    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
 });
 
