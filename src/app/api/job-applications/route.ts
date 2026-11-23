@@ -93,7 +93,9 @@ export async function POST(request: Request) {
       );
       if (missingDocs.length > 0) {
         return NextResponse.json(
-          { error: `Missing required documents: ${missingDocs.map((doc) => doc.label).join(", ")}` },
+          {
+            error: `Missing required documents: ${missingDocs.map((doc) => doc.label).join(", ")}. Please reload the page and try again.`,
+          },
           { status: 400 }
         );
       }

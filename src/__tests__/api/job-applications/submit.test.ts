@@ -194,7 +194,7 @@ describe("POST /api/job-applications - upload ownership", () => {
   });
 });
 
-describe("POST /api/job-applications - driver document columns", () => {
+describe("POST /api/job-applications - driver document columns and required uploads", () => {
   const DRIVER_ROLE = "Driver for Catering Deliveries";
 
   // Written out literally, not read from the config: renaming a label or
@@ -209,7 +209,7 @@ describe("POST /api/job-applications - driver document columns", () => {
   ] as const;
 
   const ALL_REQUIRED_MISSING =
-    "Missing required documents: Driver's License, Insurance, Second Form of ID, Vehicle Photo, Catering Bags Photo, Cart/Dolly Photo";
+    "Missing required documents: Driver's License, Insurance, Second Form of ID, Vehicle Photo, Catering Bags Photo, Cart/Dolly Photo. Please reload the page and try again.";
 
   /** Session uploads for every required document (minus `except`) and the ids the form sends. */
   function requiredUploads(except?: string) {
@@ -312,7 +312,7 @@ describe("POST /api/job-applications - driver document columns", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: `Missing required documents: ${label}`,
+      error: `Missing required documents: ${label}. Please reload the page and try again.`,
     });
     expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
@@ -362,7 +362,7 @@ describe("POST /api/job-applications - driver document columns", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "Missing required documents: Driver's License",
+      error: "Missing required documents: Driver's License. Please reload the page and try again.",
     });
     expect(prisma.jobApplication.create).not.toHaveBeenCalled();
   });
