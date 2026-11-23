@@ -21,7 +21,7 @@ const createSessionSchema = z.object({
 
 // Constants
 const SESSION_DURATION_HOURS = 2;
-const MAX_UPLOADS_PER_SESSION = 10;
+const MAX_UPLOADS_PER_SESSION = 20;
 const MAX_SESSIONS_PER_IP_PER_HOUR = 5;
 
 /**
@@ -268,6 +268,7 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       uploadToken: session.session_token,
       expiresAt: session.session_expires_at,
+      maxUploads: MAX_UPLOADS_PER_SESSION,
       message: 'Session created successfully. You can now upload files.'
     }, { status: 201 });
   } catch (error) {
