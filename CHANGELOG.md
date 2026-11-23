@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0](https://github.com/ReadySet1/ready-set/compare/v2.13.0...v2.14.0) (2026-11-20)
+
+
+### Added
+
+* **job-applications:** stop requiring registration and driver/equipment photos ([f1da765](https://github.com/ReadySet1/ready-set/commit/f1da765440e291e17cb760351f9550db36b153ee))
+
+
+### Fixed
+
+* archive data in real batches so the nightly job stops timing out ([ceca092](https://github.com/ReadySet1/ready-set/commit/ceca092d15643d02923a1e5d3d7780402d2f959a))
+* **deps:** patch node-forge, fast-xml-parser and esbuild advisories ([928bb6d](https://github.com/ReadySet1/ready-set/commit/928bb6d6a24ad82a4cddeb3baea3aee3c25d0182))
+* **deps:** raise glob to 14.0.2 for alerts 325 and 327 ([d30e19a](https://github.com/ReadySet1/ready-set/commit/d30e19a9db71f4a17009ea6654ecafb2f0d32ca8))
+* **job-applications:** clean up the admin application email ([8de7e19](https://github.com/ReadySet1/ready-set/commit/8de7e19e3e395af446f1d48b1273a6f8e473483e))
+* **job-applications:** omit file path columns from the admin email ([858b53d](https://github.com/ReadySet1/ready-set/commit/858b53d993864f3323a19eababec3738d541c8d2))
+* **job-applications:** refine admin email document labels ([9bad16e](https://github.com/ReadySet1/ready-set/commit/9bad16ed8d9ef27b61e0a308ec50024c33cf27a5))
+* **job-applications:** use document labels for admin email links ([b25c4bb](https://github.com/ReadySet1/ready-set/commit/b25c4bbd63e9e02535797fd77838bafb27400775))
+* point the admin user profile sign-in button at /sign-in ([64206ed](https://github.com/ReadySet1/ready-set/commit/64206edbe80ba138cab4b55202a3b9f07ca02f1e))
+* point the admin user profile sign-in button at /sign-in ([44d70d6](https://github.com/ReadySet1/ready-set/commit/44d70d65c7a87928ccf5595935ba6628b60abdd6))
+* read archived row count from the archive statement result ([2005e6c](https://github.com/ReadySet1/ready-set/commit/2005e6c5795bc6acd96097bfc152d87224484330))
+
+
+### Changed
+
+* **job-applications:** centralize document config and admin labels ([e857172](https://github.com/ReadySet1/ready-set/commit/e85717254c35f40282c8d957e4b3de62ca0a12fe))
+
 ## [2.13.0](https://github.com/ReadySet1/ready-set/compare/v2.12.0...v2.13.0) (2026-11-13)
 
 
