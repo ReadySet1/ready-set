@@ -17,6 +17,10 @@ import { useSearchParams } from "next/navigation";
 import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
 import { logger } from "@/utils/logger";
 import { captureException } from "@/lib/monitoring/sentry";
+import {
+  requiredDriverDocuments,
+  type DriverDocumentKey,
+} from "@/lib/job-application-documents";
 
 // Helper to generate accept string from allowed file types
 const generateAcceptString = (types: string[]): string => types.join(",");
@@ -56,11 +60,12 @@ const FORM_STEPS: FormStep[] = [
       "driversLicense",
       "insurance",
       "vehicleRegistration",
+      "secondId",
       "foodHandler",
       "hipaa",
-      "driverPhoto",
       "carPhoto",
-      "equipmentPhoto",
+      "cateringBags",
+      "cartDolly",
     ],
   },
   {
@@ -110,11 +115,12 @@ interface FormData {
   driversLicense?: FileList | null;
   insurance?: FileList | null;
   vehicleRegistration?: FileList | null;
+  secondId?: FileList | null;
   foodHandler?: FileList | null;
   hipaa?: FileList | null;
-  driverPhoto?: FileList | null;
   carPhoto?: FileList | null;
-  equipmentPhoto?: FileList | null;
+  cateringBags?: FileList | null;
+  cartDolly?: FileList | null;
 }
 
 // Type for the data structure sent to the API endpoint
@@ -139,21 +145,23 @@ interface SubmissionData {
   driversLicenseFilePath: string | null;
   insuranceFilePath: string | null;
   vehicleRegFilePath: string | null;
+  secondIdFilePath: string | null;
   foodHandlerFilePath: string | null;
   hipaaFilePath: string | null;
-  driverPhotoFilePath: string | null;
   carPhotoFilePath: string | null;
-  equipmentPhotoFilePath: string | null;
+  cateringBagsPhotoFilePath: string | null;
+  cartDollyPhotoFilePath: string | null;
   // Keep File IDs if needed for updating FileUpload records later
   resumeFileId: string | null;
   driversLicenseFileId: string | null;
   insuranceFileId: string | null;
   vehicleRegFileId: string | null;
+  secondIdFileId: string | null;
   foodHandlerFileId: string | null;
   hipaaFileId: string | null;
-  driverPhotoFileId: string | null;
   carPhotoFileId: string | null;
-  equipmentPhotoFileId: string | null;
+  cateringBagsPhotoFileId: string | null;
+  cartDollyPhotoFileId: string | null;
 }
 
 // Type for the expected API response
@@ -227,11 +235,12 @@ const JobApplicationForm = () => {
       driversLicense: null,
       insurance: null,
       vehicleRegistration: null,
+      secondId: null,
       foodHandler: null,
       hipaa: null,
-      driverPhoto: null,
       carPhoto: null,
-      equipmentPhoto: null,
+      cateringBags: null,
+      cartDolly: null,
     },
   });
 
@@ -320,12 +329,12 @@ const JobApplicationForm = () => {
     uploadToken: session?.uploadToken,
   });
 
-  const driverPhotoUpload = useJobApplicationUpload({
+  const secondIdUpload = useJobApplicationUpload({
     bucketName: "user-assets",
-    category: "job-applications/temp/driver_photo",
+    category: "job-applications/temp/second_id",
     entityType: "job_application",
     entityId: tempEntityId,
-    allowedFileTypes: [".jpg", ".jpeg", ".png"],
+    allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
     uploadToken: session?.uploadToken,
   });
@@ -340,9 +349,19 @@ const JobApplicationForm = () => {
     uploadToken: session?.uploadToken,
   });
 
-  const equipmentPhotoUpload = useJobApplicationUpload({
+  const cateringBagsUpload = useJobApplicationUpload({
     bucketName: "user-assets",
-    category: "job-applications/temp/equipment_photo",
+    category: "job-applications/temp/catering_bags",
+    entityType: "job_application",
+    entityId: tempEntityId,
+    allowedFileTypes: [".jpg", ".jpeg", ".png"],
+    maxFileCount: 1,
+    uploadToken: session?.uploadToken,
+  });
+
+  const cartDollyUpload = useJobApplicationUpload({
+    bucketName: "user-assets",
+    category: "job-applications/temp/cart_dolly",
     entityType: "job_application",
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
@@ -419,11 +438,12 @@ const JobApplicationForm = () => {
         "driversLicense",
         "insurance",
         "vehicleRegistration",
+        "secondId",
         "foodHandler",
         "hipaa",
-        "driverPhoto",
         "carPhoto",
-        "equipmentPhoto",
+        "cateringBags",
+        "cartDolly",
       ].includes(field);
     });
 
@@ -528,20 +548,23 @@ const JobApplicationForm = () => {
         vehicleRegFilePath: registrationUpload.uploadedFiles[0]
           ? registrationUpload.uploadedFiles[0].path
           : null,
+        secondIdFilePath: secondIdUpload.uploadedFiles[0]
+          ? secondIdUpload.uploadedFiles[0].path
+          : null,
         foodHandlerFilePath: foodHandlerUpload.uploadedFiles[0]
           ? foodHandlerUpload.uploadedFiles[0].path
           : null,
         hipaaFilePath: hipaaUpload.uploadedFiles[0]
           ? hipaaUpload.uploadedFiles[0].path
           : null,
-        driverPhotoFilePath: driverPhotoUpload.uploadedFiles[0]
-          ? driverPhotoUpload.uploadedFiles[0].path
-          : null,
         carPhotoFilePath: carPhotoUpload.uploadedFiles[0]
           ? carPhotoUpload.uploadedFiles[0].path
           : null,
-        equipmentPhotoFilePath: equipmentPhotoUpload.uploadedFiles[0]
-          ? equipmentPhotoUpload.uploadedFiles[0].path
+        cateringBagsPhotoFilePath: cateringBagsUpload.uploadedFiles[0]
+          ? cateringBagsUpload.uploadedFiles[0].path
+          : null,
+        cartDollyPhotoFilePath: cartDollyUpload.uploadedFiles[0]
+          ? cartDollyUpload.uploadedFiles[0].path
           : null,
         resumeFileId: resumeUpload.uploadedFiles[0]
           ? resumeUpload.uploadedFiles[0].key
@@ -555,20 +578,23 @@ const JobApplicationForm = () => {
         vehicleRegFileId: registrationUpload.uploadedFiles[0]
           ? registrationUpload.uploadedFiles[0].key
           : null,
+        secondIdFileId: secondIdUpload.uploadedFiles[0]
+          ? secondIdUpload.uploadedFiles[0].key
+          : null,
         foodHandlerFileId: foodHandlerUpload.uploadedFiles[0]
           ? foodHandlerUpload.uploadedFiles[0].key
           : null,
         hipaaFileId: hipaaUpload.uploadedFiles[0]
           ? hipaaUpload.uploadedFiles[0].key
           : null,
-        driverPhotoFileId: driverPhotoUpload.uploadedFiles[0]
-          ? driverPhotoUpload.uploadedFiles[0].key
-          : null,
         carPhotoFileId: carPhotoUpload.uploadedFiles[0]
           ? carPhotoUpload.uploadedFiles[0].key
           : null,
-        equipmentPhotoFileId: equipmentPhotoUpload.uploadedFiles[0]
-          ? equipmentPhotoUpload.uploadedFiles[0].key
+        cateringBagsPhotoFileId: cateringBagsUpload.uploadedFiles[0]
+          ? cateringBagsUpload.uploadedFiles[0].key
+          : null,
+        cartDollyPhotoFileId: cartDollyUpload.uploadedFiles[0]
+          ? cartDollyUpload.uploadedFiles[0].key
           : null,
       };
 
@@ -626,9 +652,10 @@ const JobApplicationForm = () => {
       registrationUpload.setUploadedFiles([]);
       foodHandlerUpload.setUploadedFiles([]);
       hipaaUpload.setUploadedFiles([]);
-      driverPhotoUpload.setUploadedFiles([]);
+      secondIdUpload.setUploadedFiles([]);
       carPhotoUpload.setUploadedFiles([]);
-      equipmentPhotoUpload.setUploadedFiles([]);
+      cateringBagsUpload.setUploadedFiles([]);
+      cartDollyUpload.setUploadedFiles([]);
 
       // Reset to step 1
       setCurrentStep(1);
@@ -675,25 +702,26 @@ const JobApplicationForm = () => {
       errors.push("Please upload your resume");
     }
 
-    // Driver-specific file requirements
+    // Required driver documents are checked by document key: each upload hook
+    // is looked up by its config key, so the category the server returns never
+    // decides whether a document is present.
     if (role === "Driver for Catering Deliveries") {
-      if (licenseUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your driver's license");
-      }
-      if (insuranceUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your insurance");
-      }
-      if (registrationUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your vehicle registration");
-      }
-      if (driverPhotoUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your driver photo");
-      }
-      if (carPhotoUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your car photo");
-      }
-      if (equipmentPhotoUpload.uploadedFiles.length === 0) {
-        errors.push("Please upload your equipment photo");
+      // Typed by document key so a missing or unknown document fails to compile
+      const driverUploads = {
+        license: licenseUpload,
+        insurance: insuranceUpload,
+        registration: registrationUpload,
+        second_id: secondIdUpload,
+        food_handler: foodHandlerUpload,
+        hipaa: hipaaUpload,
+        car_photo: carPhotoUpload,
+        catering_bags: cateringBagsUpload,
+        cart_dolly: cartDollyUpload,
+      } satisfies Record<DriverDocumentKey, typeof licenseUpload>;
+      for (const doc of requiredDriverDocuments()) {
+        if (driverUploads[doc.key].uploadedFiles.length === 0) {
+          errors.push(`Please upload your ${doc.label}`);
+        }
       }
     }
 
@@ -1248,9 +1276,12 @@ const JobApplicationForm = () => {
                     {/* Insurance Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Proof of Insurance
+                        Insurance
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        Proof of your current auto insurance.
+                      </p>
                       <FileUpload
                         name="insurance"
                         label="Upload Insurance"
@@ -1270,11 +1301,10 @@ const JobApplicationForm = () => {
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Vehicle Registration
-                        <span className="ml-1 text-red-500">*</span>
                       </label>
                       <FileUpload
                         name="vehicleRegistration"
-                        label="Upload Registration"
+                        label="Upload Registration (Optional)"
                         startUpload={registrationUpload.onUpload as any}
                         file={
                           (registrationUpload
@@ -1307,31 +1337,35 @@ const JobApplicationForm = () => {
                       />
                     </div>
 
-                    {/* Driver Photo Upload */}
+                    {/* Second Form of ID Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Driver Photo
+                        Second Form of ID
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        Passport, state ID or another valid form of
+                        identification.
+                      </p>
                       <FileUpload
-                        name="driverPhoto"
-                        label="Upload Photo"
-                        startUpload={driverPhotoUpload.onUpload as any}
+                        name="secondId"
+                        label="Upload ID"
+                        startUpload={secondIdUpload.onUpload as any}
                         file={
-                          (driverPhotoUpload
+                          (secondIdUpload
                             .uploadedFiles[0] as HookUploadedFile) || null
                         }
-                        deleteFile={driverPhotoUpload.deleteFile}
-                        accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
-                        isUploading={driverPhotoUpload.isUploading}
-                        progresses={driverPhotoUpload.progresses}
+                        deleteFile={secondIdUpload.deleteFile}
+                        accept={generateAcceptString(IMAGE_PDF_TYPES)}
+                        isUploading={secondIdUpload.isUploading}
+                        progresses={secondIdUpload.progresses}
                       />
                     </div>
 
                     {/* Car Photo Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Car Photo
+                        Vehicle Photo
                         <span className="ml-1 text-red-500">*</span>
                       </label>
                       <FileUpload
@@ -1349,27 +1383,52 @@ const JobApplicationForm = () => {
                       />
                     </div>
 
-                    {/* Equipment Photo Upload */}
+                    {/* Catering Bags Photo Upload */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Equipment Photo
-                        <span className="ml-2 font-normal text-gray-500">
-                          (including bags and cart)
-                        </span>
+                        Catering Bags Photo
                         <span className="ml-1 text-red-500">*</span>
                       </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        A clear photo of the catering bags you will use for
+                        deliveries.
+                      </p>
                       <FileUpload
-                        name="equipmentPhoto"
+                        name="cateringBags"
                         label="Upload Photo"
-                        startUpload={equipmentPhotoUpload.onUpload as any}
+                        startUpload={cateringBagsUpload.onUpload as any}
                         file={
-                          (equipmentPhotoUpload
+                          (cateringBagsUpload
                             .uploadedFiles[0] as HookUploadedFile) || null
                         }
-                        deleteFile={equipmentPhotoUpload.deleteFile}
+                        deleteFile={cateringBagsUpload.deleteFile}
                         accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
-                        isUploading={equipmentPhotoUpload.isUploading}
-                        progresses={equipmentPhotoUpload.progresses}
+                        isUploading={cateringBagsUpload.isUploading}
+                        progresses={cateringBagsUpload.progresses}
+                      />
+                    </div>
+
+                    {/* Cart/Dolly Photo Upload */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Cart/Dolly Photo
+                        <span className="ml-1 text-red-500">*</span>
+                      </label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        A clear photo of your cart or dolly.
+                      </p>
+                      <FileUpload
+                        name="cartDolly"
+                        label="Upload Photo"
+                        startUpload={cartDollyUpload.onUpload as any}
+                        file={
+                          (cartDollyUpload
+                            .uploadedFiles[0] as HookUploadedFile) || null
+                        }
+                        deleteFile={cartDollyUpload.deleteFile}
+                        accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
+                        isUploading={cartDollyUpload.isUploading}
+                        progresses={cartDollyUpload.progresses}
                       />
                     </div>
 
@@ -1535,6 +1594,12 @@ const JobApplicationForm = () => {
                           Vehicle Registration:{" "}
                           {registrationUpload.uploadedFiles.length > 0
                             ? "Uploaded"
+                            : "Not provided"}
+                        </p>
+                        <p>
+                          Second Form of ID:{" "}
+                          {secondIdUpload.uploadedFiles.length > 0
+                            ? "Uploaded"
                             : "Not uploaded"}
                         </p>
                         <p>
@@ -1544,20 +1609,20 @@ const JobApplicationForm = () => {
                             : "Not provided"}
                         </p>
                         <p>
-                          Driver Photo:{" "}
-                          {driverPhotoUpload.uploadedFiles.length > 0
-                            ? "Uploaded"
-                            : "Not uploaded"}
-                        </p>
-                        <p>
-                          Car Photo:{" "}
+                          Vehicle Photo:{" "}
                           {carPhotoUpload.uploadedFiles.length > 0
                             ? "Uploaded"
                             : "Not uploaded"}
                         </p>
                         <p>
-                          Equipment Photo:{" "}
-                          {equipmentPhotoUpload.uploadedFiles.length > 0
+                          Catering Bags Photo:{" "}
+                          {cateringBagsUpload.uploadedFiles.length > 0
+                            ? "Uploaded"
+                            : "Not uploaded"}
+                        </p>
+                        <p>
+                          Cart/Dolly Photo:{" "}
+                          {cartDollyUpload.uploadedFiles.length > 0
                             ? "Uploaded"
                             : "Not uploaded"}
                         </p>

@@ -76,6 +76,38 @@ describe('Application Sessions API', () => {
       expect(data.sessionId).toBe('session-123');
     });
 
+    it('should create the session with an upload limit of 20 and return it', async () => {
+      mockSupabase.gte.mockResolvedValue({ data: [], error: null });
+      mockSupabase.rpc.mockResolvedValue({
+        data: {
+          id: 'session-123',
+          session_token: 'token-abc-123',
+          session_expires_at: new Date(Date.now() + 7200000).toISOString(),
+        },
+        error: null,
+      });
+
+      const request = {
+        json: async () => ({
+          email: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: 'Driver',
+        }),
+        headers: { get: () => null },
+        url: 'http://localhost:3000/api/application-sessions'
+      } as unknown as NextRequest;
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+        'create_application_session',
+        expect.objectContaining({ p_max_uploads: 20 })
+      );
+      expect(data.maxUploads).toBe(20);
+    });
+
     it('should enforce rate limiting (5 sessions per hour per IP)', async () => {
       const mockRecentSessions = new Array(5).fill({ id: 'some-id' });
       mockSupabase.gte.mockResolvedValue({ data: mockRecentSessions, error: null });

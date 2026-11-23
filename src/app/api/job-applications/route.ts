@@ -6,6 +6,7 @@ import { resolveOwnedApplicationUploads } from "@/lib/job-application-uploads";
 import {
   APPLICATION_FILE_ID_FIELDS,
   findDocumentByCategory,
+  missingRequiredDriverDocuments,
   type JobApplicationFilePathColumn,
 } from "@/lib/job-application-documents";
 import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
@@ -62,23 +63,6 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
 
-    // --- Server-side validation for required driver documents ---
-    // Registration, driver photo and equipment photo are optional but still
-    // accepted. Catering bags and cart/dolly become required with the new form.
-    if (data.role === "Driver for Catering Deliveries") {
-      const missingDocs: string[] = [];
-      if (!data.driversLicenseFilePath) missingDocs.push("driver's license");
-      if (!data.insuranceFilePath) missingDocs.push("insurance");
-      if (!data.carPhotoFilePath) missingDocs.push("car photo");
-
-      if (missingDocs.length > 0) {
-        return NextResponse.json(
-          { error: `Missing required documents: ${missingDocs.join(", ")}` },
-          { status: 400 }
-        );
-      }
-    }
-
     // --- Step 1: Identify and Fetch FileUpload Records ---
     const fileIdsToProcess = APPLICATION_FILE_ID_FIELDS.map((field) => data[field])
       .filter((id): id is string => typeof id === 'string' && id !== '');
@@ -100,6 +84,22 @@ export async function POST(request: Request) {
     }
 
     const temporaryFileUploads = ownedUploads.files;
+
+    // Required driver documents are checked against the verified session
+    // uploads and their stored categories, never against client-sent paths.
+    if (data.role === "Driver for Catering Deliveries") {
+      const missingDocs = missingRequiredDriverDocuments(
+        temporaryFileUploads.map((file) => file.category),
+      );
+      if (missingDocs.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Missing required documents: ${missingDocs.map((doc) => doc.label).join(", ")}. Please reload the page and try again.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
 
     // --- Step 2: Create Job Application Data (prepare but don't save yet if dependent on file processing outcome) ---

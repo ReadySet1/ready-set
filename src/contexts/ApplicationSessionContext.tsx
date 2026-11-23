@@ -95,7 +95,7 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
         uploadToken: data.uploadToken,
         expiresAt: data.expiresAt,
         uploadCount: 0,
-        maxUploads: 10, // Default from backend
+        maxUploads: data.maxUploads,
       };
 
       setSession(newSession);
