@@ -5,24 +5,25 @@ import {
   categoryBase,
   findDocumentByCategory,
   getDocumentLabel,
+  missingRequiredDriverDocuments,
   requiredDriverDocuments,
 } from "@/lib/job-application-documents";
 
 describe("job application document config", () => {
-  it("requires exactly license, insurance, vehicle photo, catering bags and cart/dolly for drivers", () => {
+  it("requires exactly license, insurance, second ID, vehicle photo, catering bags and cart/dolly for drivers", () => {
     const required = requiredDriverDocuments().map((doc) => doc.key).sort();
 
     expect(required).toEqual(
-      ["cart_dolly", "car_photo", "catering_bags", "insurance", "license"].sort(),
+      ["cart_dolly", "car_photo", "catering_bags", "insurance", "license", "second_id"].sort(),
     );
   });
 
-  it("keeps registration, second ID, food handler and HIPAA optional", () => {
+  it("keeps registration, food handler and HIPAA optional", () => {
     const optional = DRIVER_DOCUMENTS.filter((doc) => !doc.required)
       .map((doc) => doc.key)
       .sort();
 
-    expect(optional).toEqual(["food_handler", "hipaa", "registration", "second_id"]);
+    expect(optional).toEqual(["food_handler", "hipaa", "registration"]);
   });
 
   it("no longer offers driver photo or equipment photo for new applications", () => {
@@ -109,5 +110,35 @@ describe("job application document config", () => {
 
   it("falls back to a readable label for unknown categories", () => {
     expect(getDocumentLabel("other_file")).toBe("Other file");
+  });
+});
+
+describe("missingRequiredDriverDocuments", () => {
+  const REQUIRED_KEYS = ["license", "insurance", "second_id", "car_photo", "catering_bags", "cart_dolly"];
+  const missingKeys = (categories: (string | null | undefined)[]) =>
+    missingRequiredDriverDocuments(categories).map((doc) => doc.key);
+
+  it("lists every required document in config order when nothing is uploaded", () => {
+    expect(missingKeys([])).toEqual(REQUIRED_KEYS);
+  });
+
+  it.each(["", "job-applications/temp/"])("is satisfied by all required categories (prefix %p)", (prefix) => {
+    expect(missingKeys(REQUIRED_KEYS.map((key) => `${prefix}${key}`))).toEqual([]);
+  });
+
+  it.each(REQUIRED_KEYS)("reports only %s when it is the one missing", (missing) => {
+    const uploaded = REQUIRED_KEYS.filter((key) => key !== missing);
+
+    expect(missingKeys(uploaded)).toEqual([missing]);
+  });
+
+  it("does not count optional or legacy documents toward the required ones", () => {
+    const uploaded = ["registration", "food_handler", "hipaa", "driver_photo", "equipment_photo"];
+
+    expect(missingKeys(uploaded)).toEqual(REQUIRED_KEYS);
+  });
+
+  it("ignores empty and unknown categories", () => {
+    expect(missingKeys([null, undefined, "", "other", "uploads/license"])).toEqual(REQUIRED_KEYS);
   });
 });
