@@ -16,6 +16,13 @@ export interface ApiDelivery {
   order_total: string | number;
   client_attention?: string | null;
   address?: { street1?: string | null; city?: string | null } | null;
+  /** Full pickup address row; its zone fields put order times on the right clock. */
+  pickupAddress?: {
+    timezone?: string | null;
+    zip?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
   delivery_address?: { street1?: string | null; city?: string | null } | null;
   headcount?: number | null;
   itemDelivered?: string | null;

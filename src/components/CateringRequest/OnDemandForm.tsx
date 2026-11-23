@@ -8,12 +8,10 @@ import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
 import {
   Loader2,
-  AlertCircle,
   Calendar,
   Clock,
   DollarSign,
   Users,
-  Clipboard,
   MapPin,
   Package,
   Truck,
@@ -21,6 +19,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import { CostEstimatorCard } from "./CostEstimatorCard";
+import { orderTimesInPickupZone } from "@/lib/utils/address-timezone";
 
 // Form field components
 const NATIVE_PICKER_TYPES = new Set(["date", "time", "datetime-local"]);
@@ -172,8 +171,6 @@ const SelectField: React.FC<{
 );
 
 interface OnDemandFormData {
-  brokerage: string;
-  order_number: string;
   address_id: string;
   delivery_address_id: string;
   date: string;
@@ -198,6 +195,10 @@ interface OnDemandFormData {
     city: string;
     state: string;
     zip: string;
+    // Used to resolve the zone the order times are entered in.
+    latitude?: number | null;
+    longitude?: number | null;
+    timezone?: string | null;
   };
   delivery_address: {
     id: string;
@@ -207,6 +208,64 @@ interface OnDemandFormData {
     state: string;
     zip: string;
   };
+}
+
+/** Parses an optional numeric form field; empty or non-numeric input is omitted. */
+function optionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/** Trims an optional text field; blank input is omitted. */
+function optionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
+ * Maps the form state to the POST /api/orders on-demand allowlist
+ * (src/app/api/orders/create-order-schema.ts). The schema is strict, so only
+ * allowlisted keys are sent: addresses go by ID, times are read in the pickup
+ * address zone (PT/CT, same as the admin form) and sent as UTC ISO strings,
+ * and vehicle type uses the enum value. The order number is generated
+ * server-side.
+ */
+export function buildOnDemandOrderBody(data: OnDemandFormData) {
+  // The inputs hold wall-clock date + time; build browser-local Dates and let
+  // the shared helper re-read them in the pickup address zone.
+  const wallClock = (time: string | undefined) =>
+    time ? new Date(`${data.date}T${time}`) : undefined;
+  const times = orderTimesInPickupZone({
+    pickupAddress: data.address,
+    pickupDateTime: wallClock(data.pickup_time),
+    arrivalDateTime: wallClock(data.arrival_time),
+    completeDateTime: wallClock(data.complete_time),
+  });
+
+  const body: Record<string, unknown> = {
+    type: "ondemand",
+    pickupAddressId: data.address.id,
+    deliveryAddressId: data.delivery_address.id,
+    pickupDateTime: times.pickupDateTime?.toISOString(),
+    arrivalDateTime: times.arrivalDateTime?.toISOString(),
+    completeDateTime: times.completeDateTime?.toISOString(),
+    clientAttention: data.client_attention.trim(),
+    itemDelivered: optionalText(data.item_delivered),
+    vehicleType: data.vehicle_type.toUpperCase(),
+    orderTotal: optionalNumber(data.order_total),
+    tip: optionalNumber(data.tip),
+    pickupNotes: optionalText(data.pickup_notes),
+    specialNotes: optionalText(data.special_notes),
+    length: optionalNumber(data.length),
+    width: optionalNumber(data.width),
+    height: optionalNumber(data.height),
+    weight: optionalNumber(data.weight),
+  };
+
+  return Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  );
 }
 
 const OnDemandOrderForm: React.FC = () => {
@@ -263,8 +322,6 @@ const OnDemandOrderForm: React.FC = () => {
     reset,
   } = useForm<OnDemandFormData>({
     defaultValues: {
-      brokerage: "",
-      order_number: "",
       date: "",
       pickup_time: "",
       arrival_time: "",
@@ -300,7 +357,6 @@ const OnDemandOrderForm: React.FC = () => {
   });
 
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
     setAddresses(loadedAddresses);
@@ -312,14 +368,12 @@ const OnDemandOrderForm: React.FC = () => {
       return;
     }
 
-    if (!data.address) {
-      console.error("Pickup address not selected");
+    if (!data.address?.id) {
       toast.error("Please select a pickup address");
       return;
     }
 
-    if (!data.delivery_address) {
-      console.error("Delivery address not selected for on-demand order");
+    if (!data.delivery_address?.id) {
       toast.error("Please select a delivery address for on-demand order");
       return;
     }
@@ -331,27 +385,7 @@ const OnDemandOrderForm: React.FC = () => {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          order_type: "on_demand",
-          address: {
-            id: data.address.id,
-            street1: data.address.street1,
-            street2: data.address.street2,
-            city: data.address.city,
-            state: data.address.state,
-            zip: data.address.zip,
-          },
-          delivery_address: {
-            id: data.delivery_address.id,
-            street1: data.delivery_address.street1,
-            street2: data.delivery_address.street2,
-            city: data.delivery_address.city,
-            state: data.delivery_address.state,
-            zip: data.delivery_address.zip,
-          },
-          tip: data.tip ? parseFloat(data.tip) : undefined,
-        }),
+        body: JSON.stringify(buildOnDemandOrderBody(data)),
       });
 
       if (response.ok) {
@@ -365,14 +399,7 @@ const OnDemandOrderForm: React.FC = () => {
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);
-
-        if (errorData.message === "Order number already exists") {
-          setErrorMessage(
-            "This order number already exists. Please use a different order number.",
-          );
-        } else {
-          toast.error("Failed to submit on-demand request. Please try again.");
-        }
+        toast.error("Failed to submit on-demand request. Please try again.");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -387,13 +414,6 @@ const OnDemandOrderForm: React.FC = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="mx-auto w-full max-w-3xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
     >
-      {errorMessage && (
-        <div className="mb-6 flex items-center rounded-md bg-red-50 p-4 text-red-800">
-          <AlertCircle className="mr-2 h-5 w-5" />
-          <p>{errorMessage}</p>
-        </div>
-      )}
-
       <div className="mb-8">
         <h3 className="mb-4 text-xl font-semibold text-gray-800">
           Pickup Location
@@ -413,6 +433,9 @@ const OnDemandOrderForm: React.FC = () => {
                   city: selectedAddress.city,
                   state: selectedAddress.state,
                   zip: selectedAddress.zip,
+                  latitude: selectedAddress.latitude ?? null,
+                  longitude: selectedAddress.longitude ?? null,
+                  timezone: selectedAddress.timezone ?? null,
                 });
               }
             }}
@@ -446,32 +469,6 @@ const OnDemandOrderForm: React.FC = () => {
             showManagementButtons={false}
           />
         </div>
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <SelectField
-          control={control}
-          name="brokerage"
-          label="Brokerage / Direct"
-          required
-          icon={<Clipboard size={16} />}
-          options={[
-            { value: "doordash", label: "DoorDash" },
-            { value: "ubereats", label: "UberEats" },
-            { value: "postmates", label: "Postmates" },
-            { value: "grubhub", label: "GrubHub" },
-            { value: "direct", label: "Direct" },
-          ]}
-        />
-
-        <InputField
-          control={control}
-          name="order_number"
-          label="Order Number"
-          required
-          icon={<Clipboard size={16} />}
-          placeholder="e.g., ORD-12345"
-        />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">

@@ -6,8 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { CateringNeedHost } from "@/types/order";
 import { CateringStatus, OnDemandStatus } from "@/types/order-status";
 import { localTimeToUtc } from "@/lib/utils/timezone";
-import { cookies } from 'next/headers';
-import { validateApiAuth } from '@/utils/api-auth';
+import { withAuth, type AuthResult } from '@/lib/auth-middleware';
 import { ORDER_CREATE_ALLOWED_ROLES, parseCreateOrderBody } from './create-order-schema';
 import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
@@ -62,6 +61,83 @@ type EmailOnDemandOrder = EmailBaseOrder & {
 type PrismaOrder = PrismaCateringOrder | PrismaOnDemandOrder;
 type EmailOrder = EmailCateringOrder | EmailOnDemandOrder;
 
+/**
+ * Staff roles that see every order and may use any address. Matches
+ * ORDER_EDIT_ROLES in ./[order_number]/route.ts. Every other role is scoped
+ * to its own orders and addresses (deny by default).
+ */
+const ORDER_STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
+
+/**
+ * Roles that may list orders: every known account type. Non-staff are scoped
+ * to their own orders below; a missing or unknown role is rejected by withAuth.
+ */
+const ORDER_LIST_ALLOWED_ROLES = ['CLIENT', 'VENDOR', 'DRIVER', ...ORDER_STAFF_ROLES];
+
+function isOrderStaff(role: unknown): boolean {
+  return ORDER_STAFF_ROLES.includes(String(role ?? '').toUpperCase());
+}
+
+/** Maps a failed withAuth result to this route's `{ error }` response shape. */
+function authFailureResponse(auth: AuthResult, forbiddenMessage: string): NextResponse {
+  const status = auth.response?.status ?? 401;
+  const error =
+    status === 401
+      ? 'Authentication required'
+      : status === 403
+        ? forbiddenMessage
+        : 'Authentication error';
+  return NextResponse.json({ error }, { status });
+}
+
+/**
+ * Returns the address-ID fields the caller may not use: missing,
+ * soft-deleted, or (for non-staff) neither created by, linked to, nor shared
+ * with the caller. Missing and foreign addresses get the same answer so the
+ * response can't be used to probe which address IDs exist.
+ */
+async function findUnusableAddressFields(
+  callerId: string,
+  isStaff: boolean,
+  addressIds: { pickupAddressId: string; deliveryAddressId: string },
+): Promise<string[]> {
+  const ids = [...new Set([addressIds.pickupAddressId, addressIds.deliveryAddressId])];
+  const usable = await prismaClient.address.findMany({
+    where: {
+      id: { in: ids },
+      deletedAt: null,
+      ...(isStaff
+        ? {}
+        : {
+            OR: [
+              { createdBy: callerId },
+              { isShared: true },
+              { userAddresses: { some: { userId: callerId } } },
+            ],
+          }),
+    },
+    select: { id: true },
+  });
+  const usableIds = new Set(usable.map((address: { id: string }) => address.id));
+
+  return (['pickupAddressId', 'deliveryAddressId'] as const).filter(
+    (field) => !usableIds.has(addressIds[field]),
+  );
+}
+
+/**
+ * Client profile fields embedded in each GET /api/orders row. No UI in this
+ * repo reads the list today, so it carries only what identifies the client
+ * (the same name/email the `search` filter matches). Never add auth or
+ * account-state columns (isTemporaryPassword, confirmationCode, status, ...)
+ * or the client's address book here.
+ */
+const ORDER_LIST_CLIENT_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+} as const;
+
 interface OrderData {
   id: string;
   type: 'catering' | 'ondemand';
@@ -90,18 +166,22 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const search = searchParams.get('search');
 
-    const cookieStore = await cookies();
-    const authValidation = await validateApiAuth(req);
-    
-    if (!authValidation.isValid || !authValidation.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' }, 
-        { status: 401 }
-      );
+    const auth = await withAuth(req, {
+      allowedRoles: ORDER_LIST_ALLOWED_ROLES,
+      requireAuth: true,
+    });
+    if (!auth.success) {
+      return authFailureResponse(auth, 'Forbidden - this account type cannot list orders');
     }
+    const caller = auth.context.user;
 
-    // Build where clauses for both catering and on-demand orders
-    const baseWhere: any = {};
+    // Build where clauses for both catering and on-demand orders.
+    // Soft-deleted orders are never listed; non-staff only see their own.
+    const baseWhere: any = { deletedAt: null };
+
+    if (!isOrderStaff(caller.type)) {
+      baseWhere.userId = caller.id;
+    }
     
     if (status) {
       baseWhere.status = status;
@@ -140,15 +220,7 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          user: {
-            include: {
-              userAddresses: {
-                include: {
-                  address: true,
-                },
-              },
-            },
-          },
+          user: { select: ORDER_LIST_CLIENT_SELECT },
           pickupAddress: true,
           deliveryAddress: true,
           fileUploads: true,
@@ -176,15 +248,7 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          user: {
-            include: {
-              userAddresses: {
-                include: {
-                  address: true,
-                },
-              },
-            },
-          },
+          user: { select: ORDER_LIST_CLIENT_SELECT },
           pickupAddress: true,
           deliveryAddress: true,
           fileUploads: true,
@@ -262,53 +326,24 @@ export async function GET(req: NextRequest) {
     return response;
 
   } catch (error: any) {
-    console.error('Error fetching orders:', error);
-    
-    // Handle specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      console.error("Prisma Error:", error.message);
-      console.error("Error Code:", error.code);
-      console.error("Meta:", error.meta);
-      
-      return NextResponse.json(
-        { error: `Database error: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch orders',
-        details: error?.message || 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Full detail goes to the server log only; the client gets a generic message.
+    logOrdersRouteError('Error fetching orders', error);
+    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    
-    const cookieStore = await cookies();
-    const authValidation = await validateApiAuth(req);
-    
-    if (!authValidation.isValid || !authValidation.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' }, 
-        { status: 401 }
-      );
+    const auth = await withAuth(req, {
+      allowedRoles: [...ORDER_CREATE_ALLOWED_ROLES],
+      requireAuth: true,
+    });
+    if (!auth.success) {
+      return authFailureResponse(auth, 'Forbidden - this account type cannot create orders');
     }
+    const caller = auth.context.user;
 
-    const callerRole = String(
-      authValidation.userType ?? authValidation.user.type ?? '',
-    ).toUpperCase();
-    if (!(ORDER_CREATE_ALLOWED_ROLES as readonly string[]).includes(callerRole)) {
-      return NextResponse.json(
-        { error: 'Forbidden - this account type cannot create orders' },
-        { status: 403 }
-      );
-    }
+    const body = await req.json();
 
     // Build the order only from the per-type allowlist. Anything else in the
     // body (status, userId, pricing columns, nested relation writes, ...) is
@@ -321,6 +356,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Address IDs are only format-checked by the schema; make sure the caller
+    // may actually use them before anything is written.
+    const unusableAddressFields = await findUnusableAddressFields(
+      caller.id,
+      isOrderStaff(caller.type),
+      parsed.data,
+    );
+    if (unusableAddressFields.length > 0) {
+      return NextResponse.json(
+        { error: 'Address not found', fields: unusableAddressFields },
+        { status: 400 }
+      );
+    }
+
     // Generate order number
     const orderNumber = generateOrderNumber();
     
@@ -329,7 +378,7 @@ export async function POST(req: NextRequest) {
       // Server-owned fields are always set here, never taken from the body.
       const serverOwned = {
         orderNumber,
-        userId: authValidation.user!.id as string,
+        userId: caller.id,
         status: 'PENDING' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -376,7 +425,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Invalidate vendor cache since new order affects metrics and order lists
-    invalidateVendorCacheOnOrderCreate(authValidation.user!.id, result.order.id);
+    invalidateVendorCacheOnOrderCreate(caller.id, result.order.id);
 
     return NextResponse.json({
       success: true,
@@ -386,28 +435,18 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Error creating order:', error);
-    
-    // Handle specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      console.error("Prisma Error:", error.message);
-      console.error("Error Code:", error.code);
-      console.error("Meta:", error.meta);
-      
-      return NextResponse.json(
-        { error: `Database error: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to create order',
-        details: error?.message || 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Full detail goes to the server log only; the client gets a generic message.
+    logOrdersRouteError('Error creating order', error);
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
   }
+}
+
+function logOrdersRouteError(context: string, error: any): void {
+  if (error && typeof error === 'object' && 'code' in error) {
+    console.error(context, { code: error.code, message: error.message, meta: error.meta });
+    return;
+  }
+  console.error(context, error);
 }
 
 // Helper function to map Prisma order data (PascalCase fields and relations)

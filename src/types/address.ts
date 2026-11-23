@@ -18,6 +18,7 @@ export interface Address {
     isShared: boolean;
     latitude?: number | null;
     longitude?: number | null;
+    timezone?: string | null;
     createdAt: Date;
     updatedAt: Date;
     createdBy: string | null;

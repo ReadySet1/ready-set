@@ -52,11 +52,15 @@ function getSpreadsheetId(): string {
   return spreadsheetId;
 }
 
+/**
+ * Reads a tab. `spreadsheetId` defaults to the legacy GOOGLE_SHEETS_SHEET_ID;
+ * the drives master sheet passes its own id (GOOGLE_SHEETS_MASTER_SHEET_ID).
+ */
 export async function getSheetData(
   sheetName: string = "Drives - Coolfire",
   range?: string,
+  spreadsheetId: string = getSpreadsheetId(),
 ): Promise<string[][]> {
-  const spreadsheetId = getSpreadsheetId();
   const client = getSheetsClient();
   const fullRange = range ? `'${sheetName}'!${range}` : `'${sheetName}'`;
 

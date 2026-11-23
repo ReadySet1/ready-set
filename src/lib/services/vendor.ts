@@ -24,6 +24,9 @@ export interface OrderData {
     city: string;
     state: string;
     zip: string;
+    timezone?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   };
   deliveryAddress: {
     id: string;
@@ -155,6 +158,7 @@ export async function getUserOrders(limit = 10, page = 1) {
             parkingLoading: true,
             latitude: true,
             longitude: true,
+            timezone: true,
             // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
           }
         },
@@ -206,6 +210,7 @@ export async function getUserOrders(limit = 10, page = 1) {
             parkingLoading: true,
             latitude: true,
             longitude: true,
+            timezone: true,
             // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
           }
         },
@@ -252,7 +257,11 @@ export async function getUserOrders(limit = 10, page = 1) {
         street2: order.pickupAddress.street2,
         city: order.pickupAddress.city,
         state: order.pickupAddress.state,
-        zip: order.pickupAddress.zip
+        zip: order.pickupAddress.zip,
+        // Zone fields: order times render on the pickup address clock.
+        timezone: order.pickupAddress.timezone ?? null,
+        latitude: order.pickupAddress.latitude ?? null,
+        longitude: order.pickupAddress.longitude ?? null,
       },
       deliveryAddress: {
         id: order.deliveryAddress.id,
@@ -281,7 +290,11 @@ export async function getUserOrders(limit = 10, page = 1) {
         street2: order.pickupAddress.street2,
         city: order.pickupAddress.city,
         state: order.pickupAddress.state,
-        zip: order.pickupAddress.zip
+        zip: order.pickupAddress.zip,
+        // Zone fields: order times render on the pickup address clock.
+        timezone: order.pickupAddress.timezone ?? null,
+        latitude: order.pickupAddress.latitude ?? null,
+        longitude: order.pickupAddress.longitude ?? null,
       },
       deliveryAddress: {
         id: order.deliveryAddress.id,

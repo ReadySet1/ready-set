@@ -247,6 +247,33 @@ describe('VendorService', () => {
       expect(result.orders[1].orderType).toBe('on_demand');
     });
 
+    it('forwards the pickup address zone fields for both order types', async () => {
+      mockGetCurrentUserFn.mockResolvedValue({ email: 'vendor@example.com' });
+      mockPrismaClient.profile.findUnique.mockResolvedValue(createMockProfile({ id: 'vendor-123' }));
+
+      const zoneFields = { zip: '78701', timezone: 'America/Chicago', latitude: 30.27, longitude: -97.74 };
+      const cateringOrder = createMockCateringRequestWithRelations({ userId: 'vendor-123', orderNumber: 'CAT-TX' });
+      cateringOrder.pickupAddress = { ...cateringOrder.pickupAddress, ...zoneFields };
+      const onDemandOrder = createMockOnDemandWithRelations({ userId: 'vendor-123', orderNumber: 'OD-TX' });
+      onDemandOrder.pickupAddress = { ...onDemandOrder.pickupAddress, ...zoneFields };
+      mockPrismaClient.cateringRequest.findMany.mockResolvedValue([cateringOrder]);
+      mockPrismaClient.onDemand.findMany.mockResolvedValue([onDemandOrder]);
+
+      const result = await getUserOrders(10, 1);
+
+      for (const order of result.orders) {
+        expect(order.pickupAddress).toMatchObject(zoneFields);
+      }
+      for (const model of [mockPrismaClient.cateringRequest, mockPrismaClient.onDemand]) {
+        expect(model.findMany.mock.calls[0][0].include.pickupAddress.select).toMatchObject({
+          zip: true,
+          timezone: true,
+          latitude: true,
+          longitude: true,
+        });
+      }
+    });
+
     it('should respect pagination', async () => {
       mockGetCurrentUserFn.mockResolvedValue({ email: 'vendor@example.com' });
       const mockProfile = createMockProfile({ id: 'vendor-123' });

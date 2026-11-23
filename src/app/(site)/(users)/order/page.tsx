@@ -32,6 +32,8 @@ import {
 import Link from "next/link";
 import { OrderData, UserOrderMetrics } from "@/lib/services/vendor";
 import { AllOrdersModal } from "@/components/Orders/AllOrdersModal";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import { formatDateTimeWithZone } from "@/lib/utils/date-display";
 
 const OrderDashboardPage = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
@@ -331,25 +333,17 @@ const OrderDashboardPage = () => {
                                 {getStatusBadge(order.status)}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
-                                {new Date(order.pickupDateTime).toLocaleString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
+                                {formatDateTimeWithZone(
+                                  order.pickupDateTime,
+                                  orderTimezone(order),
+                                  "MMM d, hh:mm a",
                                 )}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
-                                {new Date(order.arrivalDateTime).toLocaleString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
+                                {formatDateTimeWithZone(
+                                  order.arrivalDateTime,
+                                  orderTimezone(order),
+                                  "MMM d, hh:mm a",
                                 )}
                               </TableCell>
                               <TableCell className="text-right font-medium">

@@ -30,6 +30,8 @@ import {
   Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import { formatDateForDisplay, formatDateTimeWithZone } from "@/lib/utils/date-display";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { decodeOrderNumber } from "@/utils/order";
@@ -50,6 +52,8 @@ interface Address {
   city?: string;
   state?: string;
   zip?: string;
+  /** Stored IANA zone (addresses.timezone); order times are shown on it. */
+  timezone?: string | null;
   locationNumber?: string;
   parkingLoading?: string;
 }
@@ -505,26 +509,20 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
                 </div>
                 <div className="rounded-lg border bg-gray-50 p-4 text-center">
                   <p className="text-lg font-semibold text-gray-800">
-                    {new Date(order.pickupDateTime).toLocaleDateString()}
+                    {formatDateForDisplay(order.pickupDateTime, orderTimezone(order))}
                   </p>
                   <p className="text-sm text-gray-600">Pickup</p>
                   <p className="text-xs text-gray-500">
-                    {new Date(order.pickupDateTime).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTimeWithZone(order.pickupDateTime, orderTimezone(order), "h:mm a")}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-gray-50 p-4 text-center">
                   <p className="text-lg font-semibold text-gray-800">
-                    {new Date(order.arrivalDateTime).toLocaleDateString()}
+                    {formatDateForDisplay(order.arrivalDateTime, orderTimezone(order))}
                   </p>
                   <p className="text-sm text-gray-600">Delivery</p>
                   <p className="text-xs text-gray-500">
-                    {new Date(order.arrivalDateTime).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTimeWithZone(order.arrivalDateTime, orderTimezone(order), "h:mm a")}
                   </p>
                 </div>
               </div>

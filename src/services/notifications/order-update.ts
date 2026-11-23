@@ -19,6 +19,9 @@ import {
   BRAND_COLORS
 } from "@/utils/email-templates";
 import { escapeHtml } from "@/lib/utils/escape-html";
+import { orderTimezone } from "@/lib/utils/address-timezone";
+import { formatDateTimeWithZone } from "@/lib/utils/date-display";
+import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
 import type { FieldChange } from "@/app/api/orders/[order_number]/schemas";
 
 // Lazy initialization to avoid build-time errors when API key is not set
@@ -45,6 +48,10 @@ interface OrderUpdateNotificationParams {
       city: string;
       state: string;
       zip: string;
+      /** Zone inputs: the email shows order times on the pickup address clock. */
+      timezone?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
     };
     deliveryAddress?: {
       street1: string;
@@ -80,9 +87,14 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Format a value for display in the email
+ * Format a value for display in the email. Dates are shown on `timeZone`
+ * (the order's pickup-address clock), never the server's.
  */
-function formatValue(field: string, value: unknown): string {
+function formatValue(
+  field: string,
+  value: unknown,
+  timeZone: string = TIMEZONE_CONFIG.LOCAL_TIMEZONE,
+): string {
   if (value === null || value === undefined) {
     return 'Not set';
   }
@@ -91,14 +103,7 @@ function formatValue(field: string, value: unknown): string {
   if (field.includes('DateTime') || field.includes('Date')) {
     const date = new Date(value as string | Date);
     if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      return formatDateTimeWithZone(date, timeZone, 'EEEE, MMMM d, yyyy h:mm a');
     }
     return String(value);
   }
@@ -122,7 +127,7 @@ function formatValue(field: string, value: unknown): string {
 /**
  * Generate the changes summary section for the email
  */
-function generateChangesSummary(changes: FieldChange[]): string {
+function generateChangesSummary(changes: FieldChange[], timeZone: string): string {
   // Filter to only significant changes for the email
   const significantChanges = changes.filter(c => c.isSignificant);
 
@@ -135,8 +140,8 @@ function generateChangesSummary(changes: FieldChange[]): string {
   // old → bold new).  The individual values are escaped before wrapping.
   const rows = significantChanges.map(change => {
     const label = escapeHtml(FIELD_LABELS[change.field] || change.field);
-    const oldVal = escapeHtml(formatValue(change.field, change.oldValue));
-    const newVal = escapeHtml(formatValue(change.field, change.newValue));
+    const oldVal = escapeHtml(formatValue(change.field, change.oldValue, timeZone));
+    const newVal = escapeHtml(formatValue(change.field, change.newValue, timeZone));
     return `
     <tr>
       <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_COLORS.mediumGray}; width: 40%;">${label}:</td>
@@ -174,6 +179,7 @@ export async function sendOrderUpdateNotification(
   }
 
   const orderTypeLabel = order.order_type === 'catering' ? 'Catering' : 'On-Demand';
+  const orderZone = orderTimezone(order);
 
   // Build the email content
   const content = `
@@ -182,14 +188,14 @@ export async function sendOrderUpdateNotification(
     </p>
 
     <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">What's Changed</h3>
-    ${generateChangesSummary(changes)}
+    ${generateChangesSummary(changes, orderZone)}
 
     <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">Current Order Details</h3>
     ${generateDetailsTable([
       { label: 'Order Number', value: order.orderNumber },
       { label: 'Order Type', value: orderTypeLabel },
-      { label: 'Pickup Time', value: formatValue('pickupDateTime', order.pickupDateTime) },
-      { label: 'Arrival Time', value: formatValue('arrivalDateTime', order.arrivalDateTime) },
+      { label: 'Pickup Time', value: formatValue('pickupDateTime', order.pickupDateTime, orderZone) },
+      { label: 'Arrival Time', value: formatValue('arrivalDateTime', order.arrivalDateTime, orderZone) },
       { label: 'Order Total', value: formatValue('orderTotal', order.orderTotal) },
     ])}
 

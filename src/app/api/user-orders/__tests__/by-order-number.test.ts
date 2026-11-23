@@ -156,6 +156,32 @@ describe("/api/user-orders/[order_number]", () => {
     });
   });
 
+  it("forwards the pickup address zone fields so the client page can render order times", async () => {
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue({
+      ...baseCatering,
+      pickupAddress: {
+        ...baseCatering.pickupAddress,
+        zip: "7870",
+        timezone: null,
+        latitude: 30.27,
+        longitude: -97.74,
+      },
+    });
+    mockPrisma.onDemand.findFirst.mockResolvedValue(null);
+
+    const res = await GET({} as NextRequest, {
+      params: Promise.resolve({ order_number: encodeURIComponent("CAT001") }),
+    });
+    const data = await res.json();
+
+    expect(data.address).toMatchObject({
+      zip: "7870",
+      timezone: null,
+      latitude: 30.27,
+      longitude: -97.74,
+    });
+  });
+
   it("falls back to on-demand order and normalizes fields", async () => {
     mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
     mockPrisma.onDemand.findFirst.mockResolvedValue(baseOnDemand);

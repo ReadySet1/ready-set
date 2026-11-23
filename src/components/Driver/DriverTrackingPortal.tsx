@@ -28,6 +28,7 @@ import {
   StatusPill,
   TypeBadge,
   formatDuration,
+  formatOrderTime,
   getDriverNextActionLabel,
   getNextStatus,
   getStatusProgress,
@@ -37,6 +38,8 @@ import { DriverReturnSheet } from "@/components/Driver/ui/DriverReturnSheet";
 import { DriverSignatureSheet } from "@/components/Driver/ui/DriverSignatureSheet";
 import { NavigateButton } from "@/components/Driver/ui/NavigateButton";
 import { deliveryNavTarget } from "@/lib/driver/next-stop-guide";
+import { TIMEZONE_CONFIG } from "@/lib/config/timezone";
+import { formatDateTimeForDisplay } from "@/lib/utils/date-display";
 import {
   checkArrivalGeofence,
   geofenceHint,
@@ -401,16 +404,13 @@ export default function DriverTrackingPortal() {
       ? activeDeliveries
       : activeDeliveries.filter((d) => isPickupToday(d.scheduledPickupAt));
 
-  const formatPickup = (d: Date) =>
+  // Scheduled times read on the order's pickup-address clock, not the phone's.
+  const zoneOf = (d: { timeZone?: string }) =>
+    d.timeZone ?? TIMEZONE_CONFIG.LOCAL_TIMEZONE;
+  const formatPickup = (d: Date, timeZone: string) =>
     isPickupToday(d)
-      ? `today ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-      : d.toLocaleDateString([], {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        }) +
-        " " +
-        d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      ? `today ${formatOrderTime(d, timeZone)}`
+      : `${formatDateTimeForDisplay(d, "EEE, MMM d", timeZone)} ${formatOrderTime(d, timeZone)}`;
 
   const headerRight = useMemo(() => {
     if (!isShiftActive || !currentShift?.startTime) return null;
@@ -654,17 +654,14 @@ export default function DriverTrackingPortal() {
 
                       {delivery.scheduledPickupAt ? (
                         <div className="text-[12px] font-semibold text-driver-muted">
-                          Pickup {formatPickup(delivery.scheduledPickupAt)}
+                          Pickup {formatPickup(delivery.scheduledPickupAt, zoneOf(delivery))}
                         </div>
                       ) : null}
 
                       {delivery.estimatedArrival ? (
                         <div className="text-[12px] font-semibold text-driver-muted">
                           ETA{" "}
-                          {new Date(delivery.estimatedArrival).toLocaleTimeString(
-                            [],
-                            { hour: "numeric", minute: "2-digit" },
-                          )}
+                          {formatOrderTime(delivery.estimatedArrival, zoneOf(delivery))}
                         </div>
                       ) : null}
 

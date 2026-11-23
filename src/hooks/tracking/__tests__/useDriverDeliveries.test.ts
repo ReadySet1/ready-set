@@ -192,6 +192,24 @@ describe('useDriverDeliveries', () => {
       expect(delivery.deliveryLocation.address).toBe('9 Client Ave, SF, CA, 94107');
     });
 
+    it('carries the pickup address time zone so times show on the order clock', async () => {
+      setDeliveries([
+        makeOrder({ address: { street1: '1 Congress Ave', city: 'Austin', state: 'TX', zip: '78701' } }),
+        makeOrder({
+          orderNumber: 'CA-1',
+          address: { street1: '1 Vendor St', city: 'SF', state: 'CA', zip: '94103' },
+        }),
+      ]);
+
+      const { result } = renderHook(() => useDriverDeliveries());
+
+      await waitFor(() => {
+        expect(result.current.activeDeliveries).toHaveLength(2);
+      });
+      const zones = result.current.activeDeliveries.map((d) => d.timeZone).sort();
+      expect(zones).toEqual(['America/Chicago', 'America/Los_Angeles']);
+    });
+
     it('maps the feed pendingReturn flag onto the delivery (end-shift mirror)', async () => {
       setDeliveries([makeOrder({ pendingReturn: true })]);
 

@@ -7,6 +7,7 @@ import { OrderStatus } from '@/types/order';
 import { createClient } from '@/utils/supabase/client';
 import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { addressQuery } from '@/lib/driver-navigation';
+import { resolveAddressTimezone } from '@/lib/utils/address-timezone';
 
 /**
  * The raw `/api/driver-deliveries` payload behind `activeDeliveries`, shared so
@@ -173,6 +174,7 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
             },
             estimatedArrival: o.arrivalDateTime ? new Date(o.arrivalDateTime) : undefined,
             scheduledPickupAt: o.pickupDateTime ? new Date(o.pickupDateTime) : undefined,
+            timeZone: resolveAddressTimezone(pickup),
             route: [],
             proofOfDelivery: pod,
             metadata: {},

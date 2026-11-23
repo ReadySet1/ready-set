@@ -508,6 +508,19 @@ describe("buildOrderNotificationData", () => {
     expect(data.source).toBe("admin_dashboard");
   });
 
+  it("keeps the pickup address time zone inputs so the email shows the order clock", () => {
+    const order = makeCateringOrder({
+      pickupAddress: makeAddress({ timezone: "America/New_York", latitude: 30.27, longitude: -97.74 }),
+    }) as any;
+    const data = buildOrderNotificationData(order, "catering", "customer_portal");
+
+    expect(data.pickupAddress).toMatchObject({
+      timezone: "America/New_York",
+      latitude: 30.27,
+      longitude: -97.74,
+    });
+  });
+
   it("handles null orderTotal gracefully", () => {
     const order = makeCateringOrder({ orderTotal: null }) as any;
     const data = buildOrderNotificationData(order, "catering", "orders_api");

@@ -1120,6 +1120,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                     deliveredAt={(order as any).deliveryTimestamps?.deliveredAt}
                     estimatedPickupTime={order.pickupDateTime}
                     estimatedDeliveryTime={order.arrivalDateTime ?? order.completeDateTime}
+                    timeZone={orderZone}
                     currentStatus={order.driverStatus}
                     canUpdateStatus={canUserUpdateTimeline}
                     onStatusUpdate={updateDriverStatus}

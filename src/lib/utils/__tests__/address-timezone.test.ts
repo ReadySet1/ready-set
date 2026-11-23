@@ -11,7 +11,9 @@ import {
   orderTimezone,
   timezoneAbbreviation,
   orderTimesInPickupZone,
+  resetTimezoneFallbackWarnings,
 } from '../address-timezone';
+import { formatDateTimeWithZone } from '../date-display';
 
 const PACIFIC = 'America/Los_Angeles';
 const CENTRAL = 'America/Chicago';
@@ -163,5 +165,61 @@ describe('orderTimesInPickupZone', () => {
     expect(out.completeDateTime).toBeNull();
     expect(out.clientAttention).toBe('Jane');
     expect(Object.keys(out)).toEqual(['pickupAddress', 'pickupDateTime', 'arrivalDateTime', 'completeDateTime', 'clientAttention']);
+  });
+});
+
+describe('resolveAddressTimezone fallback warning', () => {
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    resetTimezoneFallbackWarnings();
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it('keeps the default zone for an unknown ZIP without coordinates', () => {
+    // "7870" is a typo of an Austin ZIP: it must not resolve to Central by accident.
+    expect(resolveAddressTimezone({ id: 'addr-typo', zip: '7870' })).toBe(PACIFIC);
+    expect(resolveAddressTimezone({ id: 'addr-ny', zip: '10001' })).toBe(PACIFIC);
+  });
+
+  it('warns once per address id, with only the id and ZIP', () => {
+    const address = { id: 'addr-typo', zip: '7870', street1: '100 Congress Ave', name: 'Taco Spot' };
+    resolveAddressTimezone(address);
+    resolveAddressTimezone(address);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const logged = JSON.stringify(warn.mock.calls[0]);
+    expect(logged).toContain('addr-typo');
+    expect(logged).toContain('7870');
+    expect(logged).not.toContain('Congress');
+    expect(logged).not.toContain('Taco');
+
+    resolveAddressTimezone({ id: 'addr-other', zip: '10001' });
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not warn when the zone comes from the stored value, the ZIP or the coordinates', () => {
+    resolveAddressTimezone({ id: 'a1', timezone: CENTRAL, zip: '7870' });
+    resolveAddressTimezone({ id: 'a2', zip: '78701' });
+    resolveAddressTimezone({ id: 'a3', zip: '10001', latitude: 30.27, longitude: -97.74 });
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('Austin order times in summer (CDT)', () => {
+  it('shows a mid-June Austin pickup on Central daylight time, labelled CT', () => {
+    // 16:00Z on 15 Jun 2026 is 11:00 AM CDT (UTC-5), 9:00 AM PDT.
+    const zone = orderTimezone({ pickupAddress: { zip: '78701' } });
+    expect(zone).toBe(CENTRAL);
+    expect(formatDateTimeWithZone('2026-06-15T16:00:00Z', zone)).toBe('Jun 15, 2026 11:00 AM CT');
+  });
+
+  it('keeps the winter (CST) offset for the same wall-clock in November', () => {
+    // 17:00Z on 20 Nov 2026 is 11:00 AM CST (UTC-6).
+    expect(formatDateTimeWithZone('2026-11-20T17:00:00Z', CENTRAL)).toBe('Nov 20, 2026 11:00 AM CT');
   });
 });

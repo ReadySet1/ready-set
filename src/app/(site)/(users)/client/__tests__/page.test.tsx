@@ -397,3 +397,57 @@ describe("Vendor Dashboard Quick Actions", () => {
     });
   });
 });
+
+describe("Client Dashboard order times (order timezone)", () => {
+  const originalTz = process.env.TZ;
+
+  beforeAll(() => {
+    // A Pacific viewer looking at an Austin order.
+    process.env.TZ = "America/Los_Angeles";
+  });
+
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getCurrentUser as jest.Mock).mockResolvedValue(mockUser);
+  });
+
+  it("shows an Austin summer order on the Central clock with a CT label", async () => {
+    const { prisma } = jest.requireMock("@/lib/db/prisma");
+    prisma.cateringRequest.findMany.mockResolvedValueOnce([
+      {
+        id: "cr-austin",
+        orderNumber: "CV-AUSTIN-1",
+        status: "ACTIVE",
+        // 16:00Z = 11:00 AM CDT; 17:30Z = 12:30 PM CDT
+        pickupDateTime: new Date("2026-06-15T16:00:00Z"),
+        arrivalDateTime: new Date("2026-06-15T17:30:00Z"),
+        orderTotal: 120,
+        pickupAddress: { timezone: null, zip: "78701", latitude: null, longitude: null },
+      },
+    ]);
+
+    render(await ClientPage());
+
+    expect(screen.getByText("Pickup: 11:00 AM CT")).toBeInTheDocument();
+    expect(screen.getByText("Arrival: 12:30 PM CT")).toBeInTheDocument();
+    expect(screen.getByText("Jun 15, 2026")).toBeInTheDocument();
+  });
+
+  it("selects the pickup address zone fields for recent orders", async () => {
+    const { prisma } = jest.requireMock("@/lib/db/prisma");
+
+    render(await ClientPage());
+
+    for (const model of [prisma.cateringRequest, prisma.onDemand]) {
+      const args = model.findMany.mock.calls[0][0];
+      expect(args.where.deletedAt).toBeNull();
+      expect(args.select.pickupAddress).toEqual({
+        select: { timezone: true, zip: true, latitude: true, longitude: true },
+      });
+    }
+  });
+});

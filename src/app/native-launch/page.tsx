@@ -10,14 +10,25 @@
  * /sign-in when signed out, and /sign-in server-redirects to /driver when
  * signed in — so this page always renders 200 and routes on the CLIENT after
  * resolving the Supabase session.
+ *
+ * A signed-in user goes to `?next=` when it is a same-origin path (set by the
+ * sign-in form inside the shell, e.g. /force-password-change), else /driver.
  */
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { isSafeInternalPath } from '@/lib/auth/post-sign-in';
 
 const SIGNED_OUT_DESTINATION = '/sign-in?returnTo=%2Fdriver';
+const SIGNED_IN_DESTINATION = '/driver';
+
+/** Read from window, not useSearchParams, so the page needs no Suspense boundary. */
+function signedInDestination(): string {
+  const next = new URLSearchParams(window.location.search).get('next');
+  return isSafeInternalPath(next) ? next : SIGNED_IN_DESTINATION;
+}
 
 export default function NativeLaunchPage() {
   const router = useRouter();
@@ -33,7 +44,7 @@ export default function NativeLaunchPage() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
-          destination = '/driver';
+          destination = signedInDestination();
         }
       } catch {
         // Session lookup failed — fall back to sign-in rather than leaving

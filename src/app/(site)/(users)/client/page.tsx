@@ -26,6 +26,14 @@ import {
   getStatusColorClasses,
 } from "@/types/order-status";
 import { CombinedOrder } from "@/types/models";
+import {
+  orderTimezone,
+  type AddressTimezoneSource,
+} from "@/lib/utils/address-timezone";
+import {
+  formatDateForDisplay,
+  formatDateTimeWithZone,
+} from "@/lib/utils/date-display";
 import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal, UserType } from "@/types/prisma";
 import {
@@ -33,6 +41,11 @@ import {
   OrderCardSkeleton,
   QuickActionsSkeleton,
 } from "@/components/Skeleton/AuthSkeleton";
+
+/** A recent order plus the pickup address fields its zone is resolved from. */
+type DashboardOrder = CombinedOrder & {
+  pickupAddress?: AddressTimezoneSource | null;
+};
 
 interface DashboardStats {
   activeOrders: number;
@@ -45,7 +58,7 @@ interface DashboardStats {
 }
 
 interface ClientDashboardData {
-  recentOrders: CombinedOrder[];
+  recentOrders: DashboardOrder[];
   stats: DashboardStats;
 }
 
@@ -122,6 +135,10 @@ async function getClientDashboardData(
             pickupDateTime: true,
             arrivalDateTime: true,
             orderTotal: true,
+            // Zone fields only: order times render on the pickup address clock.
+            pickupAddress: {
+              select: { timezone: true, zip: true, latitude: true, longitude: true },
+            },
           },
         }),
 
@@ -140,6 +157,10 @@ async function getClientDashboardData(
             pickupDateTime: true,
             arrivalDateTime: true,
             orderTotal: true,
+            // Zone fields only: order times render on the pickup address clock.
+            pickupAddress: {
+              select: { timezone: true, zip: true, latitude: true, longitude: true },
+            },
           },
         }),
       ]);
@@ -147,7 +168,7 @@ async function getClientDashboardData(
   );
 
   // Combine and sort orders
-  const combinedOrders: CombinedOrder[] = [
+  const combinedOrders: DashboardOrder[] = [
     ...recentCateringOrders.map(
       (order: {
         id: string;
@@ -156,6 +177,7 @@ async function getClientDashboardData(
         pickupDateTime: Date | null;
         arrivalDateTime: Date | null;
         orderTotal: Decimal | null;
+        pickupAddress: AddressTimezoneSource | null;
       }) => ({
         ...order,
         orderType: "catering" as const,
@@ -171,6 +193,7 @@ async function getClientDashboardData(
         pickupDateTime: Date;
         arrivalDateTime: Date;
         orderTotal: Decimal | null;
+        pickupAddress: AddressTimezoneSource | null;
       }) => ({
         ...order,
         orderType: "on_demand" as const,
@@ -399,35 +422,18 @@ async function getClientDashboardData(
   };
 }
 
-const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
+const UpcomingOrderCard = ({ order }: { order: DashboardOrder }) => {
   // Use the shared helper function for status colors
   const statusColor = getStatusColorClasses(order.status as OrderStatus);
 
-  const formatDate = (date: Date | null) => {
-    if (!date) return "N/A";
+  // Order times are shown on the pickup address clock, labelled ("11:00 AM CT").
+  const timeZone = orderTimezone(order);
 
-    // Create a date object and convert to local time
-    const localDate = new Date(date);
-    return localDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      timeZone: "America/Los_Angeles",
-    });
-  };
+  const formatDate = (date: Date | null) =>
+    formatDateForDisplay(date, timeZone);
 
-  const formatTime = (date: Date | null) => {
-    if (!date) return "N/A";
-
-    // Create a date object and convert to local time
-    const localDate = new Date(date);
-    return localDate.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "America/Los_Angeles",
-      hour12: true,
-    });
-  };
+  const formatTime = (date: Date | null) =>
+    formatDateTimeWithZone(date, timeZone, "hh:mm a");
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return "$0.00";

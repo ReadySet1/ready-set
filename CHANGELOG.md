@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0](https://github.com/ReadySet1/ready-set/compare/v2.12.0...v2.13.0) (2026-11-13)
+
+
+### Added
+
+* **orders:** vendor & client self-service order editing ([bb52495](https://github.com/ReadySet1/ready-set/commit/bb5249557b08def47c850840d129a59147a89559))
+* parse drives master sheet rows and add master sheet id setting ([6e44090](https://github.com/ReadySet1/ready-set/commit/6e44090c3709f0a5552e7cac624f5121c8148956))
+* parse drives master sheet rows and add master sheet id setting ([ff5953e](https://github.com/ReadySet1/ready-set/commit/ff5953eac0f43097467ca13642cc64b0e589d50b))
+
+
+### Fixed
+
+* **auth:** reject control characters in the native-launch next path ([b5133bb](https://github.com/ReadySet1/ready-set/commit/b5133bb969e6a00fabc0938982c17db92e95d5a8))
+* **auth:** route post-sign-in through /native-launch inside the iOS wrapper ([845783c](https://github.com/ReadySet1/ready-set/commit/845783cdf8594584529c815688de4e0696c9a148))
+* **auth:** route post-sign-in through /native-launch inside the iOS wrapper ([4e7fbc8](https://github.com/ReadySet1/ready-set/commit/4e7fbc82046d9c946667e54b693ff193179c2560))
+* drop the on-demand brokerage and order number inputs ([b6895e6](https://github.com/ReadySet1/ready-set/commit/b6895e6acaf4b0380c89742fc360d00709e7e9d0))
+* harden master sheet parser against cancel spellings, sheet errors and duplicate headers ([cf417eb](https://github.com/ReadySet1/ready-set/commit/cf417eb02c960612c8683304efe358ce06ac2478))
+* **orders:** show customer order times in the pickup address timezone ([260f585](https://github.com/ReadySet1/ready-set/commit/260f5851e62cbde05023f78d60d75efe7e637f6b))
+* **orders:** show order times in the pickup address timezone outside admin ([92bf51a](https://github.com/ReadySet1/ready-set/commit/92bf51ab1aa49b2f2c57d0fe43c08a8af8c5ac1d))
+* **orders:** show order times in the pickup address timezone outside admin ([55da6a3](https://github.com/ReadySet1/ready-set/commit/55da6a3037f24515276d312ec9cf21534dc8c8b8))
+* read on-demand order times in the pickup address zone ([3c94217](https://github.com/ReadySet1/ready-set/commit/3c942171af44b20e9e5d7dfa8ebd0b2ac6bc83e7))
+* send the on-demand form in the shape POST /api/orders accepts ([74d818d](https://github.com/ReadySet1/ready-set/commit/74d818d320ca5e64000d657fce0fe24cce0ba227))
+* **tracking:** move the batch point limit out of the route module ([78d68e3](https://github.com/ReadySet1/ready-set/commit/78d68e3d2ea055a1659bd53ad53aa814d52f5cc7))
+* **tracking:** move the batch point limit out of the route module ([314ff37](https://github.com/ReadySet1/ready-set/commit/314ff37862e9fdd7ec51891c725730e93a3b864f))
+* unblock the /on-demand form and trim the client profile in GET /api/orders ([8e74a6e](https://github.com/ReadySet1/ready-set/commit/8e74a6eb0afe31adf04d0742299b5ce55e923bbc))
+
+
+### Security
+
+* authenticate /api/orders with withAuth ([bcbf3a6](https://github.com/ReadySet1/ready-set/commit/bcbf3a65617310783d13dc97325d335971ba6ff8))
+* stop embedding the full client profile in GET /api/orders ([269ee61](https://github.com/ReadySet1/ready-set/commit/269ee61abd8d9e393373111324080c5ccc1e99e4))
+
 ## [2.12.0](https://github.com/ReadySet1/ready-set/compare/v2.11.1...v2.12.0) (2026-11-10)
 
 

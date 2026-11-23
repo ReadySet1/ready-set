@@ -62,6 +62,9 @@ function mapAddress(addr: {
   state: string;
   zip: string;
   county: string | null;
+  timezone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }): AddressData {
   return {
     street1: addr.street1,
@@ -70,6 +73,10 @@ function mapAddress(addr: {
     state: addr.state,
     zip: addr.zip,
     county: addr.county,
+    // Zone inputs, so the email shows the order's times on its own clock.
+    timezone: addr.timezone ?? null,
+    latitude: addr.latitude ?? null,
+    longitude: addr.longitude ?? null,
   };
 }
 

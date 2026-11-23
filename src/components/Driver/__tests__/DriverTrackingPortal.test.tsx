@@ -486,6 +486,33 @@ describe("DriverTrackingPortal (redesigned)", () => {
     await act(async () => resolveAdvance(true));
   });
 
+  it("shows an Austin delivery's pickup and ETA on the Central clock", () => {
+    // 2026-11-20T17:00Z = 11:00 AM CST; 18:30Z = 12:30 PM CST
+    mockUseDriverTracking.mockReturnValue(
+      baseCtx({
+        isShiftActive: true,
+        currentShift: { id: "s1", driverId: "driver-1", startTime: new Date() },
+        currentLocation: sampleLocation,
+        activeDeliveries: [
+          {
+            id: "del-austin",
+            cateringRequestId: "CR-AUSTIN",
+            driverId: "driver-1",
+            status: DriverStatus.ASSIGNED,
+            scheduledPickupAt: new Date("2026-11-20T17:00:00Z"),
+            estimatedArrival: new Date("2026-11-20T18:30:00Z"),
+            timeZone: "America/Chicago",
+            deliveryLocation: { coordinates: [-97.74, 30.27] },
+          },
+        ],
+      }),
+    );
+    renderPortal();
+
+    expect(screen.getByText(/Pickup .*11:00 AM CT/)).toBeInTheDocument();
+    expect(screen.getByText(/ETA 12:30 PM CT/)).toBeInTheDocument();
+  });
+
   it("filters Active deliveries by scheduled pickup date via the Today/All chips", () => {
     const today = new Date();
     const nextWeek = new Date(Date.now() + 7 * 24 * 3600_000);

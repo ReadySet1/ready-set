@@ -74,7 +74,7 @@ describe("buildJobApplicationEmailHtml", () => {
 
     expect(html).not.toContain("href=\"javascript:");
     expect(html).toContain(
-      "<li><strong>License:</strong> Link unavailable (Original Name: license.png)</li>",
+      "<li><strong>Driver&#39;s License:</strong> Link unavailable (Original Name: license.png)</li>",
     );
     expect(html).toContain(
       "<li><strong>Insurance:</strong> Link unavailable (Original Name: ins.pdf)</li>",
@@ -92,13 +92,26 @@ describe("buildJobApplicationEmailHtml", () => {
       [],
     );
 
-    expect(html).toContain(
-      "<li><strong>Resume File Path:</strong> applications/app-123/cv.pdf</li>",
-    );
+    expect(html).not.toContain("Resume File Path");
     expect(html).toContain("<li><strong>Phone:</strong> N/A</li>");
     expect(html).toContain(
       "<li><strong>Created At:</strong> 2026-01-01T00:00:00.000Z</li>",
     );
+  });
+
+  it("omits storage path columns, set or empty", () => {
+    const html = buildJobApplicationEmailHtml(
+      {
+        ...baseApplication,
+        driversLicenseFilePath: "job-applications/app-123/license.pdf",
+        secondIdFilePath: null,
+      },
+      [],
+    );
+
+    expect(html).not.toContain("File Path");
+    expect(html).not.toContain("job-applications/app-123/license.pdf");
+    expect(html).toContain("<li><strong>First Name:</strong> Ada</li>");
   });
 
   it("closes the applicant list before the documents section", () => {
@@ -118,5 +131,88 @@ describe("buildJobApplicationEmailHtml", () => {
     ]);
 
     expect(html).toContain("<li><strong>Resume:</strong> <a href=");
+  });
+
+  it("labels a stored upload category with its configured document label", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      {
+        category: "job-applications/temp/license",
+        fileName: "license.pdf",
+        fileUrl: "https://files.example.com/license.pdf",
+      },
+    ]);
+
+    expect(html).toContain("<li><strong>Driver&#39;s License:</strong> <a href=");
+    expect(html).not.toContain("Job-applications/temp/license");
+  });
+
+  it("only maps exact document categories to configured labels", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      {
+        category: "anything/license",
+        fileName: "license.pdf",
+        fileUrl: "https://files.example.com/license.pdf",
+      },
+    ]);
+
+    expect(html).not.toContain("Driver&#39;s License");
+    expect(html).toContain("<li><strong>Anything/license:</strong> <a href=");
+  });
+
+  it("labels a bare document key with its configured label", () => {
+    const html = buildJobApplicationEmailHtml(baseApplication, [
+      { category: "license", fileName: "license.pdf", fileUrl: "https://files.example.com/license.pdf" },
+    ]);
+
+    expect(html).toContain("<li><strong>Driver&#39;s License:</strong> <a href=");
+  });
+
+  it("adds the escaped storage path when the upload has no usable link", () => {
+    const html = buildJobApplicationEmailHtml(
+      {
+        ...baseApplication,
+        driversLicenseFilePath: "job-applications/app-123/<b>lic</b>.pdf",
+      },
+      [{ category: "job-applications/temp/license", fileName: "license.pdf", fileUrl: "" }],
+    );
+
+    expect(html).not.toContain("<b>");
+    expect(html).toContain(
+      "<li><strong>Driver&#39;s License:</strong> Link unavailable (Original Name: license.pdf; Storage Path: job-applications/app-123/&lt;b&gt;lic&lt;/b&gt;.pdf)</li>",
+    );
+  });
+
+  it.each(["", null])(
+    "omits the storage path note when the path column is %p",
+    (storagePath) => {
+      const html = buildJobApplicationEmailHtml(
+        { ...baseApplication, driversLicenseFilePath: storagePath },
+        [{ category: "job-applications/temp/license", fileName: "license.pdf", fileUrl: "" }],
+      );
+
+      expect(html).not.toContain("Storage Path");
+      expect(html).toContain(
+        "<li><strong>Driver&#39;s License:</strong> Link unavailable (Original Name: license.pdf)</li>",
+      );
+    },
+  );
+
+  it("never shows the storage path when the upload has an https link", () => {
+    const html = buildJobApplicationEmailHtml(
+      {
+        ...baseApplication,
+        driversLicenseFilePath: "job-applications/app-123/license.pdf",
+      },
+      [
+        {
+          category: "job-applications/temp/license",
+          fileName: "license.pdf",
+          fileUrl: "https://files.example.com/license.pdf",
+        },
+      ],
+    );
+
+    expect(html).not.toContain("job-applications/app-123/license.pdf");
+    expect(html).not.toContain("Storage Path");
   });
 });

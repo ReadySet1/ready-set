@@ -192,6 +192,26 @@ describe("DriverDeliveryDetail", () => {
     );
   });
 
+  it("shows an Austin order's pickup and arrival times on the Central clock", async () => {
+    // 2026-11-20T17:00Z = 11:00 AM CST; 18:30Z = 12:30 PM CST
+    currentOrder = makeOrder({
+      pickupAddress: {
+        name: "Austin Vendor",
+        street1: "1 Congress Ave",
+        city: "Austin",
+        state: "TX",
+        zip: "78701",
+        isRestaurant: true,
+      },
+      pickupDateTime: "2026-11-20T17:00:00Z",
+      arrivalDateTime: "2026-11-20T18:30:00Z",
+    });
+    renderDetail();
+
+    expect(await screen.findByText("Pickup 11:00 AM CT")).toBeInTheDocument();
+    expect(screen.getByText("Arrive by 12:30 PM CT")).toBeInTheDocument();
+  });
+
   it("advances the driver status via PATCH when the Next-Action is tapped", async () => {
     renderDetail();
     // Wait for load, then tap the next-step action.

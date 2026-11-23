@@ -1,7 +1,8 @@
 // src/__tests__/api/orders/orders-main.test.ts
 
 import { GET, POST } from '@/app/api/orders/route';
-import { validateApiAuth } from '@/utils/api-auth';
+import { getUserRole } from '@/lib/auth';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { notifyOrderCreated } from '@/services/orders/notifyOrderCreated';
 import {
@@ -16,7 +17,6 @@ import {
 jest.setTimeout(10000);
 
 // Mock dependencies
-jest.mock('@/utils/api-auth');
 jest.mock('@/utils/prismaDB', () => {
   const mockPrisma: any = {
     cateringRequest: {
@@ -26,6 +26,12 @@ jest.mock('@/utils/prismaDB', () => {
     onDemand: {
       findMany: jest.fn(),
       create: jest.fn(),
+    },
+    // Every requested address exists and is usable by the caller.
+    address: {
+      findMany: jest.fn(async (args: any) =>
+        (args?.where?.id?.in ?? []).map((id: string) => ({ id })),
+      ),
     },
   };
   mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
@@ -69,6 +75,16 @@ jest.mock('@/lib/utils/timezone', () => ({
   localTimeToUtc: jest.fn(),
 }));
 
+// The route authenticates through the real withAuth: the Supabase session
+// supplies the user, profiles.type (getUserRole) supplies the role.
+function signInAs(role: string | null) {
+  const user = role ? { id: 'user-123', email: 'user@example.com' } : null;
+  (createClient as jest.Mock).mockResolvedValue({
+    auth: { getUser: jest.fn().mockResolvedValue({ data: { user }, error: null }) },
+  });
+  (getUserRole as jest.Mock).mockResolvedValue(role);
+}
+
 describe('/api/orders API - Main Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -78,10 +94,7 @@ describe('/api/orders API - Main Endpoint', () => {
     describe('✅ Successful Retrieval', () => {
       it('should return combined catering and on-demand orders', async () => {
         // Mock authentication
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', email: 'user@example.com', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         // Mock database responses
         const mockCateringOrders = [
@@ -172,10 +185,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support pagination with skip and take', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -202,10 +212,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support status filtering', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'VENDOR' },
-        });
+        signInAs('VENDOR');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -234,10 +241,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support search by order number', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -263,10 +267,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support search by user name', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'ADMIN' },
-        });
+        signInAs('ADMIN');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -296,10 +297,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support search by user email', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'ADMIN' },
-        });
+        signInAs('ADMIN');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -329,10 +327,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should support custom sorting', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -361,10 +356,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should default to sorting by createdAt desc', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -383,11 +375,8 @@ describe('/api/orders API - Main Endpoint', () => {
         );
       });
 
-      it('should include related data (dispatches, addresses, user, files)', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+      it('should include related data (dispatches, addresses, client identity, files)', async () => {
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
@@ -411,15 +400,7 @@ describe('/api/orders API - Main Endpoint', () => {
                   }),
                 }),
               }),
-              user: expect.objectContaining({
-                include: expect.objectContaining({
-                  userAddresses: expect.objectContaining({
-                    include: expect.objectContaining({
-                      address: true,
-                    }),
-                  }),
-                }),
-              }),
+              user: { select: { id: true, name: true, email: true } },
               pickupAddress: true,
               deliveryAddress: true,
               fileUploads: true,
@@ -431,10 +412,7 @@ describe('/api/orders API - Main Endpoint', () => {
 
     describe('🔐 Authentication Tests', () => {
       it('should return 401 for unauthenticated requests', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: false,
-          user: null,
-        });
+        signInAs(null);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -442,11 +420,8 @@ describe('/api/orders API - Main Endpoint', () => {
         await expectUnauthorized(response, /Authentication required/i);
       });
 
-      it('should return 401 when user is null', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: null,
-        });
+      it('should return 401 when the session has no user', async () => {
+        signInAs(null);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -455,11 +430,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should return 401 for invalid authentication', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: false,
-          user: null,
-          error: 'Invalid token',
-        });
+        signInAs(null);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -470,10 +441,7 @@ describe('/api/orders API - Main Endpoint', () => {
 
     describe('❌ Error Handling', () => {
       it('should handle database errors from catering orders', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockRejectedValue(
           new Error('Database connection failed')
@@ -487,10 +455,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should handle database errors from on-demand orders', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
         (prisma.onDemand.findMany as jest.Mock).mockRejectedValue(
@@ -504,7 +469,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should handle authentication service errors', async () => {
-        (validateApiAuth as jest.Mock).mockRejectedValue(
+        (createClient as jest.Mock).mockRejectedValue(
           new Error('Auth service unavailable')
         );
 
@@ -517,10 +482,7 @@ describe('/api/orders API - Main Endpoint', () => {
 
     describe('📊 Data Transformation', () => {
       it('should transform orders with correct type field', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([
           {
@@ -567,10 +529,7 @@ describe('/api/orders API - Main Endpoint', () => {
       });
 
       it('should sort combined orders by the specified field', async () => {
-        (validateApiAuth as jest.Mock).mockResolvedValue({
-          isValid: true,
-          user: { id: 'user-123', type: 'CLIENT' },
-        });
+        signInAs('CLIENT');
 
         const now = new Date();
         const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -634,10 +593,7 @@ describe('/api/orders API - Main Endpoint', () => {
     };
 
     it('should call notifyOrderCreated with source "orders_api" after transaction commits', async () => {
-      (validateApiAuth as jest.Mock).mockResolvedValue({
-        isValid: true,
-        user: { id: 'user-123', email: 'john@example.com', type: 'CLIENT' },
-      });
+      signInAs('CLIENT');
 
       (prisma.cateringRequest.create as jest.Mock).mockResolvedValue(mockCreatedOrder);
 
@@ -662,10 +618,7 @@ describe('/api/orders API - Main Endpoint', () => {
     });
 
     it('should map on-demand type to "on_demand" in the notification', async () => {
-      (validateApiAuth as jest.Mock).mockResolvedValue({
-        isValid: true,
-        user: { id: 'user-123', email: 'john@example.com', type: 'CLIENT' },
-      });
+      signInAs('CLIENT');
 
       const mockOnDemandOrder = {
         ...mockCreatedOrder,
