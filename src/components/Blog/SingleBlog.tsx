@@ -63,10 +63,15 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Date not available";
-    return new Date(dateString).toLocaleDateString("en-EN", {
+    // Explicit timeZone: this client component renders on the UTC server and
+    // again in the browser; without it, readers east of UTC (e.g. UTC+8) get a
+    // different calendar day and React throws a hydration mismatch (#418).
+    // UTC matches the server render and the post detail page.
+    return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: "UTC",
     });
   };
 
