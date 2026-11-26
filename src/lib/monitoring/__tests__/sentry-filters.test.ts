@@ -100,6 +100,102 @@ describe('createBeforeSend — crawler traffic', () => {
   });
 });
 
+describe('createBeforeSend — email link scanner chunk-load errors', () => {
+  // Shape trimmed from a real GlitchTip event: scanners send a plain Chrome UA,
+  // so the console breadcrumb is the only signature.
+  const CHROME_UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+
+  const chunkTimeout = {
+    type: 'ChunkLoadError',
+    value:
+      'Loading chunk 8286 failed.\n(timeout: https://readysetllc.com/_next/static/chunks/8286-a3b2b867d9a9ceab.js)',
+  };
+
+  const scannerBreadcrumb = {
+    type: 'default',
+    category: 'console',
+    level: 'info',
+    message:
+      'antifingerprint not defined yet. will try and handle event after its ready...',
+  };
+
+  function scannerEvent(
+    exception: { type: string; value: string },
+    breadcrumbs?: Array<{ category?: string; message?: string }>
+  ): ErrorEvent {
+    return {
+      exception: { values: [exception] },
+      request: { headers: { 'User-Agent': CHROME_UA } },
+      ...(breadcrumbs ? { breadcrumbs } : {}),
+    } as unknown as ErrorEvent;
+  }
+
+  it('drops a ChunkLoadError carrying the scanner console breadcrumb', () => {
+    expect(
+      beforeSend(
+        scannerEvent(chunkTimeout, [
+          { category: 'navigation', message: '/va' },
+          scannerBreadcrumb,
+        ]),
+        noHint
+      )
+    ).toBeNull();
+  });
+
+  it('matches the breadcrumb message case-insensitively', () => {
+    expect(
+      beforeSend(
+        scannerEvent(chunkTimeout, [
+          { category: 'console', message: 'AntiFingerprint not defined yet.' },
+        ]),
+        noHint
+      )
+    ).toBeNull();
+  });
+
+  it('KEEPS a ChunkLoadError without the scanner breadcrumb', () => {
+    expect(
+      beforeSend(
+        scannerEvent(chunkTimeout, [
+          { category: 'console', message: 'hydration warning' },
+        ]),
+        noHint
+      )
+    ).not.toBeNull();
+  });
+
+  it('KEEPS a non-chunk error that carries the scanner breadcrumb', () => {
+    expect(
+      beforeSend(
+        scannerEvent({ type: 'TypeError', value: 'x is not a function' }, [
+          scannerBreadcrumb,
+        ]),
+        noHint
+      )
+    ).not.toBeNull();
+  });
+
+  it('KEEPS a ChunkLoadError when the text is not in a console breadcrumb', () => {
+    expect(
+      beforeSend(
+        scannerEvent(chunkTimeout, [
+          { category: 'fetch', message: 'GET /antifingerprint.js' },
+        ]),
+        noHint
+      )
+    ).not.toBeNull();
+  });
+
+  it('KEEPS a ChunkLoadError with missing or empty breadcrumbs', () => {
+    expect(beforeSend(scannerEvent(chunkTimeout), noHint)).not.toBeNull();
+    expect(beforeSend(scannerEvent(chunkTimeout, []), noHint)).not.toBeNull();
+    expect(
+      beforeSend(scannerEvent(chunkTimeout, [{ category: 'console' }]), noHint)
+    ).not.toBeNull();
+  });
+});
+
 describe('getSentryEnvironment — environment tag resolution', () => {
   const ENV_KEYS = [
     'NEXT_PUBLIC_SENTRY_ENVIRONMENT',

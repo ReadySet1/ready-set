@@ -256,6 +256,16 @@ function isCrawlerEvent(event: ErrorEvent): boolean {
 }
 
 /**
+ * Check if the event is a webpack ChunkLoadError.
+ */
+function isChunkLoadError(event: ErrorEvent): boolean {
+  const errorType = event.exception?.values?.[0]?.type || '';
+  const errorValue = event.exception?.values?.[0]?.value || '';
+
+  return errorType === 'ChunkLoadError' || errorValue.includes('ChunkLoadError');
+}
+
+/**
  * Check if the event is a crawler-induced chunk load *timeout*.
  *
  * Stated separately from isCrawlerEvent even though it is narrower, because it
@@ -264,12 +274,9 @@ function isCrawlerEvent(event: ErrorEvent): boolean {
  * is exactly what the ChunkLoadError recovery path exists to serve.
  */
 function isBotChunkLoadTimeout(event: ErrorEvent): boolean {
-  const errorType = event.exception?.values?.[0]?.type || '';
-  const errorValue = event.exception?.values?.[0]?.value || '';
+  if (!isChunkLoadError(event)) return false;
 
-  const isChunkLoad =
-    errorType === 'ChunkLoadError' || errorValue.includes('ChunkLoadError');
-  if (!isChunkLoad) return false;
+  const errorValue = event.exception?.values?.[0]?.value || '';
 
   // webpack's two failure modes: `timeout:` (request starved) vs `error:` (404).
   // Only the starved one is crawler-shaped.
@@ -279,11 +286,35 @@ function isBotChunkLoadTimeout(event: ErrorEvent): boolean {
 }
 
 /**
+ * Check if the event is a chunk load error from an email link scanner.
+ *
+ * Scanners that open the links of every SendGrid send run a sandboxed Chrome
+ * whose chunk requests fail within ~2s (489 events on 2026-11-24). They send a
+ * plain Chrome user agent, so isBotUserAgent never matches; the signature is a
+ * console breadcrumb logged by the sandbox's own instrumentation. Real users
+ * never carry it, so their ChunkLoadErrors keep reporting.
+ */
+function isEmailScannerChunkLoadError(event: ErrorEvent): boolean {
+  if (!isChunkLoadError(event)) return false;
+
+  return (event.breadcrumbs ?? []).some(
+    (breadcrumb) =>
+      breadcrumb.category === 'console' &&
+      (breadcrumb.message ?? '').toLowerCase().includes('antifingerprint')
+  );
+}
+
+/**
  * Apply client-specific filters
  */
 function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
   // Filter out crawler-induced chunk load timeouts (the 09-15 burst shape)
   if (isBotChunkLoadTimeout(event)) {
+    return false;
+  }
+
+  // Filter out chunk load errors from email link scanners (plain Chrome UA)
+  if (isEmailScannerChunkLoadError(event)) {
     return false;
   }
 
