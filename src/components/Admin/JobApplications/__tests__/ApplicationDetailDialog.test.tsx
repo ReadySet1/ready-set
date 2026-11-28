@@ -80,6 +80,13 @@ describe("ApplicationDetailDialog documents", () => {
     expect(screen.getByText("Vehicle Registration")).toBeInTheDocument();
   });
 
+  // Regression guard: HIPAA left the apply form, but old applications keep showing it.
+  it("keeps showing the HIPAA certificate on existing applications", () => {
+    renderDialog(application([upload("hipaa", "job-applications/temp/hipaa")]));
+
+    expect(screen.getByText("HIPAA Certificate")).toBeInTheDocument();
+  });
+
   it("labels the new catering bags, cart/dolly and second ID uploads", () => {
     renderDialog(
       application([

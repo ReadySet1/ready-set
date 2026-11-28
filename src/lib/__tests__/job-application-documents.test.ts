@@ -18,22 +18,24 @@ describe("job application document config", () => {
     );
   });
 
-  it("keeps registration, food handler and HIPAA optional", () => {
+  it("keeps registration and food handler optional", () => {
     const optional = DRIVER_DOCUMENTS.filter((doc) => !doc.required)
       .map((doc) => doc.key)
       .sort();
 
-    expect(optional).toEqual(["food_handler", "hipaa", "registration"]);
+    expect(optional).toEqual(["food_handler", "registration"]);
   });
 
-  it("no longer offers driver photo or equipment photo for new applications", () => {
+  it("no longer offers driver photo, equipment photo or HIPAA for new applications", () => {
     const keys = DRIVER_DOCUMENTS.map((doc) => doc.key);
 
     expect(keys).not.toContain("driver_photo");
     expect(keys).not.toContain("equipment_photo");
+    expect(keys).not.toContain("hipaa");
     expect(LEGACY_DRIVER_DOCUMENTS.map((doc) => doc.key).sort()).toEqual([
       "driver_photo",
       "equipment_photo",
+      "hipaa",
     ]);
   });
 
@@ -102,6 +104,7 @@ describe("job application document config", () => {
     ["job-applications/temp/second_id", "Second Form of ID"],
     ["job-applications/temp/driver_photo", "Driver Photo"],
     ["equipment_photo", "Equipment Photo"],
+    ["job-applications/temp/hipaa", "HIPAA Certificate"],
     ["registration", "Vehicle Registration"],
     ["car_photo", "Vehicle Photo"],
   ])("labels %s as %s", (category, label) => {

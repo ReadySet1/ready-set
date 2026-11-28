@@ -22,7 +22,6 @@ export interface FormData {
   vehicleRegistration: File | null;
   secondId?: File | null;
   foodHandler?: File | null;
-  hipaa?: File | null;
   carPhoto?: File | null;
   cateringBags?: File | null;
   cartDolly?: File | null;
@@ -49,7 +48,6 @@ export interface SubmissionData {
   insuranceFileId: string | null;
   vehicleRegFileId: string | null;
   foodHandlerFileId: string | null;
-  hipaaFileId: string | null;
   driverPhotoFileId: string | null;
   carPhotoFileId: string | null;
   equipmentPhotoFileId: string | null;
