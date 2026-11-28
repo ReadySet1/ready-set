@@ -62,7 +62,6 @@ const FORM_STEPS: FormStep[] = [
       "vehicleRegistration",
       "secondId",
       "foodHandler",
-      "hipaa",
       "carPhoto",
       "cateringBags",
       "cartDolly",
@@ -117,7 +116,6 @@ interface FormData {
   vehicleRegistration?: FileList | null;
   secondId?: FileList | null;
   foodHandler?: FileList | null;
-  hipaa?: FileList | null;
   carPhoto?: FileList | null;
   cateringBags?: FileList | null;
   cartDolly?: FileList | null;
@@ -147,7 +145,6 @@ interface SubmissionData {
   vehicleRegFilePath: string | null;
   secondIdFilePath: string | null;
   foodHandlerFilePath: string | null;
-  hipaaFilePath: string | null;
   carPhotoFilePath: string | null;
   cateringBagsPhotoFilePath: string | null;
   cartDollyPhotoFilePath: string | null;
@@ -158,7 +155,6 @@ interface SubmissionData {
   vehicleRegFileId: string | null;
   secondIdFileId: string | null;
   foodHandlerFileId: string | null;
-  hipaaFileId: string | null;
   carPhotoFileId: string | null;
   cateringBagsPhotoFileId: string | null;
   cartDollyPhotoFileId: string | null;
@@ -237,7 +233,6 @@ const JobApplicationForm = () => {
       vehicleRegistration: null,
       secondId: null,
       foodHandler: null,
-      hipaa: null,
       carPhoto: null,
       cateringBags: null,
       cartDolly: null,
@@ -312,16 +307,6 @@ const JobApplicationForm = () => {
   const foodHandlerUpload = useJobApplicationUpload({
     bucketName: "user-assets",
     category: "job-applications/temp/food_handler",
-    entityType: "job_application",
-    entityId: tempEntityId,
-    allowedFileTypes: IMAGE_PDF_TYPES,
-    maxFileCount: 1,
-    uploadToken: session?.uploadToken,
-  });
-
-  const hipaaUpload = useJobApplicationUpload({
-    bucketName: "user-assets",
-    category: "job-applications/temp/hipaa",
     entityType: "job_application",
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
@@ -440,7 +425,6 @@ const JobApplicationForm = () => {
         "vehicleRegistration",
         "secondId",
         "foodHandler",
-        "hipaa",
         "carPhoto",
         "cateringBags",
         "cartDolly",
@@ -554,9 +538,6 @@ const JobApplicationForm = () => {
         foodHandlerFilePath: foodHandlerUpload.uploadedFiles[0]
           ? foodHandlerUpload.uploadedFiles[0].path
           : null,
-        hipaaFilePath: hipaaUpload.uploadedFiles[0]
-          ? hipaaUpload.uploadedFiles[0].path
-          : null,
         carPhotoFilePath: carPhotoUpload.uploadedFiles[0]
           ? carPhotoUpload.uploadedFiles[0].path
           : null,
@@ -583,9 +564,6 @@ const JobApplicationForm = () => {
           : null,
         foodHandlerFileId: foodHandlerUpload.uploadedFiles[0]
           ? foodHandlerUpload.uploadedFiles[0].key
-          : null,
-        hipaaFileId: hipaaUpload.uploadedFiles[0]
-          ? hipaaUpload.uploadedFiles[0].key
           : null,
         carPhotoFileId: carPhotoUpload.uploadedFiles[0]
           ? carPhotoUpload.uploadedFiles[0].key
@@ -651,7 +629,6 @@ const JobApplicationForm = () => {
       insuranceUpload.setUploadedFiles([]);
       registrationUpload.setUploadedFiles([]);
       foodHandlerUpload.setUploadedFiles([]);
-      hipaaUpload.setUploadedFiles([]);
       secondIdUpload.setUploadedFiles([]);
       carPhotoUpload.setUploadedFiles([]);
       cateringBagsUpload.setUploadedFiles([]);
@@ -713,7 +690,6 @@ const JobApplicationForm = () => {
         registration: registrationUpload,
         second_id: secondIdUpload,
         food_handler: foodHandlerUpload,
-        hipaa: hipaaUpload,
         car_photo: carPhotoUpload,
         catering_bags: cateringBagsUpload,
         cart_dolly: cartDollyUpload,
@@ -1324,7 +1300,7 @@ const JobApplicationForm = () => {
                       </label>
                       <FileUpload
                         name="foodHandler"
-                        label="Upload Card (Optional)"
+                        label="Upload Card"
                         startUpload={foodHandlerUpload.onUpload as any}
                         file={
                           (foodHandlerUpload
@@ -1429,26 +1405,6 @@ const JobApplicationForm = () => {
                         accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
                         isUploading={cartDollyUpload.isUploading}
                         progresses={cartDollyUpload.progresses}
-                      />
-                    </div>
-
-                    {/* HIPAA Certification Upload */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
-                        HIPAA Certification
-                      </label>
-                      <FileUpload
-                        name="hipaa"
-                        label="Upload Certificate (Optional)"
-                        startUpload={hipaaUpload.onUpload as any}
-                        file={
-                          (hipaaUpload.uploadedFiles[0] as HookUploadedFile) ||
-                          null
-                        }
-                        deleteFile={hipaaUpload.deleteFile}
-                        accept={generateAcceptString(IMAGE_PDF_TYPES)}
-                        isUploading={hipaaUpload.isUploading}
-                        progresses={hipaaUpload.progresses}
                       />
                     </div>
                   </div>

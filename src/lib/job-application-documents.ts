@@ -85,11 +85,6 @@ export const DRIVER_DOCUMENTS = [
     accept: IMAGE_PDF_TYPES,
   },
   {
-    ...defineDocument("hipaa", "hipaaFileId", "hipaaFilePath", "HIPAA Certificate"),
-    required: false,
-    accept: IMAGE_PDF_TYPES,
-  },
-  {
     ...defineDocument("car_photo", "carPhotoFileId", "carPhotoFilePath", "Vehicle Photo"),
     required: true,
     accept: IMAGE_TYPES,
@@ -116,6 +111,7 @@ export type DriverDocumentKey = (typeof DRIVER_DOCUMENTS)[number]["key"];
 export const LEGACY_DRIVER_DOCUMENTS: readonly ApplicationDocument[] = [
   defineDocument("driver_photo", "driverPhotoFileId", "driverPhotoFilePath", "Driver Photo"),
   defineDocument("equipment_photo", "equipmentPhotoFileId", "equipmentPhotoFilePath", "Equipment Photo"),
+  defineDocument("hipaa", "hipaaFileId", "hipaaFilePath", "HIPAA Certificate"),
 ];
 
 const ALL_DOCUMENTS: readonly ApplicationDocument[] = [

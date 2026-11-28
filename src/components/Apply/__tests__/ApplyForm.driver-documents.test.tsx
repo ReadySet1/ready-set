@@ -45,7 +45,7 @@ const clickNext = () => fireEvent.click(screen.getAllByRole("button", { name: "N
 const missingToast = (label: string) =>
   expect.objectContaining({ description: `Please upload your ${label}` });
 
-async function submitDocumentsStep() {
+async function goToDocumentsStep() {
   const { container } = render(<JobApplicationForm />);
   for (const [name, value] of Object.entries(STEP_1_VALUES)) {
     fireEvent.change(container.querySelector(`[name="${name}"]`)!, { target: { value } });
@@ -54,6 +54,11 @@ async function submitDocumentsStep() {
   await screen.findByText("Driver Application");
   clickNext();
   await screen.findByRole("heading", { name: "Documents" });
+  return container;
+}
+
+async function submitDocumentsStep() {
+  await goToDocumentsStep();
   clickNext();
 }
 
@@ -85,6 +90,16 @@ describe("ApplyForm driver document validation", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("does not offer a HIPAA upload and does not mark the Food Handler's Card as optional", async () => {
+    const container = await goToDocumentsStep();
+
+    expect(screen.queryByText("HIPAA Certification")).not.toBeInTheDocument();
+    expect(container.querySelector('[name="hipaa"]')).toBeNull();
+    expect(screen.getByText("Upload Card")).toBeInTheDocument();
+    expect(screen.queryByText("Upload Card (Optional)")).not.toBeInTheDocument();
+  });
+
+  // Food Handler's Card stays optional: no Food Handler upload here, and submit still succeeds.
   it("submits a driver with the six required documents and no optional ones", async () => {
     REQUIRED_KEYS.forEach((key) => upload(key));
 

@@ -450,6 +450,23 @@ describe("POST /api/job-applications - driver document columns and required uplo
       }),
     );
   });
+
+  // Regression guard: HIPAA is no longer offered, but a driver on a cached older form may still send it.
+  it("accepts a driver who still sends a HIPAA upload and writes it to its old column", async () => {
+    mockOwnedUploads([
+      ...requiredUploads().uploads,
+      ownUpload("hipaa-file", "job-applications/temp/hipaa", "hipaa.pdf"),
+    ]);
+
+    const response = await POST(buildRequest({ ...driverBody, hipaaFileId: "hipaa-file" }, TOKEN));
+
+    expect(response.status).toBe(200);
+    expect(columnsWritten()).toEqual(
+      expect.objectContaining({
+        hipaaFilePath: expect.stringMatching(/^job-applications\/app-1\/hipaa_\d+\.pdf$/),
+      }),
+    );
+  });
 });
 
 describe("POST /api/job-applications - admin notification email", () => {
